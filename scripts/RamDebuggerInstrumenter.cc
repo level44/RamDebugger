@@ -87,7 +87,7 @@ void RamDebuggerInstrumenterInitState(InstrumenterState* is)
     "foreach i [list return break while eval foreach for if else elseif error switch default continue] {\n"
 	     "set ::RamDebugger::Instrumenter::colors($i) magenta\n"
 	     "}\n"
-	     "foreach i [list variable set global] {\n"
+	     "foreach i [list variable set global incr] {\n"
 	     "set ::RamDebugger::Instrumenter::colors($i) green\n"
 	     "}",-1,0);
 }
@@ -136,8 +136,9 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 
   if(is->OutputType==P){
     NewOutputType=PP;
-  } else { NewOutputType=is->OutputType; }
-
+  } else {
+    NewOutputType=is->OutputType;
+  }
 
   if(type==BRACKET_WT){
     PushState=1;
@@ -219,7 +220,7 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	      (wordslen==2 && strcmp(pword0,"while")==0) ||
 	      (wordslen>=3 && strcmp(pword0,"foreach")==0) ||
 	      (wordslen>=3 && strcmp(pword0,"mk::loop")==0) ||
-	      (wordslen==4 && strcmp(pword0,"for")==0) ||
+	      (wordslen>=1 && wordslen<=4 && strcmp(pword0,"for")==0) ||
 	      (wordslen>1 && strcmp(pword0,"eval")==0) ||
 	      (wordslen>1 && strcmp(pword0,"html::eval")==0) ||
 	      (wordslen==3 && strcmp(pword0,"bind")==0)) 
@@ -335,7 +336,7 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
 
   is->words=Tcl_CopyIfShared(is->words);
   if(isexpand) Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("expand",-1));
-  else Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("",-1));
+//   else Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("",-1));
 
   if(is->NeedsNamespaceClose){
     Tcl_AppendToObj(is->newblock[P],"}\n",-1);
@@ -521,8 +522,11 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	  is->wordtypeline=0;
 
 	  if(is->OutputType==R && RamDebuggerInstrumenterIsProc(is)){
-	    int newllen=Tcl_GetCharLength(is->newblock[R]);
-	    newllen-=Tcl_GetCharLength(is->words);
+	    int len,newllen;
+	    Tcl_GetStringFromObj(is->newblock[R],&len);
+	    newllen=len;
+	    Tcl_GetStringFromObj(is->words,&len);
+	    newllen-=len;
 	    if(lastinstrumentedline==line){
 	      sprintf(buf,"RDC::F %d %d ; ",filenum,line);
 	      newllen-=strlen(buf);
@@ -596,8 +600,11 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	      is->currentword=Tcl_ResetString(is->currentword);
 	      consumed=1;
 	      if(is->OutputType==R && RamDebuggerInstrumenterIsProc(is)){
-		int newllen=Tcl_GetCharLength(is->newblock[R]);
-		newllen-=Tcl_GetCharLength(is->words);
+		int len,newllen;
+		Tcl_GetStringFromObj(is->newblock[R],&len);
+		newllen=len;
+		Tcl_GetStringFromObj(is->words,&len);
+		newllen-=len;
 		if(lastinstrumentedline==line){
 		  sprintf(buf,"RDC::F %d %d ; ",filenum,line);
 		  newllen-=strlen(buf);
@@ -658,17 +665,20 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	    if(*pword0==':' && *(pword0+1)==':') pword0+=2;
 	    is->currentword=Tcl_ResetString(is->currentword);
 	    if(is->OutputType==R && RamDebuggerInstrumenterIsProc(is)){
-		int newllen=Tcl_GetCharLength(is->newblock[R]);
-		newllen-=Tcl_GetCharLength(is->words);
-		if(lastinstrumentedline==line){
-		  sprintf(buf,"RDC::F %d %d ; ",filenum,line);
-		  newllen-=strlen(buf);
-		}
-		Tcl_SetObjLength(is->newblock[R],newllen);
-		RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);
-
-		Tcl_AppendObjToObj(is->newblock[P],is->words);
-		is->OutputType=P;
+	      int len,newllen;
+	      Tcl_GetStringFromObj(is->newblock[R],&len);
+	      newllen=len;
+	      Tcl_GetStringFromObj(is->words,&len);
+	      newllen-=len;
+	      if(lastinstrumentedline==line){
+		sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+		newllen-=strlen(buf);
+	      }
+	      Tcl_SetObjLength(is->newblock[R],newllen);
+	      RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);
+	      
+	      Tcl_AppendObjToObj(is->newblock[P],is->words);
+	      is->OutputType=P;
 	    }
 	    Tcl_ListObjIndex(is->ip,is->words,wordslen-1,&wordi);
 	    if(RamDebuggerInstrumenterIsProc(is)){

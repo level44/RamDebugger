@@ -40,7 +40,7 @@ proc RamDebugger::Instrumenter::InitState {} {
 	    error switch default continue] {
 	set colors($i) magenta
     }
-    foreach i [list variable set global] {
+    foreach i [list variable set global incr] {
 	set colors($i) green
     }
 }
@@ -140,7 +140,7 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		    }
 		}
 		"for" {
-		    if { [llength $words] == 4 } {
+		    if { [llength $words] >= 1 && [llength $words] <= 4 } {
 		        set NewDoInstrument 1
 		    }
 		}
@@ -245,8 +245,6 @@ proc RamDebugger::Instrumenter::PopState { type line newblocknameP newblocknameR
 	NeedsNamespaceClose braceslevel] [lindex $stack end] break
     if { $words_old eq "expand" } {
 	lappend words expand
-    } else {
-	lappend words ""
     }
     set stack [lreplace $stack end end]
     incr level -1
@@ -329,31 +327,41 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 		                                   "progress 1" } {
     variable FastInstrumenterLoaded
 
-#     set dynlib {C:\Documents and Settings\ramsan\Mis documentos\myTclTk\RamDebugger\RamDebuggerInstrumenterDoWork\Debug\RamDebuggerInstrumenterDoWork.dll} 
-#     load $dynlib Ramdebuggerinstrumenter
-#     set FastInstrumenterLoaded 1
+    # this variable is used to make tests
+    set what c++
 
-    if { ![info exists FastInstrumenterLoaded] } {
-	set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
-	set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
-	catch { load $dynlib }
-	if { [info command RamDebuggerInstrumenterDoWork] eq "" && \
-		 $RamDebugger::options(CompileFastInstrumenter) != 0 } {
-	    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
-		TryCompileFastInstrumenter 0
-		set RamDebugger::options(CompileFastInstrumenter) 0
-	    } else {
-		TryCompileFastInstrumenter 1
-	    }
-	    catch { load $dynlib }
+    switch $what {
+	debug {
+	    set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
+		            RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork.dll]
+	    load $dynlib Ramdebuggerinstrumenter
+	    set FastInstrumenterLoaded 1
 	}
-	set FastInstrumenterLoaded 1
+	c++ {
+	    if { ![info exists FastInstrumenterLoaded] } {
+		set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
+		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+		catch { load $dynlib }
+		if { [info command RamDebuggerInstrumenterDoWork] eq "" && \
+		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
+		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
+		        TryCompileFastInstrumenter 0
+		        set RamDebugger::options(CompileFastInstrumenter) 0
+		    } else {
+		        TryCompileFastInstrumenter 1
+		    }
+		    catch { load $dynlib }
+		}
+		set FastInstrumenterLoaded 1
+	    }
+	}
     }
     if { [info command RamDebuggerInstrumenterDoWork] ne "" } {
-	RamDebuggerInstrumenterDoWork $block $filenum $newblocknameP $newblocknameR $blockinfoname $progress
+	RamDebuggerInstrumenterDoWork $block $filenum $newblocknameP $newblocknameR \
+	    $blockinfoname $progress
     } else {
-	uplevel [list RamDebugger::Instrumenter::DoWork $block $filenum $newblocknameP $newblocknameR \
-		     $blockinfoname $progress]
+	uplevel [list RamDebugger::Instrumenter::DoWork $block $filenum $newblocknameP \
+		     $newblocknameR $blockinfoname $progress]
     }
 }
 

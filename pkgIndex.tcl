@@ -1,5 +1,5 @@
 
-set Version 4.98
+set Version 5.2
 
 proc LoadRamDebugger { dir version } {
 

@@ -275,3 +275,160 @@ proc "Go to proc" { w } {
     }
     DialogWin::DestroyWindow
 }
+
+
+################################################################################
+#    proc Mark translation strings
+################################################################################
+
+set "macrodata(Mark translation strings,inmenu)" 0
+# recomended: <F8>
+set "macrodata(Mark translation strings,accelerator)" ""
+set "macrodata(Mark translation strings,help)" "Mark translation strings for GiD"
+
+proc "Mark translation strings" { w } {
+
+    set trans_cmd "="
+    set rex {(?:-text|-label|-helptext)\s+([^\[$\s]\S+|\"[^\"]+\"|{[^\}]+})}
+    set rex_before "(\[\[\]\\s*$trans_cmd\\s+\$|-command\\s+\$|^\\s*bind\\s+)"
+    set rex_cmd {(-command\s+$|^\s*bind\s+)}
+
+    destroy $w._t
+    set top [toplevel $w._t]
+    wm overrideredirect $top 1
+    label $top.l -bg white -fg black -bd 1 -relief raised -width 25
+    set labeltext(trans) "Y modify string\nS modify and stop\nN, F8 do not modify\nESC stop"
+    set labeltext(err) "Y, N, F8 continue\nESC stop"
+
+    pack $top.l
+    bind $top.l <KeyPress> {set Mark_translation_strings_var %K; break}
+    bind $top.l <ButtonPress-1> {set Mark_translation_strings_var Escape}
+    focus $top.l
+    wm withdraw $top
+    $w tag configure markerrstrings -background red -foreground black
+    $w tag configure marktransstrings -background orange1 -foreground black
+
+    while 1 {
+	set type trans
+	set idx1 insert
+	while 1 {
+	    set idx1 [$w search -regexp -count ::len1 $rex $idx1 end]
+	    if { $idx1 eq "" } { break }
+	    set before [$w get "$idx1 linestart" $idx1]
+	    set curr [$w get $idx1 "$idx1+${::len1}c"]
+	    regexp -indices $rex $curr {} s1
+	    if { ![regexp $rex_before $before] } {
+		set idx1_end "$idx1+[expr {[lindex $s1 1]+1}]c"
+		set idx1 "$idx1+[lindex $s1 0]c"
+		break
+	    }
+	    set idx1 "$idx1+${::len1}c"
+	}
+	set idx2 insert
+	while 1 {
+	    set ret [$w tag nextrange grey $idx2]
+	    if { $ret eq "" } {
+		set idx2 ""
+		break
+	    }
+	    foreach "idx2 idx2_end" $ret break
+	    set txt [$w get $idx2 $idx2_end]
+	    set txt_before [$w get "$idx2 linestart" $idx2]
+	    if { [string length $txt] > 2 } {
+		if { [regexp $rex_before $txt_before] } {
+		    if { ![regexp -- $rex_cmd $txt_before] && \
+		        [regexp {[^\\]\$} $txt] } {
+		        set type err
+		        break
+		    }
+		} else { break }
+	    }
+	    set idx2 $idx2_end
+	}
+	if { $idx1 eq "" && $idx2 eq "" } {
+	    bell
+	    break
+	}
+	if { $idx1 ne "" && ($idx2 eq "" || [$w compare $idx1 < $idx2]) } {
+	    foreach "ini end" [list $idx1 $idx1_end] break
+	} else {
+	    foreach "ini end" [list $idx2 $idx2_end] break
+	}
+	if { $type eq "trans" } {
+	    $w tag add marktransstrings $ini $end
+	} else {
+	    $w tag add markerrstrings $ini $end
+	}
+	$top.l configure -text $labeltext($type)
+	$w see $ini
+	update idletasks
+	foreach "tx ty tw th" [$w bbox $ini] break
+	wm deiconify $top
+	set tx [expr {$tx+[winfo rootx $w]}]
+	set ty [expr {$ty+$th+[winfo rooty $w]+10}]
+	wm geometry $top +$tx+$ty
+	grab $top.l
+	focus -force $top.l
+	vwait Mark_translation_strings_var
+	set stopafter 0
+	switch -- $::Mark_translation_strings_var {
+	    y - Y {
+		if { $type eq "trans" } {
+		    set what change
+		} else { set what cont }
+	    }
+	    s - S {
+		if { $type eq "trans" } {
+		    set what change
+		} else { set what cont }
+		set stopafter 1
+	    }
+	    n - N - F8 { set what cont }
+	    default { set what end }
+	}
+	switch $what {
+	    change {
+		set data [$w get $ini $end]
+		regsub -all {([^\\])\$(\w+|{[^\}]+})} $data {\1%s} data_new
+		set data_new "\[$trans_cmd $data_new"
+		set rex {[^\\]\$(\w+|{[^\}]+})}
+		foreach "- v" [regexp -inline -all $rex $data] {
+		    append data_new " \$$v"
+		}
+		append data_new "\]"
+		$w delete $ini $end
+		$w insert $ini $data_new
+		$w mark set insert "$ini+[string length $data_new]c"
+		if { $stopafter } { break }
+	    }
+	    cont {
+		$w tag remove marktransstrings $ini $end
+		$w tag remove markerrstrings 1.0 end
+		$w mark set insert $end
+	    }
+	    end {
+		$w mark set insert $ini
+		break
+	    }
+	}
+	wm withdraw $top
+    }
+    destroy $top
+    $w tag remove marktransstrings 1.0 end
+    $w tag remove markerrstrings 1.0 end
+    focus $w
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+

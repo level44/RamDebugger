@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.51 2005/01/21 10:34:54 miguel Exp $        
+#         $Id: RamDebugger.tcl,v 1.52 2005/01/21 20:32:42 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -15,8 +15,8 @@ if { [info exists ::starkit::topdir] } {
 }
 
 ################################################################################
-#  This software is copyrighted by Ramon RibÃ³ (RAMSAN) ramsan@cimne.upc.es.
-#  (http://gid.cimne.upc.es/ramsan) The following terms apply to all files 
+#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
+#  (http://gid.cimne.com/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
 #  The authors hereby grant permission to use, copy, modify, distribute,
@@ -49,7 +49,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 4.98
+    set Version 5.2
 
     ################################################################################
     #    Non GUI commands
@@ -548,6 +548,14 @@ proc RamDebugger::rdebug { args } {
 	}
 	interp alias local exit "" RamDebugger::exit_slave
 	local eval { set argc 0 ; set argv "" }
+	local eval [list set ::auto_path $::auto_path]
+	local eval {
+	    if { [info exists env(TCLLIBPATH)] } {
+		foreach i $env(TCLLIBPATH) {
+		    lappend ::auto_path $i
+		}
+	    }
+	}
 
 	set filetodebug $currentfile
 	set LocalDebuggingType tk
@@ -1484,7 +1492,7 @@ proc RamDebugger::rlist { args } {
 	    fconfigure $fin -encoding $opts(-encoding)
 	} else {
 	    set header [read $fin 256]
-	    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+	    if { [regexp -line -- {-\*-.*coding:\s*utf-8\s*;.*-\*-} $header] } {
 		fconfigure $fin -encoding utf-8
 	    }
 	    seek $fin 0
@@ -2816,6 +2824,9 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	set fulltext $f.fulltext
     }
 
+    set delta [expr {[$f.pw cget -sashwidth]+2*[$f.pw cget -sashpad]}]
+    set delta_ext [expr {2*[$f.pw cget -borderwidth]+4}]
+
     if { [lindex [grid info $fulltext] 1] != $f } {
 	foreach i [array names options paneweights,*] {
 	    regexp {paneweights,(.*),(.*)} $i {} orient panedw
@@ -2843,47 +2854,42 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 
 	if { [lsearch [$f.pw panes] $pane1] != -1 } {
 	    set wpane1 [winfo width $pane1]
+	    set x [expr {[winfo x $t]+$wpane1+$delta}]
 	} else {
 	    set wpane1 0
+	    set x [winfo x $t]
 	}
-	set x [expr {[winfo x $t]+$wpane1}]
 	wm geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
 	
 	set options(ViewOnlyTextOrAll) OnlyText
     } else {
+	set width [winfo width $fulltext]
+	
 	grid $f.pw
 	grid $fulltext -in $pane2in1 -sticky nsew
-
-	set width [winfo width $fulltext]
-
-	if { [info exist pane3] && [winfo width $pane3] <= 1 } {
-	    set panedw [FindPanedWindowFromPane $pane3]
-	    if { [llength [ManagePanes $panedw h "300 100"]] == 3 } {
-		foreach "weight1 weight2 weight3" [ManagePanes $panedw h "100 300 100"] break
-	    } else {
-		set weight1 2
-		foreach "weight2 weight3" [ManagePanes $panedw h "300 100"] break
+	
+	set wpane3 [winfo width $pane3]
+	if { $wpane3 <= 1 } {
+	    set wpane3 [winfo reqwidth $pane3]
+	}
+	incr width $wpane3
+	if { [lsearch [$f.pw panes] $pane1] != -1 } {
+	    set wpane1 [winfo width $pane1]
+	    if { $wpane1 <= 1 } {
+		set wpane1 [winfo reqwidth $pane1]
 	    }
-	    set w3 [expr int($weight3/double($weight2)*$width+0.5)]
-	    incr width $w3
-	    set x [expr {[winfo x $t]+0}]
+	    incr width $wpane1
+	    incr width $delta
+	    set x [expr {[winfo x $t]-$delta-$wpane1}]
 	} else {
-	    if { [lsearch [$f.pw panes] $pane1] != -1 } {
-		incr width [winfo width $pane1]
-	    }
-	    incr width [winfo width $pane3]
-	    if { [lsearch [$f.pw panes] $pane1] != -1 } {
-		set wpane1 [winfo width $pane1]
-	    } else { set wpane1 0 }
-	    set x [expr {[winfo x $t]-$wpane1+0}]
-	}     
-	#incr width 4
-	update idletasks
-	set width [winfo reqwidth $f.pw]
+	    set wpane1 0
+	    set x [winfo x $t]
+	}
+	
+	incr width [expr {$delta+$delta_ext}]
 	wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
 	set options(ViewOnlyTextOrAll) All
     }
-
     if { [[winfo toplevel $t] cget -use] == "" } {
 	wm withdraw $t
 	update
@@ -6668,7 +6674,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require supergrid
     package require supertext
     package require dialogwin
-    catch { package require helpviewer 1.1 } ;#catch for wince
+    #needed a catch for wince
+    package require helpviewer 1.1
     catch { package require tkdnd } ;# only if it is compiled
     #catch { package require mytile }
 
