@@ -142,7 +142,7 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 	    if { [regexp {^(\s*MULTIPLE RESULT\s*type\s+=\s+char\s)(.*)} $res {} ini rest] } {
 		set res $ini
 		append res "   \""
-		foreach "i c" [regexp -all -inline {'(.[^\)]*)'\n} $rest] {
+		foreach "i c" [regexp -all -inline {'(.[^']*|')'\n} $rest] {
 		    append res "$c"
 		}
 		append res "\"\n$rest"
@@ -842,13 +842,40 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
 	    return 0
 	}
 	updatecurrent {
-	    if { [llength $idx] != 1 } {
-		WarnWin "Error: it is necessary to select one block in list"
+	    if { [llength $idx] == 0 } {
+		WarnWin "Error: it is necessary to select at least one block in list"
 		return 1
 	    }
-	    set DialogWinTop::user($w,name) [lindex [$DialogWinTop::user($w,list) get $idx] 0]
-	    set DialogWinTop::user($w,lineini) [lindex [$DialogWinTop::user($w,list) get $idx] 2]
-	    set DialogWinTop::user($w,lineend) [lindex [$DialogWinTop::user($w,list) get $idx] 3]
+	    set init 1
+	    foreach i $idx {
+		set l1 [lindex [$DialogWinTop::user($w,list) get $i] 2]
+		set l2 [lindex [$DialogWinTop::user($w,list) get $i] 3]
+		if { $init || $l1 < $DialogWinTop::user($w,lineini) } {
+		    set DialogWinTop::user($w,lineini) $l1
+		}
+		if { $init || $l2 > $DialogWinTop::user($w,lineend) } {
+		    set DialogWinTop::user($w,lineend) $l2
+		}
+		set init 0
+	    }
+	    if { [llength $idx] == 1 } {
+		set DialogWinTop::user($w,name) [lindex [$DialogWinTop::user($w,list) get $idx] 0]
+	    } else {
+		set i 1
+		while 1 {
+		    set found 0
+		    foreach j $TimeMeasureData {
+		        if { [lindex $j 0] == "Block group $i" } {
+		            set found 1
+		            break
+		        }
+		    }
+		    if { !$found } { break }
+		    incr i
+		}
+		set DialogWinTop::user($w,name) "Block group $i"
+	    }
+	    tkTabToWindow $entry
 	}
 	update {
 	    $DialogWinTop::user($w,list) del 0 end
@@ -912,6 +939,17 @@ proc RamDebugger::DisplayTimesWindow {} {
 
     bind [$DialogWinTop::user($w,list) bodypath] <Double-1> \
        "RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent"
+
+    menu $w.popup
+    $w.popup add command -label "View" -command \
+        "RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent"
+    $w.popup add separator
+    $w.popup add command -label "Update" -command \
+        "RamDebugger::ModifyTimingBlock $w $f1.e1 edit"
+    $w.popup add command -label "Delete" -command \
+        "RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
+
+    bind [$DialogWinTop::user($w,list) bodypath] <ButtonPress-3> "tk_popup $w.popup %X %Y"
 
     set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w"]
     $bbox add -image acttick16 \
@@ -981,7 +1019,8 @@ proc RamDebugger::AboutWindow {} {
     append tt "ramsan@cimne.upc.es\nhttp://gid.cimne.upc.es/ramsan\n"
     append tt "http://gid.cimne.upc.es/RamDebugger"
 
-    text $w.l2 -grid "0 px20 py10" -bd 0 -bg [$w cget -bg] -width 10 -height 4
+    text $w.l2 -grid "0 px20 py10" -bd 0 -bg [$w cget -bg] -width 10 -height 4 \
+	    -highlightthickness 0 
     $w.l2 ins end $tt
     $w.l2 conf -state disabled
     bind $w.l2 <1> "focus $w.l2"
@@ -998,7 +1037,6 @@ proc RamDebugger::AboutWindow {} {
 		               ] \
 		  -labelcommand tablelist::sortByColumn \
 		  -background white \
-		  -selectbackground navy -selectforeground white \
 		  -stretch 1 -selectmode extended \
 		  -highlightthickness 0
 
@@ -1452,7 +1490,8 @@ proc RamDebugger::Compile { name } {
 		"Could not find command 'gcc'. Do you want to see the help?" -parent $text \
 		-title "Command not found" -type yesno]
 	    if { $ret == "yes" } {
-		RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
+		ViewHelpForWord "Debugging c++"
+		#RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 	    }
 	    return
 	}
@@ -1466,7 +1505,8 @@ proc RamDebugger::Compile { name } {
 		"Could not find command 'make'. Do you want to see the help?" -parent $text \
 		-title "Command not found" -type yesno]
 	    if { $ret == "yes" } {
-		RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
+		ViewHelpForWord "Debugging c++"
+		#RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 	    }
 	    return
 	}
@@ -1618,7 +1658,7 @@ proc RamDebugger::SearchInFiles {} {
 
     label $f.l1 -text "Text:" -grid 0
     ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -grid "1 2 px3 py3" \
-	    -values $options(SearchInFiles,texts) -width 30
+	    -values $options(SearchInFiles,texts) -width 40
 
     if { [string trim $txt] != "" } {
 	set ::RamDebugger::searchstring $txt
@@ -1809,9 +1849,9 @@ proc RamDebugger::Search { w { what {} } } {
 	    foreach i [bind Text] {
 		if { [bind $w.search $i] == "" } {
 		    if { [string match *nothing* [bind Text $i]] } {
-			bind $w.search $i [bind Text $i]
+		        bind $w.search $i [bind Text $i]
 		    } else {
-			bind $w.search $i "destroy $w.search" }
+		        bind $w.search $i "destroy $w.search" }
 		}
 	    }
 	    set idx [$text index insert]

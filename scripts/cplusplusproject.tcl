@@ -1626,7 +1626,8 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	    "Could not find command 'gcc'. Do you want to see the help?" -parent $w \
 	    -title "Command not found" -type yesno]
 	if { $ret == "yes" } {
-	    RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
+	    ViewHelpForWord "Debugging c++"
+	    #RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 	}
 	return -1
     }
@@ -1923,7 +1924,6 @@ proc cproject::EvalScript { w debrel scripttab { show 0 } } {
 
     rename puts ___puts
     proc puts args {
-puts enter
 	set argsN $args
 	set hasnewline 1
 	if { [lindex $argsN 0] == "-nonewline" } {
@@ -1942,10 +1942,11 @@ puts enter
 	    uplevel ___puts $args
 	}
     }
-    rename puts ""
-    rename ___puts puts
 
     set err [catch $script errstring]
+
+    rename puts ""
+    rename ___puts puts
 
     if { $err } {
 	RamDebugger::TextCompRaise

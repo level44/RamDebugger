@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.14 2002/10/03 10:34:02 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.15 2002/10/15 12:13:50 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -48,8 +48,9 @@ namespace eval RamDebugger {
     # communications issues
     ################################################################################
 
-    # can be: remote; local; master or gdb
+    # can be: remote; local; master; or gdb
     variable remoteserverType ""
+    # when remoteserverType is master, it can be master, "master proc" or "master all"
     variable remoteserver ""
     variable remoteserverNum ""
     variable debuggerserver ""
@@ -380,8 +381,12 @@ proc RamDebugger::rdebug { args } {
 	    }
 	}
 	set gdblog ""
+
+	if { [info exists options(master_type)] } {
+	    set remoteserver $options(master_type)
+	} else { set remoteserver master }
+
 	set remoteserverType master
-	set remoteserver master
 	TakeArrowOutFromText
     } elseif { $opts(-currentfile) } {
 	if { [interp exists local] } { interp delete local }
@@ -448,7 +453,8 @@ proc RamDebugger::rdebug { args } {
 		    "Could not find command 'gdb'. Do you want to see the help?" -parent $textST \
 		    -title "Command not found" -type yesno]
 		if { $ret == "yes" } {
-		    RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
+		    ViewHelpForWord "Debugging c++"
+		    #RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 		}
 		return
 	    } else {
@@ -960,6 +966,7 @@ proc RamDebugger::rtime { args } {
 
 	set TimeMeasureDataNew ""
 	set files ""
+	set currentfile_save $currentfile
 	foreach i $TimeMeasureData {
 	    foreach "name file lineini lineend lasttime" $i {
 		lappend TimeMeasureDataNew [list $name $file $lineini $lineend ""]
@@ -969,6 +976,7 @@ proc RamDebugger::rtime { args } {
 		}
 	    }
 	}
+	set currentfile $currentfile_save
 	set TimeMeasureData $TimeMeasureDataNew
 	if { $remoteserverType == "local" && $remoteserver != "" } {
 	    set currentfile $remoteserver
@@ -1043,10 +1051,10 @@ proc RamDebugger::rtime { args } {
 	}
 	set unitname $opts(-display)
 	switch -- $opts(-display) {
-	    microsec { set unitfactor 1 }
-	    milisec { set unitfactor 1e-3 }
-	    sec { set unitfactor 1e-6 }
-	    min { set unitfactor 1e-6/60.0 }
+	    microsec { set unitfactor 1 ; set format %i }
+	    milisec { set unitfactor 1e-3  ; set format %i }
+	    sec { set unitfactor 1e-6  ; set format %.4g }
+	    min { set unitfactor 1e-6/60.0  ; set format %.4g }
 	    default {
 		error "error in display units.\n$usagestring"
 	    }
@@ -1056,7 +1064,7 @@ proc RamDebugger::rtime { args } {
 	    append retval [string repeat "....." [lindex $data($i) 0]]
 	    append retval $i
 	    set time [lindex $data($i) 1]
-	    if { $time != "" } { set time [format %.4g [expr $time*$unitfactor]] }
+	    if { $time != "" } { set time [format $format [expr $time*$unitfactor]] }
 	    append retval " $time $unitname"
 	    if { [lindex $data($i) 2] != "" && [lindex $data($i) 2] != 0 } {
 		append retval " ([format %.3g [lindex $data($i) 2]]%)"
@@ -1090,7 +1098,8 @@ proc RamDebugger::rtime { args } {
 		error "block name '$opts(name)' already exists"
 	    }
 	    set fail 0
-	    if { $opts(lineini) < $lineini && $opts(lineend) > $lineend } { set fail 1 }
+	    if { $opts(lineini) < $lineini && $opts(lineend) >= $lineini && \
+		$opts(lineend) < $lineend } { set fail 1 }
 	    if { $opts(lineini) > $lineini && $opts(lineini) <= $lineend && 
 		$opts(lineend) > $lineend } { set fail 1 }
 	    if { $fail } {
@@ -1294,18 +1303,25 @@ proc RamDebugger::rlist { args } {
 
     set retval ""
 
-    if { $debuggerstate != "" && $remoteserver != "" && \
-	[info exists instrumentedfilesP($currentfile)] &&\
-	(![info exists instrumentedfilesSent($currentfile)] || \
-	    $instrumentedfilesSent($currentfile) != $debuggerstate || $force || $opts(-returndata)) } {
-	if { [catch {
+    set dosend -1
+
+    if { $debuggerstate == "" || $remoteserver == "" || \
+	![info exists instrumentedfilesP($currentfile)] } { set dosend 0 }
+    if { $remoteserver == "master" && !$opts(-returndata) } { set dosend 0 }
+    if { $dosend != 0 && ![info exists instrumentedfilesSent($currentfile)] } { set dosend 1 }
+    if { $dosend != 0 && [info exists instrumentedfilesSent($currentfile)] && \
+	$instrumentedfilesSent($currentfile) != $debuggerstate  } { set dosend 1 }
+    if { $dosend != 0 && ($force || $opts(-returndata)) } { set dosend 1 }
+
+    if { $dosend == 1 } {
+	set err [catch {
 	    if { $debuggerstate == "debug" } {
 		if { $opts(-returndata) } {
 		    append retval $instrumentedfilesP($currentfile)\n
 		} else {
 		    EvalRemote $instrumentedfilesP($currentfile)
 		}
-		if { $opts(-asmainfile) } {
+		if { $opts(-asmainfile) || $remoteserver == "master all" } {
 		    if { $opts(-returndata) } {
 		        append retval $instrumentedfilesR($currentfile)
 		    } else {
@@ -1318,11 +1334,13 @@ proc RamDebugger::rlist { args } {
 	    set instrumentedfilesSent($currentfile) $debuggerstate
 
 	    FillListBox
-	} errstring] } {
+	} errstring]
+		                
+	if { $err } {
 	    set err $::errorInfo
 	    if { [catch {
-		WarnWin $err
-	    }] } {
+		    WarnWin $err
+		}] } {
 		puts $err
 	    }
 	}
@@ -1734,7 +1752,6 @@ proc RamDebugger::RecieveErrorFromProgram { err errInfo } {
 }
 
 proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
-
     if { $hasnewline } { append string \n }
     switch $channelId {
 	stdout {
@@ -1872,6 +1889,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	return
     }
     set aa [read $fid]
+
     regsub -all {[ \t]*\(gdb\)[ \t]*} $aa {} aa
 
     regsub -all {(^|\n)(.)} $aa {\1<--\2} aalog
@@ -2178,6 +2196,10 @@ proc RamDebugger::ExitGUI {} {
     set options(FixedFont) [font configure FixedFont]
     set options(HelpFont) [font configure HelpFont]
 
+    if { [info exists remoteserver] && [string match master* $remoteserver] } {
+	set options(master_type) $remoteserver
+    }
+
     set options(watchedvars) ""
     set i 0
     while 1 {
@@ -2351,7 +2373,9 @@ proc RamDebugger::SaveFile { what } {
 	}
     }
 
+    set NeedsReinstrument 0
     if { $what == "saveas" || $currentfile == "New file" || $currentfile == "" } {
+	set NeedsReinstrument 1
 	set w [winfo toplevel $text]
 	set types {
 	    {{TCL Scripts}      {.tcl}        }
@@ -2373,6 +2397,8 @@ proc RamDebugger::SaveFile { what } {
 	}
     }
     SaveFileF $file
+
+    if { $NeedsReinstrument } { rlist -quiet }
     return 0
 }
 
@@ -2698,28 +2724,32 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 }
 
 
-proc RamDebugger::ViewHelpForWord {} {
+proc RamDebugger::ViewHelpForWord { { word "" } } {
     variable text
 
     set w [ViewHelpFile]
 
     set range [$text tag ranges sel]
-    if { $range != "" } {
+    if { $word != "" } {
+	# nothing
+    } elseif { $range != "" } {
 	set word [eval $text get $range]
     } else {
 	set word ""
 	set idx [$text index insert]
-	set idx0 $idx
-	while { [string is wordchar [$text get $idx0]] } {
-	    set word [$text get $idx0]$word
-	    set idx0 [$text index $idx0-1c]
-	    if { [$text compare $idx0 <= 1.0] } { break }
+	if { [$text compare $idx > 1.0] } {
+	    set idx0 [$text index $idx-1c]
+	    while { [string is wordchar [$text get $idx0]] } {
+		set word [$text get $idx0]$word
+		if { [$text compare $idx0 <= 1.0] } { break }
+		set idx0 [$text index $idx0-1c]
+	    }
 	}
-	set idx1 [$text index $idx+1c]
+	set idx1 $idx
 	while { [string is wordchar [$text get $idx1]] } {
 	    append word [$text get $idx1]
-	    set idx1 [$text index $idx1+1c]
 	    if { [$text compare $idx1 >= end-1c] } { break }
+	    set idx1 [$text index $idx1+1c]
 	}
 	if { $word == "" } { return }
     }
@@ -2736,9 +2766,14 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     # set at program start up
     if { [info command master] != "" } {
 	$menu del 0 end
-	$menu add command -label "master" -command {
-	    WarnWin "RamDebugger is already debugging master program"
-	}
+	$menu add radio -label "No autosend" -variable RamDebugger::remoteserver -value master
+	$menu add radio -label "Send procs" -variable RamDebugger::remoteserver -value "master proc"
+	$menu add radio -label "Send all" -variable RamDebugger::remoteserver -value "master all"
+
+	DynamicHelp::register $menu menu RamDebugger::status
+	DynamicHelp::register $menu menuentry 0 "Only instrument sourced files"
+	DynamicHelp::register $menu menuentry 1 "Instrument all procs in active files"
+	DynamicHelp::register $menu menuentry 2 "Instrument/execute all active files"
 	return
     }
 
@@ -3089,7 +3124,8 @@ proc RamDebugger::ContNextGUI { what } {
     variable currentfile
     variable options
 
-    if { $remoteserver == "" || ($remoteserverType == "local" && !$IsInStop) } {
+    if { $remoteserver == "" || ($remoteserverType == "local" && !$IsInStop) || \
+	($remoteserver == "master all" && !$IsInStop) } {
 	if { $currentfile == "" } {
 	    WarnWin "Cannot start debugging. There is no currentfile" $text
 	    return
@@ -3110,13 +3146,23 @@ proc RamDebugger::ContNextGUI { what } {
 	    }
 	} else {
 	    if { $options(ConfirmStartDebugging) } {
+		if { $remoteserverType == "local" } {
+		    set tt "Do you want to start to debug locally '$currentfile'?"
+		} else {
+		    set tt "Do you want to execute file '$currentfile'?"
+		}
 		set ret [DialogWin::messageBox -default yes -icon question -message \
-		        "Do you want to start to debug locally '$currentfile'?" -parent $text \
+		        $tt -parent $text \
 		        -title "start debugging" -type yesnocancel]
 	    } else { set ret yes }
 	    if { $ret == "cancel" } { return }
 	    if { $ret == "yes" } {
-		rdebug -currentfile
+		if { $remoteserverType == "local" } {
+		    rdebug -currentfile
+		} else {
+
+		    rlist -force -quiet
+		}
 		return
 	    }
 	}
@@ -3513,7 +3559,7 @@ proc RamDebugger::TextOutInsert { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    $textOUT ins end $data
+    TextInsertAndWrap $textOUT $data 200
     $textOUT conf -state disabled
     if { $yend == 1 } { $textOUT yview moveto 1 }
 }
@@ -3525,7 +3571,7 @@ proc RamDebugger::TextOutInsertRed { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    $textOUT ins end $data red
+    TextInsertAndWrap $textOUT $data 200 red
     $textOUT tag configure red -foreground red
     $textOUT conf -state disabled
     if { $yend == 1 } { $textOUT yview moveto 1 }
@@ -3538,7 +3584,7 @@ proc RamDebugger::TextOutInsertBlue { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    $textOUT ins end $data blue
+    TextInsertAndWrap $textOUT $data 200 blue
     $textOUT tag configure blue -foreground blue
     $textOUT conf -state disabled
     if { $yend == 1 } { $textOUT yview moveto 1 }
@@ -3554,14 +3600,18 @@ proc RamDebugger::TextCompClear {} {
     $textCOMP conf -state disabled
 }
 
-proc RamDebugger::TextInsertAndWrap { text data { maxlen 80 } } {
+proc RamDebugger::TextInsertAndWrap { text data { maxlen 80 } { tag "" } } {
 
     set tolerance 20
     if { $maxlen < 30 } { set tolerance 5 }
     while 1 {
 	foreach "line pos" [scan [$text index end] "%d.%d"] break
 	if { $pos+[string length $data] <= $maxlen } {
-	    $text insert end $data
+	    if { $tag == "" } {
+		$text insert end $data
+	    } else {
+		$text insert end $data $tag
+	    }
 	    break
 	}
 	set found 0
@@ -3572,10 +3622,18 @@ proc RamDebugger::TextInsertAndWrap { text data { maxlen 80 } } {
 	    }
 	}
 	if { $found } {
-	    $text insert end "[string range $data 0 $i]\n  "
+	     if { $tag == "" } {
+		 $text insert end "[string range $data 0 $i]\n  "
+	     } else {
+		 $text insert end "[string range $data 0 $i]\n  " $tag         
+	     }
 	    set data [string range $data [expr $i+1] end]
 	} else {
-	    $text insert end "[string range $data 0 [expr $maxlen-$pos]]\n  "
+	    if { $tag == "" } {
+		$text insert end "[string range $data 0 [expr $maxlen-$pos]]\n  "
+	    } else {
+		$text insert end "[string range $data 0 [expr $maxlen-$pos]]\n  " $tag
+	    }
 	    set data [string range $data [expr $maxlen-$pos+1] end]
 	}
     }
@@ -4353,7 +4411,7 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
 	"" { set indent 0 }
     }
     foreach "- col" [scan [$text index "$line.0 lineend"] %d.%d] break
-    set FirstPos 0
+    set FirstPos -1
     set FirstChar ""
     for { set i 0 } { $i < $col } { incr i } {
 	if { [$text get $line.$i] != " " } {
@@ -4369,6 +4427,7 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
     } elseif { $FirstChar == "\}" && $indent >= $indent_val } {
 	set indent [expr $indent-$indent_val]
     }
+    if { $FirstPos == -1 } { set FirstPos $col }
     if { $FirstPos < $indent } {
 	$text insert $line.0 [string repeat " " [expr $indent-$FirstPos]]
     } elseif { $FirstPos > $indent } {
@@ -4538,6 +4597,27 @@ proc RamDebugger::ScrollScrollAndCanvas { text yscroll canvas args } {
     MoveCanvas $text $canvas
 }
 
+proc RamDebugger::InitOptions {} {
+
+#      option add *background AntiqueWhite3
+#      option add *Button*background bisque3
+#      option add *Menu*background bisque3
+#      option add *Button*foreground black
+#      option add *Entry*background thistle
+#      option add *DisabledForeground grey60
+#      option add *HighlightBackground AntiqueWhite3
+    
+
+    if { $::tcl_platform(platform) != "windows" } {
+	option add *selectBackground \#48c96f
+	option add *selectForeground white
+    } else {
+	option add *selectBackground navy
+	option add *selectForeground white
+    }
+    option add *Menu*TearOff 0
+}
+
 proc RamDebugger::InitGUI { { w .gui } } {
     variable options
     variable options_def
@@ -4554,6 +4634,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     variable breakpoints
     variable MainDir
     variable TimeMeasureData
+
 
     proc ::bgerror { errstring } {
 	if { [info command RamDebugger::TextOutRaise] != "" } {
@@ -4579,8 +4660,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     CreateImages
     TkBackCompatibility
     CreateModifyFonts
-
-    option add *Menu*TearOff 0
+    InitOptions
 
     toplevel $w
     wm title $w RamDebugger
@@ -4848,10 +4928,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
     set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
     $sw setwidget $listbox
 
-    if { $::tcl_platform(platform) != "windows" } {
-	$listbox configure -selectbackground \#48c96f -selectforeground white
-    }
-
     $sw.lb configure -deltay [expr [font metrics [$sw.lb cget -font] -linespace]]
 
     set pane2 [$pw add -weight $weight2]
@@ -4884,10 +4960,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
     scrollbar $fulltext.yscroll -orient vertical -grid 2 -command \
 	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can]
     scrollbar $fulltext.xscroll -orient horizontal -grid "0 2" -command "$fulltext.text xview"
-
-    if { $::tcl_platform(platform) != "windows" } {
-	$text conf -exportselection 1 -selectbackground \#48c96f -selectforeground white
-    }
 
     set pane2in2 [$pwin add -weight $weight2in]
 
@@ -4926,6 +4998,22 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
     #$pane2in2.nb compute_size
     $pane2in2.nb raise stacktrace
+
+    proc NoteBookPopupMenu { f x y page } {
+
+	if { $page == "stacktrace" } { return }
+	catch { destroy $f.m }
+	menu $f.m
+	switch $page {
+	    output { $f.m add command -label Clear -command RamDebugger::TextOutClear }
+	    compile { $f.m add command -label Clear -command RamDebugger::TextCompClear }
+	}
+	tk_popup $f.m $x $y
+    }
+    $pane2in2.nb bindtabs <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y]
+    bind $textOUT <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y output]
+    bind $textCOMP <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y compile]
+
 
     proc TextStackTraceRaise {} "$pane2in2.nb raise stacktrace"
     proc TextOutRaise {} "$pane2in2.nb raise output"
