@@ -502,12 +502,15 @@ proc RamDebugger::PreferencesAddDelDirectories { listbox what } {
 	    $listbox selection clear 0 end
 	}
 	up {
-	    foreach i [$listbox curselection] {
-		set dir [$listbox get $i]
-		$listbox delete $i
-		$listbox insert [expr $i-1] $dir
+	    set sel [$listbox curselection]
+	    if { [llength $sel] != 1 } {
+		WarnWin "Select just one directory name to increase its precedence" $listbox
+		return
 	    }
-	    $listbox selection clear 0 end
+	    set dir [$listbox get $sel]
+	    $listbox delete $sel
+	    $listbox insert [expr $sel-1] $dir
+	    $listbox selection set [expr $sel-1]
 	}
     }
 }
@@ -685,7 +688,7 @@ proc RamDebugger::PreferencesWindow {} {
 	    }
 	    3 {
 		foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging \
-			ConfirmModifyVariable instrument_source LocalDebuggingType \
+		        ConfirmModifyVariable instrument_source LocalDebuggingType \
 		        CheckRemotes NormalFont FixedFont HelpFont executable_dirs] {
 		    if { [info exists options_def($i)] } {
 		        set options($i) $options_def($i)
@@ -795,10 +798,10 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
 		while 1 {
 		    set found 0
 		    foreach j $TimeMeasureData {
-			if { [lindex $j 0] == "Block $i" } {
-			    set found 1
-			    break
-			}
+		        if { [lindex $j 0] == "Block $i" } {
+		            set found 1
+		            break
+		        }
 		    }
 		    if { !$found } { break }
 		    incr i
@@ -1189,13 +1192,13 @@ proc RamDebugger::DebugCplusPlusWindow { { tryautomatic 0 } } {
     }
 
     set exe ""
-    foreach "exe dir args" [cproject::GiveDebugData] break
+    foreach "exe dir arg" [cproject::GiveDebugData] break
 
     if { $tryautomatic && $exe != "" } {
 	set found 0
 	set ipos 0
-	foreach "exe_in dir_in args_in" $options(debugcplusplus) {
-	    if { $exe == $exe_in && $dir == $dir_in && $args == $args_in } {
+	foreach "exe_in dir_in arg_in" $options(debugcplusplus) {
+	    if { $exe == $exe_in && $dir == $dir_in && $arg == $arg_in } {
 		set found 1
 		break
 	    }
@@ -1207,10 +1210,10 @@ proc RamDebugger::DebugCplusPlusWindow { { tryautomatic 0 } } {
 	}
 	if { !$found || $ipos != 0 } {
 	    set options(debugcplusplus) [linsert $options(debugcplusplus) 0 \
-		    $exe $dir $args]
+		    $exe $dir $arg]
 	}
 
-	rdebug -debugcplusplus [list $exe $dir $args]
+	rdebug -debugcplusplus [list $exe $dir $arg]
 	return
     }
     if { $tryautomatic && $options(debugcplusplus) != "" } {
@@ -1405,7 +1408,7 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
 		set ipos 0
 		foreach "curr dir args" $options(currentfileargs) {
 		    if { $curr == $DialogWin::user(curr) } {
-			set options(currentfileargs) [lreplace $options(currentfileargs) $ipos \
+		        set options(currentfileargs) [lreplace $options(currentfileargs) $ipos \
 		            [expr $ipos+2]]
 		        break
 		    }
@@ -1541,32 +1544,34 @@ proc RamDebugger::SearchInFilesDo {} {
     variable MainDir
     
      if { $::tcl_platform(platform) == "windows" } {
-         set grep [file join $MainDir addons grep.exe]
+	 set grep [file join $MainDir addons grep.exe]
      } else { set grep grep }
 
-    set comm "\"$grep\" -ns "
+    set comm [list $grep -ns]
     switch -- $::RamDebugger::searchmode {
-	-exact { append comm "-F " }
-	-regexp { append comm "-E " }
+	-exact { lappend comm -F }
+	-regexp { lappend comm -E }
     }
     if { !$::RamDebugger::searchcase } {
-	append comm "-i "
+	lappend comm -i
     }
-    append comm "\"$RamDebugger::searchstring\" "
+    lappend comm $RamDebugger::searchstring
 
     set patternlist [regexp -inline -all {[^\s,;]+} $RamDebugger::searchextensions]
 
+    WaitState 1
     set files [FindFilesWithPattern $RamDebugger::searchdir $patternlist \
 	    $RamDebugger::searchrecursedirs]
 
     if { [llength $files] == 0 } {
+	WaitState 0
 	TextOutClear
 	TextOutInsert "No files found"
 	TextOutRaise
 	return
     }
 
-    append comm "\"[join $files {" "}]\""
+    eval lappend comm $files
 
     set fin [open "|$comm" r]
 
@@ -1593,6 +1598,7 @@ proc RamDebugger::SearchInFilesDo {} {
 	    set options(SearchInFiles,$i) [lreplace $options(SearchInFiles,$i) 6 end]
 	}
     }
+    WaitState 0
 }
 
 proc RamDebugger::SearchInFiles {} {
@@ -1639,7 +1645,9 @@ proc RamDebugger::SearchInFiles {} {
     set comm [string map [list PARENT $w] $comm]
     $f.b3 configure -command $comm
 
-    set ::RamDebugger::searchdir $options(defaultdir)
+    if { ![info exists ::RamDebugger::searchdir] || $::RamDebugger::searchdir == "" } {
+	set ::RamDebugger::searchdir $options(defaultdir)
+    }
 
     set f1 [frame $f.f1 -bd 0 -grid "0 3 w"]
     set f2 [frame $f1.f2 -bd 1 -relief ridge -grid "0 w px3"]
@@ -1694,13 +1702,16 @@ proc RamDebugger::SearchWindow {} {
     if { ![info exists options(old_searchs)] } {
 	set options(old_searchs) ""
     }
-    
+    if { ![info exists ::RamDebugger::searchFromBegin] } {
+	set ::RamDebugger::searchFromBegin 1
+    }
+	
     set f [DialogWin::Init $text "Search" separator]
     set w [winfo toplevel $f]
 
     label $f.l1 -text "Text:" -grid 0
     ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs) \
-        -grid "1 2 px3 py3"
+	-grid "1 2 px3 py3"
 
     set f2 [frame $f.f2 -bd 1 -relief ridge -grid "0 2 w px3"]
     radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
@@ -1726,7 +1737,6 @@ proc RamDebugger::SearchWindow {} {
 
     set ::RamDebugger::searchmode -exact
     set ::RamDebugger::searchcase 0
-    set ::RamDebugger::searchFromBegin 0
     set ::RamDebugger::SearchType -forwards
 
     tkTabToWindow $f.e1
@@ -1769,47 +1779,57 @@ proc RamDebugger::SearchWindow {} {
 proc RamDebugger::Search { w { what {} } } {
     variable text
 
-    if { ![winfo exists $w.search] && $what != "any" } {
-	entry $w.search -width 25 -textvariable RamDebugger::searchstring
-	place $w.search -in $w -x 0 -rely 1 -y -1 -anchor sw
+    if { $what != "any" } {
+	if { ![winfo exists $w.search] } {
+	    entry $w.search -width 25 -textvariable RamDebugger::searchstring
+	    place $w.search -in $w -x 0 -rely 1 -y -1 -anchor sw
 
-	focus $text
-	bindtags $text [linsert [bindtags $text] 0 $w.search]
-	bind $w.search <FocusOut> "destroy $w.search ; break"
-	bind $w.search <Escape> "destroy $w.search ; break"
-	bind $w.search <KeyPress> [list if { [string is wordchar %A] || [string is punct %A] \
-		                             || [string is space %A] } \
-	    "tkEntryInsert $w.search %A ; break" else "destroy $w.search ; break"]
-	bind $w.search <Delete> "$w.search delete insert ; break"
-	bind $w.search <BackSpace> "tkEntryBackspace $w.search ; break"
-	bind $w.search <1> "destroy $w.search ; break"
-	bind $w.search <3> "destroy $w.search ; break"
-	bind $w.search <Return> "destroy $w.search ; break"
-	bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
-	bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
-	bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
+	    focus $text
+	    bindtags $text [linsert [bindtags $text] 0 $w.search]
+	    bind $w.search <FocusOut> "destroy $w.search ; break"
+	    bind $w.search <Escape> "destroy $w.search ; break"
+	    bind $w.search <KeyPress> [list if { [string is wordchar %A] || [string is punct %A] \
+		|| [string is space %A] } \
+		"$w.search icursor end; tkEntryInsert $w.search %A ; break" else \
+		"destroy $w.search ; break"]
+	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
+	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
+	    bind $w.search <1> "destroy $w.search ; break"
+	    bind $w.search <3> "destroy $w.search ; break"
+	    bind $w.search <Return> "destroy $w.search ; break"
+	    bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
+	    bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
+	    bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
 
-	trace var RamDebugger::searchstring w "RamDebugger::Search $w ;#"
-	bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
-		                      "RamDebugger::Search $w ;#"]
-	bind $w.search <Destroy> "+ [list bindtags $text [lreplace [bindtags $text] 0 0]] ; break"
-
-	foreach i [bind Text] {
-	    if { [bind $w.search $i] == "" } {
-		if { [string match *nothing* [bind Text $i]] } {
-		    bind $w.search $i [bind Text $i]
-		} else {
-		    bind $w.search $i "destroy $w.search" }
+	    set ::RamDebugger::searchstring ""
+	    trace var RamDebugger::searchstring w "RamDebugger::Search $w ;#"
+	    bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
+		"RamDebugger::Search $w ;#"]
+	    bind $w.search <Destroy> "+ [list bindtags $text [lreplace [bindtags $text] 0 0]] ; break"
+	    foreach i [bind Text] {
+		if { [bind $w.search $i] == "" } {
+		    if { [string match *nothing* [bind Text $i]] } {
+			bind $w.search $i [bind Text $i]
+		    } else {
+			bind $w.search $i "destroy $w.search" }
+		}
 	    }
+	    set idx [$text index insert]
+	    if { $idx == "" } { set idx 1.0 }
+	    set ::RamDebugger::SearchIni $idx
+	    set ::RamDebugger::SearchPos $idx
+	    set ::RamDebugger::searchcase -1
+	    set ::RamDebugger::searchmode -exact
+	    if { [info exists ::RamDebugger::Lastsearchstring] } {
+		set ::RamDebugger::lastwascreation $::RamDebugger::Lastsearchstring
+	    } else { set ::RamDebugger::lastwascreation "" }
+	    set ::RamDebugger::Lastsearchstring ""
+	} else {
+	    if { $::RamDebugger::searchstring == "" && $::RamDebugger::lastwascreation != "" } {
+		set ::RamDebugger::searchstring $::RamDebugger::lastwascreation
+	    }
+	    set ::RamDebugger::lastwascreation ""
 	}
-	set idx [$text index insert]
-	if { $idx == "" } { set idx 1.0 }
-	set ::RamDebugger::SearchIni $idx
-	set ::RamDebugger::SearchPos $idx
-	set ::RamDebugger::searchcase -1
-	set ::RamDebugger::searchmode -exact
-	set ::RamDebugger::Lastsearchstring ""
-	set ::RamDebugger::searchstring ""
     }
 
     switch $what {
@@ -1965,7 +1985,7 @@ proc RamDebugger::DoinstrumentThisfile { file } {
     }
     if { $options(instrument_source) == "auto" } {
 	set file [filenormalize $file]
-	if { [lsearch $WindowFilesList $file] != -1 || [GiveInstFile $file 1 P] != "" } {
+	if { [lsearch $WindowFilesList $file] != -1 } {
 	    return 1
 	} else { return 0 }
     } elseif { $options(instrument_source) == "always" } {
@@ -1988,15 +2008,15 @@ proc RamDebugger::DoinstrumentThisfile { file } {
     set f1 [frame $f.f1 -grid 0]
 
     radiobutton $f1.r1 -text "Instrument this file" -grid "0 w" -var DialogWin::user(opt) \
-        -value thisfile
+	-value thisfile
     radiobutton $f1.r2 -text "Instrument all files" -grid "0 w" -var DialogWin::user(opt) \
-        -value always
+	-value always
     radiobutton $f1.r3 -text "Do not instrument this file" -grid "0 w" -var DialogWin::user(opt) \
-        -value thisfileno
+	-value thisfileno
     radiobutton $f1.r4 -text "Do not instrument any file" -grid "0 w" -var DialogWin::user(opt) \
-        -value never
+	-value never
     radiobutton $f1.r5 -text "Instrument only load files (auto)" -grid "0 w" -var DialogWin::user(opt) \
-        -value auto
+	-value auto
 
     if { $options(instrument_source) == "ask_yes" } {
 	set DialogWin::user(opt) thisfile

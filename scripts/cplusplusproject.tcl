@@ -7,6 +7,7 @@ namespace eval cproject {
     variable groupbefore ""
     variable groups All
     variable links
+    variable scripttabs
     variable debugreleasebefore ""
     variable debugrelease debug
     variable files ""
@@ -20,6 +21,10 @@ namespace eval cproject {
 
     variable compilationstatus
 }
+
+################################################################################
+#   project creation/edition
+################################################################################
 
 proc cproject::Init { w } {
     variable project
@@ -41,6 +46,8 @@ proc cproject::synctoUI {} {
     variable dataL
     variable thisdataE
     variable dataE
+    variable thisdataS
+    variable dataS
     variable group
     variable debugrelease
 
@@ -51,6 +58,10 @@ proc cproject::synctoUI {} {
     foreach i [array names dataL $debugrelease,*] {
 	regexp {^[^,]+,(.*)} $i {} prop
 	set thisdataL($prop) $dataL($i)
+    }
+    foreach i [array names dataS $debugrelease,*] {
+	regexp {^[^,]+,(.*)} $i {} prop
+	set thisdataS($prop) $dataS($i)
     }
     foreach i [array names dataE $debugrelease,*] {
 	regexp {^[^,]+,(.*)} $i {} prop
@@ -63,6 +74,8 @@ proc cproject::syncfromUI {} {
     variable dataC
     variable thisdataL
     variable dataL
+    variable thisdataS
+    variable dataS
     variable thisdataE
     variable dataE
     variable groupbefore
@@ -87,6 +100,14 @@ proc cproject::syncfromUI {} {
 	}
 	set dataL($i) $thisdataL($prop)
     }
+    foreach i [array names dataS $debugreleasebefore,*] {
+	regexp {^[^,]+,(.*)} $i {} prop
+	if { $debugreleasebefore == "both" } {
+	    TransferDataToLowerGroups "" $debugreleasebefore $prop $dataS($i) $thisdataS($prop) \
+		dataS
+	}
+	set dataS($i) $thisdataS($prop)
+    }
     foreach i [array names dataE $debugreleasebefore,*] {
 	regexp {^[^,]+,(.*)} $i {} prop
 	if { $debugreleasebefore == "both" } {
@@ -100,6 +121,7 @@ proc cproject::syncfromUI {} {
 proc cproject::TransferDataToLowerGroups { gr dr prop olddata newdata dataname } {
     variable dataC
     variable dataL
+    variable dataS
     variable dataE
 
     upvar 0 $dataname data
@@ -126,7 +148,7 @@ proc cproject::TransferDataToLowerGroups { gr dr prop olddata newdata dataname }
     foreach i [array names data *,$prop] {
 	switch $dataname {
 	    dataC { regexp {^([^,]+),([^,]+),(.*)} $i {} gr_in dr_in prop_in }
-	    dataL - dataE {
+	    dataL - dataS - dataE {
 		set gr_in ""
 		regexp {^([^,]+),(.*)} $i {} dr_in prop_in
 	    }
@@ -140,6 +162,14 @@ proc cproject::TransferDataToLowerGroups { gr dr prop olddata newdata dataname }
 	} elseif { $dr == "both" } {
 	    if { $gr != $gr_in } { continue }
 	} else { continue }
+
+	if { $dataname == "dataS" } {
+	    regsub -all {(?n)^\s*\#.*$} $data($i) "" res
+	    if { [string trim $res] == "" } {
+		set data($i) $newdata
+	    }
+	    continue
+	}
 
 	if { ![string match *dirs $prop] } {
 	    set dataLocal [regexp -inline -all {[^\s;]+} $data($i)]
@@ -177,12 +207,15 @@ proc cproject::SaveProjectC { w } {
     variable group
     variable groups
     variable links
+    variable scripttabs
     variable debugrelease
     variable files
     variable thisdataC
     variable dataC
     variable thisdataL
     variable dataL
+    variable thisdataS
+    variable dataS
     variable thisdataE
     variable dataE
 
@@ -195,8 +228,8 @@ proc cproject::SaveProjectC { w } {
 	WarnWin "Could not open file '$project' to save ($fout)" $w
 	return
     }
-    foreach i [list groups group links debugrelease files thisdataC dataC thisdataL dataL \
-	   thisdataE dataE ] {
+    foreach i [list groups group links scripttabs debugrelease files thisdataC dataC thisdataL \
+	    dataL thisdataS dataS thisdataE dataE ] {
 	if { [array exists $i] } {
 	    puts $fout [list array set $i [array get $i]]
 	} else {
@@ -226,6 +259,7 @@ proc cproject::NewProject { w } {
     variable group
     variable groups
     variable links
+    variable scripttabs
     variable debugrelease
     variable files
     variable thisdataC
@@ -252,6 +286,7 @@ proc cproject::NewProject { w } {
     set debugreleasebefore ""
     set groups All
     set links Link
+    set scripttabs Script
     set files ""
 
     NewData
@@ -266,12 +301,15 @@ proc cproject::NewData {} {
     variable dataC
     variable thisdataL
     variable dataL
+    variable thisdataS
+    variable dataS
     variable thisdataE
     variable dataE
     variable groups
     variable links
+    variable scripttabs
 
-    foreach i [list C L E] {
+    foreach i [list C L S E] {
 	catch { unset data$i }
 	catch { unset thisdata$i }
     }
@@ -310,19 +348,11 @@ proc cproject::NewData {} {
 	    }
 	    set dataE($i,exeargs) ""
 	}
+	foreach scripttab $scripttabs {
+	    set dataS($i,$scripttab,script) help
+	    set dataS($i,$scripttab,executetime) "No automatic"
+	}
     }
-}
-
-proc cproject::GiveDebugData {} {
-    variable debugrelease
-    variable dataE
-
-    if { [info exists dataE($debugrelease,exe)] } {
-	set exe [file join $dataE($debugrelease,execdir) $dataE($debugrelease,exe)]
-	return [list $exe $dataE($debugrelease,execdir) \
-		$dataE($debugrelease,exeargs)]
-    }
-    return ""
 }
 
 proc cproject::OpenProject { w { ask 1 } } {
@@ -331,6 +361,7 @@ proc cproject::OpenProject { w { ask 1 } } {
     variable group
     variable groups
     variable links
+    variable scripttabs
     variable debugrelease
     variable files
     variable dataC
@@ -360,14 +391,19 @@ proc cproject::OpenProject { w { ask 1 } } {
 
     trace vdelete ::cproject::group w "cproject::SetGroupActive;#"
     trace vdelete ::cproject::debugrelease w "cproject::SetDebugReleaseActive;#"
-
+    trace vdelete ::cproject::links w "UpdateLinktabs ;#"
+    trace vdelete ::cproject::scripttabs w "UpdateScripttabs ;#"
     
     set err [catch {
+	if { [interp exists cproject_tmp] } { interp delete cproject_tmp }
 	interp create cproject_tmp
 	cproject_tmp eval [list source $file]
 	set groups [cproject_tmp eval set groups]
 	if { [catch { set links [cproject_tmp eval set links] }]} {
 	    set links Link
+	}
+	if { [catch { set scripttabs [cproject_tmp eval set scripttabs] }]} {
+	    set scripttabs Script
 	}
 	interp delete cproject_tmp
 	# trick because NewData needs to have groups and links defined
@@ -397,6 +433,11 @@ proc cproject::OpenProject { w { ask 1 } } {
 
     trace var ::cproject::group w "cproject::SetGroupActive;#"
     trace var ::cproject::debugrelease w "cproject::SetDebugReleaseActive;#"
+    trace var ::cproject::links w "UpdateLinktabs ;#"
+    trace var ::cproject::scripttabs w "UpdateScripttabs ;#"
+   
+    set links $links
+    set scripttabs $scripttabs
 
     set group $group
 
@@ -784,7 +825,16 @@ proc cproject::Create { par } {
     supergrid::go $f
 
     UpdateLinktabs
+    # if it exists from before, it will be deleted
+    trace vdelete ::cproject::links w "UpdateLinktabs ;#"
     trace var cproject::links w "UpdateLinktabs ;#"
+
+
+    UpdateScripttabs
+    # if it exists from before, it will be deleted
+    trace vdelete ::cproject::scripttabs w "UpdateScripttabs ;#"
+    trace var cproject::scripttabs w "UpdateScripttabs ;#"
+
 
     bind $w <Return> "DialogWin::InvokeOK"
     
@@ -818,16 +868,14 @@ proc cproject::UpdateLinktabs {} {
     set pages [$notebook pages 1 end-1]
 
     foreach i $pages {
-	if { [lsearch $links $i] == -1 } {
+	if { [string match Link* $i] } {
 	    $notebook delete $i
 	}
     }
     foreach i $links {
 	regsub -all {\W} $i {X} page
-	if { [lsearch $pages $page] == -1 } {
-	    set f [$notebook insert end-1 $page -text $i]
-	    AddLinkTab $f $i
-	}
+	set f [$notebook insert end-1 $page -text $i]
+	AddLinkTab $f $i
     }
 }
 
@@ -857,10 +905,10 @@ proc cproject::AddLinkTab { f link } {
     set f0 [$f.f0 getframe]
     entry $f0.e -grid 0 -textvariable cproject::thisdataL($link,linkgroups)
 
-    Button $f0.b1 -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add group"] \
-	 -command "cproject::AddGroupInLinkGroups $f0.b1 $f0.e" -grid 1
+    Label $f0.b1 -image acttick16 \
+	 -highlightthickness 0 -takefocus 0 -relief flat -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Add group"] -grid 1
+    bind $f0.b1 <ButtonPress-1> "cproject::AddGroupInLinkGroups $f0.b1 $f0.e" 
 
     TitleFrame $f.f1 -text "libraries directories" -grid 0
     set f1 [$f.f1 getframe]
@@ -982,13 +1030,15 @@ proc cproject::CreateDeleteLinkTab { currentlink what } {
 		    }
 		    1 {
 		        set newlink [string trim $DialogWinCR::user(name)]
-		        if { ![string match "Link *" $newlink] } {
+		        if { $newlink == "" } {
+		            set newlink "Link"
+		        } elseif { ![string match "Link *" $newlink] } {
 		            set newlink "Link $newlink"
 		        }
 		        if { $newlink == "" } {
 		            WarnWin "Link tab name cannot be void" $w
 		        } elseif { [lsearch $links $newlink] != -1 } {
-		            WarnWin "Link tab name already exists" $w
+		            WarnWin "Link tab name '$newlink' already exists" $w
 		        } else {
 		            DialogWinCR::DestroyWindow
 		            namespace delete ::DialogWinCR
@@ -1005,6 +1055,204 @@ proc cproject::CreateDeleteLinkTab { currentlink what } {
 		unset dataL($i)
 	    }
 	    set links [lreplace $links $pos $pos $newlink]
+	}
+    }
+    synctoUI
+}
+
+
+proc cproject::UpdateScripttabs {} {
+    variable notebook
+    variable scripttabs
+
+    if { ![info exists notebook] || ![winfo exists $notebook] } { return }
+    if { ![info exists scripttabs] } { set scripttabs Script }
+
+    set pages [$notebook pages 1 end-1]
+
+    foreach i $pages {
+	if { [string match Script* $i] } {
+	    $notebook delete $i
+	}
+    }
+    foreach i $scripttabs {
+	regsub -all {\W} $i {X} page
+	set f [$notebook insert end-1 $page -text $i]
+	AddScripttab $f $i
+    }
+}
+
+proc cproject::ScriptTabColorize { txt command args } {
+    
+    if { [regexp {^(ins|del)} $command] } {
+	RamDebugger::ColorizeSlow $txt
+    }
+}
+
+proc cproject::AddScripttab { f scripttab } {
+    variable links
+
+    TitleFrame $f.f0 -text "contents" -grid "0 news"
+    set f0 [$f.f0 getframe]
+
+    set helptext ""
+    append helptext "# It is possible to include a TCL script here\n"
+    append helptext "# it will be executed either automatically or\n"
+    append helptext "# manually, depending on configuration. In this\n"
+    append helptext "# latter case, it is possible to use it as a NOTES\n"
+    append helptext "# storage place\n\n"
+    append helptext "# AVAILABLE VARIABLES\n"
+    append helptext "# \$ProjectDir: the directory where the project is\n"
+    append helptext "# \$ObjectsDir: the directory where the object files are\n"
+
+    set sw [ScrolledWindow $f0.lf -relief sunken -borderwidth 0 -grid "0 nsew"]
+    supertext::text $sw.text -wrap none -syncvar cproject::thisdataS($scripttab,script) \
+	    -height 4 -bg white -postproc "cproject::ScriptTabColorize $sw.text"
+    $sw setwidget $sw.text
+
+    bind $sw.text <Return> "[bind Text <Return>] ;break"
+
+    foreach i [array names cproject::dataS *,script] {
+	if { $cproject::dataS($i) == "help" } {
+	    set cproject::dataS($i) $helptext
+	}
+    }
+    if { $cproject::thisdataS($scripttab,script) == "help" } {
+	set cproject::thisdataS($scripttab,script) $helptext
+    }
+
+    set bbox [ButtonBox $f0.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 wn"]
+    $bbox add -image acttick16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Clear text and add help"] \
+	 -command "[list $sw.text del 1.0 end] ; [list $sw.text ins end $helptext]"
+    $bbox add -image actcross16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Clear text"] \
+	 -command [list $sw.text del 1.0 end]
+
+    TitleFrame $f.f1 -text "execute when" -grid "0 n"
+    set f1 [$f.f1 getframe]
+
+    set values [list "Before compile" "After compile"]
+    foreach i $links {
+	lappend values "After $i"
+    }
+    lappend values --- "No automatic"
+
+    label $f1.l -text "Execute script:" -grid 0
+    ComboBox $f1.cb -editable 0 -textvariable cproject::thisdataS($scripttab,executetime) \
+	    -values $values -grid 1
+
+    button $f1.b -text "Execute now" -width 15 -grid "0 2 py3" -command \
+	    "cproject::syncfromUI; cproject::EvalScript $f \$cproject::debugrelease \
+	    [list $scripttab] 1"
+    
+    set bbox [ButtonBox $f.bbox -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 nw"]
+    $bbox add -image acttick16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Create new script tab"] \
+	 -command [list cproject::CreateDeleteScriptTab $scripttab create]
+    $bbox add -image actcross16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Delete script tab"] \
+	 -command [list cproject::CreateDeleteScriptTab $scripttab delete]
+    $bbox add -image edit16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Rename script tab"] \
+	 -command [list cproject::CreateDeleteScriptTab $scripttab rename]
+
+
+    supergrid::go $f0
+    supergrid::go $f1
+    supergrid::go $f
+}
+
+proc cproject::CreateDeleteScriptTab { currentscripttab what } {
+    variable scripttabs
+    variable dataS
+    variable notebook
+
+    syncfromUI
+
+    switch $what {
+	create {
+	    set num [expr [llength $scripttabs]+1]
+	    set newscripttab Script$num
+	    foreach i [array names dataS *,$currentscripttab,*] {
+		regexp {([^,]+),[^,]+,([^,]+)} $i {} dr v
+		set dataS($dr,$newscripttab,$v) $dataS($i)
+	    }
+	    lappend scripttabs $newscripttab
+	    $notebook raise $newscripttab
+	}
+	delete {
+	    if { [llength $scripttabs] == 1 } {
+		WarnWin "Error: There must be at least one Script tab" $notebook
+		return
+	    }
+	    set ret [DialogWin::messageBox -default ok -icon warning -message \
+		"Are you sure to delete script tab '$currentscripttab'?" -parent $notebook \
+		-title "delete script tab" -type okcancel]
+	    if { $ret == "cancel" } { return }
+	    
+	    set delpos [lsearch $scripttabs $currentscripttab]
+
+	    foreach i [array names dataS *,$currentscripttab,*] {
+		unset dataS($i)
+	    }
+	    set scripttabs [lreplace $scripttabs $delpos $delpos]
+	    if { $delpos >= [llength $scripttabs] } { set delpos 0 }
+	    $notebook raise [lindex $$scripttabsd $delpos]
+	}
+	rename {
+	    CopyNamespace ::DialogWin ::DialogWinCR
+	    set f [DialogWinCR::Init $notebook "Enter script tab name" separator ""]
+	    set w [winfo toplevel $f]
+	    
+	    label $f.l -text "Enter new name for script tab '$currentscripttab'" -grid "0 px3 py3"
+	    entry $f.e -textvariable DialogWinCR::user(name) -grid "0 px10 py3" -width 30
+	    
+	    set DialogWinCR::user(name) $currentscripttab
+	    tkTabToWindow $f.e
+	    supergrid::go $f
+	    bind $w <Return> "DialogWinCR::InvokeOK"
+
+	    set action [DialogWinCR::CreateWindow]
+	    while 1 {
+		switch $action {
+		    0 {
+		        DialogWinCR::DestroyWindow
+		        namespace delete ::DialogWinCR
+		        return
+		    }
+		    1 {
+		        set newscripttab [string trim $DialogWinCR::user(name)]
+		        if { $newscripttab == "" } {
+		            set newscripttab "Script"
+		        } elseif { ![string match "Script *" $newscripttab] } {
+		            set newscripttab "Script $newscripttab"
+		        }
+		        if { $newscripttab == "" } {
+		            WarnWin "Script tab name cannot be void" $w
+		        } elseif { [lsearch $scripttabs $newscripttab] != -1 } {
+		            WarnWin "Script tab name '$newscripttab' already exists" $w
+		        } else {
+		            DialogWinCR::DestroyWindow
+		            namespace delete ::DialogWinCR
+		            break
+		        }
+		    }
+		}
+		set action [DialogWinCR::WaitForWindow]
+	    }
+	    set pos [lsearch $scripttabs $currentscripttab]
+	    foreach i [array names dataS *,$currentscripttab,*] {
+		regexp {([^,]+),[^,]+,([^,]+)} $i {} dr v
+		set dataS($dr,$newscripttab,$v) $dataS($i)
+		unset dataS($i)
+	    }
+	    set scripttabs [lreplace $scripttabs $pos $pos $newscripttab]
 	}
     }
     synctoUI
@@ -1151,8 +1399,8 @@ proc cproject::AddDelDirectories { listbox what } {
     set dir [IsProjectNameOk]
     switch $what {
 	add {
-	    set dir [RamDebugger::filenormalize [tk_chooseDirectory -initialdir $dir -parent $listbox \
-		-title "Add directories" -mustexist 1]]
+	    set dir [RamDebugger::filenormalize [tk_chooseDirectory -initialdir $dir \
+		    -parent $listbox -title "Add directories" -mustexist 1]]
 	    if { $dir == "" } { return }
 	    $listbox insert end [ConvertToRelative $projectdir $dir]
 	}
@@ -1167,6 +1415,28 @@ proc cproject::AddDelDirectories { listbox what } {
 	}
     }
 }
+
+
+################################################################################
+#   execution
+################################################################################
+
+
+proc cproject::GiveDebugData {} {
+    variable project
+    variable dataE
+
+    set dr $RamDebugger::options(debugrelease)
+
+    if { [info exists dataE($dr,exe)] } {
+	set objdir [file root $project]_$dr
+	set exe [file join $objdir $dataE($dr,exe)]
+	return [list $exe $dataE($dr,execdir) \
+		$dataE($dr,exeargs)]
+    }
+    return ""
+}
+
 
 proc cproject::TryToFindPath { file } {
     variable project
@@ -1211,7 +1481,6 @@ proc cproject::ScanHeaders { file } {
 proc cproject::CleanCompiledFiles { w } {
     variable project
     variable files
-    variable debugrelease
     variable dataC
     variable dataL
     variable dataE
@@ -1231,30 +1500,19 @@ proc cproject::CleanCompiledFiles { w } {
 	    return
 	}
     }
-    if { $debugrelease == "both" } {
+
+    set dr $RamDebugger::options(debugrelease)
+
+    if { $dr == "both" } {
 	WarnWin "error: program must be in debug or in release mode"
 	RamDebugger::WaitState 0
 	return
     }
-    set objdir [file join [file dirname $project] [file root $project]_$debugrelease]
+    set objdir [file join [file dirname $project] [file root $project]_$dr]
 
     foreach i [glob -nocomplain -dir $objdir *] {
 	file delete $i
     }
-
-#     foreach i $files {
-#         foreach "file_in type group_in path" $i break
-#         set objfile [file join $objdir [file root $file_in].o]
-#         if { [file exists $objfile] } { file delete $objfile }
-#     }
-#     set exename [file join $dataE($debugrelease,execdir) $dataE($debugrelease,exe)]
-
-#     if { $::tcl_platform(platform) == "windows" && [file ext $exename] != ".exe" } {
-#         append exename .exe
-#     }
-
-#     if { [file exists $exename] } { file delete $exename }
-
     RamDebugger::TextCompClear
     RamDebugger::TextCompRaise
     RamDebugger::TextCompInsert "Compilation files deleted"
@@ -1263,13 +1521,19 @@ proc cproject::CleanCompiledFiles { w } {
     RamDebugger::SetMessage "Cleaning compilation files...done"
 }
 
+proc cproject::printfilename { filename } {
+    regsub -all " " $filename {\\ } filename
+    return $filename
+}
+
 proc cproject::TouchFiles { w } {
     variable project
     variable files
-    variable debugrelease
     variable dataC
     variable dataL
     variable dataE
+
+    set dr $RamDebugger::options(debugrelease)
 
     RamDebugger::SetMessage "Actualizing date for compilation files..."
     RamDebugger::WaitState 1
@@ -1286,12 +1550,12 @@ proc cproject::TouchFiles { w } {
 	    return
 	}
     }
-    if { $debugrelease == "both" } {
+    if { $dr == "both" } {
 	WarnWin "error: program must be in debug or in release mode"
 	RamDebugger::WaitState 0
 	return
     }
-    set objdir [file join [file dirname $project] [file root $project]_$debugrelease]
+    set objdir [file join [file dirname $project] [file root $project]_$dr]
 
     set time [clock seconds]
     foreach i [glob -nocomplain -dir $objdir *] {
@@ -1310,18 +1574,28 @@ proc cproject::CompileAll { w } {
 
     RamDebugger::TextCompClear
     foreach i [list debug release] {
-	CompileDo $w $i ""
+	set retval [CompileDo $w $i 1 ""]
+	if { $retval == -1 } { break }
     }
 }
 
 proc cproject::Compile { w { unique_file "" } } {
-    variable debugrelease
+
+    set dr $RamDebugger::options(debugrelease)
 
     RamDebugger::TextCompClear
-   CompileDo $w $debugrelease $unique_file
+    CompileDo $w $dr 0 $unique_file
 }
 
-proc cproject::CompileDo { w debugrelease { unique_file "" } } {
+proc cproject::CompileNoStop { w } {
+
+    set dr $RamDebugger::options(debugrelease)
+
+    RamDebugger::TextCompClear
+    CompileDo $w $dr 1 ""
+}
+
+proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
     variable project
     variable files
     variable dataC
@@ -1339,13 +1613,13 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 	}
 	if { $project == "" } {
 	    cproject::Create $w
-	    return
+	    return -1
 	}
     }
 
-    if { $debugrelease != "debug" && $debugrelease != "release" } {
+    if { $debrel != "debug" && $debrel != "release" } {
 	WarnWin "error: program must be in debug or in release mode"
-	return
+	return -1
     }
     if { [auto_execok gcc] == "" } {
 	set ret [DialogWin::messageBox -default yes -icon question -message \
@@ -1354,10 +1628,12 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 	if { $ret == "yes" } {
 	    RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 	}
-	return
+	return -1
     }
     $RamDebugger::mainframe setmenustate debugentry disabled
     $RamDebugger::mainframe setmenustate c++entry disabled
+    $RamDebugger::mainframe setmenustate activeconfiguration disabled
+
     set menu [$RamDebugger::mainframe getmenu c++]
     $menu add separator
     $menu add command -label "Stop compiling" -command \
@@ -1366,7 +1642,7 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
     set pwd [pwd]
     cd [file dirname $project]
 
-    set objdir [file tail [file root $project]]_$debugrelease
+    set objdir [file tail [file root $project]]_$debrel
     if { ![file exists $objdir] } { file mkdir $objdir }
 
     set cproject::compilationstatus -1
@@ -1378,7 +1654,7 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 	    foreach i $files {
 		foreach "file_in type group_in path" $i break
 		set file_in2 [RamDebugger::filenormalize [file join [file dirname $project] \
-			$path $file_in]]
+		        $path $file_in]]
 		if { [string equal $file_in2 $unique_file] } {
 		    set compfiles [list $i]
 		    set found 1
@@ -1391,11 +1667,11 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 		set compfiles ""
 	    }
 	    set forcecompile 1
-	    set project_short "$file_in $debugrelease"
+	    set project_short "$file_in $debrel"
 	} else {
 	    set compfiles $files
 	    set forcecompile 0
-	    set project_short "[file root [file tail $project]] $debugrelease"
+	    set project_short "[file root [file tail $project]] $debrel"
 	}
 	
 	RamDebugger::TextCompRaise
@@ -1418,7 +1694,7 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 	if { $unique_file == "" } {
 	    puts -nonewline $fout "all: "
 	    foreach link $links {
-		puts -nonewline $fout "[file join $objdir $dataL($debugrelease,$link,linkexe)] "
+		puts -nonewline $fout "[file join $objdir $dataL($debrel,$link,linkexe)] "
 	    }
 	    puts $fout "\n"
 	}
@@ -1426,7 +1702,7 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 	foreach i $compfiles {
 	    foreach "file_in type group_in path" $i break
 
-	    if { [string trim $dataC($group_in,$debugrelease,compiler)] == "" } { continue }
+	    if { [string trim $dataC($group_in,$debrel,compiler)] == "" } { continue }
 
 	    set file [file join $path $file_in]
 	    set objfile [file join $objdir [file root $file_in].o]
@@ -1435,70 +1711,96 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 		file delete $objfile
 	    }
 	    set dependencies [ScanHeaders $file]
-	    puts $fout "$objfile: $file $dependencies"
-	    puts -nonewline $fout "\t$dataC($group_in,$debugrelease,compiler) "
-	    foreach j $dataC($group_in,$debugrelease,flags) {
+	    puts -nonewline $fout "[printfilename $objfile]: [printfilename $file]"
+	    foreach i $dependencies {
+		puts -nonewline $fout " [printfilename $i]"
+	    }
+	    puts -nonewline $fout "\n\t$dataC($group_in,$debrel,compiler) "
+	    foreach j $dataC($group_in,$debrel,flags) {
 		puts -nonewline $fout "$j "
 	    }
-	    foreach j $dataC($group_in,$debugrelease,includedirs) {
-		puts -nonewline $fout "-I$j "
+	    foreach j $dataC($group_in,$debrel,includedirs) {
+		if { [string first " " $j] == -1 } {
+		    puts -nonewline $fout "-I$j "
+		} else {
+		    puts -nonewline $fout "-I\"$j\" "
+		}
 	    }
-	    foreach j $dataC($group_in,$debugrelease,defines) {
+	    foreach j $dataC($group_in,$debrel,defines) {
 		puts -nonewline $fout "-D$j "
 	    }
-	    puts -nonewline $fout "\\\n\t\t-o $objfile "
-	    puts $fout "$file\n"
+	    puts -nonewline $fout "\\\n\t\t-o [printfilename $objfile] "
+	    puts $fout "[printfilename $file]\n"
 	}
 	if { $unique_file == "" } {
 	    foreach link $links {
 		set objfiles ""
 		foreach i $files {
 		    foreach "file_in type group_in path" $i break
-		    if { [lsearch $dataL($debugrelease,$link,linkgroups) $group_in] != -1 || \
-			    [lsearch $dataL($debugrelease,$link,linkgroups) All] != -1 } {
-			if { [file ext $file_in] == ".rc" } {
-			    lappend objfiles [file join $path $file_in]
-			} else {
-			    lappend objfiles [file join $objdir [file root $file_in].o]
-			}
+		    if { [lsearch $dataL($debrel,$link,linkgroups) $group_in] != -1 || \
+		            [lsearch $dataL($debrel,$link,linkgroups) All] != -1 } {
+		        if { [file ext $file_in] == ".rc" } {
+		            lappend objfiles [file join $path $file_in]
+		        } else {
+		            lappend objfiles [file join $objdir [file root $file_in].o]
+		        }
 		    }
 		}
-		set outputname  [file join $objdir $dataL($debugrelease,$link,linkexe)]
+		if { [string trim $dataL($debrel,$link,linkexe)] == "" } {
+		    set tt "WARNING: no output name for linking target '$link'. "
+		    append tt "assuming 'program_$link.exe'\n"
+		    RamDebugger::TextCompInsertRed $tt
+		    set outputname [file join $objdir program_$link.exe]
+		} else {
+		    set outputname [file join $objdir $dataL($debrel,$link,linkexe)]
+		}
 
 		set target [string toupper OBJFILES_$link]
 		set string "$target = "
 		foreach i $objfiles {
 		    append string "$i "
 		    if { [string length $string] > 70 } {
-			puts $fout "$string \\"
-			set string ""
+		        puts $fout "$string \\"
+		        set string ""
 		    }
 		}
 		puts $fout "$string\n"
 
 		puts $fout "$outputname: \$($target)"
-		puts -nonewline $fout "\t$dataL($debugrelease,$link,linker) "
-		foreach j $dataL($debugrelease,$link,linkflags) {
+		puts -nonewline $fout "\t$dataL($debrel,$link,linker) "
+		foreach j $dataL($debrel,$link,linkflags) {
 		    puts -nonewline $fout  "$j "
 		}
 		puts -nonewline $fout "-o $outputname \$($target) "
-		foreach j $dataL($debugrelease,$link,librariesdirs) {
-		    if { $dataL($debugrelease,$link,linker) != "windres" } {
-			puts -nonewline $fout "-L$j "
+		foreach j $dataL($debrel,$link,librariesdirs) {
+		    if { $dataL($debrel,$link,linker) != "windres" } {
+		        if { [string first " " $j] == -1 } {
+		            puts -nonewline $fout "-L$j "
+		        } else {
+		            puts -nonewline $fout "-L\"$j\" "
+		        }
 		    } else {
-			puts -nonewline $fout "--include $j "
+		        if { [string first " " $j] == -1 } {
+		            puts -nonewline $fout "--include $j "
+		        } else {
+		            puts -nonewline $fout "--include \"$j\" "
+		        }
 		    }
 		}
-		if { $dataL($debugrelease,$link,linker) != "windres" } {
+		if { $dataL($debrel,$link,linker) != "windres" } {
 		    puts -nonewline $fout "-L$objdir "
 		}
-		foreach j $dataL($debugrelease,$link,libraries) {
-		    if { [regexp {^lib([^.]+)} $j {} j2] } {
-			puts -nonewline $fout "-l$j2 "
+		foreach j $dataL($debrel,$link,libraries) {
+		    if { [regexp {^lib(.*)(\.a|\.lib|\.so)$} $j {} j2] } {
+		        puts -nonewline $fout "-l$j2 "
+		    } elseif { [regexp {^lib(.*)} $j {} j2] } {
+		        puts -nonewline $fout "-l$j2 "
 		    } elseif { [file exists $j] } {
-			puts -nonewline $fout "$j "
+		        puts -nonewline $fout "$j "
+		    } elseif { [regexp {(?i)(.*)\.lib} $j {} j2] } {
+		        puts -nonewline $fout "-l$j2 "
 		    } else {
-			puts -nonewline $fout "[file join $objdir $j] "
+		        puts -nonewline $fout "[file join $objdir $j] "
 		    }
 		}
 		puts $fout "\n"
@@ -1507,11 +1809,18 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 	close $fout
 
 	if { $::tcl_platform(platform) == "windows" } {
-	    set comm [list start /w /m make -f $make]
+	    set comm [list start /w /m]
+	} else { set comm "" }
+
+	lappend comm make
+	if { $nostop } { lappend comm -k }
+	lappend comm -f $make
+
+	if { $nostop } {
+	    RamDebugger::TextCompInsert "make -k -f $make\n"
 	} else {
-	    set comm [list make -f $make]
+	    RamDebugger::TextCompInsert "make -f $make\n"
 	}
-	RamDebugger::TextCompInsert "make -f $make\n"
 	set fin [open "|$comm |& cat" r]
 	
 	fconfigure $fin -blocking 0
@@ -1525,7 +1834,7 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 		# but that's live and that's windows
 		foreach i [split [exec tlist] \n] {
 		    if { [string match -nocase "*make.exe*" $i] } {
-			catch { exec kill /f [scan $i %d] }
+		        catch { exec kill /f [scan $i %d] }
 		    }
 		}
 	    }
@@ -1565,7 +1874,11 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
     $menu delete end
     $RamDebugger::mainframe setmenustate c++entry normal
     $RamDebugger::mainframe setmenustate debugentry normal
+    $RamDebugger::mainframe setmenustate activeconfiguration normal
 
+    if { $compilationstatus == 2 } {
+	return -1
+    } else { return 0 }
 }
 
 proc cproject::CompileFeedback { fin} {
@@ -1588,3 +1901,67 @@ proc cproject::CompileFeedback { fin} {
 	update
     }
 }
+
+proc cproject::EvalScript { w debrel scripttab { show 0 } } {
+    variable project
+    variable dataS
+
+    set script $dataS($debrel,$scripttab,script)
+    regsub -all {(?n)^\s*\#.*$} $script "" res
+    if { [string trim $res] == "" } {
+	if { $show } {
+	    WarnWin "Nothing to execute in Script '$scripttab'" $w
+	}
+	return
+    }
+
+    set pwd [pwd]
+    cd [file dirname $project]
+
+    set ProjectDir [file dirname $project]
+    set ObjectsDir [file tail [file root $project]]_$debrel
+
+    rename puts ___puts
+    proc puts args {
+puts enter
+	set argsN $args
+	set hasnewline 1
+	if { [lindex $argsN 0] == "-nonewline" } {
+	    set hasnewline 0
+	    set argsN [lrange $argsN 1 end]
+	}
+	set channelId stdout
+	if { [llength $argsN] == 2 } {
+	    set channelId [lindex $argsN 0]
+	    set argsN [lrange $argsN 1 end]
+	}
+	if { [llength $argsN] == 1 && [regexp {stdout|stderr} $channelId] } {
+	    RamDebugger::TextCompInsert [lindex $argsN 0]
+	    if { $hasnewline } { RamDebugger::TextCompInsert \n }
+	} else {
+	    uplevel ___puts $args
+	}
+    }
+    rename puts ""
+    rename ___puts puts
+
+    set err [catch $script errstring]
+
+    if { $err } {
+	RamDebugger::TextCompRaise
+	RamDebugger::TextCompInsertRed "-----Error executing script '$scripttab'-----\n"
+	RamDebugger::TextCompInsertRed $::errorInfo\n
+	if { $show } {
+	    WarnWin "error executing script '$scripttab' ($errstring)" $w
+	}
+    } else {
+	RamDebugger::TextCompRaise
+	RamDebugger::TextCompInsert "Executed script '$scripttab'. Result: \n$errstring\n"
+	if { $show } {
+	    WarnWin "Executed script '$scripttab'. Result: $errstring" $w
+	}
+    }
+    cd $pwd
+}
+
+
