@@ -315,6 +315,10 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
     }
   }
 
+  int wordslen,isexpand=0;
+  Tcl_ListObjLength(is->ip,is->words,&wordslen);
+  if(!wordslen && strcmp(Tcl_GetString(is->currentword),"expand")==0) isexpand=1;
+
   is->level--;
   if(is->level<0) return 0;
   Tcl_DecrRefCount(is->words);
@@ -328,7 +332,10 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
   is->OutputType=is->stack[is->level].OutputType;
   is->NeedsNamespaceClose=is->stack[is->level].NeedsNamespaceClose;
   is->braceslevel=is->stack[is->level].braceslevel;
-  
+
+  is->words=Tcl_CopyIfShared(is->words);
+  if(isexpand) Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("expand",-1));
+  else Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("",-1));
 
   if(is->NeedsNamespaceClose){
     Tcl_AppendToObj(is->newblock[P],"}\n",-1);
@@ -584,9 +591,10 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	      Tcl_ListObjIndex(is->ip,is->words,0,&word0);
 	      pword0=Tcl_GetStringFromObj(word0,NULL);
 	      if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	      if(*pword0!='#' && strcmp(Tcl_GetString(is->currentword),"expand")!=0)
+		checkExtraCharsAfterCQB=BRACE_WT;
 	      is->currentword=Tcl_ResetString(is->currentword);
 	      consumed=1;
-	      if(*pword0!='#') checkExtraCharsAfterCQB=BRACE_WT;
 	      if(is->OutputType==R && RamDebuggerInstrumenterIsProc(is)){
 		int newllen=Tcl_GetCharLength(is->newblock[R]);
 		newllen-=Tcl_GetCharLength(is->words);
@@ -626,11 +634,12 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 		Tcl_DecrRefCount(blockinfo);
 		Tcl_DecrRefCount(blockinfocurrent);
 		return TCL_ERROR;
-		consumed=1;
-		is->words=Tcl_CopyIfShared(is->words);
-		Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("",-1));
-		wordslen++;
-		if(*pword0!='#') checkExtraCharsAfterCQB=BRACE_WT;
+	      }
+	      consumed=1;
+	      if(wordslen){
+		Tcl_ListObjIndex(is->ip,is->words,wordslen-1,&wordi);
+		if(*pword0!='#' && strcmp(Tcl_GetString(wordi),"expand")!=0)
+		  checkExtraCharsAfterCQB=BRACE_WT;
 	      }
 	    }
 	  }

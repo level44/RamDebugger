@@ -831,7 +831,12 @@ snit::widget procstree {
 
 proc profileprocs::OpenGUI { { w .profileprocs } } {
 
-    package require treectrl 1.1
+    set err [catch { package require treectrl 1.1 }]
+
+    if { $err } {
+	WarnWin [_ "It is necessary to install package 'treectrl 1.1' in order to use this function"]
+	return
+    }
 
     catch { destroy $w }
     set w [dialogwin_snit $w -title [_ "Profile procs"] \

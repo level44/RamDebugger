@@ -67,6 +67,12 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	if { ![catch [list pack info WIDGET] info] } {
 	    append retval "PACK SLAVE\n$info\n"
 	}
+	if { ![catch [list WIDGET panes] info] } {
+	    append retval "PANEDWINDOW MASTER\n"
+	    foreach i [WIDGET panes] {
+		append retval "    $i [WIDGET paneconfigure $i]\n"
+	    }
+	}
 	append retval "OPTIONS\n"
 	set retval_in ""
 	foreach i [WIDGET configure] {

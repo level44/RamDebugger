@@ -693,11 +693,13 @@ proc cproject::Create { par } {
     radiobutton $f1.f1.r3 -text Both -variable cproject::debugrelease -value both \
 	    -grid "2"
 
-    set pw [PanedWindow $f.pw -side top -pad 0 -weights available -grid 0 -activator line]
+    set pw [panedwindow $f.pw -orient horizontal -grid 0]
 
     foreach "weight1 weight2" [RamDebugger::ManagePanes $pw h "2 3"] break
 
-    set pane1 [$pw add -weight $weight1]
+#     set pane1 [$pw add -weight $weight1]
+    set pane1 [frame $pw.pane1]
+    $pw add $pane1 -sticky nsew -width $weight1
 
     set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0]
     set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 -height 20\
@@ -761,7 +763,10 @@ proc cproject::Create { par } {
 	tk_popup $menu %X %Y
     }
 
-    set pane2 [$pw add -weight $weight2]
+    #set pane2 [$pw add -weight $weight2]
+    set pane2 [frame $pw.pane2]
+    $pw add $pane2 -sticky nsew -width $weight2
+
 
     set notebook [NoteBook $pane2.nb -homogeneous 1 -bd 1 -internalborderwidth 3  \
 	-grid "0 px3 py3"]

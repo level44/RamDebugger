@@ -554,37 +554,37 @@ proc RamDebugger::CreateModifyFonts {} {
 
 }
 
-proc RamDebugger::UpdateFont { w but fontname } {
-
-    set newfont [SelectFont $w.fonts -type dialog -parent $w -sampletext \
-	"RamDebugger is nice" -title "Select font"]
-    if { $newfont == "" } { return }
-    set list [list family size weight slant underline overstrike]
-    foreach $list $newfont break
-
-    if { $weight == "" } { set weight normal }
-    if { $slant == "" } { set slant roman }
-
-    set comm "font configure"
-    lappend comm $fontname
-    foreach i [lrange $list 0 3] {
-	lappend comm -$i [set $i]
-    }
-    if { [info exists underline] && $underline != "" } {
-	lappend comm -underline 1
-    } else { lappend comm -underline 0 }
-
-    if { [info exists overstrike] && $overstrike != "" } {
-	lappend comm -overstrike 1
-    } else { lappend comm -overstrike 0 }
-
-    eval $comm
-
-    regexp {^[^:]+} [$but cget -text] type
-    set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
-    append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
-    $but configure -text $btext
-}
+# proc RamDebugger::UpdateFont { w but fontname } {
+# 
+#     set newfont [SelectFont $w.fonts -type dialog -parent $w -sampletext \
+#         "RamDebugger is nice" -title "Select font" -font $fontname]
+#     if { $newfont == "" } { return }
+#     set list [list family size weight slant underline overstrike]
+#     foreach $list $newfont break
+# 
+#     if { $weight == "" } { set weight normal }
+#     if { $slant == "" } { set slant roman }
+# 
+#     set comm "font configure"
+#     lappend comm $fontname
+#     foreach i [lrange $list 0 3] {
+#         lappend comm -$i [set $i]
+#     }
+#     if { [info exists underline] && $underline != "" } {
+#         lappend comm -underline 1
+#     } else { lappend comm -underline 0 }
+# 
+#     if { [info exists overstrike] && $overstrike != "" } {
+#         lappend comm -overstrike 1
+#     } else { lappend comm -overstrike 0 }
+# 
+#     eval $comm
+# 
+#     regexp {^[^:]+} [$but cget -text] type
+#     set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
+#     append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
+#     $but configure -text $btext
+# }
 
 ################################################################################
 # Preferences
@@ -625,8 +625,34 @@ proc RamDebugger::PreferencesAddDelDirectories { listbox what } {
     }
 }
 
+proc RamDebugger::_giveopposite_color { col } {
+
+    foreach "r g b" [winfo rgb . $col] break
+
+    foreach i "r g b" {
+	set $i [expr {65535-[set $i]}]
+    }
+    return [format "#%04x%04x%04x" $r $g $b]
+}
+
+proc RamDebugger::_chooseColor { button what } {
+
+    set col [tk_chooseColor -initialcolor $DialogWin::user(colors,$what) \
+	    -parent $button -title "Choose color"]
+    if { $col ne "" } {
+	set DialogWin::user(colors,$what) $col
+	$button configure -background $col -text $col \
+	    -foreground [_giveopposite_color $col]
+    }
+}
+
+proc RamDebugger::_update_pref_font { label selectfont } {
+    $label configure -font [$selectfont cget -font]
+}
+
 proc RamDebugger::PreferencesWindow {} {
     variable text
+    variable text_secondary
     variable options
     variable options_def
     
@@ -731,14 +757,42 @@ proc RamDebugger::PreferencesWindow {} {
     TitleFrame $f.f2 -text [_ fonts] -grid "0 nsew"
     set f2 [$f.f2 getframe]
     
-    foreach "but type fontname" [list $f2.b1 {GUI font} NormalFont $f2.b2 {Text font} FixedFont \
-	$f2.b3 {Help font} HelpFont] {
-	set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
-	append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
-	Button $but -text $btext -font $fontname -relief link -command \
-	    "RamDebugger::UpdateFont $w $but $fontname" -grid "0 w"
+#     foreach "but type fontname" [list $f2.b1 {GUI font} NormalFont $f2.b2 {Text font} FixedFont \
+#         $f2.b3 {Help font} HelpFont] {
+#         set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
+#         append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
+#         Button $but -text $btext -font $fontname -relief link -command \
+#             "RamDebugger::UpdateFont $w $but $fontname" -grid "0 w"
+#     }
+
+    foreach "but type fontname" [list b1 {GUI font} NormalFont b2 {Text font} \
+	    FixedFont b3 {Help font} HelpFont] {
+	label $f2.l$but -text $type: -font $fontname -grid "0 w" \
+	    -anchor w
+	SelectFont $f2.$but -type toolbar -font $fontname -command \
+	    [list RamDebugger::_update_pref_font $f2.l$but $f2.$but]
+	supergrid::gridinfo $f2.$but "1 new"
     }
 
+
+    set fco [$fb.nb insert end colors -text "Colors"]
+
+    TitleFrame $fco.f1 -text "colors" -grid "0 nsew"
+    set fco1 [$fco.f1 getframe]
+
+    foreach i [list foreground background commands defines procnames \
+	    quotestrings set comments varnames] {
+	label $fco1.l$i -text $i -grid "0 nw px3"
+	set DialogWin::user(colors,$i) $options(colors,$i)
+	button $fco1.b$i -width 15 -background $options(colors,$i) \
+	    -grid "1 w px3 py2" -text $options(colors,$i) \
+	    -foreground [_giveopposite_color $options(colors,$i)] \
+	    -command [list RamDebugger::_chooseColor $fco1.b$i $i] \
+	    -anchor center
+    }
+    supergrid::go $fco
+    supergrid::go $fco1
+ 
     set fde [$fb.nb insert end extensions -text "Extensions"]
 
     TitleFrame $fde.f1 -text "extensions" -grid "0 nsew"
@@ -894,6 +948,17 @@ proc RamDebugger::PreferencesWindow {} {
 		                   AutoSaveRevisions_idletime CompileFastInstrumenter] {
 		        set options($i) $DialogWin::user($i)
 		    }
+		    foreach i [list foreground background commands defines procnames \
+		            quotestrings set comments varnames] {
+		        set options(colors,$i) $DialogWin::user(colors,$i)
+		    }
+		    foreach "but type fontname" [list b1 {GUI font} NormalFont b2 {Text font} \
+		            FixedFont b3 {Help font} HelpFont] {
+		        $f2.l$but configure -font $fontname
+		        set options($fontname) [font actual [$f2.$but cget -font]]
+		    }
+		    CreateModifyFonts
+
 		    if { [info exists options(CheckRemotes)] } {
 		        set options(CheckRemotes) $DialogWin::user(CheckRemotes)
 		    }
@@ -905,7 +970,11 @@ proc RamDebugger::PreferencesWindow {} {
 		    UpdateExecDirs
 		    RamDebugger::CVS::ManageAutoSave
 		    if { $options(CompileFastInstrumenter) } {
-			Instrumenter::TryCompileFastInstrumenter 1
+		        Instrumenter::TryCompileFastInstrumenter 1
+		    }
+		    ApplyColorPrefs $text
+		    if { [info exists text_secondary] && [winfo exists text_secondary] } {
+		        ApplyColorPrefs $text_secondary
 		    }
 		    if { $action == 1 } {
 		        DialogWin::DestroyWindow
@@ -924,14 +993,31 @@ proc RamDebugger::PreferencesWindow {} {
 		        set DialogWin::user($i) $options_def($i)
 		    }
 		}
-		CreateModifyFonts
-
-		foreach "but fontname" [list $f2.b1 NormalFont $f2.b2 FixedFont $f2.b3 HelpFont] {
-		    regexp {^[^:]+} [$but cget -text] type
-		    set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
-		    append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
-		    $but configure -text $btext
+		foreach i [list foreground background commands defines procnames \
+		        quotestrings set comments varnames] {
+		    set options(colors,$i) $options_def(colors,$i)
+		    set DialogWin::user(colors,$i) $options_def(colors,$i)
+		    $fco1.b$i configure -background $options(colors,$i) \
+		        -text $options(colors,$i) -foreground \
+		        [_giveopposite_color $options(colors,$i)]
 		}
+		CreateModifyFonts
+		foreach "but type fontname" [list b1 {GUI font} NormalFont b2 {Text font} \
+		        FixedFont b3 {Help font} HelpFont] {
+		    $f2.l$but configure -font $fontname
+		    $f2.$but configure -font $fontname
+		}
+		ApplyColorPrefs $text
+		if { [info exists text_secondary] && [winfo exists text_secondary] } {
+		    ApplyColorPrefs $text_secondary
+		}
+
+#                 foreach "but fontname" [list $f2.b1 NormalFont $f2.b2 FixedFont $f2.b3 HelpFont] {
+#                     regexp {^[^:]+} [$but cget -text] type
+#                     set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
+#                     append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
+#                     $but configure -text $btext
+#                 }
 
 		foreach i [array names options_def extensions,*] {
 		    set options($i) $options_def($i)

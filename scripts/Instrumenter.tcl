@@ -36,8 +36,8 @@ proc RamDebugger::Instrumenter::InitState {} {
     variable level 0
     variable colors
 
-    foreach i [list return break while eval foreach for if else elseif error switch default \
-	    continue] {
+    foreach i [list return break while eval foreach for if else elseif \
+	    error switch default continue] {
 	set colors($i) magenta
     }
     foreach i [list variable set global] {
@@ -239,8 +239,15 @@ proc RamDebugger::Instrumenter::PopState { type line newblocknameP newblocknameR
 	    }
 	} 
     }
+    if { $currentword ne "" } { lappend words $currentword }
+    set words_old $words
     foreach [list words currentword wordtype wordtypeline wordtypepos DoInstrument OutputType \
 	NeedsNamespaceClose braceslevel] [lindex $stack end] break
+    if { $words_old eq "expand" } {
+	lappend words expand
+    } else {
+	lappend words ""
+    }
     set stack [lreplace $stack end end]
     incr level -1
 
@@ -302,16 +309,17 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     set OPTS [list -shared -DUSE_TCL_STUBS -O2]
     if {$::tcl_platform(platform) != "windows"} { lappend OPTS "-fPIC" }
     set basedir [file dirname [file dirname [info nameofexecutable]]]
-    lappend OPTS -I[file join $basedir include]
+    lappend OPTS -I[file join $basedir include] \
+	-I[file join $RamDebugger::MainDir scripts compile]
     set libs [glob -nocomplain -dir [file join $basedir lib] *tclstub*]
     switch [llength $libs] {
-	0 { set lib libtclstub.a }
+	0 { set lib [file join $RamDebugger::MainDir scripts compile libtclstub.a] }
 	1 { set lib [lindex $libs 0] }
 	default { set lib [file join $basedir lib libtclstub.a] }
     }
     set LOPTS [list $lib]
 
-    set err [catch {eval exec gcc $OPTS [list $sourcefile -o $dynlib] $LOPTS} errstring]
+    set err [catch {eval exec g++ $OPTS [list $sourcefile -o $dynlib] $LOPTS} errstring]
     if { $err && $raiseerror } {
 	WarnWin $::errorInfo
     }
@@ -341,7 +349,7 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 	}
 	set FastInstrumenterLoaded 1
     }
-    if {[info command RamDebuggerInstrumenterDoWork] ne "" } {
+    if { [info command RamDebuggerInstrumenterDoWork] ne "" } {
 	RamDebuggerInstrumenterDoWork $block $filenum $newblocknameP $newblocknameR $blockinfoname $progress
     } else {
 	uplevel [list RamDebugger::Instrumenter::DoWork $block $filenum $newblocknameP $newblocknameR \
@@ -493,11 +501,11 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		        if { $braceslevelNoEval == 0 } {
 		            set wordtype ""
 		            lappend words $currentword
-		            set currentword ""
-		            set consumed 1
-		            if { [lindex $words 0] != "\#" } {
+		            if { [lindex $words 0] != "\#" && $currentword ne "expand" } {
 		                set checkExtraCharsAfterCQB \}
 		            }
+		            set currentword ""
+		            set consumed 1
 		            if { $OutputType == "R" && [IsProc $words] } {
 		                if { $lastinstrumentedline == $line } {
 		                    set numdel [expr [string length $words]+\
@@ -523,8 +531,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		                error $text
 		            }
 		            set consumed 1
-		            lappend words ""
-		            if { [lindex $words 0] != "\#" } {
+		            if { [lindex $words 0] != "\#" && [lindex $words end] ne "expand" } {
 		                set checkExtraCharsAfterCQB \}
 		            }
 		        }
