@@ -31,7 +31,7 @@ proc Execute { args } {
 
 set FREEWRAP /tcltk/freewrap44/freewrap.exe
 set FREEWRAPTCLSH /utils/freewrapTCLSH
-set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html" \
+set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html1.64" \
     -split_node -menu}
 set ZIP /utils/zip.exe
 
