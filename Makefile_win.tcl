@@ -64,7 +64,8 @@ set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html" \
 set ZIP /utils/zip.exe
 
 set ZIPFILES [list RamDebugger/RamDebugger.tcl RamDebugger/license.terms RamDebugger/Readme \
-    RamDebugger/addons RamDebugger/scripts RamDebugger/Examples RamDebugger/help]
+    RamDebugger/addons RamDebugger/scripts RamDebugger/Examples RamDebugger/help \
+    RamDebugger/pkgIndex.tcl]
 
 pack [text .t -width 80 -height 8] -fill both -expand 1
 
@@ -76,7 +77,7 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
 }
 
 CheckHiddenFiles .. $ZIPFILES
-zipfile RamDebugger2.7.zip .. $ZIPFILES
+zipfile RamDebugger2.8.zip .. $ZIPFILES
 
 update
 after 500

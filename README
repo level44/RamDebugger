@@ -46,7 +46,7 @@ for details.
 Changes
 =======
 
-Changes From version 2.6 to version 2.7
+Changes From version 2.6 to version 2.8
 
    * Option to instrument last line in proc (to avoid error when not using return)
    * corrected error when brackets are not paired in comments
@@ -85,7 +85,7 @@ Download
 ========
 
 RamDebugger can be download from
-`http://gid.cimne.com/RamDebugger/RamDebugger2.7.zip'
+`http://gid.cimne.com/RamDebugger/RamDebugger2.8.zip'
 
 Installation and prerequisites
 ==============================
