@@ -1,8 +1,8 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.49 2004/12/30 18:20:38 ramsan Exp $        
-# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2004
+#         $Id: RamDebugger.tcl,v 1.50 2005/01/12 10:42:29 ramsan Exp $        
+# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
 #package require Tk 8.4
@@ -239,6 +239,18 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(showbuttonstoolbar) 1
     set options_def(CompileFastInstrumenter) -1
 
+    set options_def(colors,foreground) black
+    set options_def(colors,background) white
+    set options_def(colors,commands) magenta
+    set options_def(colors,defines) magenta2
+    set options_def(colors,procnames) blue
+    set options_def(colors,quotestrings) grey40
+    set options_def(colors,set) green
+    set options_def(colors,comments) red
+    set options_def(colors,varnames) \#b8860b
+
+    set optiods_def(listfilespane) 0
+    
     switch $::tcl_platform(platform) {
 	windows {
 	    if { $iswince } {
@@ -2234,7 +2246,7 @@ proc RamDebugger::RecieveFromProgramSource { args } {
 	TextOutRaise
 	TextOutInsertBlue "Sourcing file '$file'\n"
     }
-    return [list ::RDC::sourceproc $file]
+    return "::RDC::sourceproc $args"
 }
 
 proc RamDebugger::EvalRemote { comm } {
@@ -2714,6 +2726,8 @@ proc RamDebugger::ViewSecondText {} {
 	bind $text_secondary <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
 	bind $text_secondary <Control-Tab> [bind $text <Control-KeyPress-Tab>]
 	bind $text_secondary <Tab> "RamDebugger::Indent ; break"
+
+	ApplyColorPrefs $text_secondary
 	
 	grid columnconfigure $f.textpane.f 0 -weight 1
 	grid rowconfigure $f.textpane.f 0 -weight 1
@@ -2767,6 +2781,22 @@ proc RamDebugger::FocusSecondTextToggle {} {
 
 }
 
+proc RamDebugger::CheckListFilesPane {} {
+    variable options
+    variable pane1
+    variable pane2
+    
+    set pw [FindPanedWindowFromPane $pane2]
+
+    if { $options(listfilespane) } {
+	if { [lsearch [$pw panes] $pane1] == -1 } {
+	    $pw add $pane1 -sticky nsew -before $pane2 -width 100
+	}
+    } elseif { [lsearch [$pw panes] $pane1] != -1 } {
+	$pw forget $pane1
+    }
+}
+
 proc RamDebugger::ViewOnlyTextOrAll {} {
     variable mainframe
     variable text
@@ -2775,6 +2805,7 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     variable pane1
     variable pane2
     variable pane3
+    variable listboxlabelframe
 
     set f [$mainframe getframe]
     set t [winfo toplevel $mainframe]
@@ -2793,7 +2824,7 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 		set idx 0
 		set sum 0
 		set res ""
-		while { [set pane [$panedw getframe $idx]] != "" } {
+		foreach pane [$panedw panes] {
 		    switch $orient {
 		        h { lappend res [winfo width $pane] }
 		        v { lappend res [winfo height $pane] }
@@ -2804,43 +2835,51 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 		if { $sum > $idx } { set options($i) $res }
 	    }
 	}
-	foreach i [winfo children $f] {
-	    grid remove $i
-	}
-
+	grid remove $f.pw
 	grid $fulltext -in $f -sticky nsew
 
 	grid rowconf $f 0 -weight 1
 	grid columnconf $f 0 -weight 1
 
-	if { [info exist pane1] } { set wpane1 [winfo width $pane1] } else { set wpane1 0 }
+	if { [lsearch [$f.pw panes] $pane1] != -1 } {
+	    set wpane1 [winfo width $pane1]
+	} else {
+	    set wpane1 0
+	}
 	set x [expr {[winfo x $t]+$wpane1}]
 	wm geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
 	
 	set options(ViewOnlyTextOrAll) OnlyText
     } else {
-	foreach i [winfo children $f] {
-	    if { $i eq "$f.fulltext" } { continue }
-	    grid $i
-	}
+	grid $f.pw
 	grid $fulltext -in $pane2in1 -sticky nsew
 
 	set width [winfo width $fulltext]
 
 	if { [info exist pane3] && [winfo width $pane3] <= 1 } {
 	    set panedw [FindPanedWindowFromPane $pane3]
-	    #set panedw [winfo parent [winfo parent $pane3]] ;# dirty hack
-	    foreach "weight2 weight3" [ManagePanes $panedw h "6 2"] break
+	    if { [llength [ManagePanes $panedw h "300 100"]] == 3 } {
+		foreach "weight1 weight2 weight3" [ManagePanes $panedw h "100 300 100"] break
+	    } else {
+		set weight1 2
+		foreach "weight2 weight3" [ManagePanes $panedw h "300 100"] break
+	    }
 	    set w3 [expr int($weight3/double($weight2)*$width+0.5)]
 	    incr width $w3
 	    set x [expr {[winfo x $t]+0}]
 	} else {
-	    if { [info exist pane1] } { incr width [winfo width $pane1] }
+	    if { [lsearch [$f.pw panes] $pane1] != -1 } {
+		incr width [winfo width $pane1]
+	    }
 	    incr width [winfo width $pane3]
-	    if { [info exist pane1] } { set wpane1 [winfo width $pane1] } else { set wpane1 0 }
+	    if { [lsearch [$f.pw panes] $pane1] != -1 } {
+		set wpane1 [winfo width $pane1]
+	    } else { set wpane1 0 }
 	    set x [expr {[winfo x $t]-$wpane1+0}]
-	}
-	incr width 4
+	}     
+	#incr width 4
+	update idletasks
+	set width [winfo reqwidth $f.pw]
 	wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
 	set options(ViewOnlyTextOrAll) All
     }
@@ -2849,6 +2888,55 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	wm withdraw $t
 	update
 	after 0 wm deiconify $t
+    }
+}
+
+#option add *Panedwindow.Stretch always
+
+if { [package vcompare [package present Tcl] 8.5] >= 0 } {
+     option add *Panedwindow.Stretch always
+} else {
+    bind Panedwindow <Configure> [list RamDebugger::ResizePanedWindow %W]
+}
+
+proc RamDebugger::ResizePanedWindow { w } {
+    variable resize_panedwindow_id
+    if { [info exists resize_panedwindow_id] } {
+	after cancel $resize_panedwindow_id
+    }
+    set resize_panedwindow_id [after idle \
+	    [list RamDebugger::ResizePanedWindowDo $w]]
+}
+proc RamDebugger::ResizePanedWindowDo { w } {
+    variable resize_panedwindow_id
+
+    unset resize_panedwindow_id
+
+    switch [$w cget -orient] {
+	horizontal { set LEN width }
+	vertical { set LEN height }
+    }
+    set len 0
+    foreach i [$w panes] {
+	if { [$w panecget $i -$LEN] ne "" } {
+	    incr len [$w panecget $i -$LEN]
+	} else { incr len [winfo req$LEN $i] }
+    }
+    set delta [expr {[winfo $LEN $w]-$len}]
+
+    set spad [$w cget -sashpad]
+    set swidth [$w cget -sashwidth]
+    set tlen 0
+    for { set i 0 } { $i < [llength [$w panes]] } { incr i } {
+	set pane [lindex [$w panes] $i]
+	if { [$w panecget $pane -$LEN] ne "" } {
+	    set l [$w panecget $pane -$LEN]
+	} else { set l [winfo req$LEN $pane] }
+	incr tlen [expr {$l+$spad+int($delta*$l/$len+.5)}]
+	if { $i < [llength [$w panes]]-1 } {
+	    $w sash place $i $tlen $tlen
+	}
+	incr tlen [expr {$swidth+$spad}]
     }
 }
 
@@ -2861,10 +2949,19 @@ proc RamDebugger::ManagePanes { panedw orient default } {
 
     if { [info exists options(paneweights,$orient,$panedw)] && \
 	     $options(paneweights,$orient,$panedw) != "" } {
-	return $options(paneweights,$orient,$panedw)
+	set ret $options(paneweights,$orient,$panedw)
     } else {
-	return [set options(paneweights,$orient,$panedw) $default]
+	set ret [set options(paneweights,$orient,$panedw) $default]
     }
+#     set newret ""
+#     foreach i $ret {
+#         if { $i == 1 } {
+#             set i 20
+#         }
+#         lappend newret $i
+#     }
+    return $ret
+    
 }
 
 proc RamDebugger::ExitGUI {} {
@@ -2915,7 +3012,7 @@ proc RamDebugger::ExitGUI {} {
 		set idx 0
 		set sum 0
 		set res ""
-		while { [set pane [$panedw getframe $idx]] != "" } {
+		foreach pane [$panedw panes] {
 		    switch $orient {
 		        h { lappend res [winfo width $pane] }
 		        v { lappend res [winfo height $pane] }
@@ -2972,6 +3069,20 @@ proc RamDebugger::ExitGUI {} {
     } else { exit }
 }
 
+proc RamDebugger::ApplyColorPrefs { t } {
+    variable options
+    
+    $t conf -foreground $options(colors,foreground) \
+	-background $options(colors,background)
+    $t tag conf magenta -foreground $options(colors,commands)
+    $t tag conf magenta2 -foreground $options(colors,defines)
+    $t tag conf blue -foreground $options(colors,procnames)
+    $t tag conf grey -foreground $options(colors,quotestrings)
+    $t tag conf green -foreground $options(colors,set)
+    $t tag conf red -foreground $options(colors,comments)
+    $t tag conf cyan -foreground $options(colors,varnames)
+}
+
 # what can be text or text_secondary
 proc RamDebugger::Colorize { { what text } } {
     variable text
@@ -2979,6 +3090,7 @@ proc RamDebugger::Colorize { { what text } } {
     variable instrumentedfilesInfo
     variable currentfile
     variable currentfile_secondary
+    variable options
 
     if { $what eq "text_secondary" } {
 	set file $currentfile_secondary
@@ -2994,13 +3106,16 @@ proc RamDebugger::Colorize { { what text } } {
 	$text_secondary configure -state normal
 	set t $text_secondary
     }
-    $t tag conf magenta -foreground magenta
-    $t tag conf magenta2 -foreground magenta2
-    $t tag conf blue -foreground blue
-    $t tag conf grey -foreground grey40
-    $t tag conf green -foreground green
-    $t tag conf red -foreground red
-    $t tag conf cyan -foreground \#b8860b
+
+#     $t conf -foreground $options(colors,foreground) \
+#         -background $options(colors,background)
+#     $t tag conf magenta -foreground $options(colors,commands)
+#     $t tag conf magenta2 -foreground $options(colors,defines)
+#     $t tag conf blue -foreground $options(colors,procnames)
+#     $t tag conf grey -foreground $options(colors,quotestrings)
+#     $t tag conf green -foreground $options(colors,set)
+#     $t tag conf red -foreground $options(colors,comments)
+#     $t tag conf cyan -foreground $options(colors,varnames)
 
     set iline 1
     foreach i $instrumentedfilesInfo($file) {
@@ -3024,6 +3139,7 @@ proc RamDebugger::ColorizeLines { l1 l2 { what text } } {
     variable instrumentedfilesInfo
     variable currentfile
     variable currentfile_secondary
+    variable options
 
     if { $what eq "text_secondary" } {
 	set file $currentfile_secondary
@@ -3038,11 +3154,15 @@ proc RamDebugger::ColorizeLines { l1 l2 { what text } } {
 	$text_secondary configure -state normal
 	set t $text_secondary
     }
-    $t tag conf magenta -foreground magenta
-    $t tag conf blue -foreground blue
-    $t tag conf grey -foreground grey40
-    $t tag conf green -foreground green
-    $t tag conf red -foreground red
+#     $t conf -foreground $options(colors,foreground) \
+#         -background $options(colors,background)
+#     $t tag conf magenta -foreground $options(colors,commands)
+#     $t tag conf magenta2 -foreground $options(colors,defines)
+#     $t tag conf blue -foreground $options(colors,procnames)
+#     $t tag conf grey -foreground $options(colors,quotestrings)
+#     $t tag conf green -foreground $options(colors,set)
+#     $t tag conf red -foreground $options(colors,comments)
+#     $t tag conf cyan -foreground $options(colors,varnames)
 
     foreach i [list magenta blue grey green red] {
 	$t tag remove $i $l1.0 "$l2.0 lineend"
@@ -3063,14 +3183,20 @@ proc RamDebugger::ColorizeLines { l1 l2 { what text } } {
 }
 
 proc RamDebugger::ColorizeSlow { txt } {
+    variable options
 
     set ed [$txt cget -editable]
     $txt conf -editable 1
-    $txt tag conf magenta -foreground magenta
-    $txt tag conf blue -foreground blue
-    $txt tag conf grey -foreground grey40
-    $txt tag conf green -foreground green
-    $txt tag conf red -foreground red
+
+#     $txt conf -foreground $options(colors,foreground) \
+#         -background $options(colors,background)
+#     $txt tag conf magenta -foreground $options(colors,commands)
+#     $txt tag conf magenta2 -foreground $options(colors,defines)
+#     $txt tag conf blue -foreground $options(colors,procnames)
+#     $txt tag conf grey -foreground $options(colors,quotestrings)
+#     $txt tag conf green -foreground $options(colors,set)
+#     $txt tag conf red -foreground $options(colors,comments)
+#     $txt tag conf cyan -foreground $options(colors,varnames)
 
     set idx 1.0
     while 1 {
@@ -4065,8 +4191,9 @@ proc RamDebugger::ChooseViewFile { what args } {
 		    incr row
 		    set col 0
 		}
-		entry $w._choosevf.l$i -width [expr {$entrylen-2}] -bd 0 -highlightthickness 2 \
-		    -highlightcolor #b5b6bd -justify center -cursor "" \
+		entry $w._choosevf.l$i -width $entrylen -bd 0 -highlightthickness 2 \
+		    -highlightcolor #b5b6bd -highlightbackground [$w._choosevf cget -bg] \
+		    -justify center -cursor "" \
 		    -disabledbackground [$w._choosevf.ld cget -background] \
 		    -disabledforeground [$w._choosevf.ld cget -foreground]
 
@@ -6505,6 +6632,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable mainframe
     variable listbox
     variable listboxlabel
+    variable listboxlabelframe
     variable pane2in1
     variable images
     variable textST
@@ -6654,6 +6782,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command "&View text/all" {} \
 		"Toggle between viewing all windows or only text window" "Ctrl t" \
 		-command "RamDebugger::ViewOnlyTextOrAll"] \
+		[list checkbutton "&View files pane" {} \
+		"Toggle between viewing the file list pane" "" \
+		-command "RamDebugger::CheckListFilesPane" \
+		-variable RamDebugger::options(listfilespane)] \
 		[list command "&Secondary view" {} \
 		"Toggle between activating a secondary view for files" "Ctrl 2" \
 		-command "RamDebugger::ViewSecondText"] \
@@ -6912,44 +7044,64 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # the horizontal 3 levels pane
     ################################################################################
 
-    set pw [PanedWindow $f.pw -side top -pad 0 -weights available -grid 0 -activator line]
+    #set pw [PanedWindow $f.pw -side top -pad 0 -weights available -activator line]
+    set pw [panedwindow $f.pw -orient horizontal]
 
-    if { [llength [ManagePanes $pw h "6 2"]] == 3 } {
-	foreach "weight2 weight3" [list 6 2] break
+    if { [llength [ManagePanes $pw h "300 100"]] == 3 } {
+	foreach "weight1 weight2 weight3" [ManagePanes $pw h "100 300 100"] break
     } else {
-	foreach "weight2 weight3" [ManagePanes $pw h "6 2"] break
+	set weight1 2
+	foreach "weight2 weight3" [ManagePanes $pw h "300 100"] break
     }
 
-#     set pane1 [$pw add -weight $weight1]
-# 
-#     if { ![info exists options(defaultdir)] } {
-#         set options(defaultdir) [pwd]
-#     }
-#     set listboxlabel [Label $pane1.l -anchor e -relief raised -bd 1 \
-#         -padx 5 -grid "0 ew"]
-#     bind $listboxlabel <Configure> "RamDebugger::ConfigureLabel $listboxlabel"
-# 
-#     bind $listboxlabel <ButtonPress-1> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
-#     bind $listboxlabel <ButtonPress-3> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
-# 
-#     set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0 -grid 0]
-#     set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
-#     $sw setwidget $listbox
-# 
-#     $sw.lb configure -deltay [expr [font metrics [$sw.lb cget -font] -linespace]]
-#    ListBoxEvents $listbox RamDebugger::ListBoxDouble1 RamDebugger::ListboxMenu
+    if { ![info exists options(defaultdir)] } {
+	set options(defaultdir) [pwd]
+    }
 
-    set pane2 [$pw add -weight $weight2]
+    #set pane1 [$pw add -weight $weight1]
+
+    set listboxlabelframe [frame $f.lflf]
+    set pane1 $listboxlabelframe
+
+    if { $options(listfilespane) } {
+	set pane1 $listboxlabelframe
+	$pw add $f.lflf -sticky nsew -width $weight1
+    }
+
+#     grid $f.lflf -in $pane1 -row 0 -column 0 -sticky nsew
+#     grid columnconfigure $pane1 0 -weight 1
+#     grid rowconfigure $pane1 0 -weight 1
+
+    set listboxlabel [Label $listboxlabelframe.l -anchor e -relief raised -bd 1 \
+	-padx 5 -grid "0 ew"]
+    bind $listboxlabel <Configure> "RamDebugger::ConfigureLabel $listboxlabel"
+
+    bind $listboxlabel <ButtonPress-1> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
+    bind $listboxlabel <ButtonPress-3> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
+
+    set sw [ScrolledWindow $listboxlabelframe.lf -relief sunken -borderwidth 0 -grid 0]
+    set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
+    $sw setwidget $listbox
+
+    $sw.lb configure -deltay [expr [font metrics [$sw.lb cget -font] -linespace]]
+    ListBoxEvents $listbox RamDebugger::ListBoxDouble1 RamDebugger::ListboxMenu
+    supergrid::go $f.lflf
+
+    #set pane2 [$pw add -weight $weight2]
+    set pane2 [frame $pw.pane2]
+    $pw add $pane2 -sticky nsew -width $weight2
 
     ################################################################################
     # the vertical edit window and stack trace
     ################################################################################
 
-    set pwin [PanedWindow $pane2.pw -side left -pad 0 -weights available -grid 0 -activator line]
+    set pwin [panedwindow $pane2.pw -orient vertical -grid 0]
 
-    foreach "weight1in weight2in" [ManagePanes $pwin v "6 1"] break
+    foreach "weight1in weight2in" [ManagePanes $pwin v "300 50"] break
 
-    set pane2in1 [$pwin add -weight $weight1in]
+    #set pane2in1 [$pwin add -weight $weight1in]
+    set pane2in1 [frame $pwin.pane2in1]
+    $pwin add $pane2in1 -height $weight1in
 
     set fulltext [frame $f.fulltext -grid no -bd 1 -relief sunken]
     grid $fulltext -in $pane2in1 -sticky nsew
@@ -6973,8 +7125,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     scrollbar $fulltext.yscroll -orient vertical -grid 2 -command \
 	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can]
     scrollbar $fulltext.xscroll -orient horizontal -grid "0 2" -command "$fulltext.text xview"
+    
+    ApplyColorPrefs $text
 
-    set pane2in2 [$pwin add -weight $weight2in]
+    #set pane2in2 [$pwin add -weight $weight2in]
+    set pane2in2 [frame $pwin.pane2in2]
+    $pwin add $pane2in2 -height $weight2in
 
     NoteBook $pane2in2.nb -homogeneous 1 -bd 1 -internalborderwidth 0 \
 	    -grid "0 py2" -side bottom
@@ -7033,17 +7189,22 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     proc TextCompRaise {} "catch { $pane2in2.nb raise compile }"
 
 
-    set pane3 [$pw add -weight $weight3]
+    #set pane3 [$pw add -weight $weight3]
+    set pane3 [frame $pw.pane3]
+    $pw add $pane3 -sticky nsew -width $weight3
+
 
     ################################################################################
     # the vertical user defined - local
     ################################################################################
 
-    set pw1 [PanedWindow $pane3.pw -side left -pad 0 -weights available -grid "0" -activator line]
+    set pw1 [panedwindow $pane3.pw -orient vertical -grid "0"]
 
-    foreach "weight3in1 weight3in2" [ManagePanes $pw1 h "1 1"] break
+    foreach "weight3in1 weight3in2" [ManagePanes $pw1 h "100 100"] break
 
-    set pane3in1 [$pw1 add -weight $weight3in1]
+    #set pane3in1 [$pw1 add -weight $weight3in1]
+    set pane3in1 [frame $pw1.pane3in1]
+    $pw1 add $pane3in1 -sticky nsew -height $weight3in1
 
     label $pane3in1.l1 -text "User defined variables" -relief raised -bd 1 -grid "0 ew"
 
@@ -7057,12 +7218,16 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # the horizontal user defined vars
     ################################################################################
 
-    set pw [PanedWindow $f1.pw -side top -pad 0 -weights available -grid "0 ns" -activator line]
+    set pw [panedwindow $f1.pw -orient horizontal -grid "0 ns"]
 
-    foreach "weight1 weight2" [ManagePanes $pw h "1 1"] break
+    foreach "weight1 weight2" [ManagePanes $pw h "100 100"] break
 
-    set pane1_vars [$pw add -weight $weight1]
-    set pane2_vars [$pw add -weight $weight2]
+#     set pane1_vars [$pw add -weight $weight1]
+#     set pane2_vars [$pw add -weight $weight2]
+    set pane1_vars [frame $pw.pane1_vars]
+    $pw add $pane1_vars -sticky nsew -width $weight1
+    set pane2_vars [frame $pw.pane2_vars]
+    $pw add $pane2_vars -sticky nsew -width $weight2
 
     label $pane1_vars.l -text Variables -relief raised -bd 1
     label $pane2_vars.l -text Values -relief raised -bd 1
@@ -7084,7 +7249,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	}
     }
 
-    set pane3in2 [$pw1 add -weight $weight3in2]
+#     set pane3in2 [$pw1 add -weight $weight3in2]
+    set pane3in2 [frame $pw1.pane3in2]
+    $pw1 add $pane3in2 -sticky nsew -height $weight3in2
 
     checkbutton $pane3in2.l1 -text "Local variables" -relief raised -bd 1 -grid "0 ew" \
 	-variable RamDebugger::options(ViewLocalVariables) \
@@ -7100,12 +7267,16 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # the horizontal local vars
     ################################################################################
 
-    set pwL [PanedWindow $f1L.pw -side top -pad 0 -weights available -grid "0 ns" -activator line]
+    set pwL [panedwindow $f1L.pw -orient horizontal -grid "0 ns"]
 
-    foreach "weight1 weight2" [ManagePanes $pwL h "1 1"] break
+    foreach "weight1 weight2" [ManagePanes $pwL h "100 100"] break
 
-    set pane1_varsL [$pwL add -weight $weight1]
-    set pane2_varsL [$pwL add -weight $weight2]
+#     set pane1_varsL [$pwL add -weight $weight1]
+#     set pane2_varsL [$pwL add -weight $weight2]
+    set pane1_varsL [frame $pwL.pane1_varsL]
+    $pwL add $pane1_varsL -sticky nsew -width $weight1
+    set pane2_varsL [frame $pwL.pane2_varsL]
+    $pwL add $pane2_varsL -sticky nsew -width $weight2
 
     label $pane1_varsL.l -text Variables -relief raised -bd 1 -grid "0 ew"
     label $pane2_varsL.l -text Values -relief raised -bd 1 -grid "0 ew"
@@ -7125,10 +7296,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     supergrid::go $f1L
     supergrid::go $fulltext
     supergrid::go $pane2in2
-    if { [info exists pane1] } { supergrid::go $pane1 }
+    #if { [info exists pane1] } { supergrid::go $pane1 }
     supergrid::go $pane2
     supergrid::go $pane3
-    supergrid::go $f
+
+    grid $f.pw -sticky nsew
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1
     supergrid::go $w
 
     ################################################################################
@@ -7173,6 +7347,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     set menudev [$mainframe getmenu debug]
 
+    bind $text <1> [list focus $text]
     bind $text <3> "%W mark set insert @%x,%y ; RamDebugger::TextMotion -1 -1 -1 -1;\
 	    tk_popup $menudev %X %Y"
     bind $text <Double-1> "RamDebugger::SearchBraces %x %y ;break" 
@@ -7261,6 +7436,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # we only want them individually in every widget
     bind $w <Control-c> ""
     bind $w <Control-v> ""
+
+    if { $::tcl_platform(platform) eq "windows" } {
+	event delete <<PasteSelection>>
+    }
 
     ################################################################################
     # start up options
@@ -7387,7 +7566,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	catch { wm iconbitmap $w -default $MainDir/addons/ramdebugger.ico }
     }
     if { !$iswince } {
-    RamDebugger::CVS::ManageAutoSave
+	RamDebugger::CVS::ManageAutoSave
     }
     update idletasks
     if { [[winfo toplevel $w] cget -use] == "" } {

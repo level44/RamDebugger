@@ -208,8 +208,8 @@ proc Execute { args } {
 set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
 		              -split_node -menu]
 set ZIP zip.exe
-set Version 4.98
-set Date "December 2004"
+set Version 5.0
+set Date "January 2005"
 set Copyright "2002-2005 Ramon Ribó"
 
 set files [list RamDebugger.tcl license.terms Readme addons scripts Examples help \
