@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.16 2003/01/13 14:45:50 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.17 2003/01/21 20:17:40 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -96,6 +96,7 @@ namespace eval RamDebugger {
     variable WindowFilesList ""
     variable WindowFilesListLineNums ""
     variable WindowFilesListCurr -1
+    variable SavedPositionsStack ""
 
     ################################################################################
     # Preferences
@@ -392,6 +393,9 @@ proc RamDebugger::rdebug { args } {
 	if { [interp exists local] } { interp delete local }
 	interp create local
 	interp alias local sendmaster "" eval
+	if { $::tcl_platform(platform) == "windows" } {
+	    interp alias local console "" console
+	}
 	# dirty trick to avoid the slave interp block
 	interp eval local {
 	    proc updatemaster {} {
@@ -1001,7 +1005,7 @@ proc RamDebugger::rtime { args } {
 		if { $name == $opts(name) } {
 		    set TimeMeasureData [lreplace $TimeMeasureData $ipos $ipos]
 		    if { [info exists instrumentedfilesTime($file)] } {
-			unset instrumentedfilesTime($file)
+		        unset instrumentedfilesTime($file)
 		    }
 		    return "deleted time block '$opts(name)'"
 		}
@@ -2436,7 +2440,7 @@ proc RamDebugger::OpenFile {} {
     FillListBox
 }
 
-proc RamDebugger::OpenFileF { file { force 0 } { linenum 1 } } {
+proc RamDebugger::OpenFileF { file { force 0 } } {
     variable marker
     variable text
     variable files
@@ -2461,6 +2465,14 @@ proc RamDebugger::OpenFileF { file { force 0 } { linenum 1 } } {
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
     }
+    set linenum 1
+    if { [lsearch $WindowFilesList $file] != -1 } {
+	set pos [lsearch $WindowFilesList $file]
+	set linenum [lindex $WindowFilesListLineNums $pos]
+    }
+    if { $file == $currentfile } {
+	set idx [$text index insert]
+    } else { set idx $linenum.0 }
 
     if { !$force } {
 	set comm [list rlist -quiet $file {}]
@@ -2474,9 +2486,6 @@ proc RamDebugger::OpenFileF { file { force 0 } { linenum 1 } } {
 	WarnWin [lindex [split $errstring \n] 0]
 	return 1
     }
-    if { $file == $currentfile } {
-	set idx [$text index insert]
-    } else { set idx $linenum.0 }
 
     $marker delete arrow
     $marker delete break
@@ -2890,16 +2899,14 @@ proc RamDebugger::GotoPreviusNextInWinList { what } {
 	    if { $WindowFilesListCurr < 0 } {
 		set WindowFilesListCurr [expr [llength $WindowFilesList]-1]
 	    }
-	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr] 0 \
-	       [lindex $WindowFilesListLineNums $WindowFilesListCurr]
+	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr]
 	}
 	next {
 	    incr WindowFilesListCurr 1
 	    if { $WindowFilesListCurr >= [llength $WindowFilesList] } {
 		set WindowFilesListCurr 0
 	    }
-	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr] 0 \
-	       [lindex $WindowFilesListLineNums $WindowFilesListCurr]
+	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr]
 	}
     }
 }
@@ -2926,17 +2933,16 @@ proc RamDebugger::ActualizeViewMenu { menu } {
 	    $menu add separator
 	    set needssep 0
 	}
-	set line [lindex $WindowFilesListLineNums $ipos]
 	if { $ipos == $WindowFilesListCurr } {
 	    set label $i
 	    if { [string length $label] > 25 } { set label ...[string range $label end-22 end] }
 	    $menu add checkbutton -label $label -variable ::pp -command \
-	       [list RamDebugger::OpenFileF $i 0 $line]
+	       [list RamDebugger::OpenFileF $i]
 	    set ::pp 1
 	} else {
 	    set label $i
 	    if { [string length $label] > 25 } { set label ...[string range $label end-22 end] }
-	    $menu add command -label $label -command [list RamDebugger::OpenFileF $i 0 $line]
+	    $menu add command -label $label -command [list RamDebugger::OpenFileF $i]
 	}
 	incr ipos
     }
@@ -4633,6 +4639,69 @@ proc RamDebugger::InitOptions {} {
 
 }
 
+# what can be save or go or clean
+proc RamDebugger::PositionsStack { what } {
+    variable SavedPositionsStack
+    variable text
+    variable currentfile
+
+    set line [scan [$text index insert] %d]
+    set tag $currentfile:$line
+    
+    switch $what {
+	save {
+	    while { [set pos [lsearch $SavedPositionsStack $tag]] != -1 } {
+		set SavedPositionsStack [lreplace $SavedPositionsStack $pos $pos]
+	    }
+	    lappend SavedPositionsStack $tag
+	    SetMessage "Saved position in line $line"
+	}
+	go {
+	    if { [set pos [lsearch $SavedPositionsStack $tag]] != -1 } {
+		incr pos -1
+		if { $pos < 0 } { set pos end }
+	    } else { set pos end }
+	    set tag [lindex $SavedPositionsStack $pos]
+	    if { $tag == "" } {
+		SetMessage "Stack is void"
+		return
+	    }
+	    regexp {^(.+):([0-9]+)$} $tag {} file line
+	    if { ![AreFilesEqual $file $currentfile] } {
+		RamDebugger::OpenFileF $file
+	    }
+	    $text mark set insert $line.0
+	    $text see $line.0
+	    SetMessage "Gone to position in line $line"
+	}
+	clean {
+	    set SavedPositionsStack ""
+	    SetMessage "Clean positions stack"
+	}
+    }
+}
+
+proc RamDebugger::ApplyDropBinding { w command } {
+
+    if { [info command dnd] == "" } { return }
+
+    if { $::tcl_platform(platform) == "windows"} {
+	dnd bindtarget $w Files <Drop> $command
+    } else {
+	dnd bindtarget $w text/uri-list <Drop> $command
+	foreach i [winfo children $w] {
+	    ApplyDropBinding $i $command
+	}
+    }
+}
+
+proc RamDebugger::DropBindingDone { files } {
+
+    foreach i $files {
+	OpenFileF $i
+    }
+}
+
 proc RamDebugger::InitGUI { { w .gui } } {
     variable options
     variable options_def
@@ -4671,6 +4740,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     package require supertext
     package require dialogwin
     package require helpviewer
+    catch { package require tkdnd } ;# only if it is compiled
 
     CreateImages
     TkBackCompatibility
@@ -4680,6 +4750,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     toplevel $w
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
+    ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
 
     set descmenu [list \
 		"&File" all file 0 [list \
@@ -4722,8 +4793,15 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		        -command "RamDebugger::CenterDisplay"] \
 		    [list command "Search in files" {} "Search for pattern in given files" \
 		    "ShiftCtrl f" \
-		    -command "RamDebugger::SearchInFiles"] \
-		    ] \
+			-command "RamDebugger::SearchInFiles"] \
+		    separator \
+		    [list command "&Save position" {} "Save position to stack" "Shift F2" \
+		        -command "RamDebugger::PositionsStack save"] \
+		    [list command "&Go to position" {} "Recover position from stack" "F2" \
+		        -command "RamDebugger::PositionsStack go"] \
+		    [list command "&Clean positions stack" {} "Clean positions stack" "Ctrl F2" \
+		        -command "RamDebugger::PositionsStack clean"] \
+		   ] \
 		] \
 		separator \
 		[list command "Search..." {} "Search text in source file" "Ctrl f" \
