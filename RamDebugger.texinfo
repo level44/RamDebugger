@@ -62,7 +62,7 @@
 @set Date June 2004
 @set Copyright 2002-2004 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.23 $
+@set CVSVersion  $Revision: 1.24 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -190,7 +190,9 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
+Implemented secondary view in the Editor
 Implemented auto save, based on file revisions
+New inline file chooser to fast change views
 RamDebugger can automatically manage revisions of files (based internally on CVS)
 Added program @code{tkdiff} for visualizing file differences
 New option in Help to associate RamDebugger as command in the .tcl extension in Windows

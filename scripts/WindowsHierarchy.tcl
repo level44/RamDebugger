@@ -113,9 +113,10 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     wm overrideredirect $w 1
     wm transient $w $canvas
 
-    pack [label $w.l -bg white -justify left -anchor w]
-    $w.l conf -bd 1 -relief solid
-
+    $w configure -highlightthicknes 2 -highlightbackground grey \
+	-highlightcolor grey
+    pack [label $w.l -bg white -justify left -anchor w -bg grey90]
+    $w.l conf -bd 0
 
     append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all"
 
@@ -137,7 +138,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     }
     if { $y < 0 } { set y 5 }
 
-    focus $w.l
+    focus -force $w.l
 
     wm geom $w +$x+$y
     wm deiconify $w
@@ -199,8 +200,11 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } 
 	    }
 	    incr inum
 	}
-	$canvas bind $widget <Enter> "RamDebugger::DisplayWindowsHierarchyInfo $w \
+#         $canvas bind $widget <Enter> "RamDebugger::DisplayWindowsHierarchyInfo $w \
+#                  $canvas $widget %X %Y"
+	$canvas bind $widget <Motion> "RamDebugger::DisplayWindowsHierarchyInfo $w \
 		 $canvas $widget %X %Y"
+
 	#$canvas bind $widget <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
 
 #         $canvas bind $widget <ButtonRelease-3> {

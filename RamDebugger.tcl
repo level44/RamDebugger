@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.36 2004/07/29 16:33:26 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.37 2004/07/30 19:31:57 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 package require Tcl 8.4
@@ -105,7 +105,6 @@ namespace eval RamDebugger {
     variable WindowFilesList ""
     variable WindowFilesListLineNums ""
     variable WindowFilesListCurr -1
-    variable SavedPositionsStack ""
 
     ################################################################################
     # Handlers to save files. Array with names: filename
@@ -216,6 +215,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(executable_dirs) ""
     set options_def(debugrelease) debug
     set options_def(ViewLocalVariables) 1
+    set options_def(saved_positions_stack) ""
 
     switch $::tcl_platform(platform) {
 	windows {
@@ -514,8 +514,10 @@ proc RamDebugger::rdebug { args } {
 		    }
 		    if { [file isdirectory $dir_in] } {
 		        local eval [list cd $dir_in]
-		        TextOutInsertBlue "Executing '$filetodebug'\nin directory: $dir_in"
-		    } else { TextOutInsertBlue "Executing '$filetodebug'" }
+		        set txt "Executing '$filetodebug'\nin directory: $dir_in"
+		    } else { set txt "Executing '$filetodebug'" }
+		    TextOutInsertBlue $txt
+		    SetMessage $txt
 		    local eval [list set argc [llength $arg_in]]
 		    local eval [list set argv $arg_in]
 		    TextOutInsertBlue "Using arguments: '$arg_in'"
@@ -2652,9 +2654,8 @@ proc RamDebugger::ViewSecondText {} {
 	grid $text_secondary $f.textpane.f.yscroll -sticky nsew
 
 	bind $text_secondary <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev ; break"
-	bind $text_secondary <Control-Tab> "RamDebugger::GotoPreviusNextInWinList prev ; break"
 	bind $text_secondary <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
-	bind $text_secondary <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
+	bind $text_secondary <Control-Tab> [bind $text <Control-KeyPress-Tab>]
 	bind $text_secondary <Tab> "RamDebugger::Indent ; break"
 	
 	grid columnconfigure $f.textpane.f 0 -weight 1
@@ -2815,7 +2816,6 @@ proc RamDebugger::ExitGUI {} {
     variable breakpoints
     variable TimeMeasureData
     variable debuggerstate
-    variable SavedPositionsStack
     variable readwriteprefs
 
     if { [SaveFile ask] == -1 } { return }
@@ -2833,7 +2833,6 @@ proc RamDebugger::ExitGUI {} {
     }
 
     set options(debuggerstate) $debuggerstate
-    set options(SavedPositionsStack) $SavedPositionsStack
 
     set options(watchedvars) ""
     set i 0
@@ -2912,8 +2911,13 @@ proc RamDebugger::Colorize { { what text } } {
     variable text_secondary
     variable instrumentedfilesInfo
     variable currentfile
+    variable currentfile_secondary
 
-    if { ![info exists instrumentedfilesInfo($currentfile)] } { return }
+    if { $what eq "text_secondary" } {
+	set file $currentfile_secondary
+    } else {  set file $currentfile }
+
+    if { ![info exists instrumentedfilesInfo($file)] } { return }
 
     if { $what eq "text" } {
 	set ed [$text cget -editable]
@@ -2932,7 +2936,7 @@ proc RamDebugger::Colorize { { what text } } {
     $t tag conf cyan -foreground \#b8860b
 
     set iline 1
-    foreach i $instrumentedfilesInfo($currentfile) {
+    foreach i $instrumentedfilesInfo($file) {
 	foreach "tag li le" [lrange $i 2 end] {
 	    $t tag add $tag $iline.$li $iline.$le
 	}
@@ -2946,11 +2950,18 @@ proc RamDebugger::Colorize { { what text } } {
     }
 }
 
+# what can be text or text_secondary
 proc RamDebugger::ColorizeLines { l1 l2 { what text } } {
     variable text
     variable text_secondary
     variable instrumentedfilesInfo
     variable currentfile
+    variable currentfile_secondary
+
+    if { $what eq "text_secondary" } {
+	set file $currentfile_secondary
+    } else {  set file $currentfile }
+
 
     if { $what eq "text" } {
 	set ed [$text cget -editable]
@@ -2971,7 +2982,7 @@ proc RamDebugger::ColorizeLines { l1 l2 { what text } } {
     }
 
     for { set i $l1 } { $i <= $l2 } { incr i } {
-	foreach "tag li le" [lrange [lindex $instrumentedfilesInfo($currentfile) \
+	foreach "tag li le" [lrange [lindex $instrumentedfilesInfo($file) \
 		                         [expr $i-1]] 2 end] {
 	    $t tag add $tag $i.$li $i.$le
 	}
@@ -3129,7 +3140,7 @@ proc RamDebugger::OpenFileF { file { force 0 } { UserNumLine -1 } } {
     if { $file == "" } { return }
     set file [filenormalize $file]
 
-    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+    if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	return [OpenFileSecondary $file]
     }
 
@@ -3246,6 +3257,7 @@ proc RamDebugger::OpenFileF { file { force 0 } { UserNumLine -1 } } {
 	    $text configure -synctextwidget ""
 	}
     }
+    ManagePositionsImages
     WaitState 0
     return 0
 }
@@ -3275,13 +3287,14 @@ proc RamDebugger::OpenFileSecondary { file } {
 
     set currentfile_save $currentfile
     set comm [list rlist -quiet $file {}]
-    set currentfile $currentfile_save
 
     if { [catch $comm errstring] } {
+	set currentfile $currentfile_save
 	WaitState 0
 	WarnWin [lindex [split $errstring \n] 0]
 	return 1
     }
+    set currentfile $currentfile_save
 
     $text_secondary configure -state normal
     $text_secondary delete 1.0 end
@@ -3289,13 +3302,14 @@ proc RamDebugger::OpenFileSecondary { file } {
     $text_secondary tag add normal 1.0 end
     $text_secondary configure -state disabled
 
+    set options(defaultdir) [file dirname $file]
+    set currentfile_secondary $file
+
     Colorize text_secondary
 
     $text_secondary mark set insert $idx
     $text_secondary see $idx
     
-    set options(defaultdir) [file dirname $file]
-    set currentfile_secondary $file
 
     if { [lsearch -exact $WindowFilesList $file] == -1 } {
 	lappend WindowFilesList $file
@@ -3324,6 +3338,8 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     variable WindowFilesListCurr
     variable options
     variable FileSaveHandlers
+    variable currentfile_secondary
+    variable text_secondary
 
     if { [string index $file 0] != "*" } {
 	WarnWin "File name must begin with: '*'"
@@ -3389,6 +3405,15 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     if { $handler ne "" } {
 	set FileSaveHandlers($file) $handler
     } else { unset -nocomplain FileSaveHandlers($file) }
+
+    if { [info exists currentfile_secondary] } {
+	if { $currentfile eq $currentfile_secondary } {
+	    $text configure -synctextwidget $text_secondary
+	} else {
+	    $text configure -synctextwidget ""
+	}
+    }
+    ManagePositionsImages
     WaitState 0
     return 0
 }
@@ -3433,6 +3458,8 @@ proc RamDebugger::NewFile {} {
     variable WindowFilesList
     variable WindowFilesListCurr
     variable WindowFilesListLineNums
+    variable currentfile_secondary
+    variable text_secondary
 
     if { [SaveFile ask] == -1 } { return }
 
@@ -3471,6 +3498,15 @@ proc RamDebugger::NewFile {} {
     wm title [winfo toplevel $text] "RamDebugger     [file tail $currentfile]"
 
     $text conf -editable 1
+
+    if { [info exists currentfile_secondary] } {
+	if { $currentfile eq $currentfile_secondary } {
+	    $text configure -synctextwidget $text_secondary
+	} else {
+	    $text configure -synctextwidget ""
+	}
+    }
+    ManagePositionsImages
     WaitState 0
     return 0
 }
@@ -3507,6 +3543,12 @@ proc RamDebugger::SaveFileF { file } {
     variable instrumentedfilesSent
     variable filesmtime
     variable FileSaveHandlers
+    variable WindowFilesList
+    variable WindowFilesListCurr
+    variable WindowFilesListLineNums
+    variable options
+    variable currentfile_secondary
+    variable text_secondary
 
     WaitState 1
     SetMessage "Saving file '$file'..."
@@ -3559,7 +3601,47 @@ proc RamDebugger::SaveFileF { file } {
     if { [string index $file 0] != "*" } {
 	set filesmtime($currentfile) [file mtime $file]
     }
+    set linenum [scan [$text index insert] %d]
+    if { [lsearch -exact $WindowFilesList $file] != -1 } {
+	set WindowFilesListCurr [lsearch -exact $WindowFilesList $file]
+    } elseif { [string index $file 0] != "*" } {
+	incr WindowFilesListCurr
+	if { $WindowFilesListCurr == [llength $WindowFilesList] } {
+	    lappend WindowFilesList $file
+	    lappend WindowFilesListLineNums $linenum
+	} else {
+	    set WindowFilesList [linsert $WindowFilesList $WindowFilesListCurr $file]
+	    set WindowFilesListLineNums [linsert $WindowFilesListLineNums $WindowFilesListCurr \
+		$linenum]
+	}
+    }
 
+    if { [string index $file 0] != "*" } {
+	if { ![info exists options(RecentFiles)] } {
+	    set options(RecentFiles) ""
+	}
+	set ipos [lsearchfile $options(RecentFiles) $file]
+	if { $ipos != -1 } {
+	    set options(RecentFiles) [lreplace $options(RecentFiles) $ipos $ipos]
+	}
+	set options(RecentFiles) [linsert $options(RecentFiles) 0 $file]
+	if { [llength $options(RecentFiles)] > 10 } {
+	    set options(RecentFiles) [lreplace $options(RecentFiles) 10 end]
+	}
+	set options(defaultdir) [file dirname $file]
+	#FillListBox
+    }
+    set filetype [GiveFileType $file]
+    RamDebugger::AddFileTypeMenu $filetype
+
+    if { [info exists currentfile_secondary] } {
+	if { $currentfile eq $currentfile_secondary } {
+	    $text configure -synctextwidget $text_secondary
+	} else {
+	    $text configure -synctextwidget ""
+	}
+    }
+    ManagePositionsImages
     WaitState 0
     SetMessage "Saved file '$file'"
 }
@@ -3833,6 +3915,186 @@ proc RamDebugger::GotoPreviusNextInWinList { what { force 0 } } {
     }
 }
 
+proc RamDebugger::ChooseViewFile { w what args } {
+    variable WindowFilesList
+    variable WindowFilesListCurr
+    variable text_secondary
+    variable currentfile
+    variable currentfile_secondary
+    variable options
+
+    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+	set file $currentfile_secondary
+    } else {
+	set file $currentfile
+    }
+    if { $w eq "." } { set w "" }
+
+    if { [winfo exists $w._choosevf] } {
+	wm geometry $w._choosevf [wm geometry $w._choosevf]
+    }
+
+    set entrylen 16
+    set numcols 6
+
+    switch $what {
+	start - startrecent {
+	    if { $what eq "startrecent" || ([info exists options(RecentFiles)] && \
+		[llength $WindowFilesList] < 2 && [llength options(RecentFiles)]) } {
+		if { ![info exists options(RecentFiles)] } {
+		    set list ""
+		} else { set list $options(RecentFiles) }
+	    } else {
+		set list [lrange $WindowFilesList $WindowFilesListCurr end]
+		eval lappend list [lrange $WindowFilesList 0 \
+		        [expr {$WindowFilesListCurr-1}]]
+	    }
+	    set ipos [lsearch -exact $list $file]
+	    if { $ipos == -1 } {
+		set list [linsert $list 0 $file]
+	    } elseif { $ipos != 0 } {
+		set tmplist $list
+		set list [lrange $tmplist $ipos end]
+		eval lappend list [lrange $tmplist 0 [expr {$ipos-1}]]
+	    }
+	    destroy $w._choosevf
+	    toplevel $w._choosevf -relief raised -bd 2
+	    wm withdraw $w._choosevf
+	    wm overrideredirect $w._choosevf 1
+
+	    label $w._choosevf.ld -bd 2 -relief sunken -anchor ne \
+		-justify right -width 20
+	    foreach "row col" [list 0 0] break
+	    for { set i 0 } { $i < [llength $list] } { incr i } {
+		if { $i > 0 && $i%$numcols == 0 } {
+		    incr row
+		    set col 0
+		}
+		entry $w._choosevf.l$i -width [expr {$entrylen-2}] -bd 0 -highlightthickness 2 \
+		     -highlightcolor #b5b6bd -justify center -cursor "" \
+		    -disabledbackground [$w._choosevf.ld cget -background] \
+		    -disabledforeground [$w._choosevf.ld cget -foreground]
+
+		set path [lindex $list $i]
+		set txt [file tail $path]
+		if { [string length $txt] > $entrylen } {
+		    set txt "[string range $txt 0 [expr {$entrylen-4}]]..."
+		}
+		$w._choosevf.l$i insert end $txt
+		$w._choosevf.l$i xview end
+		$w._choosevf.l$i configure -state disabled
+		grid $w._choosevf.l$i -row $row -column $col -sticky nw
+		bind $w._choosevf.l$i <Tab> "[list RamDebugger::ChooseViewFile $w next $i] ; break"
+		bind $w._choosevf.l$i <Shift-Tab> "[list RamDebugger::ChooseViewFile $w prev $i] ; break"
+		bind $w._choosevf.l$i <Right> "[list RamDebugger::ChooseViewFile $w next $i] ; break"
+		bind $w._choosevf.l$i <Left> "[list RamDebugger::ChooseViewFile $w prev $i] ; break"
+		bind $w._choosevf.l$i <Up> "[list RamDebugger::ChooseViewFile $w up $row $col] ; break"
+		bind $w._choosevf.l$i <Down> "[list RamDebugger::ChooseViewFile $w down $row $col] ; break"
+		bind $w._choosevf.l$i <FocusIn> [list $w._choosevf.ld configure -text $path]
+		bind $w._choosevf.l$i <1> "[list RamDebugger::ChooseViewFile \
+		        $w keyrelease button1 $list] ; break"
+		incr col
+	    }
+	    grid $w._choosevf.ld -row [incr row] -column 0 -columnspan $numcols -sticky ew \
+		-padx 5 -pady 5
+	    set fontsize [expr {[font actual [$w._choosevf.ld cget -font] -size] \
+		    -2}]
+	    label $w._choosevf.note -text "Press <Space> to change file list" \
+		-font "-size $fontsize"
+	    grid $w._choosevf.note -row [incr row] -column 0 -columnspan $numcols -sticky ew
+
+	    if { [llength $list] < $numcols } { set numcols [llength $list] }
+
+	    grid columnconfigure $w._choosevf [expr {$numcols-1}] -weight 1
+
+	    update
+	    set t [winfo toplevel [winfo parent $w._choosevf]]
+	    set x [expr {int([winfo x $t]+.5*[winfo width $t]-.5*[winfo reqwidth $w._choosevf])}]
+	    set y [expr {int([winfo y $t]+.5*[winfo height $t]-.5*[winfo reqheight $w._choosevf])}]
+
+	    if { $x+[winfo reqwidth $w._choosevf] > [winfo screenwidth $w] } {
+		set x [expr {[winfo screenwidth $w]-[winfo reqwidth $w._choosevf]}]
+	    }
+	    if { $y+[winfo reqheight $w._choosevf] > [winfo screenheight $w] } {
+		set y [expr {[winfo screenheight $w]-[winfo reqheight $w._choosevf]}]
+	    }
+	    wm geometry $w._choosevf +$x+$y
+	    wm deiconify $w._choosevf
+	    
+	    bind $w._choosevf <KeyRelease> [list RamDebugger::ChooseViewFile \
+		    $w keyrelease %K $list]
+	    bind $w._choosevf <KeyPress> [list RamDebugger::ChooseViewFile \
+		    $w keypress %K $what]
+	    raise $w._choosevf
+	    if { [llength $list] > 1 } {
+		after idle focus -force $w._choosevf.l1
+	    } else { after idle focus -force $w._choosevf.l0 }
+	}
+	keyrelease {
+	    foreach "K list" $args break
+	    if { [regexp {(?i)^(control|return|button1)} $K] } {
+		regexp {[0-9]+$} [focus] pos
+		destroy $w._choosevf
+		if { [lindex $list $pos] ne $file } {
+		    update ;# to let focus change
+		    OpenFileF [lindex $list $pos]
+		}
+	    } elseif { [regexp {(?i)^escape} $K] } {
+		destroy $w._choosevf
+	    }
+	}
+	keypress {
+	    foreach "K what_in" $args break
+	    if { [regexp {(?i)^space} $K] } {
+		if { $what_in eq "start" } {
+		    ChooseViewFile $w startrecent
+		} else { ChooseViewFile $w start }
+	    }
+	}
+	next {
+	    set i [lindex $args 0]
+	    incr i
+	    if { [winfo exists $w._choosevf.l$i] } {
+		focus $w._choosevf.l$i
+	    } else {
+		focus $w._choosevf.l0
+	    }
+	}
+	prev {
+	    set i [lindex $args 0]
+	    incr i -1
+	    if { $i >= 0 } {
+		focus $w._choosevf.l$i
+	    } else {
+		while 1 {
+		    incr i
+		    if { ![winfo exists $w._choosevf.l$i] } { break }
+		}
+		incr i -1
+		focus $w._choosevf.l$i
+	    }
+	}
+	up {
+	    foreach "row col" $args break
+	    incr row -1
+	    foreach "maxcol maxrow" [grid size $w._choosevf] break
+	    if { $row < 0 } { set row [expr {$maxrow-3}] }
+	    focus [grid slaves $w._choosevf -row $row -col $col]
+	}
+	down {
+	    foreach "row col" $args break
+	    incr row 1
+	    foreach "maxcol maxrow" [grid size $w._choosevf] break
+	    if { [grid slaves $w._choosevf -row $row -col $col] eq "" || \
+		[grid slaves $w._choosevf -row $row -col $col] eq "$w._choosevf.ld" } {
+		set row 0
+	    }
+	    focus [grid slaves $w._choosevf -row $row -col $col]
+	}
+    }
+}
+
+
 proc RamDebugger::ActualizeViewMenu { menu } {
     variable WindowFilesList
     variable WindowFilesListLineNums
@@ -3847,6 +4109,8 @@ proc RamDebugger::ActualizeViewMenu { menu } {
        "RamDebugger::GotoPreviusNextInWinList prev"
     $menu add command -label "Next" -acc "Alt-Right" -command \
        "RamDebugger::GotoPreviusNextInWinList next"
+    $menu add command -label "Select..." -acc "Ctrl Tab" -command \
+	[list RamDebugger::ChooseViewFile $text start]
 
     set needssep 1
     set ipos 0
@@ -3957,7 +4221,7 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow { forceraise 1 } 
     if { $hasbreak == "" } { set hasbreak 0 }
     if { $hasarrow == "" } { set hasarrow 0 }
 
-    $marker delete l$line
+    $marker delete "l$line&&(arrowbreak||arrow||break)"
 
     if { !$hasarrow } { set IsInStop 0 } else { set IsInStop 1 }
 
@@ -4046,6 +4310,27 @@ proc RamDebugger::TakeArrowOutFromText {} {
 	if { [string match l* $j] } {
 	    regexp {l([0-9]+)} $j {} arrowline
 	    UpdateArrowAndBreak $arrowline "" 0
+	}
+    }
+}
+
+proc RamDebugger::ManagePositionsImages {} {
+    variable text
+    variable marker
+    variable options
+    variable currentfile
+    variable images
+
+    $marker delete bookmark
+    set font [$text cget -font]
+    foreach i $options(saved_positions_stack) {
+	foreach "file line -" $i break
+	if { $file eq $currentfile } {
+	    set ypos [expr ($line-1)*[font metrics $font -linespace]+\
+		    [font metrics $font -ascent]+[$text cget -pady]+2]
+	    set id [$marker create image 0 $ypos -anchor sw -image $images(bookmark) \
+		    -tags "bookmark l$line"]
+	    $marker lower $id
 	}
     }
 }
@@ -5740,7 +6025,8 @@ proc RamDebugger::MoveCanvas { text canvas } {
 	foreach "- yline - -" [$text bbox $line.0] break
 	if { $yline == "" } { continue }
 	set yline [$canvas canvasy $yline]
-	foreach "- ycanvas - -" [$canvas bbox [$canvas find withtag l$line]] break
+	set id [lindex [$canvas find withtag l$line] 0]
+	foreach "- ycanvas - -" [$canvas bbox $id] break
 	incr ycanvas -3
 	foreach "cy1 cy2" [$canvas yview] break
 	set 1p [expr ($cy2-$cy1)/double([winfo height $text])]
@@ -5903,6 +6189,8 @@ proc RamDebugger::MarkerContextualSubmenuDo { line what } {
 
 proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
     variable text
+    variable marker
+    variable options
 
     set line [scan [$text index @0,$y] %d]
     set num -1
@@ -5931,6 +6219,31 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
 	}
     }
     $menu add separator
+
+    set item [$marker find withtag "bookmark&&l$line"]
+
+    if { $item eq "" } {
+	$menu add command -label "Save position" -command \
+	    [list RamDebugger::PositionsStack save $text $line]
+    } else {
+	$menu add command -label "Clear position" -command \
+	    [list RamDebugger::PositionsStack clean $text $line]
+    }
+    $menu add separator
+    $menu add cascade -menu $menu.m -label "Go to position"
+    menu $menu.m -tearoff 0
+
+    foreach i $options(saved_positions_stack) {
+	foreach "file line context" $i break
+	set txt "[file tail $file]:$line $context"
+	if { [string length $txt] > 60 } {
+	    set txt [string range $txt 0 56]...
+	}
+	$menu.m add command -label $txt -command \
+	    [list RamDebugger::PositionsStack goto $text $line $file]
+    }
+    $menu add command -label "Positions window" -command \
+	[list RamDebugger::DisplayPositionsStack $text $line]
     $menu add command -label "Breakpoints window" -command \
 	[list RamDebugger::MarkerContextualSubmenuDo $line window]
 
@@ -6031,7 +6344,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable breakpoints
     variable MainDir
     variable TimeMeasureData
-    variable SavedPositionsStack
     variable debuggerstate
     variable descmenu
     variable pane1
@@ -6072,6 +6384,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	toplevel $w -use $topleveluse
 	update idletasks ;# doesn't work if this is removed; does not work with it either
     }
+    wm withdraw $w
+    wm geom $w 800x600
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
     ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
@@ -6134,10 +6448,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		        -command "RamDebugger::PositionsStack save"] \
 		    [list command "&Go to position" {} "Recover position from stack" "F2" \
 		        -command "RamDebugger::PositionsStack go"] \
+		    [list command "&Delete position" {} "Delete position at current line" \
+		         "ShiftCtrl F2" -command "RamDebugger::PositionsStack clean"] \
 		    [list command "&Display positions stack" {} "Display positions stack" "Ctrl F2" \
 		        -command "RamDebugger::DisplayPositionsStack"] \
-		    [list command "&Delete  positions stack" {} "Delete positions stack" \
-		         "ShiftCtrl F2" -command "RamDebugger::PositionsStack clean"] \
 		   ] \
 		] \
 		[list cascad "&Macros" {} macros 0 [list \
@@ -6650,7 +6964,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     $textOUT conf -state disabled
     bind $textOUT <1> { focus %W }
     bind $textOUT <Double-1> { RamDebugger::StackDouble1 %W @%x,%y }
-
+    
     $textCOMP conf -state disabled
     bind $textCOMP <1> { focus %W }
     bind $textCOMP <Double-1> { RamDebugger::StackDouble1 %W @%x,%y }
@@ -6662,9 +6976,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind all <F10> ""
 
     bind $text <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev ; break"
-    bind $text <Control-Tab> "RamDebugger::GotoPreviusNextInWinList prev ; break"
+    bind $text <Control-Tab> "[list RamDebugger::ChooseViewFile $text start] ; break"
+#     bind $text <Control-Tab> "RamDebugger::GotoPreviusNextInWinList prev ; break"
+#     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
-    bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Tab> "RamDebugger::Indent ; break"
     bind $text <Control-x> "RamDebugger::CutCopyPasteText cut   ; break"
     bind $text <Control-c> "RamDebugger::CutCopyPasteText copy  ; break"
@@ -6741,10 +7056,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     # trick to know if we are debugging RamDebugger
     if { [info command sendmaster] != "" } {
-	if { [regexp {(\d+)x(\d+)[+](\d+)[+](\d+)} $options(maingeometry) {} wi he xpos ypos] } {
+	if { [regexp {(\d+)x(\d+)[+]([-\d]+)[+]([-\d]+)} $options(maingeometry) {} wi he xpos ypos] } {
 	    incr xpos 20
 	    incr ypos 20
-	    wm geom $w ${wi}x$he+$xpos+$ypos
+	    wm geometry $w ${wi}x$he+$xpos+$ypos
 	    if { [info exists options(currentfile)] && \
 		     [AreFilesEqual $options(currentfile) \
 		          [sendmaster set ::RamDebugger::currentfile]] } {
@@ -6793,9 +7108,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set debuggerstate $options(debuggerstate)
 	#RamDebugger::DisplayTimesWindow
     }
-    if { [info exists options(SavedPositionsStack)] } {
-	set SavedPositionsStack $options(SavedPositionsStack)
-    }
     
 #     if { [info exists options(remoteserverType)] && $options(remoteserverType) == "remote" && \
 #          [info exists options(remoteserver)] } {
@@ -6840,6 +7152,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	catch { wm iconbitmap $w -default $MainDir/addons/ramdebugger.ico }
     }
     RamDebugger::CVS::ManageAutoSave
+
+    update idletasks
+    wm deiconify $w
 }
 
 proc RamDebugger::OpenDefaultFile {} {

@@ -2598,10 +2598,12 @@ proc RamDebugger::DoinstrumentThisfile { file } {
 ################################################################################
 
 
-proc RamDebugger::DisplayPositionsStack {} {
-    variable SavedPositionsStack
+proc RamDebugger::DisplayPositionsStack { args } {
+    variable options
     variable text
+    variable text_secondary
     variable currentfile
+    variable currentfile_secondary
 
     if { [info exists DialogWinTop::user(list)] && [winfo exits $DialogWinTop::user(list)] } {
 	raise [winfo toplevel $DialogWinTop::user(list)]
@@ -2609,14 +2611,30 @@ proc RamDebugger::DisplayPositionsStack {} {
 	return
     }
 
+    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+	set curr_text $text_secondary
+    } else {
+	set curr_text $text
+    }
+    set nowline [scan [$curr_text index insert] %d]
+    foreach "curr_text nowline" $args break
+
+    if { [info exists text_secondary] && $curr_text eq $text_secondary } {
+	set file $currentfile_secondary
+    } else {
+	set curr_text $text
+	set file $currentfile
+    }
+    set DialogWinTop::user(curr_text) $curr_text
+
     set commands [list "RamDebugger::DisplayPositionsStackDo delete" \
 	    "RamDebugger::DisplayPositionsStackDo up" \
 	    "RamDebugger::DisplayPositionsStackDo down" \
 	    "RamDebugger::DisplayPositionsStackDo go" \
 	    "RamDebugger::DisplayPositionsStackDo cancel"]
 
-    set f [DialogWinTop::Init $text "Positions stack window" separator $commands [list Up \
-		Down View] Delete Close]
+    set f [DialogWinTop::Init $curr_text "Positions stack window" separator $commands \
+	    [list Up Down View] Delete Close]
     set w [winfo toplevel $f]
 
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
@@ -2626,7 +2644,8 @@ proc RamDebugger::DisplayPositionsStack {} {
 		  -columns [list \
 		                20 File        right \
 		                5  Line left \
-		                30  Directory left \
+		                20 Context left \
+		                30 Directory left \
 		                ] \
 		  -labelcommand tablelist::sortByColumn \
 		  -background white \
@@ -2640,56 +2659,58 @@ proc RamDebugger::DisplayPositionsStack {} {
     
     focus $DialogWinTop::user(list)
     bind [$DialogWinTop::user(list) bodypath] <Button-1> {
-	focus $DialogWinTop::user(list)
+	focus [$DialogWinTop::user(list) bodypath]
     }
     bind [$DialogWinTop::user(list) bodypath] <Double-1> {
-	RamDebugger::DisplayPositionsStackDo go %W
+	RamDebugger::DisplayPositionsStackDo go
+    }
+    bind [$DialogWinTop::user(list) bodypath] <Return> {
+	RamDebugger::DisplayPositionsStackDo go
     }
     bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> \
 	    [bind TablelistBody <ButtonPress-1>]
 
     bind [$DialogWinTop::user(list) bodypath] <KeyPress-Delete> {
-	RamDebugger::DisplayPositionsStackDo delete %W
+	RamDebugger::DisplayPositionsStackDo delete
     }
 
-    bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> \
-	    [bind TablelistBody <ButtonPress-1>]
-
-    bind [$DialogWinTop::user(list) bodypath] <ButtonRelease-3> {
-	catch { destroy %W.menu }
-	set menu [menu %W.menu]
-	$menu add command -label "Up" -command "RamDebugger::DisplayPositionsStackDo up %W"
-	$menu add command -label "Down" -command "RamDebugger::DisplayPositionsStackDo down %W"
-	$menu add command -label "View" -command "RamDebugger::DisplayPositionsStackDo go %W"
-	$menu add separator
-	$menu add command -label "Delete" -command "RamDebugger::DisplayPositionsStackDo delete %W"
-	tk_popup $menu %X %Y
+    bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> {
+	set tablelist::win [winfo parent %W]
+	set tablelist::x [expr {%x + [winfo x %W]}]
+	set tablelist::y [expr {%y + [winfo y %W]}]
+	set cell [$tablelist::win nearestcell $tablelist::x $tablelist::y]
+	foreach {row col} [ split $cell ,] break
+	if { ![$tablelist::win selection includes $row] } {
+	    $tablelist::win selection clear 0 end
+	    $tablelist::win selection set $row
+	}
+	RamDebugger::DisplayPositionsStackDo contextual %X %Y
     }
     
-    set nowline [scan [$text index insert] %d]
-    foreach i $SavedPositionsStack {
-	regexp {^(.+):([0-9]+)$} $i {} file line
-	$DialogWinTop::user(list) insert end [list [file tail $file] $line \
-		[file dirname $file]]
-	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
+    foreach i $options(saved_positions_stack) {
+	foreach "file_in line context" $i break
+	$DialogWinTop::user(list) insert end [list [file tail $file_in] $line \
+		$context [file dirname $file_in]]
+	if { [AreFilesEqual $file $file_in] && $line == $nowline } {
 	    $DialogWinTop::user(list) selection set end
 	}
     }
     DialogWinTop::CreateWindow $f
 }
 
-proc RamDebugger::DisplayPositionsStackDo { what f } {
-    variable SavedPositionsStack
+proc RamDebugger::DisplayPositionsStackDo { what args } {
+    variable options
     variable text
     variable currentfile
+    variable currentfile_secondary
+    variable text_secondary
 
-
-    if { $f == "" } { set f $DialogWinTop::user(list) }
-    set w [winfo toplevel $f]
+    set w [winfo toplevel $DialogWinTop::user(list)]
+    set curr_text $DialogWinTop::user(curr_text)
     
     switch $what {
 	cancel {
-	    unset DialogWinTop::user(list)
+	    unset DialogWinTop::user(list) DialogWinTop::user(curr_text)
 	    destroy $w
 	    return
 	}
@@ -2698,9 +2719,29 @@ proc RamDebugger::DisplayPositionsStackDo { what f } {
 	    if { [llength $curr] == 0 } {
 		WarnWin "Select one or more positions to delete in the stack" $w
 	    } else {
-		set SavedPositionsStack [lreplace $SavedPositionsStack [lindex $curr 0] \
-		        [lindex $curr end]]
+		set ns ""
+		set ipos 0
+		foreach i $options(saved_positions_stack) {
+		    if { [lsearch $curr $ipos] == -1 } {
+		        lappend ns $i
+		    }
+		    incr ipos
+		}
+		set options(saved_positions_stack) $ns
+		ManagePositionsImages
 	    }
+	}
+	contextual {
+	    catch { destroy $w.menu }
+	    set menu [menu $w.menu]
+	    $menu add command -label "Up" -command "RamDebugger::DisplayPositionsStackDo up"
+	    $menu add command -label "Down" -command "RamDebugger::DisplayPositionsStackDo down"
+	    $menu add command -label "View" -command "RamDebugger::DisplayPositionsStackDo go"
+	    $menu add separator
+	    $menu add command -label "Delete" -command "RamDebugger::DisplayPositionsStackDo delete"
+	    foreach "x y" $args break
+	    tk_popup $menu $x $y
+	    return
 	}
 	up {
 	    set curr [$DialogWinTop::user(list) curselection]
@@ -2708,10 +2749,10 @@ proc RamDebugger::DisplayPositionsStackDo { what f } {
 		WarnWin "Select one or more positions to move up in the stack" $w
 	    } else {
 		if { [lindex $curr 0] > 0 } {
-		    set tomove [lrange $SavedPositionsStack [lindex $curr 0] [ lindex $curr end]]
-		    set SavedPositionsStack [lreplace $SavedPositionsStack [lindex $curr 0] \
+		    set tomove [lrange $options(saved_positions_stack) [lindex $curr 0] [ lindex $curr end]]
+		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) [lindex $curr 0] \
 		                                 [lindex $curr end]]
-		    set SavedPositionsStack [eval linsert [list $SavedPositionsStack] \
+		    set options(saved_positions_stack) [eval linsert [list $options(saved_positions_stack)] \
 		                                 [expr {[lindex $curr 0]-1}] $tomove]
 		}
 	    }
@@ -2721,11 +2762,11 @@ proc RamDebugger::DisplayPositionsStackDo { what f } {
 	    if { [llength $curr] == 0 } {
 		WarnWin "Select one or more positions to move down in the stack" $w
 	    } else {
-		if { [lindex $curr end] < [llength  $SavedPositionsStack]  } {
-		    set tomove [lrange $SavedPositionsStack [lindex $curr 0] [ lindex $curr end]]
-		    set SavedPositionsStack [lreplace $SavedPositionsStack [lindex $curr 0] \
+		if { [lindex $curr end] < [llength  $options(saved_positions_stack)]  } {
+		    set tomove [lrange $options(saved_positions_stack) [lindex $curr 0] [ lindex $curr end]]
+		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) [lindex $curr 0] \
 		                                 [lindex $curr end]]
-		    set SavedPositionsStack [eval linsert [list $SavedPositionsStack] \
+		    set options(saved_positions_stack) [eval linsert [list $options(saved_positions_stack)] \
 		                                 [expr {[lindex $curr 0]+1}] $tomove]
 		}
 	    }
@@ -2735,13 +2776,21 @@ proc RamDebugger::DisplayPositionsStackDo { what f } {
 	    if { [llength $curr] != 1 } {
 		WarnWin "Select just one position in the stack to go to it" $w
 	    } else {
-		set tag [lindex $SavedPositionsStack $curr]
-		regexp {^(.+):([0-9]+)$} $tag {} file line
-		if { ![AreFilesEqual $file $currentfile] } {
-		    RamDebugger::OpenFileF $file
+		foreach "file line -" [lindex $options(saved_positions_stack) $curr] break
+
+		if { $curr_text eq $text || ![info exists text_secondary] } {
+		    set active_file $currentfile
+		} else { set active_file $currentfile_secondary }
+
+		if { ![AreFilesEqual $file $active_file] } {
+		    if { $curr_text eq $text || ![info exists text_secondary] } {
+		        RamDebugger::OpenFileF $file
+		    } else {
+		        OpenFileSecondary $file
+		    }
 		}
-		$text mark set insert $line.0
-		$text see $line.0
+		$curr_text mark set insert $line.0
+		$curr_text see $line.0
 		SetMessage "Gone to position in line $line"
 	    }
 	}
@@ -2750,54 +2799,130 @@ proc RamDebugger::DisplayPositionsStackDo { what f } {
 	}
     }
     $DialogWinTop::user(list) delete 0 end
-    foreach i $SavedPositionsStack {
-	regexp {^(.+):([0-9]+)$} $i {} file line
+    foreach i $options(saved_positions_stack) {
+	foreach "file line context" $i break
 	$DialogWinTop::user(list) insert end [list [file tail $file] $line \
-		[file dirname $file]]
+		$context [file dirname $file]]
     }
     catch { $DialogWinTop::user(list) selection set [lindex $curr 0] }
 }
 
 # what can be save or go or clean
-proc RamDebugger::PositionsStack { what } {
-    variable SavedPositionsStack
+proc RamDebugger::PositionsStack { what args } {
+    variable options
     variable text
+    variable text_secondary
     variable currentfile
+    variable currentfile_secondary
 
-    set line [scan [$text index insert] %d]
-    set tag $currentfile:$line
+    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+	set curr_text $text_secondary
+    } else {
+	set curr_text $text
+    }
+
+    set line [scan [$curr_text index insert] %d]
+    foreach "curr_text line" $args break
+
+    if { [info exists text_secondary] && $curr_text eq $text_secondary } {
+	set file $currentfile_secondary
+    } else {
+	set curr_text $text
+	set file $currentfile
+    }
     
     switch $what {
 	save {
-	    while { [set pos [lsearch -exact $SavedPositionsStack $tag]] != -1 } {
-		set SavedPositionsStack [lreplace $SavedPositionsStack $pos $pos]
+	    set ipos 0
+	    foreach i $options(saved_positions_stack) {
+		if { $file eq [lindex $i 0] && $line == [lindex $i 1] } {
+		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) \
+		            $ipos $ipos]
+		    break
+		}
+		incr ipos
 	    }
-	    lappend SavedPositionsStack $tag
+	    set idx [$curr_text search -backwards -regexp -count count \
+		    {^\s*(proc|method)} "$line.0 lineend"]
+	    set procname ""
+	    if { $idx ne "" } {
+		regexp {^\s*(?:proc|method)\s+(\S+)} [$curr_text get $idx "$idx lineend"]\
+		    {} procname
+	    }
+	    lappend options(saved_positions_stack) [list $file $line $procname]
 	    SetMessage "Saved position in line $line"
-	    catch { RamDebugger::DisplayPositionsStackDo refresh "" }
+	    catch { RamDebugger::DisplayPositionsStackDo refresh }
+	    ManagePositionsImages
+	}
+	goto {
+	    set file_new [lindex $args 2]
+	    set ipos 0
+	    set found 0
+	    foreach i $options(saved_positions_stack) {
+		if { $file_new eq [lindex $i 0] && $line == [lindex $i 1] } {
+		    set found 1
+		    break
+		}
+		incr ipos
+	    }
+	    if { !$found } {
+		WarnWin "Position not valid"
+		return
+	    }
+	    if { ![AreFilesEqual $file_new $file] } {
+		RamDebugger::OpenFileF $file_new
+	    }
+	    $curr_text mark set insert $line.0
+	    $curr_text see $line.0
+	    SetMessage "Gone to position in line $line"
 	}
 	go {
-	    if { [set pos [lsearch -exact $SavedPositionsStack $tag]] != -1 } {
-		incr pos -1
-		if { $pos < 0 } { set pos end }
-	    } else { set pos end }
-	    set tag [lindex $SavedPositionsStack $pos]
-	    if { $tag == "" } {
+	    set ipos 0
+	    set found 0
+	    foreach i $options(saved_positions_stack) {
+		if { $file eq [lindex $i 0] && $line == [lindex $i 1] } {
+		    set found 1
+		    break
+		}
+		incr ipos
+	    }
+	    if { $found } {
+		incr ipos -1
+		if { $ipos < 0 } { set ipos end }
+	    } else { set ipos end }
+	    set file_new ""
+	    foreach "file_new line -" [lindex $options(saved_positions_stack) $ipos] break
+	    if { $file_new eq "" } {
 		bell
 		SetMessage "Stack is void"
 		return
 	    }
-	    regexp {^(.+):([0-9]+)$} $tag {} file line
-	    if { ![AreFilesEqual $file $currentfile] } {
-		RamDebugger::OpenFileF $file
+	    if { ![AreFilesEqual $file_new $file] } {
+		RamDebugger::OpenFileF $file_new
 	    }
-	    $text mark set insert $line.0
-	    $text see $line.0
+	    $curr_text mark set insert $line.0
+	    $curr_text see $line.0
 	    SetMessage "Gone to position in line $line"
 	}
 	clean {
-	    set SavedPositionsStack ""
-	    SetMessage "Clean positions stack"
+	    set ipos 0
+	    set found 0
+	    foreach i $options(saved_positions_stack) {
+		if { $file eq [lindex $i 0] && $line == [lindex $i 1] } {
+		    set found 1
+		    break
+		}
+		incr ipos
+	    }
+	    if { !$found } {
+		WarnWin "There is no saved position at current line"
+		return
+	    }
+	    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) \
+		    $ipos $ipos]
+	    SetMessage "Clean position at current line"
+	    catch { RamDebugger::DisplayPositionsStackDo refresh }
+	    ManagePositionsImages
 	}
     }
 }
