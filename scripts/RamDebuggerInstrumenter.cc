@@ -885,7 +885,7 @@ int RamDebuggerInstrumenterDoWork(ClientData clientData, Tcl_Interp *ip, int obj
   return result;
 }
 
-extern "C" __declspec( dllexport ) int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
+extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
 {
 #ifdef USE_TCL_STUBS
   const char* retchar=Tcl_InitStubs(interp,"8.4",0);
