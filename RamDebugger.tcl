@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.30 2003/11/11 09:15:12 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.31 2004/02/12 16:55:59 jsperez Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -621,6 +621,8 @@ proc RamDebugger::rdebug { args } {
 	    variable lastprocstack
 	    variable linecounter
 
+            RDC::SendDev [list RamDebugger::SetLastVisited $filenum $line]
+ 
 	    set procstack ""
 	    set procname ""
 	    for { set i [expr {[info level]-1}] } { $i >= 1 } { incr i -1 } {
@@ -1793,6 +1795,13 @@ proc RamDebugger::rdel { args } {
     error "breakpoint $opts(breakpointnum) not found"
 }
 
+proc RamDebugger::SetLastVisited { filenum line } {
+    variable data
+
+    set data(visited,filenum) $filenum
+    set data(visited,line) $line
+}
+
 ################################################################################
 #    Helper basic functions
 ################################################################################
@@ -2036,13 +2045,15 @@ proc RamDebugger::RecieveFromProgram { breaknum filenum line procname textline c
     return ""
 }
 
-proc RamDebugger::RecieveErrorFromProgram { err errInfo } {
-
+proc RamDebugger::RecieveErrorFromProgram { err errInfo args } {
     TextOutInsertRed "------RECIEVED ERROR FROM DEBUGGED PROGRAM-------------\n"
     TextOutInsertRed $errInfo\n
     TextOutInsertRed "-------------------------------------------------------\n"
     TextOutRaise
-    after idle [list WarnWin "Recieved Error from Debugged program:\n$err\nCheck Output for details"]
+    after idle [string map [list %e $err %n \n] {
+        WarnWin {Recieved Error from Debugged program:%n%e%nCheck Output for details}
+        RamDebugger::StopAtGUI "" -1
+    }]
 }
 
 proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
@@ -3648,6 +3659,14 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
     variable currentfile
     variable text
 
+    if { $line == -1 } {
+        # called from bgerror
+        variable fileslist
+        variable data 
+        
+        set file [lindex $fileslist $data(visited,filenum)]
+        set line $data(visited,line)
+    }
     if { ![info exists text] || ![winfo exists $text] } { return }
 
     foreach j [concat [$marker gettags arrow] [$marker gettags arrowbreak]] {
