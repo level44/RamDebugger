@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.18 2003/02/24 14:27:03 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.19 2003/02/25 15:26:49 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -36,6 +36,12 @@ exec wish "$0" "$@"
 ################################################################################
 
 namespace eval RamDebugger {
+
+    ################################################################################
+    #    RamDebugger version
+    ################################################################################
+
+    set Version 2.7
 
     ################################################################################
     #    Non GUI commands
@@ -151,6 +157,7 @@ proc RamDebugger::Init { readprefs { registerasremote 1 } } {
     set options_def(indentsizeC++) 2
     set options_def(ConfirmStartDebugging) 1
     set options_def(instrument_source) auto
+    set options_def(instrument_proc_last_line) 0
     set options_def(ConfirmModifyVariable) 1
     set options_def(LocalDebuggingType) tk
     set options_def(executable_dirs) ""
@@ -658,7 +665,10 @@ proc RamDebugger::rdebug { args } {
 	    proc ::source { file } {
 		set file [file join [pwd] $file]
 		set retval [RDC::SendDev [list RamDebugger::RecieveFromProgramSource $file]]
-		if { $retval != "" } { uplevel 1 $retval }
+		if { $retval != "" } {
+		    info script $file
+		    uplevel 1 $retval
+		}
 	    }
 	}
     }
@@ -814,6 +824,7 @@ proc RamDebugger::rcont { args } {
     variable debuggerstate
     variable remoteserver
     variable remoteserverType
+    variable files
 
     if { $debuggerstate == "time" } {
 	error "Command rcont cannot be used in 'time' mode. Check rtime"
@@ -842,7 +853,13 @@ proc RamDebugger::rcont { args } {
 		set ipos [string first "RDC::F $filenum $currentline ;" \
 		    $instrumentedfilesR($currentfile)]
 		if { $ipos == -1 } {
-		    error "error: line $currentline is not instrumented"
+		    set errormessage "error: line $currentline is not instrumented"
+		    set linetxt [lindex [split $files($currentfile) \n] [expr {$currentline-1}]]
+		    if { [string trim $linetxt] == "\}" } {
+			append errormessage ". Consider option 'Instrument proc last line' "
+			append errormessage "in Preferences"
+		    }
+		    error $errormessage
 		}
 	    }
 	}
@@ -1457,7 +1474,13 @@ proc RamDebugger::rbreak { args } {
 	if { $ipos == -1 } {
 	    set ipos [string first "RDC::F $filenum $currentline ;" $instrumentedfilesR($currentfile)]
 	    if { $ipos == -1 } {
-		error "error: line $currentline is not instrumented"
+		set errormessage "error: line $currentline is not instrumented"
+		set linetxt [lindex [split $files($currentfile) \n] [expr {$currentline-1}]]
+		if { [string trim $linetxt] == "\}" } {
+		    append errormessage ". Consider option 'Instrument proc last line' "
+		    append errormessage "in Preferences"
+		}
+		error $errormessage
 	    }
 	}
     }

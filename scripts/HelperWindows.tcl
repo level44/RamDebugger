@@ -627,13 +627,24 @@ proc RamDebugger::PreferencesWindow {} {
 	set DialogWin::user(instrument_source) ask
     }
 
+    checkbutton $f1.cb23 -text "Instrument proc last line" -variable \
+       DialogWin::user(instrument_proc_last_line) -grid "0 3 w"
+    DynamicHelp::register $f1.cb23 balloon "\
+        If this option is set, it is possible to put stops in the last line\n\
+        of one proc. It can make the debugged program fail if the proc wants\n\
+        to return a value without using command return. A typical example of\n\
+        failure are the procs that finish using 'set a 23' instead of 'return 23'"
+
+    set DialogWin::user(instrument_proc_last_line) $options(instrument_proc_last_line)
+
     set helptext "When debugging locally, choose here if the debugged script is only TCL "
     append helptext "or also TK"
     Label $f1.l15 -text "Local debugging type:" -helptext $helptext -grid "0 e"
-    radiobutton $f1.r1 -text "TCL" -variable DialogWin::user(LocalDebuggingType) -value tcl \
+    frame $f1.rads -grid "1 2 w"
+    radiobutton $f1.rads.r1 -text "TCL" -variable DialogWin::user(LocalDebuggingType) -value tcl \
+	    -grid "0 w"
+    radiobutton $f1.rads.r2 -text "TK" -variable DialogWin::user(LocalDebuggingType) -value tk \
 	    -grid "1 w"
-    radiobutton $f1.r2 -text "TK" -variable DialogWin::user(LocalDebuggingType) -value tk \
-	    -grid "2 w"
 
     set DialogWin::user(LocalDebuggingType) $options(LocalDebuggingType)
 
@@ -722,6 +733,7 @@ proc RamDebugger::PreferencesWindow {} {
 		    set options(ConfirmStartDebugging) $DialogWin::user(ConfirmStartDebugging)
 		    set options(ConfirmModifyVariable) $DialogWin::user(ConfirmModifyVariable)
 		    set options(instrument_source) $DialogWin::user(instrument_source)
+		    set options(instrument_proc_last_line) $DialogWin::user(instrument_proc_last_line)
 		    set options(LocalDebuggingType) $DialogWin::user(LocalDebuggingType)
 		    if { [info exists options(CheckRemotes)] } {
 		        set options(CheckRemotes) $DialogWin::user(CheckRemotes)
@@ -737,8 +749,8 @@ proc RamDebugger::PreferencesWindow {} {
 	    }
 	    3 {
 		foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging \
-		        ConfirmModifyVariable instrument_source LocalDebuggingType \
-		        CheckRemotes NormalFont FixedFont HelpFont executable_dirs] {
+		        ConfirmModifyVariable instrument_source instrument_proc_last_line \
+		        LocalDebuggingType CheckRemotes NormalFont FixedFont HelpFont executable_dirs] {
 		    if { [info exists options_def($i)] } {
 		        set options($i) $options_def($i)
 		        set DialogWin::user($i) $options_def($i)
@@ -1067,7 +1079,7 @@ proc RamDebugger::AboutWindow {} {
 
     set tt "Author: Ramon Ribó (RAMSAN)\n"
     append tt "ramsan@cimne.upc.es\nhttp://gid.cimne.upc.es/ramsan\n"
-    append tt "http://gid.cimne.upc.es/RamDebugger"
+    append tt "http://gid.cimne.com/RamDebugger"
 
     text $w.l2 -grid "0 px20 py10" -bd 0 -bg [$w cget -bg] -width 10 -height 4 \
 	    -highlightthickness 0 
@@ -1113,7 +1125,7 @@ proc RamDebugger::AboutWindow {} {
 
 
     $w.c create text 0 0 -anchor n -font "-family {new century schoolbook} -size 16 -weight bold"\
-	    -fill \#d3513d -text "Version 2.6" -tags text
+	    -fill \#d3513d -text "Version $RamDebugger::Version" -tags text
     RamDebugger::AboutMoveCanvas $w.c 0
 
 
@@ -1130,6 +1142,7 @@ proc RamDebugger::AboutWindow {} {
 	Tkhtml  "D. Richard Hipp" LGPL NO
 	tcllib Many BSD NO
 	icons "Adrian Davis" BSD NO
+	tkdnd "George Petasis" BSD NO
     }
     foreach "pack author lic mod" $data {
 	$w.lf.lb insert end [list $pack $author $lic $mod]

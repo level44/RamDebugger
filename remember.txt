@@ -1,9 +1,9 @@
 
 
 * actualize the changes section
-* actualize version number in HelperWindows.tcl and in .texinfo, also in ...1.3.zip
+* actualize version number in RamDebugger.tcl and in .texinfo, also in ...1.3.zip
   and in makefile_win
 * check makefile_win.tcl to see if more things needed to be included in the ZIP file
-* Check the README
+* Check the README. To help its update use: C-c C-e C-b in RamDebugger.texinfo
 * Put files in CVS
 * Clean CVS dirs from the ZIP file

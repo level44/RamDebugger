@@ -46,14 +46,19 @@ for details.
 Changes
 =======
 
+Changes From version 2.6 to version 2.7
+
+   * Option to instrument last line in proc (to avoid error when not using return)
+   * corrected error when brackets are not paired in comments
+
 Changes From version 2 to version 2.6
 
    * RamDebugger can now be used as a package
    * When editing one file, breakpoints are modified in position accordingly
-   * Command @b{console} works correctly now in local mode
+   * Command console works correctly now in local mode
    * It is possible to save possitions in the editor to return later
-   * Activated drag and drop (works for Windows and for platforms that have
-     package tkdnd compiled).
+   * Activated drag and drop (works for Windows and for platforms that
+     have package tkdnd compiled).
 
 Changes From version 1 to version 2
 
@@ -79,7 +84,7 @@ Download
 ========
 
 RamDebugger can be download from
-`http://gid.cimne.com/RamDebugger/RamDebugger2.5.zip'
+`http://gid.cimne.com/RamDebugger/RamDebugger2.7.zip'
 
 Installation and prerequisites
 ==============================

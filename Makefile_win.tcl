@@ -2,11 +2,12 @@
 
 proc zipfile { zipname directory files } {
 
+    set excludefiles "CVS *~"
     set cwd [pwd]
     file delete $zipname
     cd $directory
     .t ins end zipping... ; update
-    set comm "exec \"$::ZIP\" \"[file join $cwd $zipname]\" -r $files"
+    set comm "exec \"$::ZIP\" \"[file join $cwd $zipname]\" -r $files -x $excludefiles"
     eval $comm
     .t ins end "done\n" ; update
     cd $cwd
@@ -28,15 +29,15 @@ proc CheckHiddenFiles { directory files } {
 	    incr fail
 	    file attributes $j -hidden 0
 	}
-	if { [file attributes $file -hidden] } {
-	    .t ins end "Hidden file: $file\n" ; .t see end ; update
+	if { [file attributes $file -hidden] || [file attributes $file -system] } {
+	    .t ins end "Hidden or system file: $file\n" ; .t see end ; update
 	    incr fail
-	    file attributes $file -hidden 0
+	    file attributes $file -hidden 0 -system 0
 	}
     }
     cd $cwd
     if { $fail } {
-	error "There are hidden files"
+	error "There are hidden or system files"
     }
 }
 
@@ -76,7 +77,7 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
 }
 
 CheckHiddenFiles .. $ZIPFILES
-zipfile RamDebugger2.6.zip .. $ZIPFILES
+zipfile RamDebugger2.7.zip .. $ZIPFILES
 
 update
 after 500

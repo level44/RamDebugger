@@ -241,6 +241,12 @@ proc RamDebugger::Instrumenter::CheckEndOfFileState {} {
     }
 }
 
+proc RamDebugger::Instrumenter::GiveCommandUplevel {} {
+    variable stack
+
+    return [lindex [lindex [lindex $stack end] 0] 0]
+}
+
 # newblocknameP is for procs
 # newblocknameR is for the rest
 proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknameR blockinfoname } {
@@ -303,9 +309,12 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 	}
 	if { $DoInstrument == 1 && $lastinstrumentedline != $line && \
 	    ![string is space $c] && \
-	     $c != "\#" && $words == "" } {
-	    append newblock$OutputType "RDC::F $filenum $line ; "
-	    set lastinstrumentedline $line
+	    $c != "\#" &&  $words == "" } {
+	    if { $c != "\}" || [GiveCommandUplevel] != "proc" || \
+		$RamDebugger::options(instrument_proc_last_line) } {
+		append newblock$OutputType "RDC::F $filenum $line ; "
+		set lastinstrumentedline $line
+	    }
 	}
 	set consumed 0
 	switch -- $c {
@@ -445,7 +454,8 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		}
 	    }
 	    \[ {
-		if { $lastc != "\\" && $wordtype != "\{" } {
+		if { $lastc != "\\" && $wordtype != "\{" && \
+		    [lindex $words 0] != "\#" } {
 		    if { $wordtype == "" } { set wordtype "w" }
 		    set consumed 1
 		    PushState \[ $line $newblocknameP $newblocknameR
@@ -453,7 +463,8 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		}
 	    }
 	    \] {
-		if { $lastc != "\\" && $wordtype != "\"" && $wordtype != "\{" } {
+		if { $lastc != "\\" && $wordtype != "\"" && $wordtype != "\{" && \
+		    [lindex $words 0] != "\#"} {
 		    set fail [PopState \] $line $newblocknameP $newblocknameR]
 		    if { !$fail } {
 		        set consumed 1

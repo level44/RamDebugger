@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.10 $
+@set Version  $Revision: 1.11 $
 @set Date February 2003
 
 @ifinfo
@@ -66,7 +66,7 @@ Copyright 2002-2003 Ramon Ribó
 @end ifinfo
 
 @titlepage
-@title RamDebugger 2.6:
+@title RamDebugger 2.7:
 @subtitleA graphical and interactive debugger for Tcl-TK
 @author Copyright 2002-2003 Ramon Ribó
 @c The following two commands start the copyright page.
@@ -186,6 +186,13 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
+Changes From version 2.6 to version 2.7
+
+@itemize @bullet
+@item Option to instrument last line in proc (to avoid error when not using return)
+@item corrected error when brackets are not paired in comments
+@end itemize
+
 Changes From version 2 to version 2.6
 
 @itemize @bullet
@@ -221,7 +228,7 @@ RamDebugger web page is at: @url{http://gid.cimne.com/RamDebugger}
 @node  Download, Installation and prerequisites, web page, Introduction and Setup
 @section Download
 
-RamDebugger can be download from @url{http://gid.cimne.com/RamDebugger/RamDebugger2.6.zip}
+RamDebugger can be download from @url{http://gid.cimne.com/RamDebugger/RamDebugger2.7.zip}
 
 @node Installation and prerequisites, Starting RamDebugger, Download, Introduction and Setup
 @section Installation and prerequisites
@@ -587,6 +594,10 @@ some capabilities. The packages that have been modified are marked below.
 @tab NO
 @item icons 
 @tab Adrian Davis 
+@tab BSD 
+@tab NO
+@item tkdnd 
+@tab George Petasis
 @tab BSD 
 @tab NO
 @end multitable
