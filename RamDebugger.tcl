@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.40 2004/08/02 10:34:44 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.41 2004/08/02 11:48:52 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 package require Tcl 8.4
@@ -187,7 +187,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    lappend list $shortname
 	    set ::env(PATH) [join $list \;]
 	    # this is a variable from the TCL library
-            array unset ::auto_execs
+	    array unset ::auto_execs
 	}
     }
 
@@ -2691,14 +2691,15 @@ proc RamDebugger::ViewSecondText {} {
 	if { [info exists options(secondarypanes)] } {
 	    foreach "weight1 weight2" $options(secondarypanes) break
 	}
-	update idletasks
-	set h1 [expr {int($weight1*[winfo height $parent]/double($weight1+$weight2))}]
-	$f.textpane sash place 0 0 $h1
-
 	if { ![info exists currentfile_secondary] } {
 	    set currentfile_secondary $currentfile
 	}
 	OpenFileSecondary $currentfile_secondary
+	update idletasks
+	if { [winfo exists $f.textpane] } {
+	    set h1 [expr {int($weight1*[winfo height $parent]/double($weight1+$weight2))}]
+	    $f.textpane sash place 0 0 $h1
+	}
     } else {
 	_secondtextsavepos
 	if { [$text cget -synctextwidget] ne "" } {
@@ -6622,9 +6623,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ViewHelpFile"] \
 		[list command "&Contextual help" {} "Gives help for commands in editor" "F1" \
 		-command "RamDebugger::ViewHelpForWord"] \
-                separator \
+		separator \
 		[list command "&Extract examples" {} \
-                     "Extracts examples directory to a user-selectable directory" "" \
+		     "Extracts examples directory to a user-selectable directory" "" \
 		-command "RamDebugger::ExtractExamplesDir"] \
 		[list command "&Register cmd extension..." registerextension \
 		     "Register RamDebugger as command in the .tcl extension" "" \
