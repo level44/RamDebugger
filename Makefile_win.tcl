@@ -74,7 +74,7 @@ proc regsubfile { args } {
 	set x $data_out
     }
 
-    file copy -force $file $file~
+    #file copy -force $file $file~
     set fout [open $file w]
     puts -nonewline $fout $data_out
     close $fout
@@ -198,7 +198,7 @@ set FREEWRAP /tcltk/freewrap44/freewrap.exe
 set FREEWRAPTCLSH /utils/freewrapTCLSH
 set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
 		              -split_node -menu]
-set ZIP /utils/zip.exe
+set ZIP zip.exe
 set Version 3.0
 set Date "May 2003"
 set Copyright "2002-2003 Ramon Ribó"
@@ -206,7 +206,7 @@ set Copyright "2002-2003 Ramon Ribó"
 set files [list RamDebugger.tcl license.terms Readme addons scripts Examples help \
 	       pkgIndex.tcl]
 
-set packages [list tcllib Img]
+set packages [list tcllib Img tkhtml]
 set packagesout [list Tcl Tk bwidget1.6]
 
 
@@ -246,7 +246,10 @@ foreach i $files {
 }
 CleanCVSdirs install/RamDebugger
 CopyPackages $files install/RamDebugger/addons $packages $packagesout
-#zipfile RamDebugger$Version.zip .. $ZIPFILES
+
+set tclfiles ""
+foreach i $files { lappend tclfiles RamDebugger/$i }
+zipfile RamDebugger$Version.zip install $tclfiles
 
 puts -nonewline DONE\n
 #.t see end
