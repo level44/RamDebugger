@@ -1,4 +1,48 @@
 
+################################################################################
+#  HELPER FUNCTIONS
+################################################################################
+
+package require fileutil
+
+proc CopyPackages { files todir packages packagesout } {
+
+    set tclfiles ""
+    foreach i $files { if { [file extension $i] == ".tcl" } { lappend tclfiles $i } }
+    foreach i [fileutil::grep package $tclfiles] {
+	foreach "filename number contents" [split $i :] break
+	if { [regexp {package\s+require\s+(\w+)} $contents {} package] && \
+		 ![regexp {^\s*#} $contents] } {
+	    lappend packages $package
+	}
+    }
+    set packages [lsort -unique -dictionary $packages]
+
+    foreach i $packages {
+	if { $i == "registry" } { set i reg }
+	if { [lsearch $packagesout $i] != -1 } { continue }
+	set dir ""
+	set dirs $::auto_path
+	for { set k 0 } { $k < [llength $dirs] } { incr k } {
+	    set kdir [lindex $dirs $k]
+	    foreach j [glob -nocomplain -types d -dir $kdir *] {
+		if { [regexp "(?i)^${i}(\[0-9]+|-|$)" [file tail $j]] } {
+		    set dir $j
+		    break
+		}
+	    }
+	    if { $dir != "" } { break }
+	}
+	if { $dir == "" } {
+	    set dir ********************
+	} else {
+	    file copy $dir $todir
+	}
+	puts "$i    $dir"
+    }
+
+}
+
 
 proc regsubfile { args } {
 
@@ -30,10 +74,11 @@ proc regsubfile { args } {
 	set x $data_out
     }
 
-    file copy $file $file~
+    file copy -force $file $file~
     set fout [open $file w]
     puts -nonewline $fout $data_out
     close $fout
+    return $retval
 }
 
 proc zipfile { zipname directory files } {
@@ -41,11 +86,62 @@ proc zipfile { zipname directory files } {
     set cwd [pwd]
     file delete $zipname
     cd $directory
-    .t ins end zipping... ; update
+    puts -nonewline zipping... ; update
     set comm "exec \"$::ZIP\" \"[file join $cwd $zipname]\" -r $files"
     eval $comm
-    .t ins end "done\n" ; update
+    puts "done\n" ; update
     cd $cwd
+}
+
+proc CleanCVSdirs { dir } {
+
+    set savebackups ask
+
+    foreach i [glob -dir $dir "{.,}*"] {
+	if { [file tail $i] == "." || [file tail $i] == ".." } { continue }
+	if { [file isdir $i] } {
+	    if { [string tolower [file tail $i]] == "cvs" } {
+		file delete -force $i
+		puts -nonewline "deleting $i\n" ; update
+	    } elseif { [string tolower [file tail $i]] == ".xvpics" } {
+		file delete -force $i
+		puts -nonewline "deleting $i\n" ; update
+	    } else {
+		CleanCVSdirs $i
+	    }
+	} elseif { [string match .#* [file tail $i]] } {
+	    file delete -force $i
+	    puts -nonewline "deleting $i\n" ; update
+	} elseif { [string match *~ [file tail $i]] } {
+	    file delete -force $i
+	    puts -nonewline "deleting $i\n" ; update
+	} elseif { [string match *.log [string tolower $i]] } {
+	    file delete -force $i
+	    puts -nonewline "deleting $i\n" ; update
+	} elseif { [string equal [file tail $i] TemporalVariables] || \
+		[string equal [file tail $i] password.txt] } {
+	    set destname [file join /temp [file tail [file dirname $i]]_[file tail $i]]
+
+	    if { $savebackups == "ask" } {
+		set retval [tk_dialog .__temp question "Do you want to save backup file '$destname'?" \
+				question 0 Yes "Yes to all" No "No to all" Cancel]
+		switch $retval {
+		    -1 - 4 { exit }
+		    0 { set retval yes }
+		    1 { set savebackups always }
+		    2 { set retval no }
+		    3 { set savebackups never }
+		}
+	    }
+	    if { $savebackups != "never" } {
+		if { $savebackups == "always" || $retval == "yes" } {
+		    file copy -force $i $destname
+		}
+	    }
+	    file delete -force $i
+	    puts -nonewline "deleting $i\n" ; update
+	}
+    }
 }
 
 proc CheckHiddenFiles { directory files } {
@@ -60,12 +156,12 @@ proc CheckHiddenFiles { directory files } {
 	    eval lappend files [glob -nocomplain -dir $file *]
 	}
 	foreach j [glob -nocomplain -dir $file -types hidden *] {
-	    .t ins end "Hidden file: $j\n" ; .t see end ; update
+	    puts -nonewline "Hidden file: $j\n" ; .t see end ; update
 	    incr fail
 	    file attributes $j -hidden 0
 	}
 	if { [file attributes $file -hidden] || [file attributes $file -system] } {
-	    .t ins end "Hidden or system file: $file\n" ; .t see end ; update
+	    puts -nonewline "Hidden or system file: $file\n" ; .t see end ; update
 	    incr fail
 	    file attributes $file -hidden 0 -system 0
 	}
@@ -88,23 +184,52 @@ proc MustCompile { file args } {
 }
 
 proc Execute { args } {
-    .t ins end $args... ; update
+    puts -nonewline $args... ; update
     eval [concat exec $args]
-    .t ins end "done\n"
+    puts -nonewline "done\n"
 }
+
+################################################################################
+#  CONFIGURATION SECTION
+################################################################################
+
 
 set FREEWRAP /tcltk/freewrap44/freewrap.exe
 set FREEWRAPTCLSH /utils/freewrapTCLSH
-set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html" \
-    -split_node -menu}
+set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
+		              -split_node -menu]
 set ZIP /utils/zip.exe
 set Version 3.0
+set Date "May 2003"
+set Copyright "2002-2003 Ramon Ribó"
 
-set ZIPFILES [list RamDebugger/RamDebugger.tcl RamDebugger/license.terms RamDebugger/Readme \
-    RamDebugger/addons RamDebugger/scripts RamDebugger/Examples RamDebugger/help \
-    RamDebugger/pkgIndex.tcl]
+set files [list RamDebugger.tcl license.terms Readme addons scripts Examples help \
+	       pkgIndex.tcl]
 
-pack [text .t -width 80 -height 8] -fill both -expand 1
+set packages [list tcllib Img]
+set packagesout [list Tcl Tk bwidget1.6]
+
+
+################################################################################
+#  CREATING THE ZIP
+################################################################################
+
+
+#pack [text .t -width 80 -height 8] -fill both -expand 1
+console show
+wm withdraw .
+
+CheckHiddenFiles . $files
+
+foreach i [list RamDebugger.tcl pkgIndex.tcl] {
+    puts -nonewline regsubfile($i)=[regsubfile {set Version ([0-9.]+)} $i "set Version $Version"]\n
+}
+
+foreach "name value" [list Version $Version Date $Date Copyright $Copyright] {
+    puts -nonewline regsubfile(Ramdebugger.texinfo,$name)=[regsubfile -line "@set $name\\s+.*$" \
+	  Ramdebugger.texinfo "@set $name $value"]\n
+}
+
 
 if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     set oldcwd [pwd]
@@ -113,10 +238,18 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     cd $oldcwd
 }
 
-CheckHiddenFiles .. $ZIPFILES
-.t ins end regsubfile=[regsubfile {set Version ([0-9.]+)} RamDebugger/RamDebugger.tcl "set Version $Version"]
+
+file delete -force install/RamDebugger
+file mkdir install/RamDebugger
+foreach i $files {
+    file copy $i install/RamDebugger/.
+}
+CleanCVSdirs install/RamDebugger
+CopyPackages $files install/RamDebugger/addons $packages $packagesout
 #zipfile RamDebugger$Version.zip .. $ZIPFILES
 
+puts -nonewline DONE\n
+#.t see end
 update
-after 500
-exit
+#after 500
+#exit

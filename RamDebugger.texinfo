@@ -58,22 +58,24 @@
 
 @set photo
 
-@set Version  $Revision: 1.14 $
-@set Date February 2003
+@set Version 3.0
+@set Date May 2003
+@set Copyright 2002-2003 Ramon Ribó
 
+@set CVSVersion  $Revision: 1.15 $
 @ifinfo
-Copyright 2002-2003 Ramon Ribó
+Copyright @value{Copyright}
 @end ifinfo
 
 @titlepage
-@title RamDebugger 2.8:
+@title RamDebugger @value{CVSVersion}:
 @subtitleA graphical and interactive debugger for Tcl-TK
-@author Copyright 2002-2003 Ramon Ribó
+@author Copyright @value{Copyright}
 @c The following two commands start the copyright page.
 @page
 @vskip 0pt plus 1filll
 
-Copyright @copyright{} 2002-2003 Ramon Ribó
+Copyright @copyright{} @value{Copyright}
 
 @url{http://gid.cimne.upc.es/ramsan}
 
@@ -125,7 +127,7 @@ Using RamDebugger
 @end menu
 
 @ifinfo
-CN @value{Version} @value{Date}
+CN @value{CVSVersion} @value{Date}
 @end ifinfo
 
 @node Introduction and Setup, Using RamDebugger, Top, Top
@@ -245,7 +247,8 @@ RamDebugger web page is at: @url{http://gid.cimne.com/RamDebugger}
 @node  Download, Installation and prerequisites, web page, Introduction and Setup
 @section Download
 
-RamDebugger can be download from @url{http://gid.cimne.com/RamDebugger/RamDebugger2.8.zip}
+RamDebugger can be download from
+@url{http://gid.cimne.com/RamDebugger/RamDebugger@value{CVSVersion}.zip}
 
 @node Installation and prerequisites, Starting RamDebugger, Download, Introduction and Setup
 @section Installation and prerequisites

@@ -46,6 +46,20 @@ for details.
 Changes
 =======
 
+Changes From version 2.8 to version 3.0
+
+   * Count lines of code of a project (LOC)
+   * It is possible to create and use macros defined in TCL
+   * Values in User defined var & Local vars display content in balloon
+   * Autodisplay variables now displays also array variables
+   * Better interactive indentation and colors
+   * Menu close
+   * Drawing dynamically closing braces when editing
+   * better stack position
+   * search & replace
+   * comment lines are indented in normal column
+   * Added reinstrument to menu Debug
+
 Changes From version 2.6 to version 2.8
 
    * Option to instrument last line in proc (to avoid error when not using return)
@@ -85,7 +99,7 @@ Download
 ========
 
 RamDebugger can be download from
-`http://gid.cimne.com/RamDebugger/RamDebugger2.8.zip'
+`http://gid.cimne.com/RamDebugger/RamDebugger3.0.zip'
 
 Installation and prerequisites
 ==============================
