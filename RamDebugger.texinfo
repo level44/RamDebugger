@@ -58,22 +58,22 @@
 
 @set photo
 
-@set Version  $Revision: 1.8 $
-@set Date August 2002
+@set Version  $Revision: 1.9 $
+@set Date February 2003
 
 @ifinfo
-Copyright 2002 Ramon Ribó
+Copyright 2002-2003 Ramon Ribó
 @end ifinfo
 
 @titlepage
-@title RamDebugger 2.0:
+@title RamDebugger 2.5:
 @subtitleA graphical and interactive debugger for Tcl-TK
-@author Copyright 2002 Ramon Ribó
+@author Copyright 2002-2003 Ramon Ribó
 @c The following two commands start the copyright page.
 @page
 @vskip 0pt plus 1filll
 
-Copyright @copyright{} 2002 Ramon Ribó
+Copyright @copyright{} 2002-2003 Ramon Ribó
 
 @url{http://gid.cimne.upc.es/ramsan}
 
@@ -113,6 +113,7 @@ Using RamDebugger
 
 * Debugging locally::           
 * Debugging remotely::          
+* Using Ramdebugger as package::  
 * Debugging GiD::               
 * Debugging RamDebugger::       
 * Compiling/Debugging c++::     
@@ -182,14 +183,18 @@ people, as a convenience for RamDebugger users.
 @b{Note:} RamDebugger can also be an IDE for compiling and debugging c/c++ code. It
 uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 
-@node Changes, , Introduction, Introduction and Setup
+@node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
-package require ramdebugger
-Command @b{console} in local mode
-maintains linenumbers when revisiting file
-position stack
-drag and drop
+Changes From version 2 to version 2.5
+
+@itemize @bullet
+@item RamDebugger can now be used as a package
+@item Command @b{console} works correctly now in local mode
+@item It is possible to save possitions in the editor to return later
+@item Activated drag and drop (works for Windows and for platforms that have
+package tkdnd compiled).
+@end itemize
 
 Changes From version 1 to version 2
 
@@ -274,6 +279,7 @@ rhelp
 @menu
 * Debugging locally::           
 * Debugging remotely::          
+* Using Ramdebugger as package::  
 * Debugging GiD::               
 * Debugging RamDebugger::       
 * Compiling/Debugging c++::     
@@ -315,7 +321,7 @@ write: @code{[string length $i]+3}
 defined variables}, enter the new value in the right column and pres @code{Return}.
 @end itemize 
 
-@node Debugging remotely, Debugging GiD, Debugging locally, Using RamDebugger
+@node Debugging remotely, , Debugging locally, Using RamDebugger
 @section Debugging remotely
 
 To debug a TCL file remotely, apply the following steps:
@@ -359,7 +365,12 @@ to have this command enabled in the program, which is true by default.
 able to use @b{send}. As a fast workaround, write command @b{xhost -} in the UNIX command
 line.
 
-@node  Debugging GiD, Debugging RamDebugger, Debugging remotely, Using RamDebugger
+@node Using Ramdebugger as package, Debugging GiD, Debugging remotely, Using RamDebugger
+@section Using Ramdebugger as package
+
+Check @code{example4.tcl} to see how @b{Ramdebugger} can be used as a package.
+
+@node  Debugging GiD, Debugging RamDebugger, Using Ramdebugger as package, Using RamDebugger
 @section Debugging GiD
 
 GiD is a pre/postprocessing program for Finite Element Analysis that uses TCL/TK as its
@@ -372,6 +383,9 @@ To debug GiD in Windows, it is necessary to load the @b{comm} package. Do it in 
 In UNIX, it should work directly.
 
 Check section @ref{Debugging remotely} for the rest of the steps to follow.
+Check section @ref{Using Ramdebugger as package} for an alternative way of debugging
+GiD. Specifically, the package require RamDebugger should be added near the end of
+file @code{<GiD installation dir>/scripts/tclfile-opengl}.
 
 @node  Debugging RamDebugger, Compiling/Debugging c++, Debugging GiD, Using RamDebugger
 @section Debugging RamDebugger

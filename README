@@ -46,6 +46,14 @@ for details.
 Changes
 =======
 
+Changes From version 2 to version 2.5
+
+   * RamDebugger can now be used as a package
+   * Command @b{console} works correctly now in local mode
+   * It is possible to save possitions in the editor to return later
+   * Activated drag and drop (works for Windows and for platforms that have
+     package tkdnd compiled).
+
 Changes From version 1 to version 2
 
    * Tested for Tcl/Tk 8.3.4 and 8.4
@@ -70,13 +78,13 @@ Download
 ========
 
 RamDebugger can be download from
-`http://gid.cimne.com/RamDebugger/RamDebugger2.0.zip'
+`http://gid.cimne.com/RamDebugger/RamDebugger2.5.zip'
 
 Installation and prerequisites
 ==============================
 
 The only prerequisite before executing RamDebugger is to have Tcl-Tk
-installed. The tested version are Tcl-Tk 8.3.4 and 8.4b2 They can be
+installed. The tested version are Tcl-Tk 8.3.4 and 8.4 They can be
 obtained from `http://tcl.activestate.com'.
 
 RamDebugger has been tested on Windows and on Linux. For other UNIXes
