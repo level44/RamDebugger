@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.50 2005/01/12 10:42:29 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.51 2005/01/21 10:34:54 miguel Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -15,7 +15,7 @@ if { [info exists ::starkit::topdir] } {
 }
 
 ################################################################################
-#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
+#  This software is copyrighted by Ramon RibÃ³ (RAMSAN) ramsan@cimne.upc.es.
 #  (http://gid.cimne.upc.es/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
