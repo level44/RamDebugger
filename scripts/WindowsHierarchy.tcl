@@ -118,7 +118,6 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all"
 
     $w.l conf -text $res
-    bind $w <Motion> "destroy $w"
 
     wm withdraw $w
     update idletasks
@@ -136,10 +135,13 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     }
     if { $y < 0 } { set y 5 }
 
+    focus $w.l
+
     wm geom $w +$x+$y
     wm deiconify $w
+    update
+    bind $w <Motion> "destroy $w"
 
-    focus $w.l
     set widgetname [lindex [split $res \n] 0]
     bind $w.l <Control-x> "clipboard clear; [list clipboard append $widgetname]"
     bind $w.l <Control-c> "clipboard clear; [list clipboard append $res]"
@@ -197,7 +199,7 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } 
 	}
 	$canvas bind $widget <Enter> "RamDebugger::DisplayWindowsHierarchyInfo $w \
 		 $canvas $widget %X %Y"
-	$canvas bind $widget <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
+	#$canvas bind $widget <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
 
 	if { $ty > $maxy } {
 	    set maxy $ty

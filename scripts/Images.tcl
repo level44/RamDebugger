@@ -9,6 +9,11 @@ proc RamDebugger::CreateImages {} {
 	ZYoCgTAQgUkGhXEgiZIKxsI0jkdqcGBAIpJJioBoRCgVIeDDSjgkFYtuSlI8
 	Jo/tKjU9jUqnEAA7
     }]
+    set images(dbreak) [image create photo -data {
+	R0lGODdhCwALALMAANnZ2dieVuXGouKfn+q5ueOiouO6m/Xd3eu8vNSHU+Slpf//////////
+	/////////ywAAAAACwALAAAEPBBIGKSEQEoY5AwAAEoDmFBICYOcYpBi5hTkICgSDFKKIpSY
+	QAojoBAhBBBCCCmEAAMAAAY5AwRyhhDCjAA7
+    }]
     set images(arrow) [image create photo -data {
 	R0lGODlhCwALAIQAAM/Ptbq6ltjYw8zMsb6+nby8ma2thLa2kd7ezb6+nKys
 	ga2tgrOzjM3Ns8DAn729m66uhLe3kt/fzrq6l9nZxdDQt///////////////
@@ -24,7 +29,14 @@ proc RamDebugger::CreateImages {} {
 	wJ8QQCQKj8UkEhAQDAgFIzFgOCASikWR0eg2HA9IhCiZmM+UygRgubgvmIxm
 	A/gxOR3PBxSSAkQjJCMlRkNJhUd2RUdBADs=
     }]
-
+    set images(arrowdbreak) [image create photo -data {
+	R0lGODdhCwALANUAANnZ2dieVs/PtdByUNNsbNd7e9Rubrq6ltjYw8zMsb6+nby8ma2thLa2
+	kd7ezb6+nKysga2tgrOzjM3Ns8DAn729m66uhLe3kt/fzs1dT9Rvb9l/f9Vxcbq6l9nZxdSH
+	U9DQt///////////////////////////////////////////////////////////////////
+	/////////////////////////////////////////////////////////ywAAAAACwALAAAG
+	WECAEBgQCoEAoRAYEA4DAACAKBQIAcMBoWA4IIYJhUKhWDAaDuEDCBEOIxJIYEKhUCgVywUT
+	AAQCGc2G0/EEAoBAIBD4BECBAAAAAAaEwwAQIBwGAoHAMAgAOw==
+    }]
     set images(blank) [image create photo -data {
 	R0lGODlhCwALAIAAAP///////yH5BAEKAAEALAAAAAALAAsAAAIKjI+py+0P
 	o5yhAAA7
@@ -320,6 +332,21 @@ proc RamDebugger::CreateImages {} {
 	TVBUb0dJRiBQcm8gdmVyc2lvbiAyLjUNCqkgRGV2ZWxDb3IgMTk5NywxOTk4
 	LiBBbGwgcmlnaHRzIHJlc2VydmVkLg0KaHR0cDovL3d3dy5kZXZlbGNvci5j
 	b20AOw==
+    }
+    image create photo stop-22 -data {
+	R0lGODlhFgAWAIUAAASC/CQKDBwKDCwODNyKjPzq7My+vIxiXAQCBOSOjPz6
+	/OSelNySjNyGhMR+fLRaTGQ2LPz+/Nx+dNR2bNRybMxuZMxeXMxiZLQSFJQa
+	HFwqJNyKhOSCfNyCfNR6dMxmXMxWVMRORLQODOR+fOSSjNR2dMQ2LJQWFMRW
+	TLwWDNSCfMxeVLwaFKQODNR+fNx+fMxiXKQSDOSWlMRSTMxaVMQ6NMxORMQy
+	JOTS1MxqXLwWFLRORMxKPMQaHMxKTLQWFCH5BAEAAAAALAAAAAAWABYAAAb2
+	QIBwSCwajwGBcikIHIsDQmFKNRwQT2EgoVgsGOCG4wHBIgmRhWRCqVQsF0xG
+	YyYGNgoGh9PpeCQfICEic3UAAWgLIxwRJBsbHSUREyYYJ3RDAQULexGejhue
+	ESgpl3WaCxsqJKKsChEUKywtmFoFDC4vCayikzCyMbWHt38NCTKiHhUfMyzB
+	dQIFKsodob0VNDWzwppuKxMRrx6iNjcitNA4bh+iEzkwojc66JkOOxcf7G35
+	PBE9KS1MEUGgIQOIFfk++KjRw9wJgUUIZvhRoyLDFCliQDQisUWLGCJOeNx4
+	hKCGkyhPGnqCoKVLl1liypyZxUAQACH+aENyZWF0ZWQgYnkgQk1QVG9HSUYg
+	UHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29yIDE5OTcsMTk5OC4gQWxsIHJp
+	Z2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2ZWxjb3IuY29tADs=
     }
     image create photo down-22 -data {
 	R0lGODlhFgAWAIUAAPwCBAw2VCRKZDRSbBxCXJTC1Mzi7Nzq9NTm9Bx2nAQC

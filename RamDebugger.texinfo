@@ -58,11 +58,11 @@
 
 @set photo
 
-@set Version 3.1
+@set Version 3.2
 @set Date July 2003
 @set Copyright 2002-2003 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.19 $
+@set CVSVersion  $Revision: 1.20 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -188,20 +188,30 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
+Changes From version 3.1 to version 3.2
 
+@itemize @bullet
+@item Added @b{Snit} support
+@item Added contextual menu in marker zone (left margin of text)
+@item Added Enable/disable to breakpoints
+@item Added command stop in the Debug menu
+@item Added command to break execution in any moment
 @item Added zoom option to @b{Display Windows hierarchy}
-@item Cache directory created in user directories
+@item The cache directory (used internally by RamDebugger) is now created in the user directories instead of inside the installation directory
 @item Option @b{Pick window} in Windows hierarchy
-
+@item It is necessary to stop debugging before start debugging again
+@end itemize
 
 Changes From version 3.0 to version 3.1
 
+@itemize @bullet
 @item GiD customization files
 @item User can choose file extensions for every file type
 @item New macro for applying regsub to a region
 @item New option in @b{Current file arguments}: file type can be @b{TCL} or @b{TK}
 @item New option in @b{Current file arguments}: Another file can be started to begin local debugging
 @item RamDebugger::OpenFileSaveHandler
+@end itemize
 
 Changes From version 2.8 to version 3.0
 
@@ -309,13 +319,13 @@ namespace import RamDebugger::*
 rhelp
 @end example
 @item Modify the Tkcon initialization file (@t{tkcon.cfg} or @t{.tkconrc}) and add:
-@verbatim
+@example
    set ::tkcon::OPT(slaveeval) {
        source "<Path to RamDebugger>/RamDebugger.tcl"
        namespace import RamDebugger::*
        puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
    }
-@end verbatim
+@end example
 @end itemize 
 
 @node  Using RamDebugger, How does it work?, Introduction and Setup, Top
@@ -366,7 +376,7 @@ write: @code{[string length $i]+3}
 defined variables}, enter the new value in the right column and pres @code{Return}.
 @end itemize 
 
-@node Debugging remotely, , Debugging locally, Using RamDebugger
+@node Debugging remotely, Using Ramdebugger as package, Debugging locally, Using RamDebugger
 @section Debugging remotely
 
 To debug a TCL file remotely, apply the following steps:

@@ -46,6 +46,19 @@ for details.
 Changes
 =======
 
+Changes From version 3.1 to version 3.2
+
+   * Added Snit support
+   * Added contextual menu in marker zone (left margin of text)
+   * Added Enable/disable to breakpoints
+   * Added command stop in the Debug menu
+   * Added command to break execution in any moment
+   * Added zoom option to Display Windows hierarchy
+   * The cache directory (used internally by RamDebugger) is now created in
+     the user directories instead of inside the installation directory
+   * Option Pick window in Windows hierarchy
+   * It is necessary to stop debugging before start debugging again
+
  Changes From version 3.0 to version 3.1
 
    * GiD customization files
@@ -111,7 +124,7 @@ Download
 ========
 
 RamDebugger can be download from
-`http://gid.cimne.com/RamDebugger/RamDebugger3.0.zip'
+`http://gid.cimne.com/RamDebugger/RamDebugger3.2.zip'
 
 Installation and prerequisites
 ==============================

@@ -199,7 +199,7 @@ set FREEWRAPTCLSH /utils/freewrapTCLSH
 set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
 		              -split_node -menu]
 set ZIP zip.exe
-set Version 3.1
+set Version 3.2
 set Date "July 2003"
 set Copyright "2002-2003 Ramon Ribó"
 

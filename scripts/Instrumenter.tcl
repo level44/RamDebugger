@@ -26,6 +26,8 @@ proc RamDebugger::Instrumenter::InitState {} {
     variable wordtype ""
     variable wordtypeline ""
     variable wordtypepos ""
+    # = 0 no instrument, consider data; =1 instrument; =2 special case: switch;
+    # = 3 do not instrument but go inside
     variable DoInstrument 0
     variable OutputType
     variable NeedsNamespaceClose 0
@@ -69,11 +71,20 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 	    set NewDoInstrument 0
 	}
     } else {
-	if { [lindex $words 0] == "proc" && [llength $words] == 3 } {
+
+	if { [lindex $words 0] == "constructor" && [llength $words] == 2 } {
+	    set NewDoInstrument 1
+	} elseif { [lindex $words 0] == "destructor" && [llength $words] == 1 } {
+	    set NewDoInstrument 1
+	} elseif { [lindex $words 0] == "method" && [llength $words] == 3 } {
+	    set NewDoInstrument 1
+	} elseif { [lindex $words 0] == "proc" && [llength $words] == 3 } {
 	    set NewDoInstrument 1
 	} elseif { $DoInstrument == 0 } {
-	    if { [lindex $words 0] == "namespace" && [lindex $words 1] == "eval" && \
-		     [llength $words] >= 3 } {
+	    if { [regexp {snit::(type|widget|widgetadaptor)$} [lindex $words 0]] && [llength $words] == 2 } {
+		set PushState 1
+	    } elseif { [lindex $words 0] == "namespace" && [lindex $words 1] == "eval" && \
+			    [llength $words] >= 3 } {
 		set PushState 1
 #                 if { $OutputType == "R" } {
 #                     upvar 2 $newblocknameP newblock
@@ -97,7 +108,17 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		        set NewDoInstrument 1
 		        if { $OutputType == "R" } {
 		            upvar 2 $newblocknameP newblockP
-		            append newblockP "namespace eval [lindex $words 2] \{\n"
+		            append newblockP "[list namespace eval [lindex $words 2]] \{\n"
+		            set NeedsNamespaceClose 1
+		        }
+		    }
+		}
+		"*snit::type" - "*snit::widget" - "*snit::widgetadaptor" {
+		    if { [llength $words] == 2 } {
+		        set NewDoInstrument 3
+		        if { $OutputType == "R" } {
+		            upvar 2 $newblocknameP newblockP
+		            append newblockP "[lrange $words 0 1] \{\n"
 		            set NeedsNamespaceClose 1
 		        }
 		    }
@@ -252,6 +273,11 @@ proc RamDebugger::Instrumenter::GiveCommandUplevel {} {
     return [lindex [lindex [lindex $stack end] 0] 0]
 }
 
+proc RamDebugger::Instrumenter::IsProc { name } {
+    if { [regexp {snit::(type|widget|widgetadaptor)$} $name] } { return 1 }
+    return [regexp {^(proc|method|constructor|destructor)$} $name]
+}
+
 # newblocknameP is for procs
 # newblocknameR is for the rest
 proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknameR blockinfoname "progress 1" } {
@@ -296,7 +322,6 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
     set ichar 0
     set icharline 0
     foreach c [split $block ""] {
-
 	if { $ichar%1000 == 0 && $progress } {
 	    RamDebugger::ProgressVar [expr {$ichar*100/$length}]
 	}
@@ -315,7 +340,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 	if { $DoInstrument == 1 && $lastinstrumentedline != $line && \
 	    ![string is space $c] && \
 	    $c != "\#" &&  $words == "" } {
-	    if { $c != "\}" || [GiveCommandUplevel] != "proc" || \
+	    if { $c != "\}" || ![IsProc [GiveCommandUplevel]] || \
 		$RamDebugger::options(instrument_proc_last_line) } {
 		append newblock$OutputType "RDC::F $filenum $line ; "
 		set lastinstrumentedline $line
@@ -344,10 +369,11 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		        }
 		        set wordtypeline 0
 
-		        if { $OutputType == "R" && $words == "proc" } {
+		        if { $OutputType == "R" && [IsProc $words] } {
 		            if { $lastinstrumentedline == $line } {
-		                set numdel [expr 4+[string length "RDC::F $filenum $line ; "]]
-		            } else { set numdel 4 }
+		                set numdel [expr [string length $words]+\
+						[string length "RDC::F $filenum $line ; "]]
+		            } else { set numdel [string length $words] }
 		            set newblockR [string range $newblockR 0 end-$numdel]
 		            append newblockP $words
 		            set OutputType P
@@ -396,10 +422,11 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		            if { [lindex $words 0] != "\#" } {
 		                set checkExtraCharsAfterCQB \}
 		            }
-		            if { $OutputType == "R" && $words == "proc" } {
+		            if { $OutputType == "R" && [IsProc $words] } {
 		                if { $lastinstrumentedline == $line } {
-		                    set numdel [expr 4+[string length "RDC::F $filenum $line ; "]]
-		                } else { set numdel 4 }
+		                    set numdel [expr [string length $words]+\
+						    [string length "RDC::F $filenum $line ; "]]
+		                } else { set numdel [string length $words] }
 		                set newblockR [string range $newblockR 0 end-$numdel]
 		                append newblockP $words
 		                set OutputType P
@@ -433,18 +460,19 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		        lappend words $currentword
 		        set currentword ""
 
-		        if { $OutputType == "R" && $words == "proc" } {
+		        if { $OutputType == "R" && [IsProc $words] } {
 		            if { $lastinstrumentedline == $line } {
-		                set numdel [expr 4+[string length "RDC::F $filenum $line ; "]]
-		            } else { set numdel 4 }
+		                set numdel [expr [string length $words]+\
+						[string length "RDC::F $filenum $line ; "]]
+		            } else { set numdel [string length $words] }
 		            set newblockR [string range $newblockR 0 end-$numdel]
 		            append newblockP $words
 		            set OutputType P
 		        }
 
-		        if { [lindex $words 0] == "proc" } {
+		        if { [IsProc [lindex $words 0]] } {
 		            if { [llength $words] == 1 } {
-		                set icharlineold [expr $icharline-4]
+		                set icharlineold [expr $icharline-[string length [lindex $words 0]]]
 		                lappend blockinfocurrent magenta $icharlineold $icharline
 		            } elseif { [llength $words] == 2 } {
 		                set icharlineold [expr $icharline-[string length [lindex $words end]]]
@@ -589,7 +617,7 @@ proc RamDebugger::Instrumenter::DoWorkForTime { block filename newblockname time
 	foreach "name file lineini lineend lasttime" $i {
 	    if { $file != $filename } { continue }
 	    if { $lineini != $lastline } { set lastpos 0 }
-	    set text "RDC::MeasureTime [list $name] \[time { "
+	    set text "RDC::MeasureTime [list $name] \[info level] \[time { "
 	    set linepos [expr $lineini-1]
 	    set line [lindex $lines $linepos]
 	    set newline [string range $line 0 [expr $lastpos-1]]

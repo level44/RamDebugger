@@ -119,6 +119,7 @@ set auto_index(::RamDebugger::Instrumenter::PushState) [list source [file join $
 set auto_index(::RamDebugger::Instrumenter::PopState) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(::RamDebugger::Instrumenter::CheckEndOfFileState) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(::RamDebugger::Instrumenter::GiveCommandUplevel) [list source [file join $dir Instrumenter.tcl]]
+set auto_index(::RamDebugger::Instrumenter::IsProc) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(::RamDebugger::Instrumenter::DoWork) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(::RamDebugger::Instrumenter::DoWorkForTime) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(::RamDebugger::Instrumenter::DoWorkForC++) [list source [file join $dir Instrumenter.tcl]]

@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.28 2003/09/03 16:12:27 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.29 2003/11/10 15:42:30 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -41,14 +41,14 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 3.1
+    set Version 3.2
 
     ################################################################################
     #    Non GUI commands
     ################################################################################
 
     namespace export rhelp rdebug rlist reval rcont rnext rstep rbreak rcond rinfo rdel \
-	    rstack routput rtime
+	    rstack routput rtime renabledisable
 
     ################################################################################
     # communications issues
@@ -94,6 +94,7 @@ namespace eval RamDebugger {
     variable textCOMP
     variable IsInStop 0
     variable TextMotionAfterId ""
+    variable afterid_formessage ""
     variable ExpressionResult ""
     variable count
     variable listbox ""
@@ -135,6 +136,9 @@ proc RamDebugger::Init { readprefs { registerasremote 1 } } {
 	set dir $::argv0
     } else {
 	set dir [info script]
+    }
+    if {[file type $dir] eq "link"} {
+	set dir [file readlink $dir]
     }
     set dir [file join [pwd] [file dirname $dir]]
     set MainDir $dir
@@ -277,7 +281,7 @@ proc RamDebugger::UpdateExecDirs {} {
 
     if { $::tcl_platform(platform) == "windows" } {
 	set file [filenormalize [file join $MainDir addons]]
-	if { [lsearch $options(executable_dirs) $file] == -1 } {
+	if { [lsearch -exact $options(executable_dirs) $file] == -1 } {
 	    lappend options(executable_dirs) $file
 	}
 	foreach i [glob -nocomplain -dir c: mingw*] {
@@ -285,7 +289,7 @@ proc RamDebugger::UpdateExecDirs {} {
 	    foreach j [concat [list $i] $dirs_in] {
 		if { [file exists [file join $j bin]] } {
 		    set file [filenormalize [file join $j bin]]
-		    if { [lsearch $options(executable_dirs) $file] == -1 } {
+		    if { [lsearch -exact $options(executable_dirs) $file] == -1 } {
 		        lappend options(executable_dirs) $file
 		    }
 		}
@@ -304,7 +308,7 @@ proc RamDebugger::UpdateExecDirs {} {
 	    set err [catch { set shortname [file native [file attributes $i -shortname]] }]
 	    if { !$err } { set i $shortname }
 	}
-	if { [lsearch $list $i] == -1 } {
+	if { [lsearch -exact $list $i] == -1 } {
 	    lappend list $i
 	    set haschanged 1
 	}
@@ -360,6 +364,7 @@ proc RamDebugger::rdebug { args } {
     variable gdblog
     variable MainDir
     variable options
+    variable initialcommands
 
     set usagestring {usage: rdebug ?switches? ?program?
 	-h:             displays usage
@@ -503,6 +508,8 @@ proc RamDebugger::rdebug { args } {
 	if { $filetodebug == "" } {
 	    error "Error. there is no current file"
 	}
+	local eval [cd [file dirname $filetodebug]]
+
 	set remoteserver $filetodebug
 	TakeArrowOutFromText
     } elseif { $opts(-debugcplusplus) } {
@@ -557,10 +564,10 @@ proc RamDebugger::rdebug { args } {
 		return $remoteserver
 	    } else { error "error. $usagestring\nActive programs: [array names services]" }
 	}
-	if { [lsearch [array names services] $opts(program)] == -1 } {
+	if { [lsearch -exact [array names services] $opts(program)] == -1 } {
 	    FindActivePrograms 1
 	}
-	if { [lsearch [array names services] $opts(program)] != -1 } {
+	if { [lsearch -exact [array names services] $opts(program)] != -1 } {
 	    set remoteserver $opts(program)
 	    set remoteserverNum $services($remoteserver)
 	} else { error "error. $usagestring\nActive programs: [array names services]" }
@@ -585,15 +592,15 @@ proc RamDebugger::rdebug { args } {
 	    variable stopnext 0
 	    variable contto ""
 	    variable outputline 0
-	    variable lastprocname ""
-	    variable lastlevel 0
+	    variable lastprocstack ""
 	    variable currentfile ""
+	    variable linecounter 0
 	}
 	proc RDC::SendDev { comm } {
 	    SENDDEVBODY
 	}
-	proc RDC::MeasureTime { name timestr } {
-	    SendDev [list RamDebugger::RecieveTimeFromProgram $name [lindex $timestr 0]]
+	proc RDC::MeasureTime { name level timestr } {
+	    SendDev [list RamDebugger::RecieveTimeFromProgram $name $level [lindex $timestr 0]]
 	}
 	proc RDC::Continue {} {
 	    set ::RDC::code ""
@@ -606,24 +613,42 @@ proc RamDebugger::rdebug { args } {
 	proc RDC::F { filenum line } {
 	    variable code
 	    variable evalhandler
-	    # == 1 next ; == 2 step
+	    # == 1 next ; == 2 step ; == 3 nextfull
 	    variable stopnext
 	    variable contto
 	    variable breaks
 	    variable outputline
-	    variable lastprocname
-	    variable lastlevel
+	    variable lastprocstack
+	    variable linecounter
 
-	    if { [info level] > 1 } {
-		set prognameL [lindex [info level -1] 0]
-		set procname [uplevel 1 [list namespace which -command $prognameL]]
-	    } else { set procname "GLOBAL" }
+	    set procstack ""
+	    set procname ""
+	    for { set i [expr {[info level]-1}] } { $i >= 1 } { incr i -1 } {
+		set prognameL [lindex [info level -$i] 0]
+		set procnameL [uplevel $i [list namespace which -command $prognameL]]
+		lappend procstack $procnameL
+		if { $i == 1 } { set procname $procnameL }
+	    }
 	    set stop 0
 	    set breaknum 0
 	    set condinfo ""
-	    if { $stopnext == 2 } { set stop 1 }
-	    if { $stopnext == 1 && ($procname == $lastprocname || [info level] < $lastlevel) } {
-		set stop 1
+	    set len [llength $procstack]
+	    set lastlen [llength $lastprocstack]
+	    switch $stopnext {
+		1 {
+		    set lm1 [expr {$len-1}]
+		    if { $len <= $lastlen && $procstack == [lrange $lastprocstack 0 $lm1] } {
+		        set stop 1
+		    }
+		}
+		2 {
+		    if { $len < $lastlen } { set lm1 [expr {$len-1}]
+		    } else { set lm1 [expr {$lastlen-1}] }
+		    if { [lrange $procstack 0 $lm1] == [lrange $lastprocstack 0 $lm1] } {
+		        set stop 1
+		    }
+		}
+		3 { set stop 1 }
 	    }
 	    if { [lindex $contto 0] == $filenum && [lindex $contto 1] == $line } {
 		set stop 1
@@ -639,6 +664,11 @@ proc RamDebugger::rdebug { args } {
 		    if { $err || $condinfo != 0 } { set stop 1 }
 		}
 	    }
+	    incr linecounter
+	    if { $linecounter >= 500 } {
+		RDC::SendDev update
+		set linecounter 0
+	    }
 	    if { !$stop } {
 		if { $outputline } {
 		    set procname [lindex [info level -1] 0]
@@ -648,14 +678,16 @@ proc RamDebugger::rdebug { args } {
 		}
 		return
 	    }
-	    set lastprocname $procname
-	    set lastlevel [info level]
+	    set lastprocstack $procstack
 	    set textline ""
 	    set code ""
-	    catch {
+	    set ::RDC::errorInfo $::errorInfo
+	    set ::RDC::err [catch {
 		regexp "RDC::F\\s+$filenum+\\s+$line\\s+; (\[^\n]*)" [info body $procname] {} \
-		        textline
-	    }
+		    qtextline
+	    }]
+	    if { $::RDC::err } { set ::errorInfo $::RDC::errorInfo }
+
 	    RDC::SendDev [list RamDebugger::RecieveFromProgram $breaknum $filenum \
 		    $line $procname $textline $condinfo]
 	    while 1 {
@@ -961,6 +993,7 @@ proc RamDebugger::rnext { args } {
     
     set usagestring {usage: rnext ?switches?
 	-h:       displays usage
+	-full:    Tries to stop program execution in any line
 	--:     end of options
     }
     ParseArgs $args $usagestring opts
@@ -969,7 +1002,11 @@ proc RamDebugger::rnext { args } {
     StopAtGUI "" ""
 
     if { $remoteserverType != "gdb" } {
-	EvalRemote [list set ::RDC::stopnext 1]
+	if { $opts(-full) } {
+	    EvalRemote [list set ::RDC::stopnext 3]
+	} else {
+	    EvalRemote [list set ::RDC::stopnext 1]
+	}
 	EvalRemote ::RDC::Continue
     } else {
 	set remoteserver [lreplace $remoteserver 2 2 next]
@@ -1060,8 +1097,10 @@ proc RamDebugger::rtime { args } {
 		foreach "name file lineini lineend lasttime" $i {
 		    lappend TimeMeasureDataNew [list $name $file $lineini $lineend ""]
 		    if { [lsearchfile $files $file] == -1 } {
-		        rlist -quiet $file
-		        lappend files $file
+		        if { [file exists $file] } {
+		            rlist -quiet $file
+		            lappend files $file
+		        }
 		    }
 		}
 	    }
@@ -1112,44 +1151,58 @@ proc RamDebugger::rtime { args } {
     }
     if { $opts(-display) != 0 } {
 	set datanames ""
-
+	set tdata ""
 	for { set i 0 } { $i < [llength $TimeMeasureData] } { incr i } {
-	    foreach "name - lineini lineend time" [lindex $TimeMeasureData $i] break
-	    if { ![info exists data($name)] } {
-		set level 0
-		set data($name) [list $level $time 0]
+	    foreach "name file lineini lineend time" [lindex $TimeMeasureData $i] break
+	    if { [llength $time] == 0 } {
+		set tdate [lindex $TimeMeasureData $i]
+	    } elseif { [llength $time] ==1 } {
+		lappend tdata [list $name $file $lineini $lineend \
+		                   [lindex [lindex $time 0] 1]]
 	    } else {
-		set level [lindex $data($name) 0]
+		foreach j [lsort -integer -index 0 $time] {
+		    lappend tdata [list "$name (level=[lindex $j 0])" $file $lineini $lineend \
+		                       [lindex $j 1]]
+		}
+	    }
+	}
+	for { set i 0 } { $i < [llength $tdata] } { incr i } {
+	    foreach "name - lineini lineend time" [lindex $tdata $i] break
+	    if { ![info exists data($name)] } {
+		set hilevel 0
+		set data($name) [list $hilevel $time 0]
+	    } else {
+		set hilevel [lindex $data($name) 0]
 		
 	    }
 	    lappend datanames $name
-	    if { $time == "" || $time == 0 } { continue }
+	    if { $time == "" } { continue }
 
-	    incr level
+	    incr hilevel
 	    set sum 0
-	    for {set j [expr $i+1] } { $j < [llength $TimeMeasureData] } { incr j } {
-		foreach "name_in - lineini_in lineend_in time_in" [lindex $TimeMeasureData $j] break
+	    for {set j [expr $i+1] } { $j < [llength $tdata] } { incr j } {
+		foreach "name_in - lineini_in lineend_in time_in" [lindex $tdata $j] break
 		if { $lineini_in > $lineend } { break }
 		if { $lineini_in == $lineini && $lineend_in == $lineend } { continue }
-		if { $time_in == "" || $time_in == 0 } {
+		if { $time_in == "" } {
 		    set percent ""
 		} else {
 		    set percent [expr $time_in*100/double($time)]
 		    incr sum $time_in
 		}
-		set data($name_in) [list $level $time_in $percent]
+		set data($name_in) [list $hilevel $time_in $percent]
 	    }
 	    if { $sum > 0 && $time != "" && $sum < $time } {
 		set remname "Remaining time for '$name'"
 		set time_rem [expr $time-$sum]
-		set data($remname) [list $level $time_rem [expr $time_rem*100/double($time)]]
+		set data($remname) [list $hilevel $time_rem [expr $time_rem*100/double($time)]]
 		lappend datanames $remname
 	    }
 	}
 	set unitname $opts(-display)
 	switch -- $opts(-display) {
 	    microsec { set unitfactor 1 ; set format %i }
-	    milisec { set unitfactor 1e-3  ; set format %i }
+	    milisec { set unitfactor 1e-3  ; set format %.4g }
 	    sec { set unitfactor 1e-6  ; set format %.4g }
 	    min { set unitfactor 1e-6/60.0  ; set format %.4g }
 	    default {
@@ -1535,12 +1588,56 @@ proc RamDebugger::rcond { args } {
     if { !$found } {
 	error "Breakpoints $opts(breakpointnum) does not exist\n$usagestring"
     }
-    set breakpoints [lreplace $breakpoints $ipos $ipos [lreplace $i 3 3 $opts(cond)]]
+    set breakpoints [lreplace $breakpoints $ipos $ipos [lreplace $i 4 4 $opts(cond)]]
 
     UpdateRemoteBreaks
 
     if { !$opts(-quiet) } {
 	return "condition for breakpoint $opts(breakpointnum): $opts(cond)"
+    }
+}
+
+proc RamDebugger::renabledisable { args } {
+    variable breakpoints
+    variable debuggerstate
+
+    if { $debuggerstate == "time" } {
+	error "Command renabledisable cannot be used in 'time' mode. Check rtime"
+    }
+
+    set usagestring {usage: renabledisable ?switches? breakpointnum
+	-h:       displays usage
+	-quiet: do not print anything
+	--:     end of options
+    }
+    ParseArgs $args $usagestring opts
+
+    set found 0
+    set ipos 0
+    foreach i $breakpoints {
+	if { [lindex $i 0] == $opts(breakpointnum) } {
+	    set found 1
+	    break
+	}
+	incr ipos
+    }
+    if { !$found } {
+	error "Breakpoints $opts(breakpointnum) does not exist\n$usagestring"
+    }
+    set br [lindex $breakpoints $ipos]
+    if { [lindex $br 1] } {
+	lset br 1 0
+	set enabledisable 0
+    } else {
+	lset br 1 1
+	set enabledisable 1
+    }
+    set breakpoints [lreplace $breakpoints $ipos $ipos $br]
+
+    UpdateRemoteBreaks
+
+    if { !$opts(-quiet) } {
+	return "breakpoint $opts(breakpointnum) enable/disable: $enabledisable"
     }
 }
 
@@ -1577,10 +1674,11 @@ proc RamDebugger::rbreak { args } {
     if { [catch {
 	rlist -quiet $opts(file) $opts(line)
     } errcatch] } {
+	set currentfile $currentfile_save
 	error "[lindex [split $errcatch \n] 0]\n$usagestring"
     }
 
-    set filenum [lsearch $fileslist $currentfile]
+    set filenum [lsearch -exact $fileslist $currentfile]
     
     set filetype [GiveFileType $currentfile]
     if { $filetype == "TCL" } {
@@ -1612,7 +1710,7 @@ proc RamDebugger::rbreak { args } {
 	    set NumBreakPoint [expr [lindex $i 0]+1]
 	}
     }
-    lappend breakpoints [list $NumBreakPoint $currentfile $currentline ""]
+    lappend breakpoints [list $NumBreakPoint 1 $currentfile $currentline ""]
     UpdateRemoteBreaks
 
     set currentfile $currentfile_save
@@ -1626,6 +1724,7 @@ proc RamDebugger::rinfo { args } {
     variable currentfile
 
     set usagestring {usage: rinfo ?switches? ?line?
+	-full:    returns all breakpoint information for line
 	-h:       displays usage
 	--:       end of options
 
@@ -1640,8 +1739,12 @@ proc RamDebugger::rinfo { args } {
 	}
 	set retval ""
 	foreach i $breakpoints {
-	    if { [lindex $i 1] == $currentfile && [lindex $i 2] == $opts(line) } {
-		lappend retval [lindex $i 0]
+	    if { [lindex $i 2] == $currentfile && [lindex $i 3] == $opts(line) } {
+		if { $opts(-full) } {
+		    lappend retval $i
+		} else {
+		    lappend retval [lindex $i 0]
+		}
 	    }
 	}
 	return $retval
@@ -1851,15 +1954,24 @@ proc RamDebugger::FindActivePrograms { force } {
     }
 }
 
-proc RamDebugger::RecieveTimeFromProgram { name time } {
+proc RamDebugger::RecieveTimeFromProgram { name level time } {
     variable TimeMeasureData
 
     set ipos 0
     foreach i $TimeMeasureData {
 	foreach "name_in file lineini lineend lasttime" $i {
 	    if { $name == $name_in } {
-		if { $lasttime == "" } { set lasttime 0 }
-		incr lasttime $time
+		set found 0
+		set ic 0
+		foreach j $lasttime {
+		    if { [lindex $j 0] == $level } {
+		        lset lasttime $ic [list $level [expr {[lindex $j 1]+$time}]]
+		        set found 1
+		        break
+		    }
+		    incr ic
+		}
+		if { !$found } { lappend lasttime [list $level $time] }
 		set i [lreplace $i 4 4 $lasttime]
 		set TimeMeasureData [lreplace $TimeMeasureData $ipos $ipos $i]
 		return
@@ -1888,9 +2000,9 @@ proc RamDebugger::AreFilesEqual { file1 file2 } {
 
 proc RamDebugger::lsearchfile { list file } {
     if { $::tcl_platform(platform) == "windows" } {
-	return [lsearch [string tolower $list] [string tolower $file]]
+	return [lsearch -exact [string tolower $list] [string tolower $file]]
     } else {
-	return [lsearch $list $file]
+	return [lsearch -exact $list $file]
     }
 }
 
@@ -2059,8 +2171,9 @@ proc RamDebugger::UpdateRemoteBreaks {} {
 	set remoteserver [lreplace $remoteserver 2 2 setbreakpoints]
 	EvalRemote "delete"
 	foreach i $breakpoints {
-	    set line [lindex $i 2]
-	    set filenum [lsearchfile $fileslist [lindex $i 1]]
+	    if { ![lindex $i 1] } { continue }
+	    set line [lindex $i 3]
+	    set filenum [lsearchfile $fileslist [lindex $i 2]]
 	    if { $filenum == -1 } { continue }
 	    set file [file tail [lindex $fileslist $filenum]]
 	    set filetype [GiveFileType $currentfile]
@@ -2073,10 +2186,11 @@ proc RamDebugger::UpdateRemoteBreaks {} {
     } else {
 	EvalRemote { if { [info exists RDC::breaks] } { unset RDC::breaks } }
 	foreach i $breakpoints {
-	    set line [lindex $i 2]
-	    set filenum [lsearch $fileslist [lindex $i 1]]
+	    if { ![lindex $i 1] } { continue }
+	    set line [lindex $i 3]
+	    set filenum [lsearch $fileslist [lindex $i 2]]
 	    if { $filenum == -1 } { continue }
-	    EvalRemote [list set RDC::breaks($filenum,$line) [list [lindex $i 0] [lindex $i 3]]]
+	    EvalRemote [list set RDC::breaks($filenum,$line) [list [lindex $i 0] [lindex $i 4]]]
 	}
     }
 }
@@ -2186,14 +2300,14 @@ proc RamDebugger::RecieveFromGdb {} {
 	    }
 	    if { $line != "" } {
 		set remoteserver [lreplace $remoteserver 2 2 ""]
-		set filenum [lsearch $fileslist $file]
+		set filenum [lsearch -exact $fileslist $file]
 		if { $filenum == -1 } {
 		    set err [catch {OpenFileF $file} errstring]
 		    if { $err } {
 		        WarnWin "Could not open file '$file' for stopping program"
 		        return
 		    }
-		    set filenum [lsearch $fileslist $file]
+		    set filenum [lsearch -exact $fileslist $file]
 		}
 		RecieveFromProgram "" $filenum $line "" "" ""
 		return
@@ -2279,14 +2393,14 @@ proc RamDebugger::RecieveFromGdb {} {
 	    set file $drive$file
 	}
 	set file [filenormalize $file]
-	    set filenum [lsearch $fileslist $file]
+	    set filenum [lsearch -exact $fileslist $file]
 	    if { $filenum == -1 } {
 		set err [catch {OpenFileF $file} errstring]
 		if { $err } {
 		    WarnWin "Could not open file '$file' for stopping program"
 		    return
 		}
-		set filenum [lsearch $fileslist $file]
+		set filenum [lsearch -exact $fileslist $file]
 	    }
 	    RecieveFromProgram "" $filenum $line $procname "" ""
 	    return
@@ -2303,14 +2417,14 @@ proc RamDebugger::RecieveFromGdb {} {
 #             # CONDITION is forgotten by now
 #         }
 #         if { $found } {
-#             set filenum [lsearch $fileslist $file]
+#             set filenum [lsearch -exact $fileslist $file]
 #             if { $filenum == -1 } {
 #                 set err [catch {OpenFileF $file} errstring]
 #                 if { $err } {
 #                     WarnWin "Could not open file '$file' for stopping program"
 #                     return
 #                 }
-#                 set filenum [lsearch $fileslist $file]
+#                 set filenum [lsearch -exact $fileslist $file]
 #             }
 #             RecieveFromProgram $breaknum $filenum $line $procname "" ""
 #             return
@@ -2352,8 +2466,12 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     variable text
     variable pane2in1
     variable options
+    variable pane1
+    variable pane2
+    variable pane3
 
     set f [$mainframe getframe]
+    set t [winfo toplevel $mainframe]
 
     if { [lindex [grid info $f.fulltext] 1] != $f } {
 	foreach i [array names options paneweights,*] {
@@ -2380,6 +2498,9 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	grid $f.fulltext -in $f -sticky nsew
 	grid rowconf $f 0 -weight 1
 	grid columnconf $f 0 -weight 1
+
+	set x [expr {[winfo x $t]+[winfo width $pane1]}]
+	wm geometry $t [winfo width $f.fulltext]x[winfo height $t]+$x+[winfo y $t]
 	
 	set options(ViewOnlyTextOrAll) OnlyText
     } else {
@@ -2387,8 +2508,30 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	    grid $i
 	}
 	grid $f.fulltext -in $pane2in1
+
+	set width [winfo width $f.fulltext]
+
+	if { [winfo width $pane1] <= 1 } {
+	    set panedw [winfo parent [winfo parent $pane1]] ;# dirty hack
+	    foreach "weight1 weight2 weight3" [ManagePanes $panedw h "1 6 2"] break
+	    set w1 [expr int($weight1/double($weight2)*$width+0.5)]
+	    set w3 [expr int($weight3/double($weight2)*$width+0.5)]
+	    incr width $w1
+	    incr width $w3
+	    set x [expr {[winfo x $t]-$w1+0}]
+	} else {
+	    incr width [winfo width $pane1]
+	    incr width [winfo width $pane3]
+	    set x [expr {[winfo x $t]-[winfo width $pane1]+0}]
+	}
+	incr width 8
+	wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
 	set options(ViewOnlyTextOrAll) All
     }
+
+    wm withdraw $t
+    update
+    after 0 wm deiconify $t
 
 
 }
@@ -2469,7 +2612,8 @@ proc RamDebugger::ExitGUI {} {
 
     set options(breakpoints) ""
     foreach i $breakpoints {
-	if { [string index $currentfile 0] != "*" } {
+	set file [lindex $i 2]
+	if { [string index $file 0] != "*" } {
 	    lappend options(breakpoints) $i
 	}
     }
@@ -2679,7 +2823,7 @@ proc RamDebugger::OpenFile {} {
     FillListBox
 }
 
-proc RamDebugger::OpenFileF { file { force 0 } } {
+proc RamDebugger::OpenFileF { file { force 0 } { UserNumLine -1 } } {
     variable marker
     variable text
     variable files
@@ -2691,6 +2835,7 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     variable WindowFilesListCurr
     variable options
 
+    if { $file == "" } { return }
     set file [filenormalize $file]
 
     if { $force == -1 } {
@@ -2701,19 +2846,21 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
 
     WaitState 1
 
-    if { [lsearch $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch $WindowFilesList $currentfile]
+    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
+	set pos [lsearch -exact $WindowFilesList $currentfile]
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
     }
     set linenum 1
-    if { [lsearch $WindowFilesList $file] != -1 } {
-	set pos [lsearch $WindowFilesList $file]
+    if { [lsearch -exact $WindowFilesList $file] != -1 } {
+	set pos [lsearch -exact $WindowFilesList $file]
 	set linenum [lindex $WindowFilesListLineNums $pos]
     }
     if { $file == $currentfile } {
 	set idx [$text index insert]
     } else { set idx $linenum.0 }
+
+    if { $UserNumLine != -1 } { set idx $UserNumLine.0 }
 
     set currentfile_save $currentfile
     if { !$force } {
@@ -2723,6 +2870,7 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     } else {
 	set comm [list rlist -quiet -force $file {}]
     }
+
     if { [catch $comm errstring] } {
 	set currentfile $currentfile_save
 	WaitState 0
@@ -2745,8 +2893,8 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     Colorize
 
     foreach i $breakpoints {
-	if { ![AreFilesEqual [lindex $i 1]  $file] } { continue }
-	set line [lindex $i 2]
+	if { ![AreFilesEqual [lindex $i 2]  $file] } { continue }
+	set line [lindex $i 3]
 	UpdateArrowAndBreak $line 1 ""
     }
     UpdateRemoteBreaks
@@ -2763,8 +2911,8 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     wm title [winfo toplevel $text] "RamDebugger     [file tail $currentfile]"
     set currentfileIsModified 0
 
-    if { [lsearch $WindowFilesList $file] != -1 } {
-	set WindowFilesListCurr [lsearch $WindowFilesList $file]
+    if { [lsearch -exact $WindowFilesList $file] != -1 } {
+	set WindowFilesListCurr [lsearch -exact $WindowFilesList $file]
     } elseif { [string index $file 0] != "*" } {
 	incr WindowFilesListCurr
 	if { $WindowFilesListCurr == [llength $WindowFilesList] } {
@@ -2853,9 +3001,9 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     Colorize
 
     foreach i $breakpoints {
-	if { ![AreFilesEqual [lindex $i 1]  $file] } { continue }
-	set line [lindex $i 2]
-	UpdateArrowAndBreak $line 1 ""
+	if { ![AreFilesEqual [lindex $i 2]  $file] } { continue }
+	set line [lindex $i 3]
+	UpdateArrowAndBreak 1 $type ""
     }
     UpdateRemoteBreaks
 
@@ -2892,8 +3040,8 @@ proc RamDebugger::CloseFile {} {
     variable WindowFilesListCurr
     variable WindowFilesListLineNums
 
-    if { [lsearch $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch $WindowFilesList $currentfile]
+    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
+	set pos [lsearch -exact $WindowFilesList $currentfile]
 	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
 	if { $WindowFilesListCurr >= $pos } { incr WindowFilesListCurr -1 }
@@ -2919,8 +3067,8 @@ proc RamDebugger::NewFile {} {
 
     WaitState 1
 
-    if { [lsearch $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch $WindowFilesList $currentfile]
+    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
+	set pos [lsearch -exact $WindowFilesList $currentfile]
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
     }
@@ -3058,8 +3206,8 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     }
     WaitState 1
 
-    if { [lsearch $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch $WindowFilesList $currentfile]
+    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
+	set pos [lsearch -exact $WindowFilesList $currentfile]
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
     }
@@ -3375,7 +3523,7 @@ proc RamDebugger::SetGUIBreakpoint {} {
     WaitState 0
 }
 
-proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow } {
+proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow { forceraise 1 } } {
     variable marker
     variable text
     variable textST
@@ -3417,14 +3565,26 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow } {
     set ypos [expr ($line-1)*[font metrics $font -linespace]+[font metrics $font -ascent]+\
 		  [$text cget -pady]+2]
     if { $hasarrow && $hasbreak } {
-	$marker create image 0 $ypos -anchor sw -image $images(arrowbreak) -tags "arrowbreak l$line"
+	set endis 1
+	foreach "- endis - - -" [lindex [rinfo -full $line] 0] break
+	if { $endis } {
+	    $marker create image 0 $ypos -anchor sw -image $images(arrowbreak) -tags "arrowbreak l$line"
+	} else {
+	    $marker create image 0 $ypos -anchor sw -image $images(arrowdbreak) -tags "arrowbreak l$line"
+	}
     } elseif { $hasarrow } {
 	$marker create image 0 $ypos -anchor sw -image $images(arrow) -tags "arrow l$line"
     } elseif { $hasbreak } {
-	$marker create image 0 $ypos -anchor sw -image $images(break) -tags "break l$line"
+	set endis 1
+	foreach "- endis - - -" [lindex [rinfo -full $line] 0] break
+	if { $endis } {
+	    $marker create image 0 $ypos -anchor sw -image $images(break) -tags "break l$line"
+	} else {
+	    $marker create image 0 $ypos -anchor sw -image $images(dbreak) -tags "break l$line"
+	}
     }
 
-    if { $hasarrow } {
+    if { $forceraise && $hasarrow } {
 	if { $::tcl_platform(platform) == "windows" } {
 	    set doit 1
 	} elseif { [focus] != $text } {
@@ -3506,8 +3666,10 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
     }
     UpdateArrowAndBreak $line "" 1
 
+    RamDebugger::SetMessage "" ;# to take out old SetMessageFlash
     if { $condinfo != "" } {
-	WarnWin "Conditional breakpoint result: $condinfo" [winfo toplevel $text]
+	RamDebugger::SetMessageFlash "Conditional breakpoint result: $condinfo"
+	#WarnWin "Conditional breakpoint result: $condinfo" [winfo toplevel $text]
     }
 }
 
@@ -3519,8 +3681,15 @@ proc RamDebugger::ContNextGUI { what } {
     variable currentfile
     variable options
 
-    if { $remoteserver == "" || ($remoteserverType == "local" && !$IsInStop) || \
-	($remoteserver == "master all" && !$IsInStop) } {
+    # before, there was the additional cond: || ($remoteserverType == "local" && !$IsInStop) || \
+    # ($remoteserver == "master all" && !$IsInStop) 
+
+
+    if { $remoteserverType == "" && [info command master] != "" } {
+	RamDebugger::rdebug -master
+    }
+
+    if { $remoteserver == "" } {
 	if { $currentfile == "" } {
 	    WarnWin "Cannot start debugging. There is no currentfile" $text
 	    return
@@ -3559,11 +3728,14 @@ proc RamDebugger::ContNextGUI { what } {
 	    }
 	}
 	if { $remoteserver == "" } { return }
+    } elseif { $remoteserver == "master all" && !$IsInStop } {
+	rlist -resend -quiet
     }
 
     switch $what {
 	rcont { rcont }
 	rnext { rnext }
+	rnextfull { rnext -full }
 	rstep { rstep }
 	rcontto {
 	    set idx [$text index insert] 
@@ -3578,6 +3750,7 @@ proc RamDebugger::ContNextGUI { what } {
 		WarnWin $errorstring
 	    }
 	}
+	rbreak { rbreak }
     }
 }
 
@@ -3635,11 +3808,13 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		    } elseif { [info exists $::RDC::i] } {
 		        lappend ::RDC::retval variable [set $::RDC::i]
 		    } else {
+		        set ::RDC::errorInfo $::errorInfo
 		        set ::RDC::err [catch {expr [set ::RDC::i]} ::RDC::val]
 		        if { !$::RDC::err } {
 		            lappend ::RDC::retval expr $::RDC::val
 		        } else {
 		            lappend ::RDC::retval error "variable or expr $::RDC::i does not exist"
+		            set ::errorInfo $::RDC::errorInfo
 		        }
 		    }
 		}
@@ -3689,11 +3864,13 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		} elseif { [info exists {VAR}] } {
 		    set ::RDC::retval [list variable [set {VAR}]]
 		} else {
+		    set ::RDC::errorInfo $::errorInfo
 		    set ::RDC::err [catch {expr {VAR}} ::RDC::val]
 		    if { !$::RDC::err } {
 		        set ::RDC::retval [list expr $::RDC::val]
 		    } else {
 		        set ::RDC::retval [list error {variable or expr 'VAR' does not exist}]
+		        set ::errorInfo $::RDC::errorInfo
 		    }
 		}
 		set ::RDC::retval
@@ -3844,11 +4021,13 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		} elseif { [info exists {VAR}] } {
 		    set ::RDC::retval [list variable [set {VAR}]]
 		} else {
+		    set ::RDC::errorInfo $::errorInfo
 		    set ::RDC::err [catch {expr {VAR}} ::RDC::val]
 		    if { !$::RDC::err } {
 		        set ::RDC::retval [list expr $::RDC::val]
 		    } else {
 		        set ::RDC::retval [list error "variable or expr 'VAR' does not exist"]
+		        set ::errorInfo $::RDC::errorInfo
 		    }
 		}
 		set ::RDC::retval
@@ -4098,10 +4277,30 @@ proc RamDebugger::ProgressVar { value { canstop 0 } } {
 
 proc RamDebugger::SetMessage { mess } {
     variable status
-    after cancel set RamDebugger::status ""
+    variable afterid_formessage
+
+    after cancel $afterid_formessage
     set status $mess
     update
-    after 5000 { set RamDebugger::status "" }
+    set afterid_formessage [after 5000 { set RamDebugger::status "" }]
+}
+
+proc RamDebugger::SetMessageFlash { mess { time 7000 } } {
+    variable status
+    variable afterid_formessage
+
+    after cancel $afterid_formessage
+
+    if { $status == "" } {
+	set status $mess
+    } else { set status "" }
+
+    incr time -300
+    if { $time <= 0 } {
+	set status ""
+    } else {
+	set afterid_formessage [after 300 [list RamDebugger::SetMessageFlash $mess $time]]
+    }
 }
 
 proc RamDebugger::GiveListBoxItemName { listbox string } {
@@ -4398,6 +4597,7 @@ proc RamDebugger::ListBoxDouble1 { listb item } {
 }
 
 proc RamDebugger::ListboxMenu { listb x y item } {
+    variable currentfile
 
     set data [$listb itemcget $item -data]
 
@@ -4604,19 +4804,19 @@ proc RamDebugger::CheckText { command args } {
     if { $delta != 0 } {
 	for { set i 0 } { $i < [llength $breakpoints] } { incr i } {
 	    set br [lindex $breakpoints $i]
-	    if { [AreFilesEqual [lindex $br 1] $currentfile] } {
-		set line [lindex $br 2]
+	    if { [AreFilesEqual [lindex $br 2] $currentfile] } {
+		set line [lindex $br 3]
 		if { $delta < 0 && $line >= $l2_new && $line < $l2_old } {
-		    UpdateArrowAndBreak $line 0 ""
 		    set breakpoints [lreplace $breakpoints $i $i]
+		    UpdateArrowAndBreak $line 0 ""
 		    incr i -1 ;# breakpoints has now one element less
 		}
 		if { $line >= $l2_old } {
 		    UpdateArrowAndBreak $line 0 ""
 		    set line [expr {$line+$delta}]
-		    UpdateArrowAndBreak $line 1 ""
-		    set br [lreplace $br 2 2 $line]
+		    set br [lreplace $br 3 3 $line]
 		    set breakpoints [lreplace $breakpoints $i $i $br]
+		    UpdateArrowAndBreak $line 1 ""
 		}
 	    }
 	}
@@ -5230,6 +5430,76 @@ proc lrepeat { element count } {
     return $retval
 }
 
+proc RamDebugger::MarkerContextualSubmenuDo { line what } {
+
+    switch $what {
+	set {
+	    if { [catch [list rbreak $line] errorstring] } {
+		WaitState 0
+		WarnWin $errorstring
+		return
+	    }
+	    UpdateArrowAndBreak $line 1 ""
+	}
+	clear {
+	    foreach num [rinfo $line] {
+		rdel $num
+	    }
+	    UpdateArrowAndBreak $line 0 ""
+	}
+	enabledisable {
+	    foreach num [rinfo $line] {
+		renabledisable $num
+	    }
+	    UpdateArrowAndBreak $line "" ""
+	}
+	clearcond {
+	    foreach num [rinfo $line] {
+		rcond $num ""
+	    }
+	}
+	window {
+	    DisplayBreakpointsWindow
+	}
+    }
+}
+
+proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
+    variable text
+
+    set line [scan [$text index @0,$y] %d]
+    set num -1
+    foreach "num endis - - cond" [lindex [rinfo -full $line] 0] break
+
+    set menu $w.menu
+    catch { destroy $menu }
+    menu $menu -tearoff 0
+
+    if { $num == -1 } {
+	$menu add command -label "Set breakpoint" -command \
+	    [list RamDebugger::MarkerContextualSubmenuDo $line set]
+    } else {
+	$menu add command -label "Clear breakpoint" -command \
+	    [list RamDebugger::MarkerContextualSubmenuDo $line clear]
+	if { $endis } {
+	    $menu add command -label "Disable breakpoint" -command \
+		[list RamDebugger::MarkerContextualSubmenuDo $line enabledisable]
+	} else {
+	    $menu add command -label "Enable breakpoint" -command \
+		[list RamDebugger::MarkerContextualSubmenuDo $line enabledisable]
+	}
+	if { $cond != "" } {
+	    $menu add command -label "Clear condition: $cond" -command \
+		[list RamDebugger::MarkerContextualSubmenuDo $line clearcond]
+	}
+    }
+    $menu add separator
+    $menu add command -label "Breakpoints window" -command \
+	[list RamDebugger::MarkerContextualSubmenuDo $line window]
+
+    tk_popup $menu $X $Y
+}
+
 proc RamDebugger::InitGUI { { w .gui } } {
     variable options
     variable options_def
@@ -5249,6 +5519,9 @@ proc RamDebugger::InitGUI { { w .gui } } {
     variable SavedPositionsStack
     variable debuggerstate
     variable descmenu
+    variable pane1
+    variable pane2
+    variable pane3
 
     proc ::bgerror { errstring } {
 	if { [info command RamDebugger::TextOutRaise] != "" } {
@@ -5281,7 +5554,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
     ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
-
     set descmenu [list \
 		"&File" all file 0 [list \
 		[list command "&New" {} "Begin new file" "" \
@@ -5374,6 +5646,11 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::ContNextGUI rnext"] \
 		[list command "&Step" debugentry "continue one command, entering in subcommands" "F11" \
 		-command "RamDebugger::ContNextGUI rstep"] \
+		[list command "Break" debugentry "Break execution as fast as possible" "" \
+		-command "RamDebugger::ContNextGUI rnextfull"] \
+		[list command "Stop debugging" debugentry "Stop current debugging" "Shift F5" \
+		     -command RamDebugger::DisconnectStop] \
+		separator \
 		[list command "Continue &to" debugentry "continue to selected line" "Ctrl F5" \
 		-command "RamDebugger::ContNextGUI rcontto"] \
 		separator \
@@ -5544,6 +5821,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext "continue one command, entering in subcommands" \
 	 -command "RamDebugger::ContNextGUI rstep"
+    $bbox add -image stop-22 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "stop debugging" \
+	 -command "RamDebugger::DisconnectStop"
 
     supergrid::go $toolbar
 
@@ -5595,6 +5876,9 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
     set marker [canvas $fulltext.can -bg grey90 -grid "0 wns" -width 14 -bd 0 \
 	    -highlightthickness 0]
+
+    bind $marker <3> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
+
     set text [supertext::text $fulltext.text -background white -wrap none -width 80 -height 40 \
 		  -exportselection 0 -font FixedFont -highlightthickness 0 -editable 0 \
 		  -preproc RamDebugger::CheckTextBefore \
@@ -5787,6 +6071,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	    bind all <$but> $comm
 	}
     } else {
+	bind Text <MouseWheel> ""
 	bind all <MouseWheel> {
 	    set w %W
 	    while { $w != [winfo toplevel $w] } {
@@ -5938,6 +6223,12 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
 
     if { [info exists options(breakpoints)] } {
+	if { [llength [lindex $options(breakpoints) 0]] == 4 } {
+	    set breakpoints ""
+	    foreach i $options(breakpoints) {
+		lappend breakpoints [concat [list [lindex $i 0]] 1 [lrange $i 1 3]]
+	    }
+	}
 	set breakpoints $options(breakpoints)
     }
     if { [info exists options(TimeMeasureData)] } {
@@ -5959,18 +6250,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 #         SetMessage ""
 #     }
 
-    if { [info exists options(currentfile)] && $options(currentfile) != ""  && \
-	    [file exists $options(currentfile)] } {
-	SetMessage "Opening file '$options(currentfile)'..."
-	OpenFileF $options(currentfile)
-	FillListBox
-
-	if { [info exists options(currentidx)] } {
-	    $text see $options(currentidx)
-	    $text mark set insert $options(currentidx)
-	}
-	SetMessage ""
-    } else { NewFile }
+    NewFile
     
     focus $text
     cproject::Init $w
@@ -6008,6 +6288,24 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
 }
 
+proc RamDebugger::OpenDefaultFile {} {
+    variable options
+    variable text
+
+    if { [info exists options(currentfile)] && $options(currentfile) != ""  && \
+	     [file exists $options(currentfile)] } {
+	SetMessage "Opening file '$options(currentfile)'..."
+	OpenFileF $options(currentfile)
+	FillListBox
+	
+	if { [info exists options(currentidx)] } {
+	    $text see $options(currentidx)
+	    $text mark set insert $options(currentidx)
+	}
+	SetMessage ""
+    }
+}
+
 if { [info command master] != "" } {
     set registerasremote 0
 } else { set registerasremote 1 }
@@ -6027,10 +6325,11 @@ RamDebugger::Init $readprefs $registerasremote
 if { [info command wm] != "" && [info commands tkcon_puts] == "" } {
     wm withdraw .
     RamDebugger::InitGUI
+    RamDebugger::OpenDefaultFile
     bind all <Control-x><Control-l> "source [info script] ; WarnWin reload"
 }
 if { [info command master] != "" } {
-    RamDebugger::rdebug -master
+    #RamDebugger::rdebug -master
 }
 if { [llength $argv] } {
     RamDebugger::OpenFileF [file normalize [lindex $argv 0]]

@@ -81,7 +81,7 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 	    return
 	}
 
-	set ipos [lsearch $options(old_expressions) $var]
+	set ipos [lsearch -exact $options(old_expressions) $var]
 	if { $ipos != -1 } {
 	    set options(old_expressions) [lreplace $options(old_expressions) $ipos $ipos]
 	}
@@ -276,12 +276,12 @@ proc RamDebugger::DisplayVarWindow { mainwindow } {
 
     lappend varwindows $f
     bind $f <Destroy> {
-	set ipos [lsearch $RamDebugger::varwindows %W]
+	set ipos [lsearch -exact $RamDebugger::varwindows %W]
 	set RamDebugger::varwindows [lreplace $RamDebugger::varwindows $ipos $ipos]
     }
     ToggleTransientWin $w $mainwindow
 
-    Label $f.l1 -text "Expression:" -grid "0 px3"
+    Label $f.l1 -text "Expression:" -grid "0 w px3"
 
     $f.l1 configure -helptext {
 	Examples of possible expressions in TCL:
@@ -353,10 +353,15 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     CopyNamespace ::DialogWin ::DialogWinBreak
 
     set f [DialogWinBreak::Init $text "Breakpoints window" separator [list Delete \
-	    "Delete all" View] "Apply Cond" Close]
+	    "Delete all" View En/Dis] "Apply Cond" Close]
     set w [winfo toplevel $f]
 
-    label $f.l1 -text "Condition:" -grid 0
+    set help {Examples of conditions:
+	$i > $j+1
+	[string match *.tcl $file]
+    }
+
+    Label $f.l1 -text "Condition:" -helptext $help -grid 0
     entry $f.e1 -textvariable DialogWinBreak::user(cond) -width 80 -grid "1 px3 py3"
 
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
@@ -365,6 +370,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		  -exportselection 0 \
 		  -columns [list \
 		                4  Num        left \
+		                6  En/dis     center \
 		                20 File        right \
 		                5  Line left \
 		                20 Condition left \
@@ -393,16 +399,22 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	set menu [menu %W.menu]
 	$menu add command -label "Apply condition" -command "DialogWinBreak::InvokeOK"
 	$menu add command -label "View" -command "DialogWinBreak::InvokeButton 4"
+	$menu add command -label "Enable/disable" -command "DialogWinBreak::InvokeButton 5"
 	$menu add separator
 	$menu add command -label "Delete" -command "DialogWinBreak::InvokeButton 2"
 	tk_popup $menu %X %Y
     }
 
+    set nowline [scan [$text index insert] %d]
     foreach i $breakpoints {
-	foreach "num file line cond" $i break
-	$DialogWinBreak::user(list) insert end [list $num [file tail $file] $line $cond \
+	foreach "num endis file line cond" $i break
+	$DialogWinBreak::user(list) insert end [list $num $endis [file tail $file] $line $cond \
 		[file dirname $file]]
+	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
+	    $DialogWinBreak::user(list) selection set end
+	}
     }
+
     set action [DialogWinBreak::CreateWindow]
     while 1 {
 	switch $action {
@@ -419,10 +431,10 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		    set val [$DialogWinBreak::user(list) get $curr]
 		    rcond [lindex $val 0] $DialogWinBreak::user(cond)
 		    $DialogWinBreak::user(list) delete $curr
-		    $DialogWinBreak::user(list) insert $curr [lreplace $val 3 3 \
+		    $DialogWinBreak::user(list) insert $curr [lreplace $val 4 4 \
 		            $DialogWinBreak::user(cond)]
-		    set file [file join [lindex $val 4 ] [lindex $val 1]]
-		    set line [lindex $val 2]
+		    set file [file join [lindex $val 5 ] [lindex $val 2]]
+		    set line [lindex $val 3]
 		    if { $file == $currentfile } {
 		        $text mark set insert $line.0
 		        $text see $line.0
@@ -433,8 +445,8 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		foreach i [$DialogWinBreak::user(list) curselection] {
 		    set ent [$DialogWinBreak::user(list) get $i]
 		    set num [lindex $ent 0]
-		    set file [file join [lindex $ent 4 ] [lindex $ent 1]]
-		    set line [lindex $ent 2]
+		    set file [file join [lindex $ent 5 ] [lindex $ent 2]]
+		    set line [lindex $ent 3]
 		    if { $file == $currentfile } {
 		        UpdateArrowAndBreak $line 0 ""
 		    }
@@ -442,8 +454,8 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		}
 		$DialogWinBreak::user(list) delete 0 end
 		foreach i $breakpoints {
-		    foreach "num file line cond" $i break
-		    $DialogWinBreak::user(list) insert end [list $num [file tail $file] $line $cond \
+		    foreach "num endis file line cond" $i break
+		    $DialogWinBreak::user(list) insert end [list $num $endis [file tail $file] $line $cond \
 		            [file dirname $file]]
 		}
 	    }
@@ -455,8 +467,8 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		    $DialogWinBreak::user(list) delete 0 end
 		    foreach i $breakpoints {
 		        set num [lindex $i 0]
-		        set file [lindex $i 1]
-		        set line [lindex $i 2]
+		        set file [lindex $i 2]
+		        set line [lindex $i 3]
 		        if { $file == $currentfile } {
 		            UpdateArrowAndBreak $line 0 ""
 		        }
@@ -471,13 +483,32 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		    return
 		}
 		set val [$DialogWinBreak::user(list) get $curr]
-		set file [file join [lindex $val 4 ] [lindex $val 1]]
-		set line [lindex $val 2]
+		set file [file join [lindex $val 5] [lindex $val 2]]
+		set line [lindex $val 3]
 		if { $file != $currentfile } {
 		    OpenFileF $file
 		}
 		$text mark set insert $line.0
 		$text see $line.0
+	    }
+	    5 {
+		foreach i [$DialogWinBreak::user(list) curselection] {
+		    set val [$DialogWinBreak::user(list) get $i]
+		    renabledisable [lindex $val 0]
+		    $DialogWinBreak::user(list) delete $i
+		    if { [lindex $val 1] } {
+		        set enabledisable 0
+		    } else { set enabledisable 1 }
+		    $DialogWinBreak::user(list) insert $i [lreplace $val 1 1 $enabledisable]
+		    $DialogWinBreak::user(list) selection set $i
+		    set file [file join [lindex $val 5 ] [lindex $val 2]]
+		    set line [lindex $val 3]
+		    if { $file == $currentfile } {
+		        UpdateArrowAndBreak $line "" "" 0
+		        $text mark set insert $line.0
+		        $text see $line.0
+		    }
+		}
 	    }
 	}
 	set action [DialogWinBreak::WaitForWindow]
@@ -870,7 +901,7 @@ proc RamDebugger::DisplayTimesPickSelection { w } {
 
     if { [catch {
 	set DialogWinTop::user($w,lineini) [scan [$text index sel.first] %d]
-	set DialogWinTop::user($w,lineend) [scan [$text index sel.last] %d]
+	set DialogWinTop::user($w,lineend) [scan [$text index "sel.last-1c"] %d]
     }]} {
 	set DialogWinTop::user($w,lineini) [scan [$text index insert] %d]
 	set DialogWinTop::user($w,lineend) [scan [$text index insert] %d]
@@ -1840,10 +1871,10 @@ proc RamDebugger::SearchInFiles {} {
 
     set values $options(SearchInFiles,exts)
     foreach i [list "*.tcl" "*.h,*.cc,*.c"] {
-	if { [lsearch $values $i] == -1 } { lappend values $i }
+	if { [lsearch -exact $values $i] == -1 } { lappend values $i }
     }
     foreach i [array names options(extensions,*)] {
-	if { [lsearch $values $options($i)] == -1 } { lappend values $options($i) }
+	if { [lsearch -exact $values $options($i)] == -1 } { lappend values $options($i) }
     }
 
     ComboBox $f.e2 -textvariable ::RamDebugger::searchextensions -grid "1 2 px3 py3" \
@@ -2009,8 +2040,18 @@ proc RamDebugger::SearchReplace { w what {f "" } } {
 		Search $w beginreplace
 	    } else {
 		foreach "idx1 idx2" [$text tag ranges search] break
+		set txt $::RamDebugger::replacestring
+		if { $::RamDebugger::searchmode == "-regexp" } {
+		    if { $::RamDebugger::searchcase } {
+		        regsub $::RamDebugger::searchstring [$text get $idx1 $idx2] \
+		            $::RamDebugger::replacestring txt
+		    } else {
+		        regsub -nocase $::RamDebugger::searchstring [$text get $idx1 $idx2] \
+		            $::RamDebugger::replacestring txt
+		    }
+		}
 		$text delete $idx1 $idx2
-		$text insert $idx1 $::RamDebugger::replacestring
+		$text insert $idx1 $txt
 		Search $w beginreplace
 	    }
 	}
@@ -2022,8 +2063,18 @@ proc RamDebugger::SearchReplace { w what {f "" } } {
 		}
 		if { [llength [$text tag ranges search]] == 0 } { return }
 		foreach "idx1 idx2" [$text tag ranges search] break
+		set txt $::RamDebugger::replacestring
+		if { $::RamDebugger::searchmode == "-regexp" } {
+		    if { $::RamDebugger::searchcase } {
+		        regsub $::RamDebugger::searchstring [$text get $idx1 $idx2] \
+		            $::RamDebugger::replacestring txt
+		    } else {
+		        regsub -nocase $::RamDebugger::searchstring [$text get $idx1 $idx2] \
+		            $::RamDebugger::replacestring txt
+		    }
+		}
 		$text delete $idx1 $idx2
-		$text insert $idx1 $::RamDebugger::replacestring
+		$text insert $idx1 $txt
 		incr inum
 		catch {Search $w beginreplace 1}
 	    }
@@ -2047,14 +2098,14 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	if { $::RamDebugger::searchstring == "" } {
 	    return
 	}
-	set ipos [lsearch $options(old_searchs) $::RamDebugger::searchstring]
+	set ipos [lsearch -exact $options(old_searchs) $::RamDebugger::searchstring]
 	if { $ipos != -1 } {
 	    set options(old_searchs) [lreplace $options(old_searchs) $ipos $ipos]
 	}
 	set options(old_searchs) [linsert [lrange $options(old_searchs) 0 6] 0 \
 		$::RamDebugger::searchstring]
 	if { $::RamDebugger::replacestring != "" } {
-	    set ipos [lsearch $options(old_replaces) $::RamDebugger::replacestring]
+	    set ipos [lsearch -exact $options(old_replaces) $::RamDebugger::replacestring]
 	    if { $ipos != -1 } {
 		set options(old_replaces) [lreplace $options(old_replaces) $ipos $ipos]
 	    }
@@ -2167,6 +2218,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 
 	set search_options $RamDebugger::SearchType
 	lappend search_options $::RamDebugger::searchmode
+	lappend search_options -count ::len
 
 	if { $::RamDebugger::searchcase == 1 } {
 	    # nothing
@@ -2191,12 +2243,12 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    }
 	} else {
 	    set RamDebugger::SearchPos $idx
-	    set len [string length $RamDebugger::searchstring]
+	    #set len [string length $RamDebugger::searchstring]
 	    if { $RamDebugger::SearchType == "-forwards" } {
-		set idx2 [$text index $RamDebugger::SearchPos+${len}c]
+		set idx2 [$text index $RamDebugger::SearchPos+${::len}c]
 	    } else {
 		set idx2 $RamDebugger::SearchPos
-		set RamDebugger::SearchPos [$text index $RamDebugger::SearchPos+${len}c]
+		set RamDebugger::SearchPos [$text index $RamDebugger::SearchPos+${::len}c]
 	    }
 	    set ed [$text cget -editable]
 	    $text conf -editable 1
@@ -2334,7 +2386,7 @@ proc RamDebugger::DoinstrumentThisfile { file } {
     }
     if { $options(instrument_source) == "auto" } {
 	set file [filenormalize $file]
-	if { [lsearch $WindowFilesList $file] != -1 } {
+	if { [lsearch -exact $WindowFilesList $file] != -1 } {
 	    return 1
 	} else { return 0 }
     } elseif { $options(instrument_source) == "always" } {
@@ -2396,7 +2448,7 @@ proc RamDebugger::DoinstrumentThisfile { file } {
 
     if { $options(instrument_source) == "auto" } {
 	set file [filenormalize $file]
-	if { [lsearch $WindowFilesList $file] != -1 || [GiveInstFile $file 1 P] != "" } {
+	if { [lsearch -exact $WindowFilesList $file] != -1 || [GiveInstFile $file 1 P] != "" } {
 	    return 1
 	} else { return 0 }
     } elseif { $options(instrument_source) == "always" } {
@@ -2583,7 +2635,7 @@ proc RamDebugger::PositionsStack { what } {
     
     switch $what {
 	save {
-	    while { [set pos [lsearch $SavedPositionsStack $tag]] != -1 } {
+	    while { [set pos [lsearch -exact $SavedPositionsStack $tag]] != -1 } {
 		set SavedPositionsStack [lreplace $SavedPositionsStack $pos $pos]
 	    }
 	    lappend SavedPositionsStack $tag
@@ -2591,7 +2643,7 @@ proc RamDebugger::PositionsStack { what } {
 	    catch { RamDebugger::DisplayPositionsStackDo refresh "" }
 	}
 	go {
-	    if { [set pos [lsearch $SavedPositionsStack $tag]] != -1 } {
+	    if { [set pos [lsearch -exact $SavedPositionsStack $tag]] != -1 } {
 		incr pos -1
 		if { $pos < 0 } { set pos end }
 	    } else { set pos end }
@@ -2896,7 +2948,7 @@ proc RamDebugger::CountLOCInFiles { parent } {
     trace vdelete DialogWin::user(programname) w "RamDebugger::UpdateProgramNameInLOC $f ;#"
 
     set dirs [$listbox get 0 end]
-    set ipos [lsearch $programnames $DialogWin::user(programname)]
+    set ipos [lsearch -exact $programnames $DialogWin::user(programname)]
     if { $ipos != -1 } {
 	set DialogWin::user(programs) [lreplace $DialogWin::user(programs) $ipos $ipos]
     }

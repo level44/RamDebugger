@@ -1,7 +1,8 @@
 
 
 * actualize the changes section
-* actualize version number in makefile_win (RamDebugger.tcl and in .texinfo,pkgIndex.tcl)
+* actualize version number in makefile_win (RamDebugger.tcl and 
+  in .texinfo,pkgIndex.tcl is made automagically)
 * check makefile_win.tcl to see if more things needed to be included in the ZIP file
 * Check the README. To help its update use: C-c C-e C-b in RamDebugger.texinfo
 * Put files in CVS and put TAG
