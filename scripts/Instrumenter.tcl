@@ -122,7 +122,7 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		        set NewDoInstrument 1
 		    }
 		}
-		"eval" {
+		"eval" - "html::eval" {
 		    set NewDoInstrument 1
 		}
 		"uplevel" {
@@ -254,7 +254,7 @@ proc RamDebugger::Instrumenter::GiveCommandUplevel {} {
 
 # newblocknameP is for procs
 # newblocknameR is for the rest
-proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknameR blockinfoname } {
+proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknameR blockinfoname "progress 1" } {
 
     variable words
     variable currentword
@@ -267,7 +267,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
     variable colors
 
     set length [string length $block]
-    if { $length >= 1000 } {
+    if { $length >= 1000 && $progress } {
 	RamDebugger::ProgressVar 0 1
     }
 
@@ -297,7 +297,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
     set icharline 0
     foreach c [split $block ""] {
 
-	if { $ichar%1000 == 0 } {
+	if { $ichar%1000 == 0 && $progress } {
 	    RamDebugger::ProgressVar [expr {$ichar*100/$length}]
 	}
 	if { $checkExtraCharsAfterCQB != "" } {
@@ -512,7 +512,9 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		    } else {
 		        if { $wordtype == "w" } {
 		            set wordtype ""
-		            lappend words $currentword
+		            if { $currentword != "\\" } {
+		                lappend words $currentword
+		            }
 		            set currentword ""
 		        }
 		        lappend blockinfocurrent "c"
@@ -569,7 +571,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
     }
     CheckEndOfFileState
 
-    if { $length >= 1000 } {
+    if { $length >= 1000 && $progress } {
 	RamDebugger::ProgressVar 100
     }
 }
@@ -607,10 +609,10 @@ proc RamDebugger::Instrumenter::DoWorkForTime { block filename newblockname time
 }
 
 
-proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname { braceslevelIni 0 } } {
+proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" { braceslevelIni 0 } } {
 
     set length [string length $block]
-    if { $length >= 5000 } {
+    if { $length >= 5000 && $progress } {
 	RamDebugger::ProgressVar 0 1
     }
 
@@ -645,7 +647,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname { braceslevel
     set simplechar ""
     foreach c [split $block ""] {
 
-	if { $ichar%5000 == 0 } {
+	if { $ichar%5000 == 0  && $progress } {
 	    RamDebugger::ProgressVar [expr $ichar*100/$length]
 	}
 
@@ -956,7 +958,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname { braceslevel
 	}
 	error "error: There is a non-closed brace at the end of the file (see Output for details)"
     }
-    if { $length >= 1000 } {
+    if { $length >= 1000  && $progress } {
 	RamDebugger::ProgressVar 100
     }
 }

@@ -8,6 +8,7 @@ proc LoadRamDebugger { dir } {
     interp alias ramdebugger master "" eval
     ramdebugger eval [list load {} Tk]
     ramdebugger eval { set argc 0 ; set argv "" }
+    ramdebugger eval [list set auto_path $::auto_path]
     ramdebugger eval [list set argv0 [file join $dir RamDebugger.tcl]]
     ramdebugger eval [list source [file join $dir RamDebugger.tcl]]
     package provide RamDebugger 2.8

@@ -1,5 +1,41 @@
 
 
+proc regsubfile { args } {
+
+    set opts ""
+    set noopts ""
+    set isopt 0
+    foreach i $args {
+	if { $isopt || ![string match -* $i] } {
+	    lappend noopts $i
+	    set isopt 1
+	} else {
+	    lappend opts $i
+	    if { $i == "--" } { set isopt 1 }
+	}
+    }
+    if { [llength $noopts] == 4 } {
+	foreach "exp file subSpec varName" $noopts break
+    } elseif { [llength $noopts] == 3 } {
+	foreach "exp file subSpec" $noopts break
+    } else { error "error. usage: regsubfile ?switches? exp file subSpec ?varName?" }
+    
+    set fin [open $file r]
+    set data [read $fin]
+    close $fin
+    set retval [eval regsub $opts [list $exp $data $subSpec data_out]]
+
+    if { [info exists varName] } {
+	upvar $varName x
+	set x $data_out
+    }
+
+    file copy $file $file~
+    set fout [open $file w]
+    puts -nonewline $fout $data_out
+    close $fout
+}
+
 proc zipfile { zipname directory files } {
 
     set cwd [pwd]
@@ -62,6 +98,7 @@ set FREEWRAPTCLSH /utils/freewrapTCLSH
 set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html" \
     -split_node -menu}
 set ZIP /utils/zip.exe
+set Version 3.0
 
 set ZIPFILES [list RamDebugger/RamDebugger.tcl RamDebugger/license.terms RamDebugger/Readme \
     RamDebugger/addons RamDebugger/scripts RamDebugger/Examples RamDebugger/help \
@@ -77,7 +114,8 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
 }
 
 CheckHiddenFiles .. $ZIPFILES
-zipfile RamDebugger2.8.zip .. $ZIPFILES
+.t ins end regsubfile=[regsubfile {set Version ([0-9.]+)} RamDebugger/RamDebugger.tcl "set Version $Version"]
+#zipfile RamDebugger$Version.zip .. $ZIPFILES
 
 update
 after 500

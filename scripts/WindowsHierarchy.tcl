@@ -4,20 +4,20 @@
 ################################################################################
 
 
-proc RamDebugger::DisplayWindowsHierarchyInfo { canvas w x y } {
+proc RamDebugger::DisplayWindowsHierarchyInfo { w canvas widget x y } {
     variable TextMotionAfterId
     
     after cancel $TextMotionAfterId
     set TextMotionAfterId ""
     if { [winfo exists $canvas.help] } { destroy $canvas.help }
 
-    if { $w != "" } {
+    if { $widget != "" } {
 	set TextMotionAfterId [after 100 RamDebugger::DisplayWindowsHierarchyInfoDo \
-		$canvas $w $x $y]
+		$w $canvas $widget $x $y]
     }
 }
 
-proc RamDebugger::DisplayWindowsHierarchyInfoDo { canvas w x y } {
+proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
     variable TextMotionAfterId
 
     set TextMotionAfterId ""
@@ -87,22 +87,23 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { canvas w x y } {
 	append retval "    height=[winfo height WIDGET] reqheight=[winfo reqheight WIDGET]\n"
 	EVAL
     }
-    if { $DialogWinHier::user(type) == "ramdebugger" } {
-	set retcomm "RamDebugger::DisplayWindowsHierarchyInfoDo2 $canvas $w $x $y \[set retval]"
+    if { $DialogWinTop::user($w,type) == "ramdebugger" } {
+	set retcomm "RamDebugger::DisplayWindowsHierarchyInfoDo2 $canvas $x $y \
+		\[set retval]"
     } else {
 	set retcomm "RDC::SendDev \[list RamDebugger::DisplayWindowsHierarchyInfoDo2 $canvas \
-		$w $x $y \[set retval]]"
+		$x $y \[set retval]]"
     }
     set comm [string map [list EVAL $retcomm] $comm]
-    set comm [string map [list WIDGET $w] $comm]
-    if { $DialogWinHier::user(type) == "ramdebugger" } {
+    set comm [string map [list WIDGET $widget] $comm]
+    if { $DialogWinTop::user($w,type) == "ramdebugger" } {
 	eval $comm
     } else {
 	EvalRemote $comm
     }
 }
 
-proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas w x y res } {
+proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 
     set w $canvas.help
     if { [winfo exists $w] } { destroy $w }
@@ -139,10 +140,10 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas w x y res } {
 
 }
 
-proc RamDebugger::DisplayWindowsHierarchyDoDraw { canvas list x y linespace } {
+proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } {
 
     set maxwidth 0
-    foreach "w info rest" $list {
+    foreach "widget info rest" $list {
 	foreach i $info {
 	    set width [font measure NormalFont $i]
 	    if { $width > $maxwidth } { set maxwidth $width }
@@ -154,10 +155,10 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { canvas list x y linespace } {
     set maxy $y
     set ty $y
     set num 0
-    foreach "w info rest" $list {
+    foreach "widget info rest" $list {
 	if { $rest != "-" } { 
-	    foreach "newx newy" [DisplayWindowsHierarchyDoDraw $canvas $rest [expr $x+$maxwidth] \
-		$maxy $linespace] break
+	    foreach "newx newy" [DisplayWindowsHierarchyDoDraw $w $canvas $rest \
+		[expr $x+$maxwidth] $maxy $linespace] break
 	    if { $newx > $maxx } { set maxx $newx}
 	    set ty [expr ($maxy+$newy)/2-$linespace/2]
 	    set maxy $newy
@@ -169,7 +170,8 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { canvas list x y linespace } {
 	    }
 
 	    $canvas create line [expr $x+$width+2] [expr $ty+$linespace/2] \
-		[expr $x+$maxwidth-5] [expr $ty+$linespace/2] -width 2 -fill red -tags "items $w"
+		[expr $x+$maxwidth-5] [expr $ty+$linespace/2] -width 2 -fill red \
+		-tags "items $widget"
 	    incr maxy 12
 	}
 	set inum 0
@@ -180,14 +182,16 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { canvas list x y linespace } {
 		    1 { set color blue }
 		    2 { set color green }
 		}
-		$canvas create text $x $ty -text $i -tags "items $w" -font NormalFont -anchor nw \
+		$canvas create text $x $ty -text $i -tags "items $widget" -font NormalFont \
+		    -anchor nw \
 		    -fill $color
 		set ty [expr $ty+$linespace]
 	    }
 	    incr inum
 	}
-	$canvas bind $w <Enter> "RamDebugger::DisplayWindowsHierarchyInfo $canvas $w %X %Y"
-	$canvas bind $w <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $canvas {} %X %Y"
+	$canvas bind $widget <Enter> "RamDebugger::DisplayWindowsHierarchyInfo $w \
+		 $canvas $widget %X %Y"
+	$canvas bind $widget <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
 
 	if { $ty > $maxy } {
 	    set maxy $ty
@@ -203,7 +207,7 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { canvas list x y linespace } {
     return [list $maxx $maxy]
 }
 
-proc RamDebugger::DisplayWindowsHierarchyDo { what { res "" } } {
+proc RamDebugger::DisplayWindowsHierarchyDo { w what { res "" } } {
     variable remoteserver
 
     if { $what == "do" } {
@@ -231,10 +235,11 @@ proc RamDebugger::DisplayWindowsHierarchyDo { what { res "" } } {
 	    }
 	    EVAL
 	}
-	if { $DialogWinHier::user(type) == "ramdebugger" } {
-	    set retcomm "RamDebugger::DisplayWindowsHierarchyDo res \[::RDC::WindowsHierarchy .]"
+	if { $DialogWinTop::user($w,type) == "ramdebugger" } {
+	    set retcomm "RamDebugger::DisplayWindowsHierarchyDo $w res \
+		     \[::RDC::WindowsHierarchy .]"
 	} else {
-	    set retcomm "RDC::SendDev \[list RamDebugger::DisplayWindowsHierarchyDo res \
+	    set retcomm "RDC::SendDev \[list RamDebugger::DisplayWindowsHierarchyDo $w res \
 		        \[::RDC::WindowsHierarchy .]]"
 	}
 	set comm [string map [list EVAL $retcomm] $comm]
@@ -243,32 +248,32 @@ proc RamDebugger::DisplayWindowsHierarchyDo { what { res "" } } {
 	    unset RamDebugger::DisplayWindowsHierarchyFindLastId
 	}
 
-	if { $DialogWinHier::user(type) == "ramdebugger" } {
+	if { $DialogWinTop::user($w,type) == "ramdebugger" } {
 	    eval $comm
 	} else {
 	    if { $remoteserver == "" } {
 		after 100 [list WarnWin "Error: there is no debugged application" \
-		    $DialogWinHier::user(canvas)]
-		$DialogWinHier::user(canvas) delete items
+		    $DialogWinTop::user($w,canvas)]
+		$DialogWinTop::user($w,canvas) delete items
 		return
 	    }
 	    EvalRemote $comm
 	}
     } else {
-	$DialogWinHier::user(canvas) delete items
+	$DialogWinTop::user($w,canvas) delete items
 	set linespace [expr [font metrics NormalFont -linespace]+1]
 
-	foreach "newx newy" [DisplayWindowsHierarchyDoDraw $DialogWinHier::user(canvas) $res \
+	foreach "newx newy" [DisplayWindowsHierarchyDoDraw $w $DialogWinTop::user($w,canvas) $res \
 	    5 5 $linespace] break
 
-	$DialogWinHier::user(canvas) conf -scrollregion [list 0 0 $newx $newy]
+	$DialogWinTop::user($w,canvas) conf -scrollregion [list 0 0 $newx $newy]
     }
 }
 
-proc RamDebugger::DisplayWindowsHierarchyFind {} {
+proc RamDebugger::DisplayWindowsHierarchyFind { w } {
     variable DisplayWindowsHierarchyFindLastId
 
-    set canvas $DialogWinHier::user(canvas)
+    set canvas $DialogWinTop::user($w,canvas)
 
     if { ![info exists DisplayWindowsHierarchyFindLastId] } {
 	set DisplayWindowsHierarchyFindLastId -1
@@ -280,7 +285,7 @@ proc RamDebugger::DisplayWindowsHierarchyFind {} {
 	}
 	if { [$canvas type $i] == "text" } {
 	    set text [$canvas itemcget $i -text]
-	    if { [string match -nocase *$DialogWinHier::user(find)* $text] } {
+	    if { [string match -nocase *$DialogWinTop::user(find)* $text] } {
 		set found 1
 		set DisplayWindowsHierarchyFindLastId $i
 		break
@@ -308,42 +313,46 @@ proc RamDebugger::DisplayWindowsHierarchyFind {} {
     }
 }
 
+proc RamDebugger::DisplayWindowsHierarchyCancel { f } {
+    destroy [winfo toplevel $f]
+}
+
 proc RamDebugger::DisplayWindowsHierarchy {} {
     variable text
 
-    CopyNamespace ::DialogWin ::DialogWinHier
+    set commands [list "RamDebugger::DisplayWindowsHierarchyCancel"]
 
-    set f [DialogWinHier::Init $text "Windows hierarchy" separator "" -]
+    set f [DialogWinTop::Init $text "Windows hierarchy" separator $commands "" -]
     set w [winfo toplevel $f]
 
-    radiobutton $f.r1 -text "In debugged app" -variable DialogWinHier::user(type) -value debug \
-       -command "RamDebugger::DisplayWindowsHierarchyDo do" -grid "0 w"
-    radiobutton $f.r2 -text "In RamDebugger" -variable DialogWinHier::user(type) -value ramdebugger \
-       -command "RamDebugger::DisplayWindowsHierarchyDo do" -grid "1 w"
+    radiobutton $f.r1 -text "In debugged app" -variable DialogWinTop::user($w,type) -value debug \
+       -command "RamDebugger::DisplayWindowsHierarchyDo $w do" -grid "0 w"
+    radiobutton $f.r2 -text "In RamDebugger" -variable DialogWinTop::user($w,type) -value ramdebugger \
+       -command "RamDebugger::DisplayWindowsHierarchyDo $w do" -grid "1 w"
 
     frame $f.f -grid "0 2"
     label $f.f.l -text "Find:" -grid 0
-    entry $f.f.e -textvar DialogWinHier::user(find) -grid 1
+    entry $f.f.e -textvar DialogWinTop::user(find) -grid 1
 
     tkTabToWindow $f.f.e
 
     button $f.f.b1 -text Go -width 5 -grid "2 px3 py3" -command \
-       "RamDebugger::DisplayWindowsHierarchyFind"
+       "RamDebugger::DisplayWindowsHierarchyFind $w"
     bind $f.f.e <Return> "$f.f.b1 invoke"
 
-    set DialogWinHier::user(type) debug
+    set DialogWinTop::user($w,type) debug
 
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    set DialogWinHier::user(canvas) [canvas $sw.t -width 600 -height 400 -bg white -bd 0 ]
-    $sw setwidget $DialogWinHier::user(canvas)
+    set DialogWinTop::user($w,canvas) [canvas $sw.t -width 600 -height 400 -bg white -bd 0 ]
+    $sw setwidget $DialogWinTop::user($w,canvas)
 
-    bind $DialogWinHier::user(canvas) <2> {
+    bind $DialogWinTop::user($w,canvas) <2> {
 	%W scan mark %x %y
 	set tkPriv(x) %x
 	set tkPriv(y) %y
 	set tkPriv(mouseMoved) 0
     }
-    bind $DialogWinHier::user(canvas) <B2-Motion> {
+    bind $DialogWinTop::user($w,canvas) <B2-Motion> {
 	if {(%x != $tkPriv(x)) || (%y != $tkPriv(y))} {
 	    set tkPriv(mouseMoved) 1
 	}
@@ -354,9 +363,7 @@ proc RamDebugger::DisplayWindowsHierarchy {} {
 
     supergrid::go $f
 
-    DisplayWindowsHierarchyDo do
+    DisplayWindowsHierarchyDo $w do
+    DialogWinTop::CreateWindow $f
 
-    set action [DialogWinHier::CreateWindow]
-    DialogWinHier::DestroyWindow
-    namespace delete ::DialogWinHier
 }

@@ -198,16 +198,23 @@ proc RamDebugger::GetSelOrWordInIndex { idx } {
 	if { $idx != "" } {
 	    set var ""
 	    set idx0 $idx
-	    while { [string is wordchar [$text get $idx0]] } {
-		set var [$text get $idx0]$var
+	    set char [$text get $idx0]
+	    while { [string is wordchar $char] || $char == "(" || $char == ")" } {
+		set var $char$var
 		set idx0 [$text index $idx0-1c]
 		if { [$text compare $idx0 <= 1.0] } { break }
+		set char [$text get $idx0]
 	    }
 	    set idx1 [$text index $idx+1c]
-	    while { [string is wordchar [$text get $idx1]] } {
-		append var [$text get $idx1]
+	    set char [$text get $idx1]
+	    while { [string is wordchar $char] || $char == "(" || $char == ")" } {
+		append var $char
 		set idx1 [$text index $idx1+1c]
 		if { [$text compare $idx1 >= end-1c] } { break }
+		set char [$text get $idx1]
+	    }
+	    if { ![regexp {[^()]*\([^)]+\)} $var] } {
+		set var [string trimright $var "()"]
 	    }
 	} else { set var "" }
     }
@@ -242,8 +249,8 @@ proc RamDebugger::AddAlwaysOnTopFlag { w mainwindow } {
     menu $w._topmenu.system -tearoff 0
     $w._topmenu add cascade -menu $w._topmenu.system
     $w._topmenu.system add checkbutton -label "Always on top" -var \
-        RamDebugger::options(TransientVarWindow) -command \
-        "RamDebugger::ToggleTransientWinAll $mainwindow"
+	RamDebugger::options(TransientVarWindow) -command \
+	"RamDebugger::ToggleTransientWinAll $mainwindow"
 }
 
 proc RamDebugger::InvokeAllDisplayVarWindows {} {
@@ -505,6 +512,9 @@ proc RamDebugger::UpdateFont { w but fontname } {
     set list [list family size weight slant underline overstrike]
     foreach $list $newfont break
 
+    if { $weight == "" } { set weight normal }
+    if { $slant == "" } { set slant roman }
+
     set comm "font configure"
     lappend comm $fontname
     foreach i [lrange $list 0 3] {
@@ -630,10 +640,10 @@ proc RamDebugger::PreferencesWindow {} {
     checkbutton $f1.cb23 -text "Instrument proc last line" -variable \
        DialogWin::user(instrument_proc_last_line) -grid "0 3 w"
     DynamicHelp::register $f1.cb23 balloon "\
-        If this option is set, it is possible to put stops in the last line\n\
-        of one proc. It can make the debugged program fail if the proc wants\n\
-        to return a value without using command return. A typical example of\n\
-        failure are the procs that finish using 'set a 23' instead of 'return 23'"
+	If this option is set, it is possible to put stops in the last line\n\
+	of one proc. It can make the debugged program fail if the proc wants\n\
+	to return a value without using command return. A typical example of\n\
+	failure are the procs that finish using 'set a 23' instead of 'return 23'"
 
     set DialogWin::user(instrument_proc_last_line) $options(instrument_proc_last_line)
 
@@ -775,7 +785,7 @@ proc RamDebugger::PreferencesWindow {} {
 ################################################################################
 
 
-proc RamDebugger::DisplayTimesWindowStart { f } {
+proc RamDebugger::DisplayTimesWindowStart { { f "" } } {
     rtime -start
     #WarnWin "Starting to measure times. Use 'File->Debug on->currentfile' to proceed" $f
 }
@@ -813,8 +823,12 @@ proc RamDebugger::DisplayTimesWindowReport { f } {
 
 proc RamDebugger::DisplayTimesWindowCancel { f } {
 
-    rtime -stop
     destroy [winfo toplevel $f]
+}
+
+proc RamDebugger::DisplayTimesWindowStop { { f "" } } {
+
+    rtime -stop
 }
 
 proc RamDebugger::DisplayTimesPickSelection { w } {
@@ -948,14 +962,31 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
     }
 }
 
+proc RamDebugger::DisplayTimesWindowMenu { w x y } {
+
+    catch { destroy $w.debugtime }
+    menu $w.debugtime
+
+    $w.debugtime add radiobutton -label "Normal debug" \
+	-command "RamDebugger::DisplayTimesWindowStop" -variable RamDebugger::debuggerstate \
+	-value debug
+    $w.debugtime add radiobutton -label "Time debug" -command \
+	"RamDebugger::DisplayTimesWindowStart" -variable RamDebugger::debuggerstate \
+	-value time
+    $w.debugtime add separator
+    $w.debugtime add command -label "Time window..." -command RamDebugger::DisplayTimesWindow
+
+    tk_popup $w.debugtime $x $y
+}
+
 proc RamDebugger::DisplayTimesWindow {} {
     variable text
     variable TimeMeasureData
 
-    set commands [list RamDebugger::DisplayTimesWindowStart RamDebugger::DisplayTimesWindowReport \
-	RamDebugger::DisplayTimesWindowCancel]
+    set commands [list RamDebugger::DisplayTimesWindowStart RamDebugger::DisplayTimesWindowStop \
+	    RamDebugger::DisplayTimesWindowReport RamDebugger::DisplayTimesWindowCancel]
     set f [DialogWinTop::Init $text "Timing control" separator $commands \
-	       [list Report] Start]
+	       [list Stop Report] Start]
     set w [winfo toplevel $f]
 
     TitleFrame $f.f1 -text [_ "current block"] -grid "0 ew"
@@ -1004,12 +1035,12 @@ proc RamDebugger::DisplayTimesWindow {} {
 
     menu $w.popup
     $w.popup add command -label "View" -command \
-        "RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent"
+	"RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent"
     $w.popup add separator
     $w.popup add command -label "Update" -command \
-        "RamDebugger::ModifyTimingBlock $w $f1.e1 edit"
+	"RamDebugger::ModifyTimingBlock $w $f1.e1 edit"
     $w.popup add command -label "Delete" -command \
-        "RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
+	"RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
 
     bind [$DialogWinTop::user($w,list) bodypath] <ButtonPress-3> "tk_popup $w.popup %X %Y"
 
@@ -1056,7 +1087,7 @@ proc RamDebugger::DisplayTimesWindow {} {
     tkTabToWindow $f1.e1
 
     DialogWinTop::CreateWindow $f
-    DialogWinTop::InvokeOK $f
+    #DialogWinTop::InvokeOK $f
 }
 
 ################################################################################
@@ -1735,7 +1766,7 @@ proc RamDebugger::SearchInFiles {} {
 
     label $f.l3 -text "Directory:" -grid 0
     ComboBox $f.e3 -textvariable ::RamDebugger::searchdir -grid "1 1 px3 py3" \
-	    -values $options(SearchInFiles,dirs)
+	    -values $options(SearchInFiles,dirs) -width 70
     Button $f.b3 -image [Bitmap::get folder] -relief link -grid "2" 
 
 
@@ -1798,23 +1829,46 @@ proc RamDebugger::SearchInFiles {} {
 # Search
 ################################################################################
 
-proc RamDebugger::SearchWindow {} {
+proc RamDebugger::SearchWindow { { replace 0 } }  {
     variable text
     variable options
 
     if { ![info exists options(old_searchs)] } {
 	set options(old_searchs) ""
     }
+    if { ![info exists options(old_replaces)] } {
+	set options(old_replaces) ""
+    }
+
     if { ![info exists ::RamDebugger::searchFromBegin] } {
 	set ::RamDebugger::searchFromBegin 1
     }
+    set ::RamDebugger::replacestring ""
+
+    set w [winfo toplevel $text]
+    if { !$replace } {
+	set commands [list "RamDebugger::Search $w begin 0" "RamDebugger::SearchReplace $w cancel"]
+	set morebuttons ""
+	set OKname ""
+    } else {
+	set commands [list "RamDebugger::SearchReplace $w beginreplace" "RamDebugger::SearchReplace $w replace" \
+		"RamDebugger::SearchReplace $w replaceall"  "RamDebugger::SearchReplace $w cancel"]
+	set morebuttons [list "Replace" "Replace all"]
+	set OKname "Search"
+    }
 	
-    set f [DialogWin::Init $text "Search" separator]
+    set f [DialogWinTop::Init $text "Search" separator $commands $morebuttons $OKname]
     set w [winfo toplevel $f]
 
-    label $f.l1 -text "Text:" -grid 0
+    label $f.l1 -text "Search:" -grid 0
     ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs) \
 	-grid "1 2 px3 py3"
+
+    if { $replace } {
+	label $f.l11 -text "Replace:" -grid 0
+	ComboBox $f.e11 -textvariable ::RamDebugger::replacestring -values $options(old_replaces) \
+	    -grid "1 2 px3 py3"
+    }
 
     set f2 [frame $f.f2 -bd 1 -relief ridge -grid "0 2 w px3"]
     radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
@@ -1843,46 +1897,93 @@ proc RamDebugger::SearchWindow {} {
     set ::RamDebugger::SearchType -forwards
 
     tkTabToWindow $f.e1
-    bind $w <Return> "DialogWin::InvokeOK"
-    
-    set action [DialogWin::CreateWindow]
-    switch $action {
-	0 {
-	    DialogWin::DestroyWindow
-	    return
-	}
-	1 {
-	    if { $::RamDebugger::searchstring == "" } {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    set ipos [lsearch $options(old_searchs) $::RamDebugger::searchstring]
-	    if { $ipos != -1 } {
-		set options(old_searchs) [lreplace $options(old_searchs) $ipos $ipos]
-	    }
-	    set options(old_searchs) [linsert [lrange $options(old_searchs) 0 6] 0 \
-		$::RamDebugger::searchstring]
+    if { !$replace } {
+	bind $w <Return> "DialogWinTop::InvokeOK $f"
+    } else {
+	bind $w <Return> "DialogWinTop::InvokeButton $f 2"
+    }
+    bind $w <Destroy> "$text tag remove search 1.0 end"
+    DialogWinTop::CreateWindow $f
+}
 
-	    if { $::RamDebugger::searchFromBegin } {
-		if { $::RamDebugger::SearchType == "-forwards" } {
-		    set idx 1.0
-		} else { set idx [$text index end] }
+proc RamDebugger::SearchReplace { w what {f "" } } {
+    variable text
+
+    switch $what {
+	beginreplace {
+	    Search $w $what
+	} 
+	replace {
+	    if { [llength [$text tag ranges search]] == 0 } {
+		Search $w beginreplace
 	    } else {
-		set idx [$text index insert]
+		foreach "idx1 idx2" [$text tag ranges search] break
+		$text delete $idx1 $idx2
+		$text insert $idx1 $::RamDebugger::replacestring
+		Search $w beginreplace
 	    }
-	    set ::RamDebugger::SearchIni $idx
-	    set ::RamDebugger::SearchPos $idx
-	    set ::RamDebugger::Lastsearchstring ""
-	    Search [winfo toplevel $text] any
-	    DialogWin::DestroyWindow
+	}
+	replaceall {
+	    set inum 0
+	    while 1 {
+		if { [llength [$text tag ranges search]] == 0 } {
+		    catch {Search $w beginreplace 1}
+		}
+		if { [llength [$text tag ranges search]] == 0 } { return }
+		foreach "idx1 idx2" [$text tag ranges search] break
+		$text delete $idx1 $idx2
+		$text insert $idx1 $::RamDebugger::replacestring
+		incr inum
+		catch {Search $w beginreplace 1}
+	    }
+	    SetMessage "Replaced $inum words"
+	}
+	cancel {
+	    destroy [winfo toplevel $f]
+	    return
 	}
     }
 }
 
-proc RamDebugger::Search { w { what {} } } {
+proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     variable text
+    variable options
 
-    if { $what != "any" } {
+    if { [string match begin* $what] } {
+	if { $what == "begin" } {
+	    destroy [winfo toplevel $f]
+	}
+	if { $::RamDebugger::searchstring == "" } {
+	    return
+	}
+	set ipos [lsearch $options(old_searchs) $::RamDebugger::searchstring]
+	if { $ipos != -1 } {
+	    set options(old_searchs) [lreplace $options(old_searchs) $ipos $ipos]
+	}
+	set options(old_searchs) [linsert [lrange $options(old_searchs) 0 6] 0 \
+		$::RamDebugger::searchstring]
+	if { $::RamDebugger::replacestring != "" } {
+	    set ipos [lsearch $options(old_replaces) $::RamDebugger::replacestring]
+	    if { $ipos != -1 } {
+		set options(old_replaces) [lreplace $options(old_replaces) $ipos $ipos]
+	    }
+	    set options(old_replaces) [linsert [lrange $options(old_replaces) 0 6] 0 \
+		    $::RamDebugger::replacestring]
+	}        
+	if { $::RamDebugger::searchFromBegin } {
+	    if { $::RamDebugger::SearchType == "-forwards" } {
+		set idx 1.0
+	    } else { set idx [$text index end] }
+	} else {
+	    set idx [$text index insert]
+	}
+	if { $what == "beginreplace" } {
+	    set ::RamDebugger::searchFromBegin 0
+	}
+	set ::RamDebugger::SearchIni $idx
+	set ::RamDebugger::SearchPos $idx
+	set ::RamDebugger::Lastsearchstring ""
+    } elseif { $what != "any" } {
 	if { ![winfo exists $w.search] } {
 	    entry $w.search -width 25 -textvariable RamDebugger::searchstring
 	    place $w.search -in $w -x 0 -rely 1 -y -1 -anchor sw
@@ -1891,8 +1992,8 @@ proc RamDebugger::Search { w { what {} } } {
 	    bindtags $text [linsert [bindtags $text] 0 $w.search]
 	    bind $w.search <FocusOut> "destroy $w.search ; break"
 	    bind $w.search <Escape> "destroy $w.search ; break"
-	    bind $w.search <KeyPress> [list if { [string is print %A] || \
-		[string is space %A] } \
+	    bind $w.search <KeyPress> [list if { ![string equal "%A" ""] && ([string is print %A] || \
+		[string is space %A]) } \
 		"$w.search icursor end; tkEntryInsert $w.search %A ; break" else \
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
@@ -1905,9 +2006,9 @@ proc RamDebugger::Search { w { what {} } } {
 	    bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
 
 	    set ::RamDebugger::searchstring ""
-	    trace var RamDebugger::searchstring w "RamDebugger::Search $w ;#"
+	    trace var RamDebugger::searchstring w "[list RamDebugger::Search $w {}];#"
 	    bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
-		"RamDebugger::Search $w ;#"]
+		"[list RamDebugger::Search $w {}];#"]
 	    bind $w.search <Destroy> "+ [list bindtags $text [lreplace [bindtags $text] 0 0]] ; break"
 	    foreach i [bind Text] {
 		if { [bind $w.search $i] == "" } {
@@ -1930,11 +2031,12 @@ proc RamDebugger::Search { w { what {} } } {
 	} else {
 	    if { $::RamDebugger::searchstring == "" && $::RamDebugger::lastwascreation != "" } {
 		set ::RamDebugger::searchstring $::RamDebugger::lastwascreation
+		set ::RamDebugger::lastwascreation ""
+		return ;# the trace will continue the search
 	    }
 	    set ::RamDebugger::lastwascreation ""
 	}
     }
-
     switch $what {
 	iforward {
 	    set ::RamDebugger::SearchType -forwards
@@ -1971,21 +2073,23 @@ proc RamDebugger::Search { w { what {} } } {
 	    set idx $RamDebugger::SearchIni
 	} else { set idx $RamDebugger::SearchPos }
 
-	set options $RamDebugger::SearchType
-	lappend options $::RamDebugger::searchmode
+	set search_options $RamDebugger::SearchType
+	lappend search_options $::RamDebugger::searchmode
 
 	if { $::RamDebugger::searchcase == 1 } {
 	    # nothing
 	} elseif { $::RamDebugger::searchcase == 0 } {
-	    lappend options -nocase
+	    lappend search_options -nocase
 	} elseif { $RamDebugger::searchstring == [string tolower $RamDebugger::searchstring] } {
-	    lappend options -nocase
+	    lappend search_options -nocase
 	}
-	lappend options --
-
-	set idx [eval $text search $options [list $RamDebugger::searchstring] \
+	lappend search_options --
+	set idx [eval $text search $search_options [list $RamDebugger::searchstring] \
 		     $idx $stopindex]
 	if { $idx == "" } {
+	    if { $raiseerror } {
+		error "Search not found"
+	    }
 	    SetMessage "Search not found"
 	    bell
 	    if { $RamDebugger::SearchType == "-forwards" } {
@@ -2003,16 +2107,28 @@ proc RamDebugger::Search { w { what {} } } {
 		set RamDebugger::SearchPos [$text index $RamDebugger::SearchPos+${len}c]
 	    }
 	    set ed [$text cget -editable]
-	     $text conf -editable 1
+	    $text conf -editable 1
 	    $text tag remove sel 1.0 end
+	    $text tag remove search 1.0 end
 	    if { $RamDebugger::SearchType == "-forwards" } {
-		$text tag add sel $RamDebugger::SearchPos $idx2
-	    } else { $text tag add sel $idx2 $RamDebugger::SearchPos }
-	     $text conf -editable $ed
+		set idxA $RamDebugger::SearchPos
+		set idxB $idx2
+	     } else {
+		set idxB $RamDebugger::SearchPos
+		set idxA $idx2
+	    }
+	    $text tag add sel $idxA $idxB
+	    if { $what == "beginreplace" } {
+		$text tag add search $idxA $idxB
+		$text tag conf search -background [$text tag cget sel -background] \
+		    -foreground [$text tag cget sel -foreground]
+	    }
+	    $text conf -editable $ed
 	    $text mark set insert $idx2
 	    $text see $RamDebugger::SearchPos
 	}
 	set RamDebugger::Lastsearchstring $RamDebugger::searchstring
+
     }
 }
 
@@ -2024,7 +2140,7 @@ proc RamDebugger::OpenProgram { what } {
     variable MainDir
 
     switch $what {
-	visualregexp { set file [file join $MainDir addons visual_regexp-2.2 visual_regexp.tcl] }
+	visualregexp { set file [file join $MainDir addons visualregexp visual_regexp.tcl] }
 	tkcvs { set file [file join $MainDir addons tkcvs bin tkcvs.tcl] }
 	tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
     }
@@ -2046,11 +2162,14 @@ proc RamDebugger::OpenConsole {} {
 	return
     }
 
+    catch { font delete tkconfixed }
+    catch { namespace delete ::tkcon }
+
     set tkconprefs {
 	if { $::tcl_platform(platform) == "windows" } {
 	    tkcon font "MS Sans Serif" 8
 	} else {
-	    tkcon font "new century schoolbook" 12
+	   tkcon font "new century schoolbook" 12
 	}
 	# Keep 50 commands in history
 	set ::tkcon::OPT(history)  50
@@ -2068,7 +2187,9 @@ proc RamDebugger::OpenConsole {} {
 	puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
     }
     if { [winfo exists .tkcon] } { destroy .tkcon }
+
     set argv [list -rcfile "" -exec "" -root .tkcon -eval $tkconprefs]
+
     uplevel \#0 [list source $tkcon]
     uplevel \#0 ::tkcon::Init $argv
     proc ::tkcon::FinalExit { args } { destroy .tkcon }
@@ -2160,3 +2281,614 @@ proc RamDebugger::DoinstrumentThisfile { file } {
     }
 
 }
+
+################################################################################
+# Position stack
+################################################################################
+
+
+proc RamDebugger::DisplayPositionsStack {} {
+    variable SavedPositionsStack
+    variable text
+    variable currentfile
+
+    if { [info exists DialogWinTop::user(list)] && [winfo exits $DialogWinTop::user(list)] } {
+	raise [winfo toplevel $DialogWinTop::user(list)]
+	DisplayPositionsStackDo refresh
+	return
+    }
+
+    set commands [list "RamDebugger::DisplayPositionsStackDo delete" \
+	    "RamDebugger::DisplayPositionsStackDo up" \
+	    "RamDebugger::DisplayPositionsStackDo down" \
+	    "RamDebugger::DisplayPositionsStackDo go" \
+	    "RamDebugger::DisplayPositionsStackDo cancel"]
+
+    set f [DialogWinTop::Init $text "Positions stack window" separator $commands [list Up \
+		Down View] Delete Close]
+    set w [winfo toplevel $f]
+
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    
+    set DialogWinTop::user(list) [tablelist::tablelist $sw.lb -width 55\
+		  -exportselection 0 \
+		  -columns [list \
+		                20 File        right \
+		                5  Line left \
+		                30  Directory left \
+		                ] \
+		  -labelcommand tablelist::sortByColumn \
+		  -background white \
+		  -selectbackground navy -selectforeground white \
+		  -stretch 1 -selectmode extended \
+		  -highlightthickness 0]
+
+    $sw setwidget $DialogWinTop::user(list)
+    
+    supergrid::go $f
+    
+    focus $DialogWinTop::user(list)
+    bind [$DialogWinTop::user(list) bodypath] <Button-1> {
+	focus $DialogWinTop::user(list)
+    }
+    bind [$DialogWinTop::user(list) bodypath] <Double-1> {
+	RamDebugger::DisplayPositionsStackDo go %W
+    }
+    bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> \
+	    [bind TablelistBody <ButtonPress-1>]
+
+    bind [$DialogWinTop::user(list) bodypath] <ButtonRelease-3> {
+	catch { destroy %W.menu }
+	set menu [menu %W.menu]
+	$menu add command -label "Up" -command "RamDebugger::DisplayPositionsStackDo up %W"
+	$menu add command -label "Down" -command "RamDebugger::DisplayPositionsStackDo down %W"
+	$menu add command -label "View" -command "RamDebugger::DisplayPositionsStackDo go %W"
+	$menu add separator
+	$menu add command -label "Delete" -command "RamDebugger::DisplayPositionsStackDo delete %W"
+	tk_popup $menu %X %Y
+    }
+    
+    set nowline [scan [$text index insert] %d]
+    foreach i $SavedPositionsStack {
+	regexp {^(.+):([0-9]+)$} $i {} file line
+	$DialogWinTop::user(list) insert end [list [file tail $file] $line \
+		[file dirname $file]]
+	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
+	    $DialogWinTop::user(list) selection set end
+	}
+    }
+    DialogWinTop::CreateWindow $f
+}
+
+proc RamDebugger::DisplayPositionsStackDo { what f } {
+    variable SavedPositionsStack
+    variable text
+    variable currentfile
+
+
+    if { $f == "" } { set f $DialogWinTop::user(list) }
+    set w [winfo toplevel $f]
+    
+    switch $what {
+	cancel {
+	    unset DialogWinTop::user(list)
+	    destroy $w
+	    return
+	}
+	delete {
+	    set curr [$DialogWinTop::user(list) curselection]
+	    if { [llength $curr] == 0 } {
+		WarnWin "Select one or more positions to delete in the stack" $w
+	    } else {
+		set SavedPositionsStack [lreplace $SavedPositionsStack [lindex $curr 0] \
+		                             [ lindex $curr end]]
+	    }
+	}
+	up {
+	    set curr [$DialogWinTop::user(list) curselection]
+	    if { [llength $curr] == 0 } {
+		WarnWin "Select one or more positions to move up in the stack" $w
+	    } else {
+		if { [lindex $curr 0] > 0 } {
+		    set tomove [lrange $SavedPositionsStack [lindex $curr 0] [ lindex $curr end]]
+		    set SavedPositionsStack [lreplace $SavedPositionsStack [lindex $curr 0] \
+		                                 [lindex $curr end]]
+		    set SavedPositionsStack [eval linsert [list $SavedPositionsStack] \
+		                                 [expr {[lindex $curr 0]-1}] $tomove]
+		}
+	    }
+	}
+	down {
+	    set curr [$DialogWinTop::user(list) curselection]
+	    if { [llength $curr] == 0 } {
+		WarnWin "Select one or more positions to move down in the stack" $w
+	    } else {
+		if { [lindex $curr end] < [llength  $SavedPositionsStack]  } {
+		    set tomove [lrange $SavedPositionsStack [lindex $curr 0] [ lindex $curr end]]
+		    set SavedPositionsStack [lreplace $SavedPositionsStack [lindex $curr 0] \
+		                                 [lindex $curr end]]
+		    set SavedPositionsStack [eval linsert [list $SavedPositionsStack] \
+		                                 [expr {[lindex $curr 0]+1}] $tomove]
+		}
+	    }
+	}
+	go {
+	    set curr [$DialogWinTop::user(list) curselection]
+	    if { [llength $curr] != 1 } {
+		WarnWin "Select just one position in the stack to go to it" $w
+	    } else {
+		set tag [lindex $SavedPositionsStack $curr]
+		regexp {^(.+):([0-9]+)$} $tag {} file line
+		if { ![AreFilesEqual $file $currentfile] } {
+		    RamDebugger::OpenFileF $file
+		}
+		$text mark set insert $line.0
+		$text see $line.0
+		SetMessage "Gone to position in line $line"
+	    }
+	}
+	refresh {
+	    # nothing
+	}
+    }
+    $DialogWinTop::user(list) del 0 end
+    foreach i $SavedPositionsStack {
+	regexp {^(.+):([0-9]+)$} $i {} file line
+	$DialogWinTop::user(list) insert end [list [file tail $file] $line \
+		[file dirname $file]]
+    }
+}
+
+# what can be save or go or clean
+proc RamDebugger::PositionsStack { what } {
+    variable SavedPositionsStack
+    variable text
+    variable currentfile
+
+    set line [scan [$text index insert] %d]
+    set tag $currentfile:$line
+    
+    switch $what {
+	save {
+	    while { [set pos [lsearch $SavedPositionsStack $tag]] != -1 } {
+		set SavedPositionsStack [lreplace $SavedPositionsStack $pos $pos]
+	    }
+	    lappend SavedPositionsStack $tag
+	    SetMessage "Saved position in line $line"
+	    catch { RamDebugger::DisplayPositionsStackDo refresh "" }
+	}
+	go {
+	    if { [set pos [lsearch $SavedPositionsStack $tag]] != -1 } {
+		incr pos -1
+		if { $pos < 0 } { set pos end }
+	    } else { set pos end }
+	    set tag [lindex $SavedPositionsStack $pos]
+	    if { $tag == "" } {
+		bell
+		SetMessage "Stack is void"
+		return
+	    }
+	    regexp {^(.+):([0-9]+)$} $tag {} file line
+	    if { ![AreFilesEqual $file $currentfile] } {
+		RamDebugger::OpenFileF $file
+	    }
+	    $text mark set insert $line.0
+	    $text see $line.0
+	    SetMessage "Gone to position in line $line"
+	}
+	clean {
+	    set SavedPositionsStack ""
+	    SetMessage "Clean positions stack"
+	}
+    }
+}
+
+################################################################################
+# Macros
+################################################################################
+
+
+proc RamDebugger::MacrosDo { what { f "" } } {
+    variable text
+    variable options
+
+    switch $what {
+	edit {
+	    if { $f != "" } { destroy [winfo toplevel $f] }
+	    OpenFileF *Macros*
+	}
+	execute {
+	    set w [winfo toplevel $f]
+	    set idx [$DialogWinTop::user($w,list) curselection]
+	    if { [llength $idx] != 1 } {
+		WarnWin "It is necessary to select one macro in order to execute it"
+		return
+	    }
+	    set macro [lindex [$DialogWinTop::user($w,list) get $idx] 0]
+	    RamDebugger::Macros::$macro $text
+	}
+	default {
+	    set ret [DialogWinTop::messageBox -default ok -icon warning -message \
+		         "Are you sure to delete all your macros and load default macros?" -parent $f \
+		         -title "delete all macros and update" -type okcancel]
+	    if { $ret == "ok" } {
+		catch { unset options(MacrosDocument) }
+		AddActiveMacrosToMenu $Macros::mainframe $Macros::menu
+		destroy [winfo toplevel $f]
+	    }
+	}
+	cancel {
+	    destroy [winfo toplevel $f]
+	}
+    }
+}
+
+proc RamDebugger::Macros { parent } {
+
+    set commands [list "RamDebugger::MacrosDo execute" "RamDebugger::MacrosDo edit" \
+		     "RamDebugger::MacrosDo default" "RamDebugger::MacrosDo cancel"]
+    set f [DialogWinTop::Init $parent "Macros" separator $commands \
+	       [list Edit Default] Execute]
+    set w [winfo toplevel $f]
+
+    TitleFrame $f.f2 -text "Defined macros" -grid 0
+    set f2 [$f.f2 getframe]
+
+    set sw [ScrolledWindow $f2.lf -relief sunken -borderwidth 0 -grid "0 ewns"]
+    
+    set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 70 \
+	-exportselection 0 \
+	-columns [list \
+	    16 "Name"        left \
+	    9 "Accelerator"        center \
+	    7 "In menu"         center \
+	    50 "Description"        left \
+	   ] \
+	-labelcommand tablelist::sortByColumn \
+	-background white \
+	-selectbackground navy -selectforeground white \
+	-stretch "0 1 3" -selectmode extended \
+	-highlightthickness 0]
+
+    $sw setwidget $DialogWinTop::user($w,list)
+
+    bind [$DialogWinTop::user($w,list) bodypath] <Double-1> \
+       "RamDebugger::MacrosDo execute $f"
+
+    supergrid::go $f2
+    supergrid::go $f
+
+    bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
+
+
+    foreach i [info commands Macros::*] {
+	set i [namespace tail $i]
+	if { [info exists Macros::macrodata($i,accelerator)] } {
+	    set acc $Macros::macrodata($i,accelerator)
+	} else { set acc "" }
+	if { [info exists Macros::macrodata($i,inmenu)] && $Macros::macrodata($i,inmenu) == 1 } {
+	    set inmenu $Macros::macrodata($i,inmenu)
+	} else { set inmenu "" }
+	if { [info exists Macros::macrodata($i,help)] } {
+	    set help $Macros::macrodata($i,help)
+	} else { set help "" }
+
+	$DialogWinTop::user($w,list) insert end [list $i $acc $inmenu $help]
+    }
+    DialogWinTop::CreateWindow $f
+}
+
+proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
+    variable text
+
+    if { [$menu index end] > 0 } { $menu del 1 end }
+
+    namespace eval Macros {
+	eval $RamDebugger::options(MacrosDocument)
+    }
+
+    set commands ""
+    foreach i [array names Macros::macrodata *,inmenu] {
+	if { $Macros::macrodata($i) == 1 } {
+	    regexp {^[^,]*} $i comm
+	    lappend commands $comm
+	}
+    }
+    if { [llength $commands] } {
+	$menu add separator
+	foreach i $commands {
+	    $menu add command -label $i -command [list RamDebugger::Macros::$i $text]
+	    if { [info exists Macros::macrodata($i,accelerator)] && \
+		     $Macros::macrodata($i,accelerator) != "" } {
+		set acclabel [string trim $Macros::macrodata($i,accelerator) " <>"]
+		regsub -all Control $acclabel Ctrl acclabel
+		regsub -all { } $acclabel + acclabel
+		regsub {><} $acclabel { } acclabel
+		$menu entryconfigure end -acc $acclabel
+		bind all $Macros::macrodata($i,accelerator) [list $menu invoke [$menu index end]]
+	    }
+	    if { [info exists Macros::macrodata($i,help)] && $Macros::macrodata($i,help) != "" } {
+		DynamicHelp::register $menu menu [$mainframe cget -textvariable]
+		DynamicHelp::register $menu menuentry [$menu index end] $Macros::macrodata($i,help)
+	    }
+	}
+    }
+}
+
+proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
+    variable options
+    variable MainDir
+    variable text
+
+    if { ![info exists options(MacrosDocument)] } {
+	set file [file join $MainDir scripts Macros_default.tcl]
+	set fin [open $file r]
+	set options(MacrosDocument) [read $fin]
+	close $fin
+    }
+    if { [namespace exists Macros] } { namespace delete Macros }
+    namespace eval Macros {}
+    set Macros::menu $menu
+    set Macros::mainframe $mainframe
+
+    if { [catch {_AddActiveMacrosToMenu $mainframe $menu} errstring] } {
+	WarnWin "There is an error when trying to use Macros ($errstring). Correct it please"
+    }
+
+}
+
+proc RamDebugger::GiveMacrosDocument {} {
+    variable options
+    variable MainDir
+
+    if { ![info exists options(MacrosDocument)] } {
+	set file [file join $MainDir scripts Macros_default.tcl]
+	set fin [open $file r]
+	set options(MacrosDocument) [read $fin]
+	close $fin
+    }
+    return $options(MacrosDocument)
+}
+
+proc RamDebugger::SaveMacrosDocument { data } {
+    variable options
+
+    set options(MacrosDocument) $data
+    AddActiveMacrosToMenu $Macros::mainframe $Macros::menu
+
+}
+
+################################################################################
+#    LOC
+################################################################################
+
+proc RamDebugger::UpdateProgramNameInLOC { f } {
+
+    set DialogWin::user(dirs) ""
+    set DialogWin::user(patterns) ""
+    $DialogWin::user(listbox) del 0 end
+    foreach i $DialogWin::user(programs) {
+	if { [lindex $i 0] == $DialogWin::user(programname) } {
+	    eval $DialogWin::user(listbox) insert end [lindex $i 1]
+	    set DialogWin::user(patterns) [lindex $i 2]
+	    break
+	}
+    }
+}
+
+proc RamDebugger::AddDirToLOC {} {
+    variable MainDir
+
+    set dir [tk_chooseDirectory -initialdir $MainDir -parent $DialogWin::user(listbox) \
+	    -title [_ "Select directory"] -mustexist 1]
+    if { $dir == "" } { return }
+    $DialogWin::user(listbox) insert end $dir
+}
+
+proc RamDebugger::DelDirFromLOC {} {
+    set numdel 0
+    foreach i [$DialogWin::user(listbox) curselection] {
+	$DialogWin::user(listbox) del $i
+	incr numdel
+    }
+    if { $numdel == 0 } {
+	WarnWin [_ "Select one directory to erase from list"]
+    }
+}
+
+proc RamDebugger::CountLOCInFiles { parent } {
+    variable options
+
+    set f [DialogWin::Init $parent "Count LOC in files" separator]
+    
+    if { [catch {set DialogWin::user(programs) $options(CountLOCInFilesProgram)}] || \
+	$DialogWin::user(programs) == "" } {
+	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
+	set DialogWin::user(programs) [list [list "RamDebugger" [list $options(defaultdir)] .tcl]]
+    }
+    
+    set programnames ""
+    foreach i $DialogWin::user(programs) {
+	lappend programnames [lindex $i 0]
+    }
+
+    
+    label $f.lp -text [_ "Project"]: -grid 0
+    set combo [ComboBox $f.c \
+	-textvariable DialogWin::user(programname) \
+	-values $programnames -width 20 -helptext [_ "Enter the name of the program"] \
+	-grid 1]
+
+    label $f.l -text [_ "Select directories names:"] -grid "0 2 w"
+    
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    set listbox [listbox $sw.ls -selectmode extended]
+    set DialogWin::user(listbox) $listbox
+    $sw setwidget $listbox
+
+    set bbox [ButtonBox $f.bbox1 -spacing 0 -padx 1 -pady 1 -grid "0 2 wn"]
+    $bbox add -image filenew16 \
+	-highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	-helptext [_ "Add a directory to the list"] -command "RamDebugger::AddDirToLOC"
+    $bbox add -image actcross16 \
+	-highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	-helptext [_ "Delete dir from the list"] -command "RamDebugger::DelDirFromLOC"
+
+    label $f.l2 -text [_ "Enter patterns (ex: .tcl .cc):"] -grid "0 2 w"
+    entry $f.e2 -textvar DialogWin::user(patterns) -width 30 -grid "0 2 px3"
+
+    trace var DialogWin::user(programname) w "RamDebugger::UpdateProgramNameInLOC $f ;#"
+
+    set DialogWin::user(programname) [lindex $programnames 0]
+
+    supergrid::go $f
+
+    set action [DialogWin::CreateWindow]
+
+    while 1 {
+	if { $action == 0 } {
+	    trace vdelete DialogWin::user(programname) w \
+		"RamDebugger::UpdateProgramNameInLOC $f ;#"
+	    DialogWin::DestroyWindow
+	    return
+	}
+	if { $DialogWin::user(programname) == "" } {
+	    tk_messageBox -icon error -message "Error. Program name cannot be void" \
+		    -type ok
+	} else {
+	    break
+	}
+	set action [DialogWin::WaitForWindow]
+    }
+    trace vdelete DialogWin::user(programname) w "RamDebugger::UpdateProgramNameInLOC $f ;#"
+
+    set dirs [$listbox get 0 end]
+    set ipos [lsearch $programnames $DialogWin::user(programname)]
+    if { $ipos != -1 } {
+	set DialogWin::user(programs) [lreplace $DialogWin::user(programs) $ipos $ipos]
+    }
+    set DialogWin::user(programs) [linsert $DialogWin::user(programs) 0 \
+	[list $DialogWin::user(programname) $dirs $DialogWin::user(patterns)]]
+    set options(CountLOCInFilesProgram) $DialogWin::user(programs)
+
+    DialogWin::DestroyWindow
+
+    WaitState 1
+
+    CountLOCInFilesDo $parent $DialogWin::user(programname) $dirs \
+	    $DialogWin::user(patterns)
+    WaitState 0
+}
+
+proc RamDebugger::CountLOCInFilesCancel { f } {
+    destroy [winfo toplevel $f]
+}
+
+proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
+
+    set files ""
+    foreach i $dirs {
+	foreach j $patterns {
+	    foreach k [glob -nocomplain -directory $i *$j] {
+		lappend files $k
+	    }
+	}
+    }
+    set numfiles [llength $files]
+    set ifiles 0
+    set LOC 0
+    set LOCnoBlank 0
+    set LOCnoCommments 0
+
+    ProgressVar 0
+    foreach i $files {
+	ProgressVar [expr {int($ifiles*100/$numfiles)}]
+	set fin [open $i r]
+	set txt [read $fin]
+	close $fin
+
+	set numlines [llength [split $txt "\n"]]
+	set numblank [regexp -all -line {^\s*$} $txt]
+	# comments are only an approximation to full comment lines of tipe: # or // or /* */
+	set numcomments [regexp -all -line {^\s*(#|//)} $txt]
+	incr numcomments [regexp -all -lineanchor {^\s*/\*.*?\*/\s*$} $txt]
+
+	incr ifiles
+	incr LOC $numlines
+	incr LOCnoBlank [expr {$numlines-$numblank}]
+	incr LOCnoCommments [expr {$numlines-$numblank-$numcomments}]
+
+	set dir [file dirname $i]
+	if { ![info exists ifiles_D($dir)] } {
+	    set ifiles_D($dir) 0
+	    set LOC_D($dir) 0
+	    set LOCnoBlank_D($dir) 0
+	    set LOCnoCommments_D($dir) 0
+	}
+	incr ifiles_D($dir)
+	incr LOC_D($dir) $numlines
+	incr LOCnoBlank_D($dir) [expr {$numlines-$numblank}]
+	incr LOCnoCommments_D($dir) [expr {$numlines-$numblank-$numcomments}]
+
+    }
+    update
+    ProgressVar 100
+    
+    set commands [list RamDebugger::CountLOCInFilesCancel]
+    set f [DialogWinTop::Init $parent "LOC info" separator $commands \
+	    "" - Close]
+    set w [winfo toplevel $f]
+    
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    text $sw.text -background white -wrap word -width 80 -height 40 \
+	-exportselection 0 -font FixedFont -highlightthickness 0
+    $sw setwidget $sw.text
+    
+    if { $::tcl_platform(platform) != "windows" } {
+	$sw.text conf -exportselection 1
+    }
+    supergrid::go $f
+
+
+    $sw.text insert end "Number of lines of code for program '$program'\n\n"
+    $sw.text insert end "Number of files: $numfiles\n"
+    $sw.text insert end "LOC: $LOC\n"
+    $sw.text insert end "LOC (no blank lines): $LOCnoBlank\n"
+    $sw.text insert end "LOC (no blank, no comments): $LOCnoCommments\n"
+
+    $sw.text insert end "\nNumber of lines of code per directory\n\n"
+    foreach dir [array names ifiles_D] {
+	$sw.text insert end "Directory: $dir\n"
+	$sw.text insert end "Number of files: $ifiles_D($dir)\n"
+	$sw.text insert end "LOC: $LOC_D($dir)\n"
+	$sw.text insert end "LOC (no blank lines): $LOCnoBlank_D($dir)\n"
+	$sw.text insert end "LOC (no blank, no comments): $LOCnoCommments_D($dir)\n\n"
+    }
+
+    $sw.text conf -state disabled
+    bind $sw.text <1> "focus $sw.text"
+    bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeCancel $f"
+
+    DialogWinTop::CreateWindow $f
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

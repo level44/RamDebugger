@@ -102,6 +102,7 @@ proc cproject::syncfromUI {} {
     }
     foreach i [array names dataS $debugreleasebefore,*] {
 	regexp {^[^,]+,(.*)} $i {} prop
+	if { ![info exists thisdataS($prop)] } { continue }
 	if { $debugreleasebefore == "both" } {
 	    TransferDataToLowerGroups "" $debugreleasebefore $prop $dataS($i) $thisdataS($prop) \
 		dataS
@@ -370,10 +371,10 @@ proc cproject::OpenProject { w { ask 1 } } {
     variable debugreleasebefore
 
     if { $ask } {
-#  	set ret [DialogWin::messageBox -default ok -icon warning -message \
-#  	    "Are you sure to discard all project data?" -parent $w \
-#  	    -title "discard data" -type okcancel]
-#  	if { $ret == "cancel" } { return }
+#          set ret [DialogWin::messageBox -default ok -icon warning -message \
+#              "Are you sure to discard all project data?" -parent $w \
+#              -title "discard data" -type okcancel]
+#          if { $ret == "cancel" } { return }
 
 	set types {
 	    {{Project files}      {.prj}   }
@@ -612,6 +613,21 @@ proc cproject::CreateModifyGroup { w what } {
 
 }
 
+proc cproject::CreateDo { what f } {
+
+    set w [winfo toplevel $f]
+    switch $what {
+	Ok {
+	    SaveProjectC $w
+	    destroy $w
+	}
+	Apply {
+	    SaveProjectC $w
+	}
+	Cancel { destroy $w }
+    }
+}
+
 proc cproject::Create { par } {
     variable notebook
 
@@ -619,7 +635,10 @@ proc cproject::Create { par } {
 	set RamDebugger::options(recentprojects) ""
     }
 
-    set f [DialogWin::Init $par "C++ compilation project" separator [list Apply]]
+    set commands [list "cproject::CreateDo Ok" "cproject::CreateDo Apply" \
+		      "cproject::CreateDo Cancel"]
+
+    set f [DialogWinTop::Init $par "C++ compilation project" separator $commands [list Apply]]
     set w [winfo toplevel $f]
 
     set f1 [frame $f.f1 -grid "0 n"]
@@ -681,7 +700,7 @@ proc cproject::Create { par } {
     set pane1 [$pw add -weight $weight1]
 
     set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0 -grid "0"]
-    set DialogWin::user(list) [tablelist::tablelist $sw.lb -width 55 -height 20\
+    set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 -height 20\
 	    -exportselection 0 \
 	    -columns [list \
 	    14 File   left \
@@ -696,7 +715,7 @@ proc cproject::Create { par } {
 	    -highlightthickness 0 \
 	    -listvariable cproject::files]
     
-    $sw setwidget $DialogWin::user(list)
+    $sw setwidget $DialogWinTop::user($w,list)
 
     bind [$sw.lb bodypath] <1> "focus $sw.lb"
 
@@ -722,10 +741,10 @@ proc cproject::Create { par } {
 	 -helptext [_ "View file"] \
 	 -command "cproject::AddModFiles $sw.lb view"
 
-    bind [$DialogWin::user(list) bodypath] <ButtonPress-3> \
-	    [bind TablelistBody <ButtonPress-1>]
+    bind [$DialogWinTop::user($w,list) bodypath] <ButtonPress-3> \
+	[bind TablelistBody <ButtonPress-1>]
 
-    bind [$DialogWin::user(list) bodypath] <ButtonRelease-3> {
+    bind [$DialogWinTop::user($w,list) bodypath] <ButtonRelease-3> {
 	catch { destroy %W.menu }
 	set menu [menu %W.menu]
 	set lb [winfo parent %W]
@@ -844,26 +863,9 @@ proc cproject::Create { par } {
     trace var cproject::scripttabs w "UpdateScripttabs ;#"
 
 
-    bind $w <Return> "DialogWin::InvokeOK"
+    bind $w <Return> "DialogWinTop::InvokeOK $f"
     
-    set action [DialogWin::CreateWindow "" "" 500]
-    while 1 {
-	switch $action {
-	    0 {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    1 {
-		SaveProjectC $w
-		DialogWin::DestroyWindow
-		return
-	    }
-	    2 {
-		SaveProjectC $w
-	    }
-	}
-	set action [DialogWin::WaitForWindow]
-    }
+    DialogWinTop::CreateWindow $f "" "" 500
 }
 
 proc cproject::UpdateLinktabs {} {
@@ -1099,6 +1101,7 @@ proc cproject::ScriptTabColorize { txt command args } {
 
 proc cproject::AddScripttab { f scripttab } {
     variable links
+    variable debugrelease
 
     TitleFrame $f.f0 -text "contents" -grid "0 news"
     set f0 [$f.f0 getframe]
@@ -1124,6 +1127,10 @@ proc cproject::AddScripttab { f scripttab } {
 	if { $cproject::dataS($i) == "help" } {
 	    set cproject::dataS($i) $helptext
 	}
+    }
+    foreach i [array names cproject::dataS $debugrelease,*,script] {
+	regexp {^[^,]+,(.*)} $i {} prop
+	set cproject::thisdataS($prop) $cproject::dataS($i)
     }
     if { $cproject::thisdataS($scripttab,script) == "help" } {
 	set cproject::thisdataS($scripttab,script) $helptext
@@ -1634,7 +1641,7 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	    "Could not find command 'gcc'. Do you want to see the help?" -parent $w \
 	    -title "Command not found" -type yesno]
 	if { $ret == "yes" } {
-	    ViewHelpForWord "Debugging c++"
+	    RamDebugger::ViewHelpForWord "Debugging c++"
 	    #RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 	}
 	return -1
@@ -1818,7 +1825,10 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	close $fout
 
 	if { $::tcl_platform(platform) == "windows" } {
-	    set comm [list start /w /m]
+	    set comm ""
+	    #set comm [auto_execok start]
+	    #lappend comm  /w /m
+	    #lappend comm  /WAIT /MIN
 	} else { set comm "" }
 
 	lappend comm make

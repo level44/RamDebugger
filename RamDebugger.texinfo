@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.13 $
+@set Version  $Revision: 1.14 $
 @set Date February 2003
 
 @ifinfo
@@ -185,6 +185,22 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
+
+Changes From version 2.8 to version 3.0
+
+@itemize @bullet
+@item Count lines of code of a project (LOC)
+@item It is possible to create and use macros defined in TCL
+@item Values in User defined var & Local vars display content in balloon
+@item Autodisplay variables now displays also array variables
+@item Better interactive indentation and colors
+@item Menu close
+@item Drawing dynamically closing braces when editing
+@item better stack position
+@item search & replace
+@item comment lines are indented in normal column
+@item Added reinstrument to menu Debug
+@end itemize
 
 Changes From version 2.6 to version 2.8
 
@@ -313,11 +329,11 @@ of the text indicates that the program has stopped in that line.
 @item Use @code{Edit->Goto line->27} and press @code{Debug->Continue to}
 @item Modify source code line @b{21} from:
 @example
-        set cc $bb--qq
+	set cc $bb--qq
 @end example
 to:
 @example
-        set cc $bb--qq2
+	set cc $bb--qq2
 @end example
 @item to continue one line, entering in functions, use @code{Debug->Step} or press @b{F11}.
 @item Press @b{F11} several times until arrow is in line @b{22}
@@ -524,6 +540,8 @@ TCL code. Try and comment.
 
 That's for sure that there are many not listed bugs. This is only a list of known
 bugs that the author could not fix at the time of the release.
+
+@strong{Note:} These bugs should be fixed in last versions.
 
 @itemize @bullet
 @item TCL code that returns a value without using @code{return}, will fail when being
