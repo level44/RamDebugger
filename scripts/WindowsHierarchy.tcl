@@ -49,7 +49,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { canvas w x y } {
 	    }
 	    append retval "  COLUMNS\n"
 	    for { set j 0 } { $j < $cols } { incr j } {
-		append retval "    $i [grid columnconfigure WIDGET $j]\n" 
+		append retval "    $j [grid columnconfigure WIDGET $j]\n" 
 	    }
 	}
 	set info [grid info WIDGET]

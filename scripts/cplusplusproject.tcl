@@ -370,10 +370,10 @@ proc cproject::OpenProject { w { ask 1 } } {
     variable debugreleasebefore
 
     if { $ask } {
-	set ret [DialogWin::messageBox -default ok -icon warning -message \
-	    "Are you sure to discard all project data?" -parent $w \
-	    -title "discard data" -type okcancel]
-	if { $ret == "cancel" } { return }
+#  	set ret [DialogWin::messageBox -default ok -icon warning -message \
+#  	    "Are you sure to discard all project data?" -parent $w \
+#  	    -title "discard data" -type okcancel]
+#  	if { $ret == "cancel" } { return }
 
 	set types {
 	    {{Project files}      {.prj}   }
@@ -443,6 +443,14 @@ proc cproject::OpenProject { w { ask 1 } } {
 
     set groupbefore $group
     set debugreleasebefore $debugrelease
+
+    if { [RamDebugger::lsearchfile $RamDebugger::options(recentprojects) $project] != -1 } {
+	set ipos [RamDebugger::lsearchfile $RamDebugger::options(recentprojects) $project]
+	set RamDebugger::options(recentprojects) [lreplace $RamDebugger::options(recentprojects) \
+		$ipos $ipos]
+    }
+    set RamDebugger::options(recentprojects) [linsert $RamDebugger::options(recentprojects) \
+	    0 $project]
 }
 
 proc cproject::SaveProject { w } {
@@ -1922,8 +1930,8 @@ proc cproject::EvalScript { w debrel scripttab { show 0 } } {
     set ProjectDir [file dirname $project]
     set ObjectsDir [file tail [file root $project]]_$debrel
 
-    rename puts ___puts
-    proc puts args {
+    rename ::puts ::___puts
+    proc ::puts args {
 	set argsN $args
 	set hasnewline 1
 	if { [lindex $argsN 0] == "-nonewline" } {
@@ -1945,8 +1953,8 @@ proc cproject::EvalScript { w debrel scripttab { show 0 } } {
 
     set err [catch $script errstring]
 
-    rename puts ""
-    rename ___puts puts
+    rename ::puts ""
+    rename ::___puts ::puts
 
     if { $err } {
 	RamDebugger::TextCompRaise

@@ -773,6 +773,7 @@ proc RamDebugger::DisplayTimesDrawSelection { w } {
     variable text
 
     if { [catch {
+	$text tag remove sel 1.0 end
 	$text tag add sel "$DialogWinTop::user($w,lineini).0 linestart" \
 	   "$DialogWinTop::user($w,lineend).0 lineend"
 	$text see $DialogWinTop::user($w,lineini).0
@@ -1828,8 +1829,8 @@ proc RamDebugger::Search { w { what {} } } {
 	    bindtags $text [linsert [bindtags $text] 0 $w.search]
 	    bind $w.search <FocusOut> "destroy $w.search ; break"
 	    bind $w.search <Escape> "destroy $w.search ; break"
-	    bind $w.search <KeyPress> [list if { [string is wordchar %A] || [string is punct %A] \
-		|| [string is space %A] } \
+	    bind $w.search <KeyPress> [list if { [string is print %A] || \
+		[string is space %A] } \
 		"$w.search icursor end; tkEntryInsert $w.search %A ; break" else \
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
