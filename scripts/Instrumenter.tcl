@@ -355,7 +355,11 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 		set FastInstrumenterLoaded 1
 	    }
 	}
+	tcl {
+	    # nothing
+	}
     }
+
     if { [info command RamDebuggerInstrumenterDoWork] ne "" } {
 	RamDebuggerInstrumenterDoWork $block $filenum $newblocknameP $newblocknameR \
 	    $blockinfoname $progress

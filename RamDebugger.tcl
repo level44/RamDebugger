@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.52 2005/01/21 20:32:42 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.53 2005/02/14 13:55:01 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -4167,10 +4167,11 @@ proc RamDebugger::ChooseViewFile { what args } {
 		    set list $options(RecentFiles)
 		}
 		startcurrdir {
+		    set list [lsort -dictionary $list]
 		    # already assigned
 		}
 	    }
-	    set list [lrange [lsort -dictionary $list] 0 39]
+	    set list [lrange $list 0 39]
 	    set ipos [lsearch -exact $list $file]
 	    if { $ipos == -1 } {
 		set list [linsert $list 0 $file]
@@ -7552,18 +7553,19 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set ::tcl_nonwordchars "\\W"
 
     # it is done in this way because if not, the definition gets reload
-    uplevel \#0 {
-	proc tkTabToWindow {w} {
-	    focus $w
-	    after 100 {
-		set w [focus]
-		if {[string equal [winfo class $w] Entry]} {
-		    $w selection range 0 end
-		    $w icursor end
-		}
-	    }
-	}
-    }
+    proc ::tkTabToWindow { w } { after 100 Widget::traverseTo $w }
+#     uplevel \#0 {
+#         proc tkTabToWindow {w} {
+#             focus $w
+#             after 100 {
+#                 set w [focus]
+#                 if {[string equal [winfo class $w] Entry]} {
+#                     $w selection range 0 end
+#                     $w icursor end
+#                 }
+#             }
+#         }
+#     }
 
     # if we do it at the beginning, an ugly update is made
     if { $::tcl_platform(platform) != "windows" } {
