@@ -199,8 +199,8 @@ set FREEWRAPTCLSH /utils/freewrapTCLSH
 set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
 		              -split_node -menu]
 set ZIP zip.exe
-set Version 3.0
-set Date "May 2003"
+set Version 3.1
+set Date "July 2003"
 set Copyright "2002-2003 Ramon Ribó"
 
 set files [list RamDebugger.tcl license.terms Readme addons scripts Examples help \
@@ -237,6 +237,7 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     eval [concat Execute $TEXI2HTML ../../RamDebugger.texinfo]
     cd $oldcwd
 }
+auto_mkindex scripts *.tcl
 
 
 file delete -force install_temp/RamDebugger
@@ -251,7 +252,7 @@ CopyPackages $files install_temp/RamDebugger/addons $packages $packagesout
 set tclfiles ""
 foreach i $files { lappend tclfiles RamDebugger/$i }
 zipfile RamDebugger$Version.zip install_temp $tclfiles
-
+file delete install_temp
 puts -nonewline DONE\n
 #.t see end
 update

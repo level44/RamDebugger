@@ -1,7 +1,7 @@
 
 set Version 3.0
 
-proc LoadRamDebugger { dir } {
+proc LoadRamDebugger { dir version } {
 
     if { [interp exists ramdebugger] } { interp delete ramdebugger }
     interp create ramdebugger
@@ -11,8 +11,8 @@ proc LoadRamDebugger { dir } {
     ramdebugger eval [list set auto_path $::auto_path]
     ramdebugger eval [list set argv0 [file join $dir RamDebugger.tcl]]
     ramdebugger eval [list source [file join $dir RamDebugger.tcl]]
-    package provide RamDebugger $::Version
+    package provide RamDebugger $version
     update idletasks
 }
 if {![package vsatisfies [package provide Tcl] 8.3]} {return}
-package ifneeded RamDebugger $Version [list LoadRamDebugger $dir]
+package ifneeded RamDebugger $Version [list LoadRamDebugger $dir $Version]

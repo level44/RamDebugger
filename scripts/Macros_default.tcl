@@ -83,3 +83,48 @@ proc "Insert rectangular text" { w } {
 	$w insert $i.$c1 $txt
     }
 }
+
+################################################################################
+#    proc Macro regsub
+################################################################################
+
+set "macrodata(Macro regsub,inmenu)" 1
+set "macrodata(Macro regsub,accelerator)" ""
+set "macrodata(Macro regsub,help)" "This commands applies a user-defined regsub to the selected text"
+
+proc "Macro regsub" { w } {
+
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range == "" } { 
+	WarnWin "Select a region to modify"
+	return
+    }
+
+    set f [DialogWin::Init $w "Macro regsub" separator ""]
+    set wf [winfo toplevel $f]
+
+    label $f.l -text "Enter a regsub to be applied to variable 'sel':" -grid "0 px3 py5"
+    text $f.t -wrap word -width 80 -height 4 -grid 0
+    $f.t insert end {regsub -all {text1} $sel {text2} sel}
+    $f.t tag add sel 1.0 end-1c
+    tkTabToWindow $f.t
+
+    bind $wf <Return> "DialogWin::InvokeOK"
+
+    supergrid::go $f
+
+    set action [DialogWin::CreateWindow]
+    set reg [$f.t get 1.0 end-1c]
+    DialogWin::DestroyWindow
+    if { $action == 0 } { return }
+
+    set sel [eval $w get $range]
+    set err [catch { eval $reg } errstring]
+    if { $err } {
+	WarnWin "Error applying regsub: $errstring"
+	return
+    }
+    eval $w delete $range
+    $w insert [lindex $range 0] $sel
+    eval $w tag add sel $range
+}

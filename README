@@ -46,6 +46,16 @@ for details.
 Changes
 =======
 
+ Changes From version 3.0 to version 3.1
+
+   * GiD customization files
+   * User can choose file extensions for every file type
+   * New macro for applying regsub to a region
+   * New option in @b{Current file arguments}: file type can be @b{TCL} or @b{TK}
+   * New option in @b{Current file arguments}: Another file can be started to begin local debugging
+   * RamDebugger::OpenFileSaveHandler
+
+
 Changes From version 2.8 to version 3.0
 
    * Count lines of code of a project (LOC)

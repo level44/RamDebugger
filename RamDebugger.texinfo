@@ -62,13 +62,13 @@
 @set Date May 2003
 @set Copyright 2002-2003 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.16 $
+@set CVSVersion  $Revision: 1.17 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
 
 @titlepage
-@title RamDebugger @value{CVSVersion}:
+@title RamDebugger @value{Version}:
 @subtitleA graphical and interactive debugger for Tcl-TK
 @author Copyright @value{Copyright}
 @c The following two commands start the copyright page.
@@ -127,7 +127,7 @@ Using RamDebugger
 @end menu
 
 @ifinfo
-CN @value{CVSVersion} @value{Date}
+CN @value{Version} @value{Date}
 @end ifinfo
 
 @node Introduction and Setup, Using RamDebugger, Top, Top
@@ -187,6 +187,15 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
+
+Changes From version 3.0 to version 3.1
+
+@item GiD customization files
+@item User can choose file extensions for every file type
+@item New macro for applying regsub to a region
+@item New option in @b{Current file arguments}: file type can be @b{TCL} or @b{TK}
+@item New option in @b{Current file arguments}: Another file can be started to begin local debugging
+@item RamDebugger::OpenFileSaveHandler
 
 Changes From version 2.8 to version 3.0
 
@@ -250,7 +259,7 @@ RamDebugger web page is at: @url{http://gid.cimne.com/RamDebugger}
 @section Download
 
 RamDebugger can be download from
-@url{http://gid.cimne.com/RamDebugger/RamDebugger@value{CVSVersion}.zip}
+@url{http://gid.cimne.com/RamDebugger/RamDebugger@value{Version}.zip}
 
 @node Installation and prerequisites, Starting RamDebugger, Download, Introduction and Setup
 @section Installation and prerequisites

@@ -136,7 +136,7 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
     } else {
 	set var $DialogWinTop::user($w,expression)
 	$DialogWinTop::user($w,textv) conf -state normal
-	$DialogWinTop::user($w,textv) del 1.0 end
+	$DialogWinTop::user($w,textv) delete 1.0 end
 
 	if { $remoteserverType == "gdb" } {
 	    if { [regexp {^(\s*MULTIPLE RESULT\s*type\s+=\s+char\s)(.*)} $res {} ini rest] } {
@@ -440,7 +440,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		    }
 		    rdel $num
 		}
-		$DialogWinBreak::user(list) del 0 end
+		$DialogWinBreak::user(list) delete 0 end
 		foreach i $breakpoints {
 		    foreach "num file line cond" $i break
 		    $DialogWinBreak::user(list) insert end [list $num [file tail $file] $line $cond \
@@ -452,7 +452,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		             "Are you sure to delete all breakpoints?" -parent $f \
 		             -title "delete all breakpoints" -type okcancel]
 		if { $ret == "ok" } {
-		    $DialogWinBreak::user(list) del 0 end
+		    $DialogWinBreak::user(list) delete 0 end
 		    foreach i $breakpoints {
 		        set num [lindex $i 0]
 		        set file [lindex $i 1]
@@ -681,6 +681,30 @@ proc RamDebugger::PreferencesWindow {} {
 	    "RamDebugger::UpdateFont $w $but $fontname" -grid "0 w"
     }
 
+    set fde [$fb.nb insert end extensions -text "Extensions"]
+
+    TitleFrame $fde.f1 -text "extensions" -grid "0 n"
+    set fde1 [$fde.f1 getframe]
+
+    label $fde1.ll -text "Choose extensions for every file type:" -grid "0 2 w"
+    set ic 0
+    foreach "type extsdefaultlist" [list TCL [list ".tcl" ".tcl .tk *"] \
+		                            C/C++ [list ".c .cpp .cc .h"] \
+		                            "GiD BAS file" .bas \
+		                            "GiD data files" [list ".prb .mat .cnd"]] {
+	label $fde1.l$ic -text $type: -grid "0 e"
+	if { ![info exists options(extensions,$type)] } {
+	    set DialogWin::user(extensions,$type) $options_def(extensions,$type)
+	} else {
+	    set DialogWin::user(extensions,$type) $options(extensions,$type)
+	}
+	ComboBox $fde1.cb$ic -textvariable DialogWin::user(extensions,$type) -values \
+	    $extsdefaultlist -grid 1
+	incr ic
+    }
+    supergrid::go $fde
+    supergrid::go $fde1
+
     set fd [$fb.nb insert end directories -text "Directories"]
 
     TitleFrame $fd.f1 -text "executable directories" -grid 0
@@ -748,6 +772,11 @@ proc RamDebugger::PreferencesWindow {} {
 		    if { [info exists options(CheckRemotes)] } {
 		        set options(CheckRemotes) $DialogWin::user(CheckRemotes)
 		    }
+
+		    foreach i [array names options_def extensions,*] {
+		        set options($i) $DialogWin::user($i)
+		    }
+
 		    set options(executable_dirs) $DialogWin::user(executable_dirs)
 		    UpdateExecDirs
 
@@ -774,6 +803,11 @@ proc RamDebugger::PreferencesWindow {} {
 		    append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
 		    $but configure -text $btext
 		}
+
+		foreach i [array names options_def extensions,*] {
+		    set options($i) $options_def($i)
+		}
+
 	    }
 	}
 	set action [DialogWin::WaitForWindow]
@@ -798,7 +832,7 @@ proc RamDebugger::DisplayTimesWindowReport { f } {
 
     ComboBox $f.cb1 -textvariable DialogWin::user(units) -editable 0 \
        -modifycmd {
-	   $DialogWin::user(text) del 1.0 end
+	   $DialogWin::user(text) delete 1.0 end
 	   $DialogWin::user(text) ins end [RamDebugger::rtime -display $DialogWin::user(units)]
        } -width 10 -values [list microsec  milisec  sec  min] -grid "0 w"
     set DialogWin::user(units) sec
@@ -954,7 +988,7 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
 	    tkTabToWindow $entry
 	}
 	update {
-	    $DialogWinTop::user($w,list) del 0 end
+	    $DialogWinTop::user($w,list) delete 0 end
 	    foreach i $TimeMeasureData {
 		$DialogWinTop::user($w,list) insert end [lrange $i 0 3]
 	    }
@@ -1454,28 +1488,38 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
 	WarnWin "Error. there is no current file"
 	return
     }
-    if { [regexp {\.(h|c|cc)$} $currentfile] } {
+    set filetype [GiveFileType $currentfile]
+    if { $filetype != "TCL" } {
 	WarnWin "Current file is not TCL"
 	return
     }
 
-    if { ![info exists options(currentfileargs)] } {
-	set options(currentfileargs) ""
+    if { ![info exists options(currentfileargs5)] } {
+	set options(currentfileargs5) ""
     }
 
     set dir [file dirname $currentfile]
     set arg ""
+    set curr_as ""
     set currs ""
+    set currs_as ""
     set dirs ""
     set args ""
-    foreach "curr dir_in arg_in" $options(currentfileargs) {
+    set tcl_or_tk auto
+    set tcl_or_tks ""
+    
+    foreach "curr curr_as_in dir_in arg_in tcl_or_tk_in" $options(currentfileargs5) {
 	if { $curr == $currentfile } {
+	    set curr_as $curr_as_in
 	    set dir $dir_in
 	    set arg $arg_in
+	    set tcl_or_tk $tcl_or_tk_in
 	}
 	lappend currs $curr
-	lappend dirs $dirs
-	lappend args $args
+	lappend currs_as $curr_as
+	lappend dirs $dir_in
+	lappend args $arg_in
+	lappend tcl_or_tks $tcl_or_tk_in
     }
 
     set f [DialogWin::Init $text "TCL Execution arguments" separator [list Clear]]
@@ -1483,9 +1527,14 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
     
     label $f.l -text "Currentfile to debug:" -grid "0 e px3 py5"
 
-    ComboBox $f.cb1 -textvariable DialogWin::user(curr) -width 40 -grid 1 -values \
+    ComboBox $f.cb1 -textvariable DialogWin::user(curr) -width 60 -grid 1 -values \
 	    $currs
     Button $f.b1 -image [Bitmap::get file] -width 16 -grid 2 -relief link
+
+    label $f.lb -text "File to debug as:" -grid "0 e px3 py5"
+    ComboBox $f.cb1b -textvariable DialogWin::user(curr_as) -width 40 -grid 1 -values \
+	$currs_as -helptext "Select another TCL file to execute when 'Current file' is open"
+    Button $f.b1b -image [Bitmap::get file] -width 16 -grid 2 -relief link
 
     label $f.l2 -text "Directory:" -grid "0 e px3 py5"
     ComboBox $f.cb2 -textvariable DialogWin::user(directory) -width 40 -grid "1" -values \
@@ -1496,18 +1545,38 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
     ComboBox $f.cb3 -textvariable DialogWin::user(arguments) -width 40 -grid "1 2" -values \
 	    $args
 
+    label $f.l4 -text "File type:" -grid "0 e"
+    frame $f.f1 -grid "1 2 w"
+    radiobutton $f.f1.r1 -text "Auto" -variable DialogWin::user(tcl_or_tk) -value auto -grid 0
+    radiobutton $f.f1.r2 -text "Tcl" -variable DialogWin::user(tcl_or_tk) -value tcl -grid 1
+    radiobutton $f.f1.r3 -text "Tk" -variable DialogWin::user(tcl_or_tk) -value tk -grid 2
+
+
     set DialogWin::user(curr) $currentfile
+    set DialogWin::user(curr_as) $curr_as
     set DialogWin::user(directory) $dir
     set DialogWin::user(arguments) $arg
+    set DialogWin::user(tcl_or_tk) $tcl_or_tk
 
     set comm {
 	set initial $RamDebugger::options(defaultdir)
 	catch { set initial [file dirname $DialogWin::user(curr)] }
-	set DialogWin::user(curr) [tk_getOpenFile -filetypes {{{TCL Scripts} {.tcl} }{{All Files} *}} \
-		-initialdir $initial -parent PARENT -title "Debug TCL file"]
+	set curr [tk_getOpenFile -filetypes {{{TCL Scripts} {.tcl} } {{All Files} *}} \
+		     -initialdir $initial -parent PARENT -title "Debug TCL file"]
+	if { $curr != "" } { set DialogWin::user(curr) $curr }
     }
     set comm [string map [list PARENT $w] $comm]
     $f.b1 configure -command $comm
+
+    set comm {
+	set initial $RamDebugger::options(defaultdir)
+	catch { set initial [file dirname $DialogWin::user(curr_as)] }
+	set curr_as [tk_getOpenFile -filetypes {{{TCL Scripts} {.tcl} } {{All Files} *}} \
+		         -initialdir $initial -parent PARENT -title "Debug as TCL file"]
+	if { $curr_as != "" } { set DialogWin::user(curr_as) $curr_as }
+    }
+    set comm [string map [list PARENT $w] $comm]
+    $f.b1b configure -command $comm
 
     set comm {
 	set initial $RamDebugger::options(defaultdir)
@@ -1534,21 +1603,25 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
 	    }
 	    1 - 2 {
 		if { $action == 2 } {
+		    set DialogWin::user(curr_as) ""
 		    set DialogWin::user(directory) ""
 		    set DialogWin::user(arguments) ""
+		    set DialogWin::user(tcl_or_tk) auto
 		}
 		set ipos 0
-		foreach "curr dir args" $options(currentfileargs) {
+		foreach "curr curr_as dir args tcl_or_tk" $options(currentfileargs5) {
 		    if { $curr == $DialogWin::user(curr) } {
-		        set options(currentfileargs) [lreplace $options(currentfileargs) $ipos \
-		            [expr $ipos+2]]
+		        set options(currentfileargs5) [lreplace $options(currentfileargs5) $ipos \
+		            [expr $ipos+4]]
 		        break
 		    }
-		    incr ipos 3
+		    incr ipos 5
 		}
-		if { $DialogWin::user(directory) != "" || $DialogWin::user(arguments) != "" } {
-		    lappend options(currentfileargs) $DialogWin::user(curr) \
-		       $DialogWin::user(directory) $DialogWin::user(arguments)
+		if { $DialogWin::user(directory) != "" || $DialogWin::user(arguments) != "" || \
+		     $DialogWin::user(curr_as) != "" || $DialogWin::user(tcl_or_tk) != "auto" } {
+		    lappend options(currentfileargs5) $DialogWin::user(curr) \
+		        $DialogWin::user(curr_as) $DialogWin::user(directory) \
+		        $DialogWin::user(arguments) $DialogWin::user(tcl_or_tk)
 		}
 		DialogWin::DestroyWindow
 		return
@@ -1575,7 +1648,8 @@ proc RamDebugger::Compile { name } {
     set pwd [pwd]
     cd $dir
 
-    if { [regexp {\.(c|cc)$} $name] } {
+    set filetype [GiveFileType $currentfile]
+    if { $filetype == "C/C++" } {
 	if { [auto_execok gcc] == "" } {
 	    $mainframe setmenustate debug normal
 	    cd $pwd
@@ -1705,15 +1779,19 @@ proc RamDebugger::SearchInFilesDo {} {
 	return
     }
 
-    eval lappend comm $files
-
-    set fin [open "|$comm" r]
-
     set result ""
-    while { ![eof $fin] } {
-	append result [gets $fin]\n
+    set ifile 0
+    while { $ifile < [llength $files] } {
+	set comm2 $comm
+	eval lappend comm2 [lrange $files $ifile [expr {$ifile+50}]]
+	incr ifile 50
+	set fin [open "|$comm2" r]
+	while { ![eof $fin] } {
+	    append result [gets $fin]\n
+	}
+	set result [string trim $result]
+	set err [catch { close $fin } errstring]
     }
-    set err [catch { close $fin } errstring]
     if { [string trim $result] == "" } { set result "Nothing found" }
 
     TextOutClear
@@ -1759,8 +1837,17 @@ proc RamDebugger::SearchInFiles {} {
     } else { set ::RamDebugger::searchstring [lindex $options(SearchInFiles,texts) 0] }
 
     label $f.l2 -text "File ext:" -grid 0
+
+    set values $options(SearchInFiles,exts)
+    foreach i [list "*.tcl" "*.h,*.cc,*.c"] {
+	if { [lsearch $values $i] == -1 } { lappend values $i }
+    }
+    foreach i [array names options(extensions,*)] {
+	if { [lsearch $values $options($i)] == -1 } { lappend values $options($i) }
+    }
+
     ComboBox $f.e2 -textvariable ::RamDebugger::searchextensions -grid "1 2 px3 py3" \
-	    -values [concat $options(SearchInFiles,exts) [list "*.tcl" "*.h,*.cc,*.c"]]
+	    -values $values]
 
     set ::RamDebugger::searchextensions [lindex [$f.e2 cget -values] 0]
 
@@ -2002,6 +2089,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
 	    bind $w.search <1> "destroy $w.search"
 	    bind $w.search <3> "destroy $w.search"
+	    bind $w.search <F9> "destroy $w.search"
 	    bind $w.search <Return> "destroy $w.search ; break"
 	    bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
@@ -2372,6 +2460,13 @@ proc RamDebugger::DisplayPositionsStack {} {
     bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> \
 	    [bind TablelistBody <ButtonPress-1>]
 
+    bind [$DialogWinTop::user(list) bodypath] <KeyPress-Delete> {
+	RamDebugger::DisplayPositionsStackDo delete %W
+    }
+
+    bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> \
+	    [bind TablelistBody <ButtonPress-1>]
+
     bind [$DialogWinTop::user(list) bodypath] <ButtonRelease-3> {
 	catch { destroy %W.menu }
 	set menu [menu %W.menu]
@@ -2416,7 +2511,7 @@ proc RamDebugger::DisplayPositionsStackDo { what f } {
 		WarnWin "Select one or more positions to delete in the stack" $w
 	    } else {
 		set SavedPositionsStack [lreplace $SavedPositionsStack [lindex $curr 0] \
-		                             [ lindex $curr end]]
+		        [lindex $curr end]]
 	    }
 	}
 	up {
@@ -2466,12 +2561,13 @@ proc RamDebugger::DisplayPositionsStackDo { what f } {
 	    # nothing
 	}
     }
-    $DialogWinTop::user(list) del 0 end
+    $DialogWinTop::user(list) delete 0 end
     foreach i $SavedPositionsStack {
 	regexp {^(.+):([0-9]+)$} $i {} file line
 	$DialogWinTop::user(list) insert end [list [file tail $file] $line \
 		[file dirname $file]]
     }
+    catch { $DialogWinTop::user(list) selection set [lindex $curr 0] }
 }
 
 # what can be save or go or clean
@@ -2616,7 +2712,7 @@ proc RamDebugger::Macros { parent } {
 proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
     variable text
 
-    if { [$menu index end] > 0 } { $menu del 1 end }
+    if { [$menu index end] > 0 } { $menu delete 1 end }
 
     namespace eval Macros {
 	eval $RamDebugger::options(MacrosDocument)
@@ -2667,7 +2763,7 @@ proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
     set Macros::mainframe $mainframe
 
     if { [catch {_AddActiveMacrosToMenu $mainframe $menu} errstring] } {
-	WarnWin "There is an error when trying to use Macros ($errstring). Correct it please"
+	WarnWin "There is an error when trying to use Macros ($::errorInfo). Correct it please"
     }
 
 }
@@ -2701,7 +2797,7 @@ proc RamDebugger::UpdateProgramNameInLOC { f } {
 
     set DialogWin::user(dirs) ""
     set DialogWin::user(patterns) ""
-    $DialogWin::user(listbox) del 0 end
+    $DialogWin::user(listbox) delete 0 end
     foreach i $DialogWin::user(programs) {
 	if { [lindex $i 0] == $DialogWin::user(programname) } {
 	    eval $DialogWin::user(listbox) insert end [lindex $i 1]
@@ -2723,7 +2819,7 @@ proc RamDebugger::AddDirToLOC {} {
 proc RamDebugger::DelDirFromLOC {} {
     set numdel 0
     foreach i [$DialogWin::user(listbox) curselection] {
-	$DialogWin::user(listbox) del $i
+	$DialogWin::user(listbox) delete $i
 	incr numdel
     }
     if { $numdel == 0 } {

@@ -962,3 +962,185 @@ proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" 
 	RamDebugger::ProgressVar 100
     }
 }
+
+proc RamDebugger::Instrumenter::DoWorkForBas { block blockinfoname "progress 1" { braceslevelIni 0 } } {
+
+    set length [string length $block]
+    if { $length >= 5000 && $progress } {
+	RamDebugger::ProgressVar 0 1
+    }
+
+    upvar $blockinfoname blockinfo
+    set blockinfo ""
+
+    foreach i [list gendata matprop cond localaxesdef nelem nnode ndime elems notused onlyincond] {
+	set colors($i) blue
+    }
+    foreach i [list if elseif else endif loop endloop end for endfor set break] {
+	set colors($i) magenta
+    }
+    foreach i [list messagebox] {
+	set colors($i) red
+    }
+    foreach i [list realformat intformat nodesnum nodescoor elemsnum elemsconec \
+	    nelem elemsmat matnum NodesCoord] {
+	set colors($i) green
+    }
+
+    set braceslevel $braceslevelIni
+    set bracesstack [string repeat ANY $braceslevelIni]
+    set blockinfocurrent [list 0 n]
+
+    set iline 1
+    set nlines [regexp {\n} $block]
+    foreach line [split $block \n] {
+	if { $iline%50 == 0  && $progress } {
+	    RamDebugger::ProgressVar [expr $iline*100/$nlines]
+	}
+	if { [regexp {^\s*\*\#} $line] } {
+	    lappend blockinfocurrent red 0 [string length $line]
+	}
+	foreach "- word" [regexp -inline -indices -all {(?:^|[^*])\*(\w+)} $line] {
+	    foreach "i1 i2" $word break
+	    set word [string tolower [string range $line $i1 $i2]]
+	    if { [info exists colors($word)] } {
+		incr i2
+		lappend blockinfocurrent $colors($word) $i1 $i2
+	    }
+	}
+	foreach "txt" [regexp -inline -indices -all {\"[^\"]*\"} $line] {
+	    lappend blockinfocurrent grey [lindex $txt 0] [expr {[lindex $txt 1]+1}]
+	}
+	if { [regexp {^\*(if|loop|for)\M} [string tolower $line] - what] } {
+	    incr braceslevel
+	    lappend bracesstack [list $what $iline]
+	}
+	if { [regexp {^\*(end|endif|endfor|endloop)\M} [string tolower $line] - what] } {
+	    foreach "what_old iline_old" [lindex $bracesstack end] break
+	    if { $braceslevel == 0 } {
+		set txt "error: there is an '$what' in line $iline "
+		append txt "and opening loop cannot be found"
+		error $txt
+	    }
+	    if { $what_old != "ANY" } {
+		if { ($what == "endif" && $what_old != "if") || \
+		         ($what == "endfor" && $what_old != "for") || \
+		         ($what == "endloop" && $what_old != "loop") } {
+		    set txt "error: there is an '$what' in line $iline"
+		    append txt "and one '$what_old' in line $iline_old"
+		    error $txt
+		}
+	    }
+	    incr braceslevel -1
+	    set bracesstack [lreplace $bracesstack end end]
+	}
+	incr iline
+	lappend blockinfo $blockinfocurrent
+	set blockinfocurrent [list 0 n]
+    }
+    if { $braceslevel != 0 } {
+	foreach "what_old iline_old" [lindex $bracesstack end] break
+	set text "There is a block of type ($what_old) beginning at line $iline_old "
+	append text "that is not closed at the end of the file (N of open levels: $braceslevel)"
+	error $text
+     }
+    if { $length >= 1000  && $progress } {
+	RamDebugger::ProgressVar 100
+    }
+}
+
+proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress 1" { braceslevelIni 0 } } {
+
+    set length [string length $block]
+    if { $length >= 5000 && $progress } {
+	RamDebugger::ProgressVar 0 1
+    }
+
+    upvar $blockinfoname blockinfo
+    set blockinfo ""
+
+    foreach i [list book title dependencies help tkwidget] {
+	set colors($i) blue
+    }
+    foreach i [list question value condtype condmeshtype] {
+	set colors($i) magenta
+    }
+#     foreach i [list messagebox] {
+#         set colors($i) red
+#     }
+    foreach i [list number condition end] {
+	set colors($i) green
+    }
+
+    set braceslevel $braceslevelIni
+    set bracesstack [string repeat ANY $braceslevelIni]
+    set blockinfocurrent [list 0 n]
+
+    set iline 1
+    set nlines [regexp {\n} $block]
+    foreach line [split $block \n] {
+	if { $iline%50 == 0  && $progress } {
+	    RamDebugger::ProgressVar [expr $iline*100/$nlines]
+	}
+	if { [regexp {(?i)^\s*end\M} $line] } {
+	    if { $braceslevel > 1 } {
+		incr braceslevel -1
+		set bracesstack [lreplace $bracesstack end end]
+	    } elseif { $braceslevel == 1 } {
+		lappend blockinfocurrent $colors(end) 0 [string length $line]
+		incr braceslevel -1
+	    } else {
+		error "error: found an 'end line' without having beginning in line $iline"
+	    }
+	} elseif { [regexp -indices {(?i)^\s*(INTERVAL|PROBLEM)\s+DATA} $line idxs] } {
+	    foreach "idx1 idx2" $idxs break
+	    incr idx2
+	    lappend blockinfocurrent $colors(condition) $idx1 $idx2
+	    incr braceslevel
+	    lappend bracesstack [list problem $iline]
+	} elseif { [regexp -indices {(?i)^\s*(NUMBER:)\s*[0-9]+\s+((?:CONDITION|MATERIAL):)\s*\S+\s*$} \
+		        $line {} idxs1 idxs2] } {
+	    foreach "idx1 idx2" $idxs1 break
+	    incr idx2
+	    lappend blockinfocurrent $colors(number) $idx1 $idx2
+	    foreach "idx1 idx2" $idxs2 break
+	    incr idx2
+	    lappend blockinfocurrent $colors(condition) $idx1 $idx2
+	    incr braceslevel
+	    lappend bracesstack [list condmat $iline]
+	} elseif { [regexp -indices {\s*([^\s:]+:)} $line {} idxs] } {
+	    foreach "idx1 idx2" $idxs break
+	    set word [string tolower [string range $line $idx1 [expr {$idx2-1}]]]
+	    if { [info exists colors($word)] } {
+		incr idx2
+		lappend blockinfocurrent $colors($word) $idx1 $idx2
+	    }
+	    if { [regexp -indices {#(CB|LA)#\([^\)]+\)} $line idxs] } {
+		foreach "idx1 idx2" $idxs break
+		incr idx2
+		lappend blockinfocurrent grey $idx1 $idx2
+	    }
+	    if { [regexp -indices {#N#\s+[0-9]+} $line idxs] } {
+		foreach "idx1 idx2" $idxs break
+		incr idx2
+		#lappend blockinfocurrent chocolate2 $idx1 $idx2
+		lappend blockinfocurrent red $idx1 $idx2
+	    }
+	} elseif { ![regexp {^\s*$} $line] } {
+	    error "error reading line $iline"
+	}
+	incr iline
+	lappend blockinfo $blockinfocurrent
+	set blockinfocurrent [list 0 n]
+    }
+    if { $braceslevel != 0 } {
+	foreach "what_old iline_old" [lindex $bracesstack end] break
+	set text "There is a block of type ($what_old) beginning at line $iline_old "
+	append text "that is not closed at the end of the file (N of open levels: $braceslevel)"
+	error $text
+     }
+    if { $length >= 1000  && $progress } {
+	RamDebugger::ProgressVar 100
+    }
+}
+
