@@ -69,6 +69,7 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 	    set val [string range $val 0 496]...
 	}
 	$w.l conf -text "$var=$val"
+	raise $w
     }
 }
 
@@ -720,6 +721,13 @@ proc RamDebugger::PreferencesWindow {} {
        -width 4 -grid "1 2 px3"
     set DialogWin::user(indentsizeC++) $options(indentsizeC++)
 
+    checkbutton $f1.cb12 -text "Compile fast instrumenter" -variable \
+	DialogWin::user(CompileFastInstrumenter) -grid "0 2 w"
+    DynamicHelp::register $f1.cb1 balloon "\
+      If this option is set, RamDebugger tries to compile automatically the fast C++ instrumented code"
+
+    set DialogWin::user(CompileFastInstrumenter) $options(CompileFastInstrumenter)
+
     TitleFrame $f.f2 -text [_ fonts] -grid "0 nsew"
     set f2 [$f.f2 getframe]
     
@@ -883,7 +891,7 @@ proc RamDebugger::PreferencesWindow {} {
 		    foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging \
 		                   ConfirmModifyVariable instrument_source instrument_proc_last_line \
 		                   LocalDebuggingType AutoSaveRevisions AutoSaveRevisions_time \
-		                   AutoSaveRevisions_idletime] {
+		                   AutoSaveRevisions_idletime CompileFastInstrumenter] {
 		        set options($i) $DialogWin::user($i)
 		    }
 		    if { [info exists options(CheckRemotes)] } {
@@ -893,10 +901,12 @@ proc RamDebugger::PreferencesWindow {} {
 		    foreach i [array names options_def extensions,*] {
 		        set options($i) $DialogWin::user($i)
 		    }
-
 		    set options(executable_dirs) $DialogWin::user(executable_dirs)
 		    UpdateExecDirs
 		    RamDebugger::CVS::ManageAutoSave
+		    if { $options(CompileFastInstrumenter) } {
+			Instrumenter::TryCompileFastInstrumenter 1
+		    }
 		    if { $action == 1 } {
 		        DialogWin::DestroyWindow
 		        return
@@ -2472,7 +2482,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
 	    bind $w.search <1> "destroy $w.search"
 	    bind $w.search <3> "destroy $w.search"
-	    foreach i [list F2 F5 F9 F10 F11] {
+	    foreach i [list F1 F2 F5 F6 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
 	    }
 	    bind $w.search <Return> "destroy $w.search ; break"
@@ -2710,12 +2720,19 @@ proc RamDebugger::OpenConsole {} {
 
     if { [info exists textOUT] && [winfo exists $textOUT] } {
 	set channel stdout
+	set line [scan [$textOUT index end-1c] %d]
+	if { $line > 50 } {
+	    set idx0 [expr {$line-50}].0
+	    append tkconprefs [list puts -nonewline $channel "---last lines---"]\n
+	} else { set idx0 1.0 }
 	foreach "k v i" [$textOUT dump -tag -text 1.0 end-1c] {
 	    switch $k {
 		tagon { if { $v eq "red" } { set channel stderr } }
 		tagoff { if { $v eq "red" } { set channel stdout } }
 		text {
-		    append tkconprefs [list puts -nonewline $channel $v]\n
+		    if { [$textOUT compare $i > $idx0] } {
+		        append tkconprefs [list puts -nonewline $channel $v]\n
+		    }
 		}
 	    }
 	}
@@ -3073,9 +3090,10 @@ proc RamDebugger::PositionsStack { what args } {
 		}
 		incr ipos
 	    }
-	    if { [llength $options(saved_positions_stack)] > 14 } {
+	    set len [llength $options(saved_positions_stack)]
+	    if { $len > 14 } {
 		set options(saved_positions_stack) [lrange \
-		        $options(saved_positions_stack) 0 13]
+		        $options(saved_positions_stack) [expr {$len-14}] end]
 	    }
 	    set idx $line.0
 	    set procname ""

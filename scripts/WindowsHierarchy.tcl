@@ -87,6 +87,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	append retval "SIZES\n"
 	append retval "    width=[winfo width WIDGET] reqwidth=[winfo reqwidth WIDGET]\n"
 	append retval "    height=[winfo height WIDGET] reqheight=[winfo reqheight WIDGET]\n"
+	append retval "BINDTAGS\n[bindtags WIDGET]\n"
 	EVAL
     }
     if { $DialogWinTop::user($w,type) == "ramdebugger" } {

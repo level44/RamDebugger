@@ -283,13 +283,13 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 		set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
 		set file1 [file tail $file]
 		RamDebugger::_savefile_only $file1 $data
-		lappend deletefiles $file1
+		lappend deletefiles [file join $cvsworkdir $file1]
 	    } else {
 		set file1 $file
 	    }
 	    set file2 [file tail $file].$revision
 	    exec cvs -Q update -p -r $revision $lfile > $file2
-	    lappend deletefiles $file2
+	    lappend deletefiles [file join $cvsworkdir $file2]
 	} else {
 	    set r1 [lindex $selecteditems 0 0]
 	    set r2 [lindex $selecteditems 1 0]
@@ -297,7 +297,8 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	    exec cvs -Q update -p -r $r1 $lfile > $file1
 	    set file2 [file tail $file].$r2
 	    exec cvs -Q update -p -r $r2 $lfile > $file2
-	    lappend deletefiles $file1 $file2
+	    lappend deletefiles [file join $cvsworkdir $file1] \
+		[file join $cvsworkdir $file2]
 	}
 	set ex ""
 	set interp diff

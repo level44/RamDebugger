@@ -289,6 +289,62 @@ proc RamDebugger::Instrumenter::NeedsToInsertSnitPackage { name } {
 
 }
 
+proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } {
+
+    set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
+    set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+
+    catch { load $dynlib }
+    if {[info command RamDebuggerInstrumenterDoWork] ne "" } { return }
+
+    set sourcefile [file join $RamDebugger::MainDir scripts RamDebuggerInstrumenter.cc]
+
+    set OPTS [list -shared -DUSE_TCL_STUBS -O2]
+    if {$::tcl_platform(platform) != "windows"} { lappend OPTS "-fPIC" }
+    set basedir [file dirname [file dirname [info nameofexecutable]]]
+    lappend OPTS -I[file join $basedir include]
+    set libs [glob -nocomplain -dir [file join $basedir lib] *tclstub*]
+    switch [llength $libs] {
+	0 { set lib libtclstub.a }
+	1 { set lib [lindex $libs 0] }
+	default { set lib [file join $basedir lib libtclstub.a] }
+    }
+    set LOPTS [list $lib]
+
+    set err [catch {eval exec gcc $OPTS [list $sourcefile -o $dynlib] $LOPTS} errstring]
+    if { $err && $raiseerror } {
+	WarnWin $::errorInfo
+    }
+}
+    
+proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newblocknameR blockinfoname \
+		                                   "progress 1" } {
+    variable FastInstrumenterLoaded
+
+    if { ![info exists FastInstrumenterLoaded] } {
+	set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
+	set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+	catch { load $dynlib }
+	if { [info command RamDebuggerInstrumenterDoWork] eq "" && \
+		 $RamDebugger::options(CompileFastInstrumenter) != 0 } {
+	    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
+		TryCompileFastInstrumenter 0
+		set RamDebugger::options(CompileFastInstrumenter) 0
+	    } else {
+		TryCompileFastInstrumenter 1
+	    }
+	    catch { load $dynlib }
+	}
+	set FastInstrumenterLoaded 1
+    }
+    if {[info command RamDebuggerInstrumenterDoWork] ne "" } {
+	RamDebuggerInstrumenterDoWork $block $filenum $newblocknameP $newblocknameR $blockinfoname $progress
+    } else {
+	uplevel [list RamDebugger::Instrumenter::DoWork $block $filenum $newblocknameP $newblocknameR \
+		     $blockinfoname $progress]
+    }
+}
+
 # newblocknameP is for procs
 # newblocknameR is for the rest
 proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknameR blockinfoname "progress 1" } {
@@ -503,8 +559,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		        } elseif { [info exists colors([lindex $words end])] } {
 		            set icharlineold [expr $icharline-[string length [lindex $words end]]]
 		            lappend blockinfocurrent $colors([lindex $words end]) $icharlineold \
-		               $icharline
-		        }
+		               $icharline                        }
 		    } elseif { $wordtype == "" } { set consumed 1 }
 		}
 	    }
