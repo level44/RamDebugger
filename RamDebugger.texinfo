@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.7 $
+@set Version  $Revision: 1.8 $
 @set Date August 2002
 
 @ifinfo
@@ -184,6 +184,12 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 
 @node Changes, , Introduction, Introduction and Setup
 @section Changes
+
+package require ramdebugger
+Command @b{console} in local mode
+maintains linenumbers when revisiting file
+position stack
+drag and drop
 
 Changes From version 1 to version 2
 
