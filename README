@@ -59,6 +59,8 @@ Changes From version 2.8 to version 3.0
    * search & replace
    * comment lines are indented in normal column
    * Added reinstrument to menu Debug
+   * If tkcon is open, output goes also to tkcon
+   * New menu options in Tkcon to send commands to debugged program
 
 Changes From version 2.6 to version 2.8
 

@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.23 2003/05/30 18:39:07 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.24 2003/06/06 18:44:31 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -367,7 +367,7 @@ proc RamDebugger::rdebug { args } {
 	}
 	if { $remoteserverType == "local" } {
 	    catch { local eval destroy . }
-	    interp delete local
+	    catch { interp delete local }
 	} elseif { $remoteserverType == "gdb" } {
 	    catch {
 		#puts -nonewline [lindex $remoteserver 0] {\x03}
@@ -384,7 +384,7 @@ proc RamDebugger::rdebug { args } {
     if { $opts(-master) } {
 	if { $remoteserverType == "local" } {
 	    catch { local eval destroy . }
-	    interp delete local
+	    catch { interp delete local }
 	} elseif { $remoteserverType == "gdb" } {
 	    catch {
 		puts [lindex $remoteserver 0] quit
@@ -402,7 +402,7 @@ proc RamDebugger::rdebug { args } {
     } elseif { $opts(-currentfile) } {
 	if { [interp exists local] } {
 	    catch { local eval destroy . }
-	    interp delete local
+	    catch { interp delete local }
 	}
 	interp create local
 	interp alias local sendmaster "" eval
@@ -448,6 +448,7 @@ proc RamDebugger::rdebug { args } {
 	}
 	if { ![info exists options(LocalDebuggingType)] || $options(LocalDebuggingType) == "tk" } {
 	    interp eval local [list load {} Tk]
+	    local eval bind . <Destroy> exit
 	}
 	#local eval { catch { bind . <Destroy> exit } }
 	set remoteserverType local
@@ -481,7 +482,7 @@ proc RamDebugger::rdebug { args } {
 	
 	if { $remoteserverType == "local" } {
 	    catch { local eval destroy . }
-	    interp delete local
+	    catch { interp delete local }
 	} elseif { $remoteserverType == "gdb" } {
 	    catch {
 		puts [lindex $remoteserver 0] quit
@@ -517,7 +518,7 @@ proc RamDebugger::rdebug { args } {
 	} else { error "error. $usagestring\nActive programs: [array names services]" }
 	if { $remoteserverType == "local" } {
 	    catch { local eval destroy . }
-	    interp delete local
+	    catch { interp delete local }
 	} elseif { $remoteserverType == "gdb" } {
 	    catch {
 		puts [lindex $remoteserver 0] quit
@@ -1871,6 +1872,32 @@ proc RamDebugger::EvalRemote { comm } {
 	interp eval local after idle [list $comm]
     } elseif { $remoteserverType == "master" } {
 	master after idle [list $comm]
+    } elseif { $remoteserverType == "gdb" } {
+	foreach "fid program state" $remoteserver break
+	regsub -all {(^|\n)(.)} $comm\n {\1-->\2} commlog
+	append gdblog $commlog
+	puts $fid $comm
+	flush $fid
+    } elseif { $::tcl_platform(platform) == "windows" } {
+	comm::comm send $remoteserverNum $comm
+    } else {
+	send $remoteserver $comm
+    }
+}
+
+proc RamDebugger::EvalRemoteAndReturn { comm } {
+    variable remoteserver
+    variable remoteserverNum
+    variable remoteserverType
+    variable gdblog
+
+    if { $remoteserver == "" } {
+	error "Error: a program to debug must be selected using rdebug"
+    }
+    if { $remoteserverType == "local" } {
+	local eval $comm
+    } elseif { $remoteserverType == "master" } {
+	master $comm
     } elseif { $remoteserverType == "gdb" } {
 	foreach "fid program state" $remoteserver break
 	regsub -all {(^|\n)(.)} $comm\n {\1-->\2} commlog
@@ -3683,6 +3710,7 @@ proc RamDebugger::TextOutClear {} {
 
 proc RamDebugger::TextOutInsert { data } {
     variable textOUT
+    variable textOUT2
 
     if { ![info exists textOUT] || ![winfo exists $textOUT] } { return }
 
@@ -3690,6 +3718,7 @@ proc RamDebugger::TextOutInsert { data } {
     $textOUT conf -state normal
     foreach i [split $data \n] {
 	TextInsertAndWrap $textOUT "$i\n" 200
+	catch { tkcon_puts "$i" }
     }
     $textOUT conf -state disabled
     if { $yend == 1 } { $textOUT yview moveto 1 }
@@ -3697,6 +3726,7 @@ proc RamDebugger::TextOutInsert { data } {
 
 proc RamDebugger::TextOutInsertRed { data } {
     variable textOUT
+    variable textOUT2
 
     if { ![info exists textOUT] || ![winfo exists $textOUT] } { return }
 
@@ -3704,6 +3734,7 @@ proc RamDebugger::TextOutInsertRed { data } {
     $textOUT conf -state normal
     foreach i [split $data \n] {
 	TextInsertAndWrap $textOUT "$i\n" 200 red
+	catch { tkcon_puts stderr "$i" }
     }
     $textOUT tag configure red -foreground red
     $textOUT conf -state disabled
@@ -5632,6 +5663,8 @@ if { [info command master] != "" } {
 
 if { [lsearch $argv "-noprefs"] != -1 } {
     set readprefs 0
+    set ipos [lsearch $argv "-noprefs"]
+    set argv [lreplace $argv $ipos $ipos]
 } else { set readprefs 1 }
 
 RamDebugger::Init $readprefs $registerasremote
@@ -5647,4 +5680,7 @@ if { [info command wm] != "" && [info commands tkcon_puts] == "" } {
 }
 if { [info command master] != "" } {
     RamDebugger::rdebug -master
+}
+if { [llength $argv] } {
+    RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
 }

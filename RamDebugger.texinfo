@@ -62,7 +62,7 @@
 @set Date May 2003
 @set Copyright 2002-2003 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.15 $
+@set CVSVersion  $Revision: 1.16 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -202,6 +202,8 @@ Changes From version 2.8 to version 3.0
 @item search & replace
 @item comment lines are indented in normal column
 @item Added reinstrument to menu Debug
+@item If tkcon is open, output goes also to tkcon
+@item New menu options in Tkcon to send commands to debugged program
 @end itemize
 
 Changes From version 2.6 to version 2.8
