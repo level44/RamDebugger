@@ -2,9 +2,38 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.4 2002/08/02 17:39:01 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.5 2002/08/07 12:19:25 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jul-2002
 
+
+################################################################################
+#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
+#  The following terms apply to all files associated
+#  with the software unless explicitly disclaimed in individual files.
+
+#  The authors hereby grant permission to use, copy, modify, distribute,
+#  and license this software and its documentation for any purpose, provided
+#  that existing copyright notices are retained in all copies and that this
+#  notice is included verbatim in any distributions. No written agreement,
+#  license, or royalty fee is required for any of the authorized uses.
+#  Modifications to this software may be copyrighted by their authors
+#  and need not follow the licensing terms described here, provided that
+#  the new terms are clearly indicated on the first page of each file where
+#  they apply.
+
+#  IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY
+#  FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+#  ARISING OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY
+#  DERIVATIVES THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE
+#  POSSIBILITY OF SUCH DAMAGE.
+
+#  THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+#  INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+#  FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+#  IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+#  NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+#  MODIFICATIONS.
+################################################################################
 
 namespace eval RamDebugger {
 
@@ -67,6 +96,7 @@ namespace eval RamDebugger {
     ################################################################################
 
     variable options
+    variable options_def
 
 }
 
@@ -80,7 +110,7 @@ proc RamDebugger::Init {} {
     variable debuggerserverNum
     variable MainDir
     variable CacheDir
-    variable options
+    variable options_def
 
     set dir [info script]
     if { $dir == "" } {
@@ -101,8 +131,7 @@ proc RamDebugger::Init {} {
 
     if { $::tcl_platform(platform) == "windows" } {
 	if { $CheckRemotes } {
-	    lappend ::auto_path {C:\TclTk\ActiveTcl\lib\tcllib-1.3\comm}
-	    uplevel \#0 package require comm
+	    uplevel \#0 package require commR
 	    set debuggerserverNum [comm::register RamDebugger 1]
 	}
     } else {
@@ -116,8 +145,19 @@ proc RamDebugger::Init {} {
     # Setting preferences
     ################################################################################
 
-    set options(DebuggingType) Local
-    set options(indentsize) 2
+    set options_def(DebuggingType) Local
+    set options_def(indentsize) 4
+
+    switch $::tcl_platform(platform) {
+	windows {
+	    set options_def(NormalFont) {-family "MS Sans Serif" -size 8}
+	    set options_def(FixedFont)  {-family "Courier" -size 8}
+	}
+	default {
+	    set options_def(NormalFont) {-family "new century schoolbook" -size 12}
+	    set options_def(FixedFont)  {-family "Courier" -size 12}
+	}
+    }
 }
 
 ################################################################################
@@ -197,6 +237,7 @@ proc RamDebugger::rdebug { args } {
 	if { [interp exists local] } { interp delete local }
 	interp create local
 	interp alias local sendmaster "" eval
+	interp alias local exit "" interp delete local
 	interp eval local [list load {} Tk]
 	set remoteserverIsLocal 1
 	if { $currentfile == "" } {
@@ -749,6 +790,9 @@ proc RamDebugger::rlist { args } {
 	set files($currentfile) [string map $map [$text get 1.0 end-1c]]
 	if { [info exists instrumentedfiles($currentfile)] } {
 	    unset instrumentedfiles($currentfile)
+	}
+	if { [info exists instrumentedfilesTime($currentfile)] } {
+	    unset instrumentedfilesTime($currentfile)
 	}
     }
 
@@ -1355,10 +1399,11 @@ proc RamDebugger::Instrumenter::InitState {} {
     variable level 0
     variable colors
 
-    foreach i [list return break while eval foreach for if else elseif error switch default] {
+    foreach i [list return break while eval foreach for if else elseif error switch default \
+	    continue] {
 	set colors($i) magenta
     }
-    foreach i [list variable set] {
+    foreach i [list variable set global] {
 	set colors($i) green
     }
 }
@@ -1652,7 +1697,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		        if { $fail } {
 		            set wordtype \{
 		            set wordtypeline $line
-		            set braceslevel 0
+		            set braceslevel 1
 		        } else {
 		            set lastinstrumentedline $line
 		        }
@@ -1662,9 +1707,8 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 	    \} {
 		if { $lastc != "\\" } {
 		    if { $wordtype == "\{" } {
-		        if { $braceslevel } {
-		            incr braceslevel -1
-		        } else {
+			incr braceslevel -1
+		        if { $braceslevel == 0 } {
 		            set wordtype ""
 		            lappend words $currentword
 		            set currentword ""
@@ -1944,6 +1988,9 @@ proc RamDebugger::ExitGUI {} {
 
     if { [SaveFile ask] == -1 } { return }
 
+    set options(NormalFont) [font configure NormalFont]
+    set options(FixedFont) [font configure FixedFont]
+
     set options(watchedvars) ""
     set i 0
     while 1 {
@@ -2085,11 +2132,12 @@ proc RamDebugger::SaveFile { what } {
     variable options
     variable currentfile
     variable currentfileIsModified
+    variable filesmtime
 
     if { $what == "ask" } {
 	if { !$currentfileIsModified } { return 0 }
 	set ret [tk_messageBox -default yes -icon question -message \
-	    "Do you want to save file '$currentfile?'" -parent $text \
+	    "Do you want to save file '$currentfile'?" -parent $text \
 	    -title "save file" -type yesnocancel]
 	if { $ret == "cancel" } { return -1 }
 	if { $ret == "no" } {
@@ -2111,6 +2159,13 @@ proc RamDebugger::SaveFile { what } {
 	set options(defaultdir) [file dirname $file]
     } else {
 	set file $currentfile
+
+	if { [file mtime $file] > $filesmtime($file) } {
+	    set ret [tk_messageBox -default yes -icon question -message \
+		"File '$currentfile' has been modified outside RamDebugger. Loose external changes?" \
+		-parent $text -title "Warning" -type yescancel]
+	    if { $ret == "cancel" } { return -1 }
+	}
     }
     SaveFileF $file
     return 0
@@ -2619,7 +2674,10 @@ proc RamDebugger::ContNextGUI { what } {
 	    "Do you want to start to debug locally '$currentfile?'" -parent $text \
 	    -title "start debugging" -type yesnocancel]
 	if { $ret == "cancel" } { return }
-	if { $ret == "yes" } { rdebug -currentfile }
+	if { $ret == "yes" } {
+	    rdebug -currentfile
+	    return
+	}
 	if { $remoteserver == "" } { return }
     }
 
@@ -2934,31 +2992,79 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     }
 }
 
+proc RamDebugger::CreateModifyFonts {} {
+    variable options
+
+    if { [lsearch [font names] NormalFont] == -1 } { font create NormalFont }
+    if { [lsearch [font names] FixedFont] == -1 } { font create FixedFont }
+
+    eval font configure NormalFont $options(NormalFont)
+    eval font configure FixedFont $options(FixedFont)
+}
+
+proc RamDebugger::UpdateFont { w fontname } {
+
+    set newfont [SelectFont $w.fonts -type dialog -parent $w -sampletext \
+	"RamDebugger is nice" -title "Select font"]
+    if { $newfont == "" } { return }
+    set list [list family size weight slant underline overstrike]
+    foreach $list $newfont break
+
+    set comm "font configure"
+    lappend comm $fontname
+    foreach i [lrange $list 0 3] {
+	lappend comm -$i [set $i]
+    }
+    if { [info exists underline] && $underline != "" } {
+	lappend comm -underline 1
+    } else { lappend comm -underline 0 }
+
+    if { [info exists overstrike] && $overstrike != "" } {
+	lappend comm -overstrike 1
+    } else { lappend comm -overstrike 0 }
+
+    eval $comm
+}
+
 proc RamDebugger::PreferencesWindow {} {
     variable text
     variable options
+    variable options_def
     
-    set f [DialogWin::Init $text "Preferences window" separator]
+    set f [DialogWin::Init $text "Preferences window" separator [list Defaults]]
     set w [winfo toplevel $f]
+
+    TitleFrame $f.f1 -text [_ debugging] -grid 0
+    set f1 [$f.f1 getframe]
 
     set help "Ramdebugger can make two types of debugging: local and remote.\n"
     append help "Every type needs a different instrumenting. If you select here\n"
     append help "the one that you make more often, you'll avoid many re-instrumenting"
 
-    Label $f.l1 -text "Preferred debugging type:" -helptext $help -grid "0 e"
-    radiobutton $f.rb1 -text Local -variable DialogWin::user(type) -value Local -grid 1
-    radiobutton $f.rb2 -text Remote -variable DialogWin::user(type) -value Remote -grid 2
+    Label $f1.l1 -text "Preferred debugging type:" -helptext $help -grid "0 e"
+    radiobutton $f1.rb1 -text Local -variable DialogWin::user(type) -value Local -grid 1
+    radiobutton $f1.rb2 -text Remote -variable DialogWin::user(type) -value Remote -grid 2
 
     set DialogWin::user(type) $options(DebuggingType)
 
-    Label $f.l2 -text "Indent size:" -helptext "Size used when indenting with key: <Tab>" -grid "0 e"
-    SpinBox $f.sb -range "0 10 1" -textvariable DialogWin::user(indentsize) \
+    Label $f1.l2 -text "Indent size:" -helptext "Size used when indenting with key: <Tab>" -grid "0 e"
+    SpinBox $f1.sb -range "0 10 1" -textvariable DialogWin::user(indentsize) \
 	    -width 4 -grid "1 px3"
     set DialogWin::user(indentsize) $options(indentsize)
+
+    TitleFrame $f.f2 -text [_ fonts] -grid 0
+    set f2 [$f.f2 getframe]
     
+    Button $f2.b1 -text "GUI font" -font NormalFont -relief link -command \
+       "RamDebugger::UpdateFont $w NormalFont" -grid "0 w"
+    Button $f2.b2 -text "Text font" -font FixedFont -relief link -command \
+       "RamDebugger::UpdateFont $w FixedFont" -grid "0 w"
+
+    supergrid::go $f1
+    supergrid::go $f2
     supergrid::go $f
 
-    focus $f.rb1
+    focus $f1.rb1
 
     set action [DialogWin::CreateWindow "" "" 200]
     while 1 {
@@ -2978,6 +3084,13 @@ proc RamDebugger::PreferencesWindow {} {
 		    return
 		}
 	    }
+	    2 {
+		foreach i [list DebuggingType indentsize NormalFont FixedFont] {
+		    set options($i) $options_def($i)
+		    set DialogWin::user($i) $options_def($i)
+		}
+		CreateModifyFonts
+	    }
 	}
 	set action [DialogWin::WaitForWindow]
     }
@@ -2988,13 +3101,23 @@ proc RamDebugger::DisplayTimesWindowStart { f } {
 }
 
 proc RamDebugger::DisplayTimesWindowReport { f } {
+    variable text
 
     set f [DialogWin::Init $text "Timing report" separator "" -]
     set w [winfo toplevel $f]
 
+    ComboBox $f.cb1 -textvariable DialogWin::user(units) -editable 0 \
+       -modifycmd {
+	   $DialogWin::user(text) del 1.0 end
+	   $DialogWin::user(text) ins end [RamDebugger::rtime -display $DialogWin::user(units)]
+       } -width 10 -values [list microsec  milisec  sec  min] -grid "0 w"
+    set DialogWin::user(units) sec
+
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     text $sw.t
     $sw setwidget $sw.t
+
+    set DialogWin::user(text) $sw.t
 
     bind $sw.t <1> "focus $sw.t"
     
@@ -3002,7 +3125,7 @@ proc RamDebugger::DisplayTimesWindowReport { f } {
 
     focus $sw.t
 
-    $sw.t ins end [rtime -display]
+    $sw.t ins end [rtime -display sec]
 
     set action [DialogWin::CreateWindow]
     DialogWin::DestroyWindow
@@ -3031,7 +3154,7 @@ proc RamDebugger::DrawSelection { w } {
     if { [catch {
 	$text tag add sel "$DialogWinTop::user($w,lineini).0 linestart" \
 	   "$DialogWinTop::user($w,lineend).0 lineend"
-	$text see $DialogWinTop::user($w,lineini)
+	$text see $DialogWinTop::user($w,lineini).0
     }] } {
 	WarnWin "Lines are not correct" $w
     }
@@ -3079,8 +3202,8 @@ proc RamDebugger::ModifyTimingBlock { w what } {
 		return 1
 	    }
 	    set DialogWinTop::user($w,name) [lindex [$DialogWinTop::user($w,list) get $idx] 0]
-	    set DialogWinTop::user($w,lineini) [lindex [$DialogWinTop::user($w,list) get $idx] 1]
-	    set DialogWinTop::user($w,lineend) [lindex [$DialogWinTop::user($w,list) get $idx] 2]
+	    set DialogWinTop::user($w,lineini) [lindex [$DialogWinTop::user($w,list) get $idx] 2]
+	    set DialogWinTop::user($w,lineend) [lindex [$DialogWinTop::user($w,list) get $idx] 3]
 	}
 	update {
 	    $DialogWinTop::user($w,list) del 0 end
@@ -3141,7 +3264,8 @@ proc RamDebugger::DisplayTimesWindow {} {
 
     $sw setwidget $DialogWinTop::user($w,list)
 
-    bind $DialogWinTop::user($w,list) <1> "RamDebugger::ModifyTimingBlock $w updatecurrent"
+    bind [$DialogWinTop::user($w,list) bodypath] <Double-1> \
+       "RamDebugger::ModifyTimingBlock $w updatecurrent"
 
     set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w"]
     $bbox add -image acttick16 \
@@ -3169,6 +3293,137 @@ proc RamDebugger::DisplayTimesWindow {} {
     DialogWinTop::InvokeOK $f
 }
 
+proc RamDebugger::AboutWindow {} {
+    variable text
+    
+    set par [winfo toplevel $text]
+    set w $par.about
+    toplevel $w
+    wm protocol $w WM_DELETE_WINDOW {
+  	# nothing
+    }
+    
+    label $w.l -text RamDebugger -font "-family {new century schoolbook} -size 24 -weight bold" \
+	    -fg \#d3513d -grid 0
+    label $w.l2 -grid 0 -text \
+	    "Author: Ramon Ribó (RAMSAN)\nramsan@cimne.upc.es\nhttp://gid.cimne.upc.es/ramsan"
+    canvas $w.c -height 50 -grid 0 -bg white -highlightthickness 0
+    ScrolledWindow $w.lf -relief sunken -borderwidth 0 -grid 0
+
+    tablelist::tablelist $w.lf.lb -width 55\
+		  -exportselection 0 \
+		  -columns [list \
+		                10 Package        left \
+		                10 Author        left \
+		                10 License right\
+		                4  Mod left \
+		               ] \
+		  -labelcommand tablelist::sortByColumn \
+		  -background white \
+		  -selectbackground navy -selectforeground white \
+		  -stretch 1 -selectmode extended \
+		  -highlightthickness 0
+
+
+    $w.lf setwidget $w.lf.lb
+
+    frame $w.buts -height 35 -bg [CCColorActivo [$w  cget -bg]] -grid 0
+
+    supergrid::go $w
+
+    button $w.close -text Close -width 10
+    place $w.close -in $w.buts -anchor n -y 3
+    
+    wm withdraw $w
+    update idletasks
+    set x [expr [winfo x $par]+[winfo width $par]/2-[winfo reqwidth $w]/2]
+    set y [expr [winfo y $par]+[winfo height $par]/2-[winfo reqheight $w]/2]
+    wm geom $w +$x+$y
+    wm deiconify $w
+    wm transient $w $par
+
+    bind $w.close <Enter> "RamDebugger::MotionInAbout $w.close ; break"
+    bind $w.close <ButtonPress-1> "WarnWin [list {Congratulations!!!}] ; destroy $w; break"
+
+
+    $w.c create text 0 0 -anchor n -font "-family {new century schoolbook} -size 16 -weight bold"\
+	    -fill \#d3513d -text "Version 1.0" -tags text
+    RamDebugger::AboutMoveCanvas $w.c 0
+
+
+    set data {
+	tkcon "Jeffrey Hobbs" BSD NO
+	comm "Open Group Res. Ins." BSD YES
+	BWidgets "Unifix" BSD YES
+	dialogwin  RAMSAN BSD NO
+	helpviewer RAMSAN BSD NO
+	supergrid  RAMSAN BSD NO
+	supertext  "Bryan Oakley" "FREE SOFT" YES
+	tablelist  "Csaba Nemethi" "FREE SOFT" NO
+	"visual regexp" "Laurent Riesterer" GPL NO
+    }
+    foreach "pack author lic mod" $data {
+	$w.lf.lb insert end [list $pack $author $lic $mod]
+    }
+
+
+}
+
+proc RamDebugger::AboutMoveCanvas { c t } {
+
+    if { ![winfo exists $c] } { return }
+    set w [winfo width $c]
+    set h [winfo height $c]
+
+    set x [expr $w/2*(1.0+sin($t))]
+    set y [expr $h/2*(cos($t)+1)]
+
+    $c coords text $x $y
+
+    set t [expr $t+.2]
+    after 100 [list RamDebugger::AboutMoveCanvas $c $t]
+}
+
+proc RamDebugger::MotionInAbout { but } {
+
+    if { ![winfo exists $but] } { return }
+
+    set w [winfo toplevel $but]
+
+    while 1 {
+	if { ![winfo exists $but] } { return }
+	set x [expr [winfo pointerx $w]-[winfo rootx $w]]
+	set y [expr [winfo pointery $w]-[winfo rooty $w]]
+	
+	set x1 [expr [winfo rootx $but]-[winfo rootx $w]]
+	set y1 [expr [winfo rooty $but]-[winfo rooty $w]]
+	set x2 [expr $x1+[winfo width $but]]
+	set y2 [expr $y1+[winfo height $but]]
+
+	if { $x < $x1-2 || $x > $x2+2 || $y < $y1-2 || $y > $y2+2 } { return }
+	
+	set xmax [winfo width $w]
+	set ymax [winfo height $w]
+	
+	if { $x < ($x1+$x2)/2 } {
+	    set newx [expr $x1+int((rand()-.2)*5.1)]
+	} else { set newx [expr $x1+int((rand()-.8)*5.1)] }
+	
+	if { $newx < 0 } { set newx 0 }
+	if { $newx > $xmax-[winfo width $but] } { set newx [expr $xmax-[winfo width $but]] }
+	
+	if { $y < ($y1+$y2)/2 } {
+	    set newy [expr $y1+int((rand()-.2)*5.1)]
+	} else { set newy [expr $y1+int((rand()-.8)*5.1)] }
+	
+	
+	if { $newy < 0 } { set newy 0 }
+	if { $newy > $ymax-[winfo height $but] } { set newy [expr $ymax-[winfo height $but]] }
+	place $but -in $w -x $newx -y $newy -anchor nw
+	update
+    }
+}
+
 proc RamDebugger::DisplayWindowsHierarchyInfo { canvas w x y } {
     variable TextMotionAfterId
     
@@ -3177,7 +3432,8 @@ proc RamDebugger::DisplayWindowsHierarchyInfo { canvas w x y } {
     if { [winfo exists $canvas.help] } { destroy $canvas.help }
 
     if { $w != "" } {
-	set TextMotionAfterId [after 100 RamDebugger::DisplayWindowsHierarchyInfoDo $canvas $w $x $y]
+	set TextMotionAfterId [after 100 RamDebugger::DisplayWindowsHierarchyInfoDo \
+		$canvas $w $x $y]
     }
 }
 
@@ -3897,7 +4153,7 @@ proc RamDebugger::Search { w { what {} } } {
 	bind $w.search <1> "destroy $w.search ; break"
 	bind $w.search <3> "destroy $w.search ; break"
 	bind $w.search <Return> "destroy $w.search ; break"
-	bind $w.search <Control-s> "RamDebugger::Search $w iforward ; break"
+	bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
 	bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
 	bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
 
@@ -4232,17 +4488,104 @@ proc RamDebugger::CheckText { command args } {
     if { [info exists instrumentedfiles($currentfile)] } {
 	unset instrumentedfiles($currentfile)
     }
+    if { [info exists instrumentedfilesTime($currentfile)] } {
+	unset instrumentedfilesTime($currentfile)
+    }
+}
 
-# puts ll=[llength $instrumentedfilesInfo($currentfile)]
-# puts l1=$l1_new
-# puts l2=$l2_new
-# puts block=$block
-# puts blockinfo=$blockinfo
-# puts instrumentedfilesInfo=---$instrumentedfilesInfo($currentfile)---
-# puts err=$err
-# if { $err } { puts $::errorInfo }
+proc RamDebugger::SearchBraces { x y } {
+    variable text
 
-
+    set sel [$text get insert]
+    $text tag remove sel 0.0 end
+    $text tag add sel insert insert+1c
+    if { [lsearch -exact [list \[ \] \{ \}] $sel] == -1 } {
+	set sel [$text get insert-1c]
+	$text tag remove sel 0.0 end
+	$text mark set insert insert-1c
+	$text tag add sel insert insert+1c
+    }
+    if {[lsearch -exact [list \[ \] \{ \}] $sel] == -1 } {
+	set ::tkPriv(selectMode) word
+	tkTextSelectTo $text $x $y
+	catch { $text mark set insert sel.last}
+	catch { $text mark set anchor sel.first}
+    } else {
+	if { $sel == "\[" || $sel == "\{" } {
+	    set dir -forwards
+	    set stopindex [$text index end]
+	    set idx [$text index sel.last]
+	    set incr +1
+	} else {
+	    set dir -backwards
+	    set stopindex 1.0
+	    set idx [$text index sel.first]
+	    set incr -1
+	    $text mark set insert insert+1c
+	}
+	switch $sel {
+	    "\{" { set open "\{" ; set close "\}" ; set openalt "\[" ; set closealt "\]" }
+	    "\[" { set open "\[" ; set close "\]" ; set openalt "\{" ; set closealt "\}" }
+	    "\}" { set open "\}" ; set close "\{" ; set openalt "\]" ; set closealt "\[" }
+	    "\]" { set open "\]" ; set close "\[" ; set openalt "\}" ; set closealt "\{" }
+	}
+	set error 0
+	set found 0
+	set level 0
+	set level_alt 0
+	set idx_alt ""
+	while { [set idx2 [$text search $dir -regexp -- {\{|\}|\[|\]} $idx $stopindex]] != "" } {
+	    if { [$text get "$idx2-1c"] == "\\" } {
+		if { $dir == "-forwards" } {
+		    set idx [$text index $idx2+1c]
+		} else { set idx $idx2 }
+		continue
+	    }
+	    set newsel [$text get $idx2]
+	    switch $newsel \
+		$open { incr level } \
+		$openalt {
+		    incr level_alt
+		    set idx_alt $idx2
+		} \
+		$close {
+		    incr level -1
+		    if { $level < 0 } {
+#                         if { $level_alt > 0 } {
+#                             set error 1
+#                             set idx2 $idx_alt
+#                             break
+#                         }
+		        set found 1
+		        break
+		    }
+		} \
+		$closealt {
+		    incr level_alt -1
+		    if { $level_alt < 0 } {
+		        set level_alt 0
+		        #set error 1
+		        #break
+		    }
+		}
+	    if { $dir == "-forwards" } {
+		set idx [$text index $idx2+1c]
+	    } else { set idx $idx2 }
+	}
+	if { $idx2 == "" } {
+	    set error 1
+	    set idx2 $stopindex
+	}
+	if { $error } { bell }
+	$text tag remove sel 0.0 end
+	
+	if { $dir == "-forwards" } {
+	    $text tag add sel insert $idx2+1c
+	} else {
+	    $text tag add sel $idx2 insert
+	} 
+	$text see $idx2
+    }
 }
 
 proc RamDebugger::IndentCurrent {} {
@@ -4298,7 +4641,7 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
     }
     if { $FirstPos < $indent } {
 	$text insert $line.0 [string repeat " " [expr $indent-$FirstPos]]
-    } else {
+    } elseif { $FirstPos > $indent } {
 	$text delete $line.0 $line.[expr $FirstPos-$indent]        
     }
     if { $pos >= 0 && $pos < $indent } { $text mark set insert $line.$indent }
@@ -4321,15 +4664,23 @@ proc RamDebugger::UpdateLineNum { command args } {
     }
 
     set idx [$text index insert]
+    set line ""
     foreach "line col" [scan $idx "%d,%d"] break
+    if { $line == "" } { return }
     set LineNum "L: $line"
 
     if { $currentfile != "" && $currentfile != "New file" &&  [file exists $currentfile] && \
 	[file mtime $currentfile] > $filesmtime($currentfile) } {
 	set filesmtime($currentfile) [file mtime $currentfile]
-	set ret [tk_messageBox -default ok -icon warning -message \
-		     "File '$currentfile' has been modified. Reload it?" -parent $text \
-		     -title "reload file" -type okcancel]
+
+	if { $currentfileIsModified } {
+	    set quest "File '$currentfile' has been modified outside RamDebugger. Reload it "
+	    append quest "and loose the changes made inside RamDebugger?"
+	} else {
+	    set quest "File '$currentfile' has been modified outside RamDebugger. Reload it?"
+	}
+	set ret [tk_messageBox -default ok -icon warning -message $quest \
+	    -parent $text -title "reload file" -type okcancel]
 	if { $ret == "ok" } {
 	    OpenFileF $currentfile 1
 	}
@@ -4616,6 +4967,7 @@ proc RamDebugger::CreateImages {} {
 
 proc RamDebugger::InitGUI { { w .gui } } {
     variable options
+    variable options_def
     variable marker
     variable text
     variable mainframe
@@ -4627,17 +4979,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
     variable breakpoints
     variable MainDir
 
-    # WARNING
-    if { $::tcl_platform(platform) == "windows" } {
-	lappend ::auto_path /compasser/addons
-    } else {
-	lappend ::auto_path /c/compasser/addons
-    }
 
     package require Tablelist
     package require BWidgetR
     package require supertext
-    supertext::overrideTextCommand
     package require supergrid
     package require dialogwin
     package require helpviewer
@@ -4645,6 +4990,8 @@ proc RamDebugger::InitGUI { { w .gui } } {
     if { $::tcl_platform(platform) == "windows" } {
 	package require registry
     }
+
+    array set options [array get options_def]
 
     CreateImages
 
@@ -4658,17 +5005,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	}
 	    array set options $data 
     }
- 
 
-    if { $::tcl_platform(platform) == "windows"} {
-	font create NormalFont -family "MS Sans Serif" -size 8
-	option add *font NormalFont
-	font create FixedFont -family Courier -size 8
-    } else {
-	font create NormalFont -family {new century schoolbook} -size 12
-	option add *font NormalFont
-	font create FixedFont -family Courier -size 12
-    }
+    CreateModifyFonts
+
+    option add *font NormalFont
     option add *Menu*TearOff 0
 
     toplevel $w
@@ -4681,7 +5021,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::NewFile"] \
 		[list command "&Open file" {} "Select source file" "Ctrl o" \
 		-command "RamDebugger::OpenFile"] \
-		[list command "&Save" {} "Save file" "Ctrl x-Ctrl s" \
+		[list command "&Save" {} "Save file" "Ctrl s" \
 		-command "RamDebugger::SaveFile save"] \
 		[list command "Save &as" {} "Save file as" "" \
 		-command "RamDebugger::SaveFile saveas"] \
@@ -4712,14 +5052,14 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::SearchWindow"] \
 		[list command "Continue search" {} "Continue searching text" "F3" \
 		-command "RamDebugger::Search $w any"] \
-		[list command "Isearch forward" {} "Incrementally search forward" "Ctrl s" \
+		[list command "Isearch forward" {} "Incrementally search forward" "Ctrl i" \
 		-command "RamDebugger::Search $w iforward"] \
 		[list command "Isearch backward" {} "Incrementally search backward" "Ctrl r" \
 		-command "RamDebugger::Search $w ibackward"] \
 		[list command "&Goto line" {} "Go to the given line" "Ctrl g" \
 		-command "RamDebugger::GotoLine"] \
 		separator \
-		[list command "&Preferences" {} "Choose preferences for RamDebugger" "" \
+		[list command "&Preferences" {} "Choose preferences for RamDebugger" "Ctrl p" \
 		-command "RamDebugger::PreferencesWindow"] \
 		] \
 		"&View" all view 0 [list \
@@ -4741,10 +5081,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		[list command "Continue &to" {} "continue to selected line" "Ctrl F5" \
 		-command "RamDebugger::ContNextGUI rcontto"] \
 		separator \
-		[list command "Expressions..." {} \
+		[list command "&Expressions..." {} \
 		    "Open a window to visualize expresions or variables" "" \
 		-command "RamDebugger::DisplayVarWindow"] \
-		[list command "Breakpoints..." {} \
+		[list command "&Breakpoints..." {} \
 		    "Open a window to visualize the breakpoints list" "" \
 		-command "RamDebugger::DisplayBreakpointsWindow"] \
 		[list command "&Timing control..." {} \
@@ -4756,6 +5096,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::OpenConsole"] \
 		[list command "O&pen VisualRegexp" {} "Open VisualRegexp" "" \
 		-command "RamDebugger::OpenVisualRegexp"] \
+		separator \
 		[list command "&View instrumented file" {} "View instrumented file" "" \
 		-command "RamDebugger::ViewInstrumentedFile instrumented"] \
 		[list command "&View instrumented info file" {} "View instrumented info file" "" \
@@ -4767,6 +5108,9 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		"&Help" all help 0 [list \
 		[list command "&Help" {} "Gives help" "Ctrl h" \
 		-command "RamDebugger::ViewHelpFile"] \
+		separator \
+		[list command "&About" {} "Information about the program" "" \
+		-command "RamDebugger::AboutWindow"] \
 		] \
 		]
 
@@ -4866,7 +5210,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
     set pw [PanedWindow $f.pw -side top -pad 0 -weights available -grid 0 -activator line]
 
-    foreach "weight1 weight2 weight3" [ManagePanes $pw h "1 6 3"] break
+    foreach "weight1 weight2 weight3" [ManagePanes $pw h "1 6 2"] break
 
     set pane1 [$pw add -weight $weight1]
 
@@ -4898,7 +5242,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     grid columnconf $pane2in1 0 -weight 1
 
     set marker [canvas $fulltext.can -bg grey90 -grid "0 wns" -width 14 -bd 0 -highlightthickness 0]
-    set text [text $fulltext.text -background white -wrap none -width 80 -height 40 \
+    set text [supertext::text $fulltext.text -background white -wrap none -width 80 -height 40 \
 		  -exportselection 0 -font FixedFont -highlightthickness 0 -editable 0 \
 		  -preproc RamDebugger::CheckTextBefore \
 		  -postproc RamDebugger::UpdateLineNum -bd 0 -grid 1 \
@@ -5053,6 +5397,11 @@ proc RamDebugger::InitGUI { { w .gui } } {
     supergrid::go $f
     supergrid::go $w
 
+    if {[string equal "unix" $::tcl_platform(platform)]} {
+	bind $listbox.c <4> { %W yview scroll -5 units }
+	bind $listbox.c <5> { %W yview scroll 5 units }
+    }
+
     $listbox bindImage <1> "+focus $listbox ;#"
     $listbox bindText <1> "+focus $listbox ;#"
     $listbox bindImage <Double-1> "RamDebugger::ListBoxDouble1"
@@ -5061,7 +5410,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     bind $listbox <Return> "RamDebugger::ListBoxDouble1 \[$listbox selection get]"
     set menudev [$mainframe getmenu debug]
     bind $text <3> "%W mark set insert @%x,%y ; tk_popup $menudev %X %Y"
-
+    bind $text <Double-1> "RamDebugger::SearchBraces %x %y ;break" 
 
     $textST conf -state disabled
     bind $textST <1> { focus %W }
@@ -5109,9 +5458,22 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	tkCancelRepeat
     }
     if { ![info exists options(maingeometry)] } {
-	set options(maingeometry) 300x300+300+300
+	set options(maingeometry) 800x600
     }
-    wm geom $w $options(maingeometry)
+
+    # trick to know if we are debugging RamDebugger
+    if { [info command sendmaster] != "" } {
+	if { [regexp {(\d+)x(\d+)[+](\d+)[+](\d+)} $options(maingeometry) {} wi he xpos ypos] } {
+	    incr xpos 20
+	    incr ypos 20
+	    wm geom $w ${wi}x$he+$xpos+$ypos
+	    if { [info exists options(currentfile)] } {
+		set options(currentfile) ""
+	    }
+	}
+    } else {
+	wm geom $w $options(maingeometry)
+    }
 
     ActualizeActivePrograms $menu 1
 
@@ -5146,6 +5508,11 @@ proc RamDebugger::InitGUI { { w .gui } } {
     # for tkcon
     rename ::exit ::exit_final
     proc ::exit { args } {}
+
+    # for defining what is a word for text widgets
+    auto_load tcl_wordBreakAfter
+    set ::tcl_wordchars "\\w"
+    set ::tcl_nonwordchars "\\W"
 
 }
 

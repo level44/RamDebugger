@@ -1,0 +1,413 @@
+\gdef\putwordsee{see}
+\input gid_base.tex
+\input psfig.sty
+\pssilent %\psnoisy
+\hoffset=1.52cm
+\input texinfo @c -*-texinfo-*-
+
+@tex
+
+\def\verysmallbook{
+  \global\chapheadingskip = 15pt plus 4pt minus 2pt
+  \global\secheadingskip = 12pt plus 3pt minus 2pt
+  \global\subsecheadingskip = 9pt plus 2pt minus 2pt
+  %
+  \global\lispnarrowing = 0.3in
+  \setleading{12pt}
+  \advance\topskip by -1cm
+  \global\parskip 2pt plus 1pt
+  \global\hsize = 5.5in
+  \global\vsize=6in
+  \global\tolerance=700
+  \global\hfuzz=1pt
+  \global\contentsrightmargin=0pt
+  \global\deftypemargin=0pt
+  \global\defbodyindent=.5cm
+  %
+  \global\pagewidth=\hsize
+  \global\pageheight=\vsize
+  %
+  \global\let\smalllisp=\smalllispx
+  \global\let\smallexample=\smalllispx
+  \global\def\Esmallexample{\Esmalllisp}
+  \global\hoffset=1.75cm
+}
+
+\verysmallbook
+
+@end tex
+
+
+@c To update all in emacs use: C-u C-c C-u m
+@c to get a gid.info file without running makeinfo try: C-c C-e C-b
+
+
+@c %**start of header
+@setfilename ramdebugger.info
+@settitle RamDebugger: A graphical and interactive debugger for Tcl-TK
+@paragraphindent 3
+@iftex
+@c @smallbook
+@c @afourpaper
+@c @finalout   ---to avoid black squares in hboxes (long lines)---
+@finalout
+@end iftex
+@c %**end of header ptype.texinfo
+
+@setchapternewpage odd
+
+@set photo
+
+@set Version  $Revision: 1.1 $
+@set Date August 2002
+
+@ifinfo
+Copyright 2002 Ramon Ribó
+@end ifinfo
+
+@titlepage
+@title RamDebugger 1.0:
+@subtitleA graphical and interactive debugger for Tcl-TK
+@author Copyright 2002 Ramon Ribó
+@c The following two commands start the copyright page.
+@page
+@vskip 0pt plus 1filll
+
+Copyright @copyright{} 2002 Ramon Ribó
+
+@url{http://gid.cimne.upc.es}
+
+@end titlepage
+
+@iftex
+@headings off
+@end iftex
+
+@node Top, Introduction and Setup, (dir), (dir)
+@comment node-name, next, previous, up
+
+
+RamDebugger: A graphical and interactive debugger for Tcl-TK
+
+@menu
+* Introduction and Setup::      
+* Using RamDebugger::           
+* Additional packages included in the distribution::  
+
+@detailmenu
+ --- The Detailed Node Listing ---
+
+Introduction and Setup
+
+* Introduction::                
+* Installation and prerequisites::  
+* Starting RamDebugger::        
+
+Using RamDebugger
+
+* Debugging locally::           
+* Debugging remotely::          
+* Timing control::              
+
+@end detailmenu
+@end menu
+
+@ifinfo
+CN @value{Version} @value{Date}
+@end ifinfo
+
+@node Introduction and Setup, Using RamDebugger, Top, Top
+@chapter Introduction and Setup
+
+@menu
+* Introduction::                
+* Installation and prerequisites::  
+* Starting RamDebugger::        
+@end menu
+
+@node Introduction, Installation and prerequisites, Introduction and Setup, Introduction and Setup
+@section Introduction
+
+RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK. It can operate
+basically in two modes:
+@itemize @bullet
+@item @b{GUI mode:} The normal one, is the one that appears when opening normally
+the program and has a Graphical User Interface.
+@item @b{Text mode:} In this mode, the GUI is not displayed and the debugger is
+executed as a set of text commands, similar to GDB. To use RamDebugger in this mode,
+load it inside Tkcon.
+@end itemize 
+With RamDebugger, it is possible to make @b{Local Debugging}, where the debugger starts
+the program to be debugged. and @b{Remote debugging}, where the program to debug is already
+started and RamDebugger connects to it.
+
+RamDebugger has additional capabilities like:
+@itemize @bullet
+@item Editing the code. It is possible to edit the code inside its own editor and resend
+the new code without closing the debugged program.
+@item The TCL-TK source code is colorized and supports automatic indentation.
+@item When stopping the debugger is one source code line, it is possible to view all the
+variables and expression values, as well as change them.
+@item It has additional options to measure execution times in the debugged program.
+@item Works in Linux and Windows
+@item Includes additional packages, like Tkcon and VisualRegexp, developed by third party
+people, as a convenience for RamDebugger users.
+@end itemize 
+
+
+@ifhtml
+<center>
+<table><tr>
+<td><img src="images/main_gui.gif"><td><img src="images/tkcon_gui.gif">
+<tr><td>GUI mode<td>Non GUI mode inside Tkcon
+</table>
+</center><p>
+@end ifhtml
+
+@node Installation and prerequisites, Starting RamDebugger, Introduction, Introduction and Setup
+@section Installation and prerequisites
+
+The only prerequisite before executing RamDebugger is to have Tcl-Tk installed. The tested
+version is Tcl-Tk 8.3.4
+It can be obtained from @url{http://tcl.activestate.com}.
+
+RamoDebugger has been tested on Windows and on Linux. For other UNIXes and MAC, it is necessary
+to obtain, separately, the package Tkhtml compiled for the platform. Without it, the help
+cannot be visualized.
+
+All the additional packages that RamDebugger uses, are already contained in the distribution.
+
+The distribution comes in a ZIP file. Once it is unpacked in one directory, RamDebugger is
+realy to begin to work.
+
+@node Starting RamDebugger,  , Installation and prerequisites, Introduction and Setup
+@section Starting RamDebugger
+
+To start RamDebugger on Windows, double-click over @b{RamDebugger.tcl}.
+
+To start Ramdebugger on UNIX, in the command line use something similar to:
+@b{wish RamDebugger.tcl}
+
+To start RamDebugger in text mode inside Tkcon, one of the following possibilities can
+be done:
+@itemize @bullet
+@item Open Tkcon and do:
+@example
+source RamDebugger.tcl
+namespace import RamDebugger::*
+rhelp
+@end example
+@item Modify the Tkcon initialization file (@t{tkcon.cfg} or @t{.tkconrc}) and add:
+@example
+set ::tkcon::OPT(slaveeval) {
+    source "<Path to RamDebugger>/RamDebugger.tcl"
+    namespace import RamDebugger::*
+    puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
+}
+@end example
+@end itemize 
+
+@node  Using RamDebugger, , Introduction and Setup, Top
+@chapter Using RamDebugger
+
+@menu
+* Debugging locally::           
+* Debugging remotely::          
+* Timing control::              
+@end menu
+
+@node Debugging locally, Debugging remotely, Using RamDebugger, Using RamDebugger
+@section Debugging locally
+
+To debug a TCL file locally, apply the following steps:
+
+@itemize @bullet
+@item Load the TCL file inside RamDebugger with @code{Files->Open file}. To make a test,
+use the example located in @b{<RamDebugger directory>/Examples/example1.tcl}
+@item Set a breakpoint in line 4 with @code{Debug->Set breakpoint} or press @b{F9} after
+having the cursor in the desired line.
+@item Start the debugger with @code{Debug->Go} or press @b{F5}. A grey arrow at the left
+of the text indicates that the program has stopped in that line.
+@item to continue one line, use @code{Debug->Next} or press @b{F10}.
+@item Use @code{Edit->Goto line->21} and press @code{Debug->Continue to}
+@item To see the value of one expression, open the window: @code{Debug->Expressions} and
+write: @code{[string length $i]+3}
+@item To modify the value of variable @b{i}, enter @b{i} in the left column of the @b{User
+defined variables}, enter the new value in the right column and pres @code{Return}.
+@end itemize 
+
+@node Debugging remotely, , Debugging locally, Using RamDebugger
+@section Debugging remotely
+
+To debug a TCL file remotely, apply the following steps:
+
+@itemize @bullet
+@item execute the external program outside of RamDebugger. In this case, execute 
+@b{Examples/example2.tcl} by double clicking over it or using @code{wish example2.tcl}
+@item Open RamDebugger
+@item Load the TCL file inside RamDebugger with @code{Files->Open file}. In this case,
+use the example located in @b{<RamDebugger directory>/Examples/example2.tcl}
+@item Set a breakpoint in line 29 with @code{Debug->Set breakpoint} or press @b{F9} after
+having the cursor in the desired line.
+@item Start debugging remotely with @b{File->Debug on->example2}
+@item Press button @b{Go} in the remote application
+@item Program should stop in line 29. From now, it is possible to use similar commands
+than in local debugging (@pxref{Debugging locally})
+@end itemize
+
+To debug remotely, in Windows it is necessary to load the package @t{comm} in the remote
+program. To do so use something similar to:
+@example
+    lappend ::auto_path <RamDebugger path>/addons
+    package require commR
+    comm::register application_name 1
+@end example
+@strong{Note:} The package @t{commR} included in RamDebugger is based on the package @b{comm} 
+in tcllib with some modifications. Use always @b{commR} instead of @b{comm}
+
+In Linux/Unix, the communication is made with the command @b{send}, So, it is only necessary
+to have this command enabled in the program, which is true by default.
+@strong{Note:} It can be necessary to check the security of the server in Unix before being
+able to use @b{send}. As a fast workaround, write command @b{xhost -} in the UNIX command
+line.
+
+@node Timing control,  , Debugging remotely, Using RamDebugger
+@section Timing control
+An additional feature of RamDebugger is the possibility of controlling the computing time
+of several parts of the program.
+
+To proceed with the control of time, make the following steps:
+
+@itemize @bullet
+@item Load the TCL file inside RamDebugger with @code{Files->Open file}. In this case,
+use the example located in @b{<RamDebugger directory>/Examples/example3.tcl}
+@item Open window @code{Debug->Timing control}
+@item Create a first block with name @b{Block 1}, initial line @b{26} and end line @b{27}.
+@item Create another block with name @b{Block 2}, initial line @b{26} and end line @b{26}.
+@item Create another block with name @b{Block 3}, initial line @b{27} and end line @b{27}.
+@item Press button @b{Start} and select @code{Files->Debug on->Currentfile}.
+@item Check the report with button @b{Report}
+@end itemize
+
+
+
+@ifhtml
+<center>
+<table><tr>
+<td><img src="images/timing_control.gif"><td><img src="images/timing_control_report.gif">
+<tr><td>Timing control window<td>Timing control report
+</table>
+</center><p>
+@end ifhtml
+
+@node
+@chapter How does it work?
+
+ 
+
+
+@node Additional packages included in the distribution,  , Using RamDebugger, Top
+@chapter Additional packages included in the distribution
+
+RamDebugger needs sevral packages to work properly. Other packages are just included
+to give additional functionality to the user. All the needed packages are included
+in the distribution as a convenience to the final user.
+
+Some of the packages have been modified, either to fix some errors or to improve
+some capabilities. The packages that have been modified are marked below.
+
+@multitable @columnfractions .3 .3 .2 .2
+
+@item @b{Package}
+@tab @b{Author}
+@tab @b{License}
+@tab @b{Modified}
+
+@item tkcon 
+@tab Jeffrey Hobbs 
+@tab BSD 
+@tab NO
+@item comm 
+@tab Open Group Res. Ins. 
+@tab  BSD 
+@tab YES
+@item BWidgets 
+@tab Unifix 
+@tab BSD 
+@tab YES
+@item dialogwin  
+@tab RAMSAN 
+@tab BSD 
+@tab NO
+@item helpviewer 
+@tab RAMSAN 
+@tab BSD 
+@tab NO
+@item supergrid  
+@tab RAMSAN 
+@tab BSD 
+@tab NO
+@item supertext  
+@tab Bryan Oakley 
+@tab FREE SOFT 
+@tab YES
+@item tablelist  
+@tab Csaba Nemethi 
+@tab FREE SOFT 
+@tab  NO
+@item visual regexp 
+@tab Laurent Riesterer 
+@tab GPL 
+@tab NO
+@end multitable
+
+@node 
+@chapter License
+
+@example
+This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
+The following terms apply to all files associated
+with the software unless explicitly disclaimed in individual files.
+
+The authors hereby grant permission to use, copy, modify, distribute,
+and license this software and its documentation for any purpose, provided
+that existing copyright notices are retained in all copies and that this
+notice is included verbatim in any distributions. No written agreement,
+license, or royalty fee is required for any of the authorized uses.
+Modifications to this software may be copyrighted by their authors
+and need not follow the licensing terms described here, provided that
+the new terms are clearly indicated on the first page of each file where
+they apply.
+
+IN NO EVENT SHALL THE AUTHORS OR DISTRIBUTORS BE LIABLE TO ANY PARTY
+FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES
+ARISING OUT OF THE USE OF THIS SOFTWARE, ITS DOCUMENTATION, OR ANY
+DERIVATIVES THEREOF, EVEN IF THE AUTHORS HAVE BEEN ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+
+THE AUTHORS AND DISTRIBUTORS SPECIFICALLY DISCLAIM ANY WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.  THIS SOFTWARE
+IS PROVIDED ON AN "AS IS" BASIS, AND THE AUTHORS AND DISTRIBUTORS HAVE
+NO OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR
+MODIFICATIONS.
+
+GOVERNMENT USE: If you are acquiring this software on behalf of the
+U.S. government, the Government shall have only "Restricted Rights"
+in the software and related documentation as defined in the Federal 
+Acquisition Regulations (FARs) in Clause 52.227.19 (c) (2).  If you
+are acquiring the software on behalf of the Department of Defense, the
+software shall be classified as "Commercial Computer Software" and the
+Government shall have only "Restricted Rights" as defined in Clause
+252.227-7013 (c) (1) of DFARs.  Notwithstanding the foregoing, the
+authors grant the U.S. Government and others acting in its behalf
+permission to use and distribute the software in accordance with the
+terms specified in this license. 
+@end example
+
+@iftex
+@headings off
+@end iftex
+@contents
+@bye
+
