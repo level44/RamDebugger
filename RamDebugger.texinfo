@@ -58,11 +58,11 @@
 
 @set photo
 
-@set Version 4.0
-@set Date June 2004
+@set Version 4.1
+@set Date July 2004
 @set Copyright 2002-2004 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.24 $
+@set CVSVersion  $Revision: 1.25 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -190,19 +190,23 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
-Implemented secondary view in the Editor
-Implemented auto save, based on file revisions
-New inline file chooser to fast change views
-RamDebugger can automatically manage revisions of files (based internally on CVS)
-Added program @code{tkdiff} for visualizing file differences
-New option in Help to associate RamDebugger as command in the .tcl extension in Windows
-When TCL raises and error, RamDebugger shows last visited line
-If files contain, in first lines something like @code{# -*- coding: utf-8;-*-} they are
+Changes From version 3.2 to version 4.1
+
+@itemize @bullet
+@item Implemented secondary view in the Editor
+@item Implemented auto save, based on file revisions
+@item New inline file chooser to fast change buffers
+@item RamDebugger can automatically manage revisions of files (based internally on CVS)
+@item Added program @code{tkdiff} for visualizing file differences
+@item New option in Help to associate RamDebugger as command in the .tcl extension in Windows
+@item When TCL raises and error, RamDebugger shows last visited line
+@item If files contain, in first lines something like @code{# -*- coding: utf-8;-*-} they are
 considered as in utf-8 encoding
-RamDebugger works only for TCL version 8.4
-Open file and save file browser follow the preferences extensions for file types
-Added new macro for going to function names
-Corrections for when several pop-up windows appear at the same time
+@item RamDebugger works only for TCL version 8.4
+@item Open file and save file browser follow the preferences extensions for file types
+@item Added new macro for going to function names
+@item Corrections for when several pop-up windows appear at the same time
+@end itemize
 
 Changes From version 3.1 to version 3.2
 

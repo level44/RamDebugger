@@ -46,6 +46,22 @@ for details.
 Changes
 =======
 
+Changes From version 3.2 to version 4.1
+
+   * Implemented secondary view in the Editor
+   * Implemented auto save, based on file revisions
+   * New inline file chooser to fast change buffers
+   * RamDebugger can automatically manage revisions of files (based internally on CVS)
+   * Added program `tkdiff' for visualizing file differences
+   * New option in Help to associate RamDebugger as command in the .tcl extension in Windows
+   * When TCL raises and error, RamDebugger shows last visited line
+   * If files contain, in first lines something like `# -*- coding:
+     utf-8;-*-' they are considered as in utf-8 encoding
+   * RamDebugger works only for TCL version 8.4
+   * Open file and save file browser follow the preferences extensions for file types
+   * Added new macro for going to function names
+   * Corrections for when several pop-up windows appear at the same time
+     
 Changes From version 3.1 to version 3.2
 
    * Added Snit support
@@ -54,20 +70,18 @@ Changes From version 3.1 to version 3.2
    * Added command stop in the Debug menu
    * Added command to break execution in any moment
    * Added zoom option to Display Windows hierarchy
-   * The cache directory (used internally by RamDebugger) is now created in
-     the user directories instead of inside the installation directory
+   * The cache directory (used internally by RamDebugger) is now created in the user directories instead of inside the installation directory
    * Option Pick window in Windows hierarchy
    * It is necessary to stop debugging before start debugging again
 
- Changes From version 3.0 to version 3.1
+Changes From version 3.0 to version 3.1
 
    * GiD customization files
    * User can choose file extensions for every file type
    * New macro for applying regsub to a region
-   * New option in @b{Current file arguments}: file type can be @b{TCL} or @b{TK}
-   * New option in @b{Current file arguments}: Another file can be started to begin local debugging
+   * New option in Current file arguments: file type can be TCL or TK
+   * New option in Current file arguments: Another file can be started to begin local debugging
    * RamDebugger::OpenFileSaveHandler
-
 
 Changes From version 2.8 to version 3.0
 
@@ -102,7 +116,7 @@ Changes From version 2 to version 2.6
 
 Changes From version 1 to version 2
 
-   * Tested for Tcl/Tk 8.3.4 and 8.4
+   * Tested for Tcl/Tk 8.4
    * When Tkhtml is not compiled for the given platform, gives message and continues
    * Added contextual help for programming commands. If there are
      manual pages (UNIX), it also uses them if man2html is found in
@@ -120,18 +134,21 @@ web page
 
 RamDebugger web page is at: `http://gid.cimne.com/RamDebugger'
 
+
 Download
 ========
 
 RamDebugger can be download from
-`http://gid.cimne.com/RamDebugger/RamDebugger3.2.zip'
+`http://gid.cimne.com/RamDebugger/RamDebugger4.1.zip'
+`http://gid.cimne.com/RamDebugger/RamDebugger4.1.kit'
+
 
 Installation and prerequisites
 ==============================
 
 The only prerequisite before executing RamDebugger is to have Tcl-Tk
-installed. The tested version are Tcl-Tk 8.3.4 and 8.4 They can be
-obtained from `http://tcl.activestate.com'.
+installed. The tested version is Tcl-Tk8.4 They can be obtained from
+`http://tcl.activestate.com'.
 
 RamDebugger has been tested on Windows and on Linux. For other UNIXes
 and MAC, it is necessary to obtain, separately, the package Tkhtml
@@ -162,15 +179,14 @@ Installation and prerequisites::.
 
 To start RamDebugger in text mode inside Tkcon, one of the following
 possibilities can be done:
+   * Open Tkcon and do:
+          source RamDebugger.tcl
+          namespace import RamDebugger::*
+          rhelp
+   * Modify the Tkcon initialization file (tkcon.cfg or .tkconrc) and add:
 
-Open Tkcon and do:
-     source RamDebugger.tcl
-     namespace import RamDebugger::*
-     rhelp
-
-Modify the Tkcon initialization file (tkcon.cfg or .tkconrc) and add:
-
-   set ::tkcon::OPT(slaveeval) {
-       source "<Path to RamDebugger>/RamDebugger.tcl"
-       namespace import RamDebugger::*
-       puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
+             set ::tkcon::OPT(slaveeval) {
+                 source "<Path to RamDebugger>/RamDebugger.tcl"
+                 namespace import RamDebugger::*
+                 puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
+             }

@@ -136,6 +136,7 @@ set auto_index(::RamDebugger::Instrumenter::DoWorkForGiDData) [list source [file
 set {auto_index(To upper)} [list source [file join $dir Macros_default.tcl]]
 set {auto_index(To lower)} [list source [file join $dir Macros_default.tcl]]
 set {auto_index(Insert rectangular text)} [list source [file join $dir Macros_default.tcl]]
+set {auto_index(Kill rectangular text)} [list source [file join $dir Macros_default.tcl]]
 set {auto_index(Macro regsub)} [list source [file join $dir Macros_default.tcl]]
 set {auto_index(Comment header)} [list source [file join $dir Macros_default.tcl]]
 set {auto_index(Go to proc)} [list source [file join $dir Macros_default.tcl]]
