@@ -76,8 +76,8 @@ proc "Insert rectangular text" { w } {
     if { $l2 < $l1 } { set tmp $l1 ; set l1 $l2 ; set l2 $tmp }
 
     for { set i $l1 } { $i <= $l2 } { incr i } {
-        $w delete $i.$c1 $i.$c2
-        $w insert $i.$c1 $txt
+	$w delete $i.$c1 $i.$c2
+	$w insert $i.$c1 $txt
     }
 }
 
@@ -99,7 +99,7 @@ proc "Kill rectangular text" { w } {
     if { $l2 < $l1 } { set tmp $l1 ; set l1 $l2 ; set l2 $tmp }
 
     for { set i $l1 } { $i <= $l2 } { incr i } {
-        $w delete $i.$c1 $i.$c2
+	$w delete $i.$c1 $i.$c2
     }
 }
 
@@ -116,8 +116,8 @@ proc "Macro regsub" { w } {
 
     set range [$w tag nextrange sel 1.0 end]
     if { $range == "" } { 
-        WarnWin "Select a region to modify"
-        return
+	WarnWin "Select a region to modify"
+	return
     }
 
     set f [DialogWin::Init $w "Macro regsub" separator ""]
@@ -141,8 +141,8 @@ proc "Macro regsub" { w } {
     set sel [eval $w get $range]
     set err [catch { eval $reg } errstring]
     if { $err } {
-        WarnWin "Error applying regsub: $errstring"
-        return
+	WarnWin "Error applying regsub: $errstring"
+	return
     }
     eval $w delete $range
     $w insert [lindex $range 0] $sel
@@ -180,77 +180,85 @@ proc "Go to proc" { w } {
     set procs ""
     set numline 1
     foreach line [split [$w get 1.0 end-1c] \n] {
-        set types {proc|method|constructor|onconfigure|snit::type|snit::widget|snit::widgetadaptor}
+	set types {proc|method|constructor|onconfigure|snit::type|snit::widget|snit::widgetadaptor}
 
-        if { [regexp "^\\s*(?:::)?($types)\\s+(\[\\w:]+)" $line {} type name] } {
-            lappend procs [list $name $type $numline]
-        }
-        incr numline
+	if { [regexp "^\\s*(?:::)?($types)\\s+(\[\\w:]+)" $line {} type name] } {
+	    set namespace ""
+	    regexp {(.*)::([^:]+)} $name {} namespace name
+	    lappend procs [list $name $namespace $type $numline]
+	}
+	incr numline
     }
     
     set f [DialogWin::Init $w "Go to proc" separator]
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     
     set DialogWin::user(list) [tablelist::tablelist $sw.lb -width 55\
-            -exportselection 0 \
-        -columns [list \
-                25  "Proc name"        left \
-                10  "Proc type"        center \
-                5  "line"     right \
-                ] \
-            -labelcommand tablelist::sortByColumn \
-            -background white \
-            -selectbackground navy -selectforeground white \
-            -stretch 0 -selectmode browse \
-            -highlightthickness 0]
-        
+	    -height 35 -exportselection 0 \
+	-columns [list \
+		20  "Proc name"        left \
+		14  "Proc namespace"   left \
+		10  "Proc type"        center \
+		5  "line"     right \
+		] \
+	    -labelcommand tablelist::sortByColumn \
+	    -background white \
+	    -selectbackground navy -selectforeground white \
+	    -stretch "" -selectmode browse \
+	    -highlightthickness 0]
+    
     $sw setwidget $DialogWin::user(list)
+    $DialogWin::user(list) columnconfigure 0 -sortmode dictionary
+    $DialogWin::user(list) columnconfigure 1 -sortmode dictionary
+    $DialogWin::user(list) columnconfigure 2 -sortmode dictionary
+    $DialogWin::user(list) columnconfigure 3 -sortmode integer
+
     foreach i $procs {
-        $DialogWin::user(list) insert end $i
-        if { [string match *snit* [lindex $i 1]] } {
-            $DialogWin::user(list) rowconfigure end -background orange
-        }
+	$DialogWin::user(list) insert end $i
+	if { [string match *snit* [lindex $i 2]] } {
+	    $DialogWin::user(list) rowconfigure end -background orange
+	}
     }
     $DialogWin::user(list) selection set 0
     $DialogWin::user(list) activate 0
 
     bind [$DialogWin::user(list) bodypath] <Double-1> {
-        DialogWin::InvokeOK
+	DialogWin::InvokeOK
     }
     bind [$DialogWin::user(list) bodypath] <Return> {
-        DialogWin::InvokeOK
+	DialogWin::InvokeOK
     }
     bind [$DialogWin::user(list) bodypath] <KeyPress> {
-        set w [winfo parent %W]
-        set idx [$w index active]
-        if { [string is wordchar -strict %A] } {
-            if { ![info exists ::searchstring] } { set ::searchstring "" }
-            if { ![string equal $::searchstring %A] } {
-                append ::searchstring %A
-            }
-            set found 0
-            for { set i [expr {$idx+1}] } { $i < [$w index end] } { incr i } {
-                if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
-                    set found 1
-                    break
-                }
-            }
-            if { !$found } {
-                for { set i 0 } { $i < $idx } { incr i } {
-                    if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
-                        set found 1
-                        break
-                    }
-                }
-            }
-            if { $found } {
-                $w selection clear 0 end
-                $w selection set $i
-                $w activate $i
-                $w see $i
-            }
-            after 500 unset -nocomplain ::searchstring
-        }
+	set w [winfo parent %W]
+	set idx [$w index active]
+	if { [string is wordchar -strict %A] } {
+	    if { ![info exists ::searchstring] } { set ::searchstring "" }
+	    if { ![string equal $::searchstring %A] } {
+		append ::searchstring %A
+	    }
+	    set found 0
+	    for { set i [expr {$idx+1}] } { $i < [$w index end] } { incr i } {
+		if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
+		    set found 1
+		    break
+		}
+	    }
+	    if { !$found } {
+		for { set i 0 } { $i < $idx } { incr i } {
+		    if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
+		        set found 1
+		        break
+		    }
+		}
+	    }
+	    if { $found } {
+		$w selection clear 0 end
+		$w selection set $i
+		$w activate $i
+		$w see $i
+	    }
+	    after 500 unset -nocomplain ::searchstring
+	}
     }
     supergrid::go $f
     focus $sw.lb
@@ -258,12 +266,12 @@ proc "Go to proc" { w } {
     set action [DialogWin::CreateWindow]
 
     if { $action == 1 } {
-        set curr [$DialogWin::user(list) curselection]
-        if { [llength $curr] != 1 } { return }
-        set line [lindex [$DialogWin::user(list) get $curr] 2]
-        $w mark set insert $line.0
-        $w see $line.0
-        focus $w
+	set curr [$DialogWin::user(list) curselection]
+	if { [llength $curr] != 1 } { return }
+	set line [lindex [$DialogWin::user(list) get $curr] 2]
+	$w mark set insert $line.0
+	$w see $line.0
+	focus $w
     }
     DialogWin::DestroyWindow
 }

@@ -170,7 +170,7 @@ proc RamDebugger::CreateImages {} {
 	NQ0KqSBEZXZlbENvciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQu
 	DQpodHRwOi8vd3d3LmRldmVsY29yLmNvbQA7
     }
-    image create photo fileopen-22 -data {
+    image create photo fileopen22 -data {
 	R0lGODlhFgAWAIYAAPwCBAQCBCQWDCwaDDwmFPSubPzGhPzCfPy2dOSmZPzK
 	lPzSnPzOlPzKjBQODPzChPzWnPy2bPSmXPyuZOyeXIRSLEQuFEwyHEQqFDQi
 	FCweDKRuPFRSTPT29PTy9Ozq7OTi3Nze3NTW1MzOzMTGxMTCxLy6tLSytKyu

@@ -341,7 +341,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     supergrid::go $f
 
     tkTabToWindow $f.e1
-    bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
+    $DialogWinTop::user($w,combo) bind <Return> "DialogWinTop::InvokeOK $f ; break"
     $DialogWinTop::user($w,textv) conf -state disabled
     bind $DialogWinTop::user($w,textv) <1> "focus $DialogWinTop::user($w,textv)"
 
@@ -637,7 +637,7 @@ proc RamDebugger::PreferencesWindow {} {
     
     set f [$fb.nb insert end basic -text "Basic"]
 
-    TitleFrame $f.f1 -text [_ debugging] -grid 0
+    TitleFrame $f.f1 -text [_ debugging] -grid "0 nsew"
     set f1 [$f.f1 getframe]
 
     if { $::tcl_platform(platform) == "windows" } {
@@ -720,7 +720,7 @@ proc RamDebugger::PreferencesWindow {} {
        -width 4 -grid "1 2 px3"
     set DialogWin::user(indentsizeC++) $options(indentsizeC++)
 
-    TitleFrame $f.f2 -text [_ fonts] -grid 0
+    TitleFrame $f.f2 -text [_ fonts] -grid "0 nsew"
     set f2 [$f.f2 getframe]
     
     foreach "but type fontname" [list $f2.b1 {GUI font} NormalFont $f2.b2 {Text font} FixedFont \
@@ -733,7 +733,7 @@ proc RamDebugger::PreferencesWindow {} {
 
     set fde [$fb.nb insert end extensions -text "Extensions"]
 
-    TitleFrame $fde.f1 -text "extensions" -grid "0 n"
+    TitleFrame $fde.f1 -text "extensions" -grid "0 nsew"
     set fde1 [$fde.f1 getframe]
 
     label $fde1.ll -text "Choose extensions for every file type:" -grid "0 2 w"
@@ -757,7 +757,7 @@ proc RamDebugger::PreferencesWindow {} {
 
     set fd [$fb.nb insert end directories -text "Directories"]
 
-    TitleFrame $fd.f1 -text "executable directories" -grid 0
+    TitleFrame $fd.f1 -text "executable directories" -grid "0 nsew"
     set fd1 [$fd.f1 getframe]
 
     set sw [ScrolledWindow $fd1.lf -relief sunken -borderwidth 0]
@@ -2050,17 +2050,19 @@ proc RamDebugger::SearchInFiles {} {
 # Search
 ################################################################################
 
-proc RamDebugger::SearchWindow_autoclose {} {
+proc RamDebugger::SearchWindow_autoclose { { force "" } } {
     variable options
     variable SearchToolbar
     variable mainframe
+    variable text
 
-    if { ![info exists options(SearchToolbar_autoclose)] ||
-	!$options(SearchToolbar_autoclose) } { return }
+    if { $force eq "" && (![info exists options(SearchToolbar_autoclose)] ||
+	!$options(SearchToolbar_autoclose)) } { return }
 
     if { [info exists SearchToolbar] && [lindex $SearchToolbar 0] } {
 	$mainframe showtoolbar 1 0
 	lset SearchToolbar 0 0
+	if { [focus] ne $text } { focus $text }
     }
 }
 
@@ -2152,6 +2154,11 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     label $f.l1 -text "Search:"
     ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs)
 
+    set cmd "$f.e1 configure -values \$RamDebugger::options(old_searchs)"
+    trace add variable ::RamDebugger::options(old_searchs) write "$cmd ;#"
+    bind $f.e1 <Destroy> [list trace remove variable \
+	    ::RamDebugger::options(old_searchs) write "$cmd ;#"]
+
     set f2 [frame $f.f2 -bd 1 -relief ridge]
     radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
 	-value -exact
@@ -2202,6 +2209,7 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	label $f.l11 -text "Replace:"
 	ComboBox $f.e11 -textvariable ::RamDebugger::replacestring \
 	    -values $options(old_replaces)
+	raise $f.e11 $f2.r1
 	frame $f.buts
 	
 	set ic 0
@@ -2253,8 +2261,10 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     tkTabToWindow $f.e1
     if { !$replace } {
 	$f.e1 bind <Return> "RamDebugger::Search $w begin 0 $f"
+	$f.e1 bind <Escape> [list RamDebugger::SearchWindow_autoclose force]
     } else {
 	$f.e1 bind <Return> "RamDebugger::SearchReplace $w replace"
+	$f.e1 bind <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
 	$f.e11 bind <Return> "RamDebugger::SearchReplace $w replace ; break"
 	$f.e11 bind <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
 	bind $f.l11 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
@@ -2263,6 +2273,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	$f.e11 bind <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
 	$f.e11 bind <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
 	$f.e11 bind <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
+	$f.e1 bind <Escape> [list RamDebugger::SearchWindow_autoclose force]
+	$f.e11 bind <Escape> [list RamDebugger::SearchWindow_autoclose force]
     }
 
     if { $istoplevel } {
@@ -2276,6 +2288,10 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 
 proc RamDebugger::SearchReplace { w what args } {
     variable text
+    variable searchstring
+    variable replacestring
+    variable searchmode
+    variable searchcase
 
     switch $what {
 	beginreplace {
@@ -2286,15 +2302,24 @@ proc RamDebugger::SearchReplace { w what args } {
 		Search $w beginreplace
 	    } else {
 		foreach "idx1 idx2" [$text tag ranges search] break
-		set txt $::RamDebugger::replacestring
-		if { $::RamDebugger::searchmode == "-regexp" } {
-		    if { $::RamDebugger::searchcase } {
-		        regsub $::RamDebugger::searchstring [$text get $idx1 $idx2] \
-		            $::RamDebugger::replacestring txt
+		set txt $replacestring
+		if { $searchmode == "-regexp" } {
+		    if { $searchcase } {
+		        regsub $searchstring [$text get $idx1 $idx2] \
+		            $replacestring txt
 		    } else {
-		        regsub -nocase $::RamDebugger::searchstring [$text get $idx1 $idx2] \
-		            $::RamDebugger::replacestring txt
+		        regsub -nocase $searchstring [$text get $idx1 $idx2] \
+		            $replacestring txt
 		    }
+		} elseif { !$searchcase && \
+		    [string tolower $searchstring] eq $searchstring && \
+		    [string tolower $replacestring] eq $replacestring } {
+		    
+		    set otxt [$text get $idx1 $idx2]
+		    switch -- $otxt \
+		        [string tolower $otxt] { set txt [string tolower $txt] } \
+		        [string toupper $otxt] { set txt [string toupper $txt] } \
+		        [string totitle $otxt] { set txt [string totitle $txt] }
 		}
 		$text delete $idx1 $idx2
 		$text insert $idx1 $txt
@@ -2309,15 +2334,24 @@ proc RamDebugger::SearchReplace { w what args } {
 		}
 		if { [llength [$text tag ranges search]] == 0 } { return }
 		foreach "idx1 idx2" [$text tag ranges search] break
-		set txt $::RamDebugger::replacestring
-		if { $::RamDebugger::searchmode == "-regexp" } {
-		    if { $::RamDebugger::searchcase } {
-		        regsub $::RamDebugger::searchstring [$text get $idx1 $idx2] \
-		            $::RamDebugger::replacestring txt
+		set txt $replacestring
+		if { $searchmode == "-regexp" } {
+		    if { $searchcase } {
+		        regsub $searchstring [$text get $idx1 $idx2] \
+		            $replacestring txt
 		    } else {
-		        regsub -nocase $::RamDebugger::searchstring [$text get $idx1 $idx2] \
-		            $::RamDebugger::replacestring txt
+		        regsub -nocase $searchstring [$text get $idx1 $idx2] \
+		            $replacestring txt
 		    }
+		} elseif { !$searchcase && \
+		    [string tolower $searchstring] eq $searchstring && \
+		    [string tolower $replacestring] eq $replacestring } {
+
+		    set otxt [$text get $idx1 $idx2]
+		    switch -- $otxt \
+		        [string tolower $otxt] { set txt [string tolower $txt] } \
+		        [string toupper $otxt] { set txt [string toupper $txt] } \
+		        [string totitle $otxt] { set txt [string totitle $txt] }
 		}
 		$text delete $idx1 $idx2
 		$text insert $idx1 $txt
@@ -3039,6 +3073,10 @@ proc RamDebugger::PositionsStack { what args } {
 		}
 		incr ipos
 	    }
+	    if { [llength $options(saved_positions_stack)] > 14 } {
+		set options(saved_positions_stack) [lrange \
+		        $options(saved_positions_stack) 0 13]
+	    }
 	    set idx $line.0
 	    set procname ""
 	    regexp -all -line {^\s*(?:proc|method)\s+(\S+)} [$text get \
@@ -3234,6 +3272,7 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
     }
     if { [llength $commands] } {
 	$menu add separator
+	DynamicHelp::register $menu menu [$mainframe cget -textvariable]
 	foreach i $commands {
 	    $menu add command -label $i -command [list RamDebugger::Macros::$i $text]
 	    if { [info exists Macros::macrodata($i,accelerator)] && \
@@ -3246,7 +3285,6 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
 		bind all $Macros::macrodata($i,accelerator) [list $menu invoke [$menu index end]]
 	    }
 	    if { [info exists Macros::macrodata($i,help)] && $Macros::macrodata($i,help) != "" } {
-		DynamicHelp::register $menu menu [$mainframe cget -textvariable]
 		DynamicHelp::register $menu menuentry [$menu index end] $Macros::macrodata($i,help)
 	    }
 	}

@@ -649,7 +649,7 @@ proc cproject::Create { par } {
 
     focus $f1.cb1
 
-    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "4 w"]
+    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "4 nw"]
     $bbox add -image filenew16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Create new project"] \
@@ -699,7 +699,7 @@ proc cproject::Create { par } {
 
     set pane1 [$pw add -weight $weight1]
 
-    set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0 -grid "0"]
+    set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0]
     set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 -height 20\
 	    -exportselection 0 \
 	    -columns [list \
@@ -719,7 +719,7 @@ proc cproject::Create { par } {
 
     bind [$sw.lb bodypath] <1> "focus $sw.lb"
 
-    set bbox [ButtonBox $pane1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 wn py3"]
+    set bbox [ButtonBox $pane1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
     $bbox add -image fileopen16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Add file to project"] \
@@ -740,6 +740,11 @@ proc cproject::Create { par } {
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "View file"] \
 	 -command "cproject::AddModFiles $sw.lb view"
+
+    grid $sw -sticky nsew
+    grid $bbox -sticky nw -pady 3
+    grid columnconfigure $pane1 0 -weight 1
+    grid rowconfigure $pane1 0 -weight 1
 
     bind [$DialogWinTop::user($w,list) bodypath] <ButtonPress-3> \
 	[bind TablelistBody <ButtonPress-1>]
@@ -843,7 +848,6 @@ proc cproject::Create { par } {
     $pane2.nb compute_size
     $pane2.nb raise compilation
  
-    supergrid::go $pane1
     supergrid::go $f1215
     supergrid::go $f122
     supergrid::go $f123

@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.44 2004/08/12 13:27:56 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.45 2004/10/26 12:59:07 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2004
 
 package require Tcl 8.4
@@ -9,6 +9,7 @@ package require Tcl 8.4
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
     # that the following line out if you want to run without GUI
+    interp eval local [list load {} Tk]
     package require Tk 8.4
 }
 
@@ -140,6 +141,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     variable options_def
     variable options
     variable readwriteprefs $_readwriteprefs
+    variable iswince
 
     if { [info exists ::freewrap::scriptFile] } {
 	set dir $::argv0
@@ -158,6 +160,10 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	catch { tk_messageBox -message $text }
     }
 
+    if { [info command winfo] ne "" && [winfo screenwidth .] < 300 } {
+	set iswince 1
+    } else { set iswince 0 }
+
     lappend ::auto_path [file join $MainDir addons]
     lappend ::auto_path [file join $MainDir scripts]
 
@@ -168,13 +174,19 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    package require registry
 	    set key {HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion}
 	    append key {\Explorer\Shell Folders}
-	    set AppDataDir [file join [registry get $key AppData] RamDebugger]
+	    set err [catch { registry get $key AppData } AppData]
+	    if { !$err } {
+		set AppDataDir [file join [registry get $key AppData] RamDebugger]
+	    } else {
+		set AppDataDir [file join $::env(HOME) .RamDebugger]
+	    }
 	}
     } else {
 	set AppDataDir [file join $::env(HOME) .RamDebugger]
     }
 
-    if { [auto_execok cvs] eq "" && $::tcl_platform(platform) eq "windows" } {
+    if { [auto_execok cvs] eq "" && $::tcl_platform(platform) eq "windows" && \
+	!$iswince} {
 	set exe [file join $AppDataDir exe]
 	if { ![file exists $exe] } {
 	    file mkdir $exe
@@ -223,15 +235,29 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(debugrelease) debug
     set options_def(ViewLocalVariables) 1
     set options_def(saved_positions_stack) ""
+    set options_def(showstatusbar) 1
+    set options_def(showbuttonstoolbar) 1
 
     switch $::tcl_platform(platform) {
 	windows {
-	    set options_def(NormalFont) { -family "MS Sans Serif" -size 8 -weight normal \
-		-slant roman -underline 0 -overstrike 0 }
-	    set options_def(FixedFont)  { -family "Courier" -size 8 -weight normal \
-		-slant roman -underline 0 -overstrike 0 }
-	    set options_def(HelpFont)  { -family "Helvetica" -size 11 -weight normal \
-		-slant roman -underline 0 -overstrike 0 }
+	    if { $iswince } {
+		# Wince
+		set options_def(NormalFont) { -family "Tahoma" -size 7 -weight normal \
+		    -slant roman -underline 0 -overstrike 0 }
+		set options_def(FixedFont)  { -family "Courier" -size 7 -weight normal \
+		    -slant roman -underline 0 -overstrike 0 }
+		set options_def(HelpFont)  { -family "Helvetica" -size 7 -weight normal \
+		    -slant roman -underline 0 -overstrike 0 }
+		set options_def(showstatusbar) 0
+		set options_def(ViewOnlyTextOrAll) OnlyText
+	    } else {
+		set options_def(NormalFont) { -family "MS Sans Serif" -size 8 -weight normal \
+		    -slant roman -underline 0 -overstrike 0 }
+		set options_def(FixedFont)  { -family "Courier" -size 8 -weight normal \
+		    -slant roman -underline 0 -overstrike 0 }
+		set options_def(HelpFont)  { -family "Helvetica" -size 11 -weight normal \
+		    -slant roman -underline 0 -overstrike 0 }
+	    }
 	}
 	default {
 	    set options_def(NormalFont) { -family "new century schoolbook" -size 12 \
@@ -2799,7 +2825,8 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	set width [winfo width $fulltext]
 
 	if { [info exist pane3] && [winfo width $pane3] <= 1 } {
-	    set panedw [winfo parent [winfo parent $pane3]] ;# dirty hack
+	    set panedw [FindPanedWindowFromPane $pane3]
+	    #set panedw [winfo parent [winfo parent $pane3]] ;# dirty hack
 	    foreach "weight2 weight3" [ManagePanes $panedw h "6 2"] break
 	    set w3 [expr int($weight3/double($weight2)*$width+0.5)]
 	    incr width $w3
@@ -3288,6 +3315,10 @@ proc RamDebugger::OpenFileF { file { force 0 } { UserNumLine -1 } } {
     }
     ManagePositionsImages
     WaitState 0
+    if { [focus -lastfor $text] eq $text || \
+	[focus -lastfor $text] eq [winfo toplevel $text] } {
+	focus -force $text
+    }
     return 0
 }
 
@@ -4125,8 +4156,8 @@ proc RamDebugger::ActualizeViewMenu { menu } {
     variable text
     variable currentfile
 
-    if { [$menu index end] > 4 } {
-	$menu del 5 end
+    if { [$menu index end] > 7 } {
+	$menu del 8 end
     }
 
     $menu add command -label "Previus" -acc "Alt-Left" -command \
@@ -5951,14 +5982,19 @@ proc RamDebugger::DynamicHelpInEntryWithVar { entry } {
     trace var $var w "_DynamicHelpInEntryWithVar $entry ;#"
 }
 
+proc RamDebugger::FindPanedWindowFromPane { pane } {
+
+    while 1 {
+	set pane [winfo parent $pane]
+	if { [string tolower [winfo class $pane]] eq "panedwindow" } { break }
+    }
+    return $pane
+}
+
 proc RamDebugger::CreatePanedEntries { num pane1 pane2 suffix } {
     variable EvalEntries
 
-    set panew $pane1
-    while 1 {
-	set panew [winfo parent $panew]
-	if { [winfo class $panew] == "PanedWindow" } { break }
-    }
+    set panew [FindPanedWindowFromPane $pane1]
 
     for { set i 0 } { $i < $num } { incr i } {
 	if { [winfo exists $pane1.e$i] } { continue }
@@ -6172,7 +6208,7 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 	MainFrame::_create_menubar $mainframe $descmenu_new
 	
 	set menu [$mainframe getmenu activeprograms]
-	$menu configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu]
+	#$menu configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu]
 
 	set menu [$mainframe getmenu view]
 	$menu configure -postcommand [list RamDebugger::ActualizeViewMenu $menu]
@@ -6383,6 +6419,34 @@ proc RamDebugger::ExtractExamplesDir {} {
     SetMessage "Copied examples directory into directory '$dir'"
 }
 
+proc RamDebugger::ShowStatusBar {} {
+    variable mainframe
+    variable options
+
+    switch $options(showstatusbar) {
+	1 {
+	    $mainframe showstatusbar progression
+	}
+	0 {
+	    $mainframe showstatusbar none
+	}
+    }
+}
+
+proc RamDebugger::ShowButtonsToolBar {} {
+    variable mainframe
+    variable options
+
+    switch $options(showbuttonstoolbar) {
+	1 {
+	    $mainframe showtoolbar 0 1
+	}
+	0 {
+	    $mainframe showtoolbar 0 0
+	}
+    }
+}
+
 
 proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } { topleveluse "" } } {
     variable options
@@ -6405,6 +6469,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable pane1
     variable pane2
     variable pane3
+    variable iswince
 
     proc ::bgerror { errstring } {
 	if { [info command RamDebugger::TextOutRaise] != "" } {
@@ -6426,8 +6491,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require supergrid
     package require supertext
     package require dialogwin
-    package require helpviewer 1.1
+    catch { package require helpviewer 1.1 } ;#catch for wince
     catch { package require tkdnd } ;# only if it is compiled
+    #catch { package require mytile }
 
     CreateImages
     TkBackCompatibility
@@ -6440,10 +6506,14 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	toplevel $w -use $topleveluse
 	update idletasks ;# doesn't work if this is removed; does not work with it either
     }
-    wm withdraw $w
-    wm geom $w 800x600
+    if { !$iswince && $topleveluse == "" } {
+	wm withdraw $w
+	wm geom $w 800x600
+    } else { update }
+
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
+
     ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
     set descmenu [list \
 		"&File" all file 0 [list \
@@ -6544,6 +6614,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command "&Toggle views" {} \
 		"Toggle files between the main and the secondary view" "Ctrl 4" \
 		-command "RamDebugger::ToggleViews"] \
+		separator \
+		[list checkbutton "Status bar" {} \
+		 "View/hide status bar" "" \
+		-variable RamDebugger::options(showstatusbar) -command RamDebugger::ShowStatusBar] \
+		[list checkbutton "Buttons toolbar" {} \
+		 "View/hide buttons toolbar" "" \
+		-variable RamDebugger::options(showbuttonstoolbar) -command RamDebugger::ShowButtonsToolBar] \
 		separator \
 		] \
 		"&Debug" all debug 0 [list \
@@ -6648,7 +6725,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		       -textvariable RamDebugger::status \
 		       -progressvar RamDebugger::progressvar -progressmax 100 \
 		       -progresstype normal -menu $descmenu -grid 0]
-    $mainframe showstatusbar progression 
+    #$mainframe showstatusbar progression 
 
     if { $::tcl_platform(platform) ne "windows" } {
 	$mainframe setmenustate registerextension disabled
@@ -6666,7 +6743,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set label [$mainframe addindicator -textvariable RamDebugger::remoteserver -width 15 \
 		   -anchor e -padx 3]
     set menu [$mainframe getmenu activeprograms]
-    $menu configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu]
+    #$menu configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu]
 
     bind $label <1> "tk_popup $menu %X %Y"
     set menu [$mainframe getmenu view]
@@ -6686,69 +6763,90 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     set toolbar [$mainframe addtoolbar]
 
-    set bbox [ButtonBox $toolbar.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w" \
-	    -spacing 2]
-    $bbox add -image filenew22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Begin new file" \
-	 -command "RamDebugger::NewFile"
-    $bbox add -image fileopen-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Open source file" \
-	 -command "RamDebugger::OpenFile"
-    $bbox add -image filesave22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Save file" \
-	 -command "RamDebugger::SaveFile save"
-
-    Separator $toolbar.sep -orient vertical -grid "1 ns px3"
-    set bbox [ButtonBox $toolbar.bbox2 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "2 w"]
-
-    $bbox add -image actundo22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Undo previus insert/delete operation" \
-	 -command "RamDebugger::CutCopyPasteText undo"
-    $bbox add -image editcut22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Cut selected text to clipboard" \
-	 -command "RamDebugger::CutCopyPasteText cut"
-    $bbox add -image editcopy-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Copy selected text to clipboard" \
-	 -command "RamDebugger::CutCopyPasteText copy"
-    $bbox add -image editpaste22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Past text from clipboard" \
-	 -command "RamDebugger::CutCopyPasteText paste"
-    $bbox add -image find-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Search text in source file" \
-	 -command "RamDebugger::SearchWindow"
-
-    Separator $toolbar.sep2 -orient vertical -grid "3 ns px3"
-    set bbox [ButtonBox $toolbar.bbox3 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "4 w"]
-
-    $bbox add -image player_end-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "begin/continue execution" \
-	 -command "RamDebugger::ContNextGUI rcont"
-    $bbox add -image player_stop-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "Set/unset &breakpoint" \
-	 -command "RamDebugger::SetGUIBreakpoint"
-    $bbox add -image finish-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "continue one command" \
-	 -command "RamDebugger::ContNextGUI rnext"
-    $bbox add -image down-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "continue one command, entering in subcommands" \
-	 -command "RamDebugger::ContNextGUI rstep"
-    $bbox add -image stop-22 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext "stop debugging" \
-	 -command "RamDebugger::DisconnectStop"
-
+    if { $iswince } {
+	#wince
+	set bbox [ButtonBox $toolbar.bbox1 -spacing 0 -padx 0 -pady 0 -homogeneous 1 -grid "0 w" \
+		-spacing 0]
+	$bbox add -text . \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
+	    -helptext "Menu" \
+	    -command "tk_popup [$w cget -menu] \[winfo pointerx .] \[winfo pointery .]"
+	$bbox add -image filenew16 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
+	    -helptext "Begin new file" \
+	    -command "RamDebugger::NewFile"
+	$bbox add -image fileopen16 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
+	    -helptext "Open source file" \
+	    -command "RamDebugger::OpenFile"
+	$bbox add -image filesave16 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
+	    -helptext "Save file" \
+	    -command "RamDebugger::SaveFile save"
+    } else {
+	set bbox [ButtonBox $toolbar.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w" \
+		-spacing 2]
+	$bbox add -image filenew22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Begin new file" \
+	    -command "RamDebugger::NewFile"
+	$bbox add -image fileopen22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Open source file" \
+	    -command "RamDebugger::OpenFile"
+	$bbox add -image filesave22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Save file" \
+	    -command "RamDebugger::SaveFile save"
+	
+	Separator $toolbar.sep -orient vertical -grid "1 ns px3"
+	set bbox [ButtonBox $toolbar.bbox2 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "2 w"]
+	
+	$bbox add -image actundo22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Undo previus insert/delete operation" \
+	    -command "RamDebugger::CutCopyPasteText undo"
+	$bbox add -image editcut22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Cut selected text to clipboard" \
+	    -command "RamDebugger::CutCopyPasteText cut"
+	$bbox add -image editcopy-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Copy selected text to clipboard" \
+	    -command "RamDebugger::CutCopyPasteText copy"
+	$bbox add -image editpaste22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Past text from clipboard" \
+	    -command "RamDebugger::CutCopyPasteText paste"
+	$bbox add -image find-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Search text in source file" \
+	    -command "RamDebugger::SearchWindow"
+	
+	Separator $toolbar.sep2 -orient vertical -grid "3 ns px3"
+	set bbox [ButtonBox $toolbar.bbox3 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "4 w"]
+	
+	$bbox add -image player_end-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "begin/continue execution" \
+	    -command "RamDebugger::ContNextGUI rcont"
+	$bbox add -image player_stop-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Set/unset &breakpoint" \
+	    -command "RamDebugger::SetGUIBreakpoint"
+	$bbox add -image finish-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "continue one command" \
+	    -command "RamDebugger::ContNextGUI rnext"
+	$bbox add -image down-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "continue one command, entering in subcommands" \
+	    -command "RamDebugger::ContNextGUI rstep"
+	$bbox add -image stop-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "stop debugging" \
+	    -command "RamDebugger::DisconnectStop"
+    }
     supergrid::go $toolbar
 
 
@@ -7150,7 +7248,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	}
     }
 
-    set menu [$mainframe getmenu recentfiles]
+    if { $iswince } {
+	# wince
+	wm geometry $w 244x268+-6+0
+    }
+
+    set menu [$mainframe getmenu activeprograms]
     ActualizeActivePrograms $menu
 
     set menu [$mainframe getmenu macros]
@@ -7175,9 +7278,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set debuggerstate $options(debuggerstate)
 	#RamDebugger::DisplayTimesWindow
     }
-    if { [info exists options(SearchToolbar)] && [lindex $options(SearchToolbar) 0] } {
+    if { [info exists options(SearchToolbar)] && [lindex $options(SearchToolbar) 0] && \
+	(![info exists options(SearchToolbar_autoclose)] || !$options(SearchToolbar_autoclose)) } {
 	SearchWindow [lindex $options(SearchToolbar) 1]
     }
+    ShowStatusBar
     
 #     if { [info exists options(remoteserverType)] && $options(remoteserverType) == "remote" && \
 #          [info exists options(remoteserver)] } {
@@ -7217,14 +7322,18 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # if we do it at the beginning, an ugly update is made
     if { $::tcl_platform(platform) != "windows" } {
 	wm iconbitmap $w @$MainDir/addons/ramdebugger.xbm
-    } else {
+    } elseif { !$iswince } {
 	wm iconbitmap $w  $MainDir/addons/ramdebugger.ico
 	catch { wm iconbitmap $w -default $MainDir/addons/ramdebugger.ico }
     }
+    if { !$iswince } {
     RamDebugger::CVS::ManageAutoSave
-
+    }
     update idletasks
-    wm deiconify $w
+    if { [[winfo toplevel $w] cget -use] == "" } {
+	wm deiconify $w
+	focus -force $text
+    }
 }
 
 proc RamDebugger::OpenDefaultFile {} {
@@ -7245,52 +7354,52 @@ proc RamDebugger::OpenDefaultFile {} {
     }
 }
 
-if { [info command master] != "" } {
-    set registerasremote 0
-} else { set registerasremote 1 }
-
-if { [set ipos [lsearch $argv "-noprefs"]] != -1 } {
-    set readwriteprefs 0
-    set argv [lreplace $argv $ipos $ipos]
-} else { set readwriteprefs 1 }
-
-if { [set ipos [lsearch $argv "-onlytext"]] != -1 } {
-    set ViewOnlyTextOrAll OnlyText
-    set argv [lreplace $argv $ipos $ipos]
-} else { set ViewOnlyTextOrAll "" }
-
-if { [set ipos [lsearch $argv "-rgeom*"]] != -1 } {
-    set iposm1 [expr {$ipos+1}]
-    set geometry [lindex $argv $iposm1]
-    set argv [lreplace $argv $ipos $iposm1]
-} else { set geometry "" }
-
-if { [set ipos [lsearch $argv "-ruse"]] != -1 } {
-    set iposm1 [expr {$ipos+1}]
-    set topleveluse [lindex $argv $iposm1]
-    set argv [lreplace $argv $ipos $iposm1]
-} else { set topleveluse "" }
-
-RamDebugger::Init $readwriteprefs $registerasremote
-
-################################################################################
-#     Init the GUI part
-################################################################################
-
-if { [info command wm] != "" && [info commands tkcon_puts] == "" } {
-    wm withdraw .
-    RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
-    if { [llength $argv] } {
-	RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
-    } else {
-	RamDebugger::OpenDefaultFile
-    }
-    bind all <Control-x><Control-l> "[list source [info script]] ; WarnWin reload"
-
+if { ![info exists SkipRamDebuggerInit] } {
     if { [info command master] != "" } {
-	#RamDebugger::rdebug -master
+	set registerasremote 0
+    } else { set registerasremote 1 }
+    
+    if { [set ipos [lsearch $argv "-noprefs"]] != -1 } {
+	set readwriteprefs 0
+	set argv [lreplace $argv $ipos $ipos]
+    } else { set readwriteprefs 1 }
+    
+    if { [set ipos [lsearch $argv "-onlytext"]] != -1 } {
+	set ViewOnlyTextOrAll OnlyText
+	set argv [lreplace $argv $ipos $ipos]
+    } else { set ViewOnlyTextOrAll "" }
+    
+    if { [set ipos [lsearch $argv "-rgeom*"]] != -1 } {
+	set iposm1 [expr {$ipos+1}]
+	set geometry [lindex $argv $iposm1]
+	set argv [lreplace $argv $ipos $iposm1]
+    } else { set geometry "" }
+    
+    if { [set ipos [lsearch $argv "-ruse"]] != -1 } {
+	set iposm1 [expr {$ipos+1}]
+	set topleveluse [lindex $argv $iposm1]
+	set argv [lreplace $argv $ipos $iposm1]
+    } else { set topleveluse "" }
+    
+    RamDebugger::Init $readwriteprefs $registerasremote
+    
+    ################################################################################
+    #     Init the GUI part
+    ################################################################################
+    
+    if { [info command wm] != "" && [info commands tkcon_puts] == "" } {
+	wm withdraw .
+	RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
+	if { [llength $argv] } {
+	    RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
+	} else {
+	    RamDebugger::OpenDefaultFile
+	}
+	bind all <Control-x><Control-l> "[list source [info script]] ; WarnWin reload"
+	
+	if { [info command master] != "" } {
+	    #RamDebugger::rdebug -master
+	}
     }
-
-
-
-}
+} 
+    

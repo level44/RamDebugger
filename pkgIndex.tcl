@@ -9,7 +9,7 @@ proc LoadRamDebugger { dir version } {
 	interp create ramdebugger
     }
     interp alias ramdebugger master "" eval
-    #ramdebugger eval [list load {} Tk]
+    ramdebugger eval [list load {} Tk]
     ramdebugger eval package require Tk
     if { ![ramdebugger eval info exists argv] } {
 	ramdebugger eval { set argc 0 ; set argv "" }
