@@ -241,6 +241,7 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
 
 file delete -force install/RamDebugger
 file mkdir install/RamDebugger
+file delete RamDebugger$Version.zip
 foreach i $files {
     file copy $i install/RamDebugger/.
 }
