@@ -15,7 +15,7 @@ proc LoadRamDebugger { dir version } {
     }
     ramdebugger eval [list set auto_path $::auto_path]
     ramdebugger eval [list set argv0 [file join $dir RamDebugger.tcl]]
-    ramdebugger hide exit
+    catch { ramdebugger hide exit }
     ramdebugger alias exit EndLoadRamDebugger
     ramdebugger eval [list source [file join $dir RamDebugger.tcl]]
     package provide RamDebugger $version

@@ -12,13 +12,15 @@ proc RamDebugger::DisplayWindowsHierarchyInfo { w canvas widget x y } {
     if { [winfo exists $canvas.help] } { destroy $canvas.help }
 
     if { $widget != "" } {
-	set TextMotionAfterId [after 100 RamDebugger::DisplayWindowsHierarchyInfoDo \
+	set TextMotionAfterId [after 1000 RamDebugger::DisplayWindowsHierarchyInfoDo \
 		$w $canvas $widget $x $y]
     }
 }
 
 proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
     variable TextMotionAfterId
+
+    if { abs($x-[winfo pointerx .])> 6 || abs($y-[winfo pointery .])> 6 } { return }
 
     set TextMotionAfterId ""
     set comm {
@@ -201,12 +203,12 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } 
 		 $canvas $widget %X %Y"
 	#$canvas bind $widget <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
 
-# 	$canvas bind $widget <ButtonRelease-3> {
-# 	    set menu %W.menu
-# 	    catch { destroy $menu }
-# 	    menu $menu
-# 	    $menu add command -label "Draw red" -command "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
-# 	}
+#         $canvas bind $widget <ButtonRelease-3> {
+#             set menu %W.menu
+#             catch { destroy $menu }
+#             menu $menu
+#             $menu add command -label "Draw red" -command "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
+#         }
 	if { $ty > $maxy } {
 	    set maxy $ty
 	} else { set ty $maxy }
@@ -435,6 +437,7 @@ proc RamDebugger::DisplayWindowsHierarchy {} {
 
     set f [DialogWinTop::Init $text "Windows hierarchy" separator $commands "" -]
     set w [winfo toplevel $f]
+    wm withdraw $w
 
     radiobutton $f.r1 -text "In debugged app" -variable DialogWinTop::user($w,type) -value debug \
        -command "RamDebugger::DisplayWindowsHierarchyDo $w do" -grid "0 w"
@@ -445,18 +448,18 @@ proc RamDebugger::DisplayWindowsHierarchy {} {
 	set DialogWinTop::user($w,fontsize) [font actual NormalFont -size]
     }
 
-    set bbox [ButtonBox $f.font -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "2 nw px5 py3" \
+    set bbox [ButtonBox $f.font -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "2 nwwe px5 py3" \
 	    -spacing 2]
     $bbox add -image viewmag-16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext "Decrease display size" \
 	 -command "[list incr DialogWinTop::user($w,fontsize) -1] ;\
-                    [list RamDebugger::DisplayWindowsHierarchyDo $w do]"
+		    [list RamDebugger::DisplayWindowsHierarchyDo $w do]"
     $bbox add -image viewmag+16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext "Increase display size" \
 	 -command "[list incr DialogWinTop::user($w,fontsize) 1] ;\
-                    [list RamDebugger::DisplayWindowsHierarchyDo $w do]"
+		    [list RamDebugger::DisplayWindowsHierarchyDo $w do]"
 
     frame $f.f -grid "0 3"
     label $f.f.l -text "Find:" -grid 0
@@ -495,6 +498,8 @@ proc RamDebugger::DisplayWindowsHierarchy {} {
     supergrid::go $f
 
     DisplayWindowsHierarchyDo $w do
+    update idletasks
+    wm deiconify $w
     DialogWinTop::CreateWindow $f
 
 }

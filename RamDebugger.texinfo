@@ -62,7 +62,7 @@
 @set Date July 2003
 @set Copyright 2002-2003 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.21 $
+@set CVSVersion  $Revision: 1.22 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -188,6 +188,7 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
+New option in Help to associate RamDebugger as command in the .tcl extension in Windows
 When TCL raises and error, RamDebugger shows last visited line
 If files contain, in first lines something like @code{# -*- coding: utf-8;-*-} they are
 considered as in utf-8 encoding

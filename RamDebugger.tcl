@@ -4,7 +4,7 @@ exec wish "$0" "$@"
 
 package require Tcl 8.4
 
-#         $Id: RamDebugger.tcl,v 1.34 2004/02/26 21:33:37 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.35 2004/05/25 07:51:53 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -614,12 +614,12 @@ proc RamDebugger::rdebug { args } {
 	    set ::RDC::code $comm
 	    update
 	}
-        proc RDC::GetLastVisited { } {
-            variable data
+	proc RDC::GetLastVisited { } {
+	    variable data
 	    if { [info exists data(visited,filenum)] } {
 		return [list $data(visited,filenum) $data(visited,line)]
 	    } else { return "" }
-        }
+	}
 	proc RDC::F { filenum line } {
 	    variable code
 	    variable evalhandler
@@ -631,9 +631,9 @@ proc RamDebugger::rdebug { args } {
 	    variable lastprocstack
 	    variable linecounter
 
-            variable data
-            set data(visited,filenum) $filenum
-            set data(visited,line) $line
+	    variable data
+	    set data(visited,filenum) $filenum
+	    set data(visited,line) $line
 
 	    set procstack ""
 	    set procname ""
@@ -665,8 +665,12 @@ proc RamDebugger::rdebug { args } {
 		3 { set stop 1 }
 	    }
 	    if { [lindex $contto 0] == $filenum && [lindex $contto 1] == $line } {
-		set stop 1
-		set contto ""
+		if { $len > $lastlen && [lindex $procstack end] eq [lindex $lastprocstack end] } {
+		    # nothing
+		} else {
+		    set stop 1
+		    set contto ""
+		}
 	    }
 	    if { [info exists breaks($filenum,$line)] } {
 		set breaknum [lindex $breaks($filenum,$line) 0]
@@ -1090,6 +1094,7 @@ proc RamDebugger::rtime { args } {
 	-delete:        Delete named time block
 	-list:          List previusly defined time blocks
 	-display units: Displays table of results. units can be: microsec, milisec, sec, min
+	-cleartimes:    Clear times table
 	--:             end of options
 
 	This function is used to obtain absolute and relative times of several blocks
@@ -1100,6 +1105,16 @@ proc RamDebugger::rtime { args } {
     }
     ParseArgs $args $usagestring opts
     
+    if { $opts(-cleartimes) } {
+	set TimeMeasureDataNew ""
+	foreach i $TimeMeasureData {
+	    foreach "name file lineini lineend lasttime" $i {
+		lappend TimeMeasureDataNew [list $name $file $lineini $lineend ""]
+	    }
+	}
+	set TimeMeasureData $TimeMeasureDataNew
+	return "cleared times table"
+    }
     if { $opts(-start) } {
 	set debuggerstate time
 
@@ -1128,6 +1143,9 @@ proc RamDebugger::rtime { args } {
 # why currentfile should be changed here?
 #             set currentfile $remoteserver
 	    rdebug -currentfile
+	}
+	if { $remoteserverType == "" && [info command master] != "" } {
+	    rdebug -master
 	}
 	return "Using 'measure times' mode"
     }
@@ -1420,7 +1438,7 @@ proc RamDebugger::rlist { args } {
 		} else {
 		    set header [read $fin 256]
 		    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
-			fconfigure $fin -encoding utf-8
+		        fconfigure $fin -encoding utf-8
 		    }
 		    seek $fin 0
 		}
@@ -1510,7 +1528,7 @@ proc RamDebugger::rlist { args } {
 		} else {
 		    set header [string range [set instrumentedfiles${i}($currentfile)] 0 255]
 		    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
-			fconfigure $fout -encoding utf-8
+		        fconfigure $fout -encoding utf-8
 		    }
 		}
 		puts -nonewline $fout [set instrumentedfiles${i}($currentfile)]
@@ -2099,8 +2117,8 @@ proc RamDebugger::RecieveErrorFromProgram { err errInfo args } {
     TextOutInsertRed $errInfo\n
     TextOutInsertRed "-------------------------------------------------------\n"
     TextOutRaise
-    after idle [string map [list %e $err %n \n] {
-        WarnWin {Recieved Error from Debugged program:%n%e%nCheck Output for details}
+    after idle [string map [list %e [list $err] %n \n] {
+	WarnWin {Recieved Error from Debugged program:%n%e%nCheck Output for details}
 	RamDebugger::StopAtGUI "" -1
     }]
 }
@@ -2848,12 +2866,12 @@ proc RamDebugger::SaveFile { what } {
 	set NeedsReinstrument 1
 	set w [winfo toplevel $text]
 	set types [GiveFileTypeForFileBrowser]
-# 	set types {
-# 	    {{TCL Scripts}      {.tcl}        }
-# 	    {{C,C++ files}      {.cc .c .h}   }
-# 	    {{GiD files}      {.bas .prb .mat .cnd}   }
-# 	    {{All Files}        *             }
-# 	}
+#         set types {
+#             {{TCL Scripts}      {.tcl}        }
+#             {{C,C++ files}      {.cc .c .h}   }
+#             {{GiD files}      {.bas .prb .mat .cnd}   }
+#             {{All Files}        *             }
+#         }
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
 	set file [tk_getSaveFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
 	    -title "Save file"]
@@ -2888,10 +2906,10 @@ proc RamDebugger::OpenFile {} {
     set types [GiveFileTypeForFileBrowser]
 
 #     set types {
-# 	{{TCL Scripts}      {.tcl}        }
-# 	{{C,C++ files}      {.cc .c .h}   }
-# 	{{GiD files}      {.bas .prb .mat .cnd}   }
-# 	{{All Files}        *             }
+#         {{TCL Scripts}      {.tcl}        }
+#         {{C,C++ files}      {.cc .c .h}   }
+#         {{GiD files}      {.bas .prb .mat .cnd}   }
+#         {{All Files}        *             }
 #     }
     if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
     set file [tk_getOpenFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
@@ -3081,7 +3099,7 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     foreach i $breakpoints {
 	if { ![AreFilesEqual [lindex $i 2]  $file] } { continue }
 	set line [lindex $i 3]
-	UpdateArrowAndBreak 1 $type ""
+	UpdateArrowAndBreak $line 1 ""
     }
     UpdateRemoteBreaks
 
@@ -3679,10 +3697,10 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow { forceraise 1 } 
 	if { $doit } {
 	    after 100 "raise [winfo toplevel $text] ; focus -force $text"
 	}
-	if { !$hadarrow } {
-	    $text see $line.0
-	    $text mark set insert $line.0
-	}
+    }
+    if { !$hadarrow && $hasarrow } {
+	$text see $line.0
+	$text mark set insert $line.0
     }
     MoveCanvas $text $marker
 
@@ -3735,13 +3753,13 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
 
     set forceraise 1
     if { $line == -1 } {
-        # called from bgerror
-        variable fileslist
-        
+	# called from bgerror
+	variable fileslist
+	
 	set filenum ""
-        foreach {filenum line} [EvalRemoteAndReturn ::RDC::GetLastVisited] break;
+	foreach {filenum line} [EvalRemoteAndReturn ::RDC::GetLastVisited] break;
 	if { $filenum eq "" } { return }
-        set file [lindex $fileslist $filenum]
+	set file [lindex $fileslist $filenum]
 	set forceraise 0
     }
     if { ![info exists text] || ![winfo exists $text] } { return }
@@ -4344,29 +4362,35 @@ proc RamDebugger::TextCompInsertRed { data } {
 
 proc RamDebugger::ProgressVar { value { canstop 0 } } {
     variable progressvar
-	variable text
+    variable text
+    variable mainframe
+    variable label_for_ProgressVar
+
+    if { ![info exists label_for_ProgressVar] } { set label_for_ProgressVar "" }
 
     if { [info exists progressvar] && $progressvar == -2 } {
 	set RamDebugger::progressvar -1
-	if { [winfo exists $text.__frame] } { destroy $text.__frame }
-	bind all <Escape> ""
+	if { [winfo exists $label_for_ProgressVar] } { destroy $label_for_ProgressVar }
 	error "Stop at user demand"
     }
 
     set progressvar $value
 
     if { $canstop == 1 && $value == 0 } {
-	if { [winfo exists $text.__frame] } { destroy $text.__frame }
-	frame $text.__frame
-	focus $text.__frame
-	catch { grab $text.__frame }
-	bind all <Escape> "set RamDebugger::progressvar -2"
+	if { [winfo exists $label_for_ProgressVar] } { destroy $label_for_ProgressVar }
+
+	set label_for_ProgressVar [$mainframe addindicator -text "Wait please..."]
+	bindtags $label_for_ProgressVar [list $label_for_ProgressVar]
+	focus $label_for_ProgressVar
+	# catch is necessary because it fails in Linux (it says window needs to be viewable)
+	catch {grab -global $label_for_ProgressVar}
+
+	bind $label_for_ProgressVar <Escape> "set RamDebugger::progressvar -2"
     }
 
     if { $value == 100 } {
 	after 1000 set RamDebugger::progressvar -1
-	if { [winfo exists $text.__frame] } { destroy $text.__frame }
-	bind all <Escape> ""
+	if { [winfo exists $label_for_ProgressVar] } { destroy $label_for_ProgressVar }
     }
     update
 }
@@ -5598,6 +5622,84 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
     tk_popup $menu $X $Y
 }
 
+# only for windows
+proc RamDebugger::RegisterExtension {} {
+    variable text
+
+    package require registry
+
+    set key(1) {HKEY_CLASSES_ROOT\.tcl}
+
+    if { [catch {registry get $key(1) ""} val(1)] } {
+	set val(1) TclFile
+    }
+
+    set key(2) "HKEY_CLASSES_ROOT\\$val(1)"
+
+    if { [catch {registry get $key(2) ""} val(2)] } {
+	set val(2) TCL-TK
+    }
+
+    set key(3) "$key(2)\\shell\\RamDebugger\\command"
+    set val(3) "\"[file nativename [info nameofexecutable]]\" "
+    if { ![string equal [file tail $::argv0] main.tcl] } {
+	append val(3) "\"[file nativename $::argv0]\" "
+    }
+    append val(3) "\"%1\" %*"
+
+    for { set i 1 } { $i <= 3 } { incr i } {
+	if { [catch { registry get $key($i) "" } rval($i)] } {
+	    set rval($i) ""
+	}
+    }
+
+    if { $val(1) eq $rval(1) && $val(2) eq $rval(2) && $val(3) eq $rval(3) } {
+	dialogwin_snit $text._ask -title "Unassociate extension"
+	set f [$text._ask giveframe]
+	label $f.l1 -text "Do you want to unassociate command 'RamDebugger from extension .tcl?"
+	set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
+	label $f.l2 -font "-size $smallfontsize" -text "Note: this command can be used in the Windows\
+	      explorer by using the contextual menu over one .tcl file" -wraplength 170 -justify left
+
+	grid $f.l1 -sticky nw -padx 5 -pady 5
+	grid $f.l2 -sticky nw -padx 5 -pady 5
+
+	set action [$text._ask createwindow]
+	destroy $text._ask
+	if { $action <= 0 } {  return }
+
+	if { [catch {
+	    registry delete "$key(2)\\shell\\RamDebugger"
+	}] } {
+	    tk_messageBox -message \
+		"Error in the operation. Check your permissions and/or enter as administrator"
+	}
+	return
+    }
+    dialogwin_snit $text._ask -title "Associate extension"
+    set f [$text._ask giveframe]
+    label $f.l1 -text "Do you want to associate command 'RamDebugger to extension .tcl?"
+    set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
+    label $f.l2 -font "-size $smallfontsize" -text "Note: this command can be used in the Windows\
+	   explorer by using the contextual menu over one .tcl file" -wraplength 170 -justify left
+
+    grid $f.l1 -sticky nw -padx 5 -pady 5
+    grid $f.l2 -sticky nw -padx 5 -pady 5
+
+    set action [$text._ask createwindow]
+    destroy $text._ask
+    if { $action <= 0 } {  return }
+
+    if { [catch {
+	for { set i 1 } { $i <= 3 } { incr i } {
+	    registry set $key($i) "" $val($i)
+	}
+    }] } {
+	tk_messageBox -message "Error in the operation. Check your permissions and/or enter as administrator"
+    }
+}
+
+
 proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } { topleveluse "" } } {
     variable options
     variable options_def
@@ -5821,17 +5923,25 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ViewHelpFile"] \
 		[list command "&Contextual help" {} "Gives help for commands in editor" "F1" \
 		-command "RamDebugger::ViewHelpForWord"] \
+		[list command "&Register cmd extension..." registerextension \
+		     "Register RamDebugger as command in the .tcl extension" "" \
+		-command "RamDebugger::RegisterExtension"] \
 		separator \
 		[list command "&About" {} "Information about the program" "" \
 		-command "RamDebugger::AboutWindow"] \
 		] \
 		]
 
+
     set mainframe [MainFrame $w.mainframe \
 		       -textvariable RamDebugger::status \
 		       -progressvar RamDebugger::progressvar -progressmax 100 \
 		       -progresstype normal -menu $descmenu -grid 0]
     $mainframe showstatusbar progression 
+
+    if { $::tcl_platform(platform) ne "windows" } {
+	$mainframe setmenustate registerextension disabled
+    }
 
     set label [$mainframe addindicator -textvariable RamDebugger::debuggerstate -width 6 \
 	    -anchor e -padx 3]

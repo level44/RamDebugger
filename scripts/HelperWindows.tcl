@@ -743,11 +743,11 @@ proc RamDebugger::PreferencesWindow {} {
     TitleFrame $fd.f1 -text "executable directories" -grid 0
     set fd1 [$fd.f1 getframe]
 
-    set sw [ScrolledWindow $fd1.lf -relief sunken -borderwidth 0 -grid "0"]
+    set sw [ScrolledWindow $fd1.lf -relief sunken -borderwidth 0]
     listbox $sw.lb -listvariable DialogWin::user(executable_dirs) -selectmode extended
     $sw setwidget $sw.lb
 
-    set bbox [ButtonBox $fd1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 wn"]
+    set bbox [ButtonBox $fd1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
     $bbox add -image folderopen16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Add include directory"] \
@@ -761,6 +761,11 @@ proc RamDebugger::PreferencesWindow {} {
 	 -helptext [_ "Increase directory priority"] \
 	 -command "RamDebugger::PreferencesAddDelDirectories $sw.lb up"
 
+    grid $fd1.lf -sticky nsew
+    grid $fd1.bbox1 -sticky nw
+    grid columnconfigure $fd1 0 -weight 1
+    grid rowconfigure $fd1 0 -weight 1
+
     set DialogWin::user(executable_dirs) $options(executable_dirs)
 
     set tt "Include here all directories where RamDebugger should find executables\n"
@@ -771,7 +776,6 @@ proc RamDebugger::PreferencesWindow {} {
     supergrid::go $f2
     supergrid::go $f
     supergrid::go $fd
-    supergrid::go $fd1
 
     $fb.nb compute_size
     $fb.nb raise basic
@@ -869,6 +873,10 @@ proc RamDebugger::DisplayTimesWindowReport { f } {
 	   $DialogWin::user(text) ins end [RamDebugger::rtime -display $DialogWin::user(units)]
        } -width 10 -values [list microsec  milisec  sec  min] -grid "0 w"
     set DialogWin::user(units) sec
+    button $f.b1 -text "Clear time table" -command {
+	$DialogWin::user(text) delete 1.0 end
+	RamDebugger::rtime -cleartimes
+    } -grid "1 w"
 
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     text $sw.t
@@ -1056,15 +1064,15 @@ proc RamDebugger::DisplayTimesWindow {} {
 	       [list Stop Report] Start]
     set w [winfo toplevel $f]
 
-    TitleFrame $f.f1 -text [_ "current block"] -grid "0 ew"
+    TitleFrame $f.f1 -text [_ "current block"] -grid "0 new"
     set f1 [$f.f1 getframe]
 
-    label $f1.l1 -text "Name" -grid 0
+    label $f1.l1 -text "Name:" -grid "0 e"
     entry $f1.e1 -textvariable DialogWinTop::user($w,name) -grid "1 ew"
     label $f1.l2 -text "Initial line:" -grid "0 e"
-    entry $f1.e2 -textvariable DialogWinTop::user($w,lineini) -grid "1 w py2" -width 8
+    entry $f1.e2 -textvariable DialogWinTop::user($w,lineini) -grid "1 ew py2" -width 8
     label $f1.l3 -text "End line:" -grid "0 e"
-    entry $f1.e3 -textvariable DialogWinTop::user($w,lineend) -grid "1 w py2" -width 8
+    entry $f1.e3 -textvariable DialogWinTop::user($w,lineend) -grid "1 ew py2" -width 8
     
     set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 2 w"]
     $bbox add -text "Pick selection" \
@@ -1076,10 +1084,10 @@ proc RamDebugger::DisplayTimesWindow {} {
 	 -helptext [_ "Selects current block in text"] \
 	 -command "RamDebugger::DisplayTimesDrawSelection $w"
 
-    TitleFrame $f.f2 -text [_ "blocks"] -grid 0
+    TitleFrame $f.f2 -text [_ "blocks"] -grid "0 nsew"
     set f2 [$f.f2 getframe]
 
-    set sw [ScrolledWindow $f2.lf -relief sunken -borderwidth 0 -grid "0 ewns"]
+    set sw [ScrolledWindow $f2.lf -relief sunken -borderwidth 0]
     
     set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 \
 	-exportselection 0 \
@@ -1111,7 +1119,7 @@ proc RamDebugger::DisplayTimesWindow {} {
 
     bind [$DialogWinTop::user($w,list) bodypath] <ButtonPress-3> "tk_popup $w.popup %X %Y"
 
-    set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w"]
+    set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
     $bbox add -image acttick16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Create new block"] \
@@ -1125,8 +1133,13 @@ proc RamDebugger::DisplayTimesWindow {} {
 	 -helptext [_ "Delete selected block"] \
 	 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
 
+    grid $f2.lf -sticky nsew
+    grid $f2.bbox1 -sticky w
+    grid columnconfigure $f2 0 -weight 1
+    grid rowconfigure $f2 0 -weight 1
+
+
     supergrid::go $f1
-    supergrid::go $f2
     supergrid::go $f
 
     bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
