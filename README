@@ -46,9 +46,10 @@ for details.
 Changes
 =======
 
-Changes From version 2 to version 2.5
+Changes From version 2 to version 2.6
 
    * RamDebugger can now be used as a package
+   * When editing one file, breakpoints are modified in position accordingly
    * Command @b{console} works correctly now in local mode
    * It is possible to save possitions in the editor to return later
    * Activated drag and drop (works for Windows and for platforms that have

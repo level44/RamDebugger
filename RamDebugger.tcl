@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.17 2003/01/21 20:17:40 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.18 2003/02/24 14:27:03 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -793,8 +793,8 @@ proc RamDebugger::rstack { args } {
 	    set ::RDC::level ""
 	    foreach ::RDC::j [info level $::RDC::i] {
 		regsub -all {\n} $::RDC::j { } ::RDC::j
-		if { [string length $::RDC::j] > 50 } {
-		    set ::RDC::j [string range $::RDC::j 0 46]...
+		if { [string length $::RDC::j] > 100 } {
+		    set ::RDC::j [string range $::RDC::j 0 96]...
 		}
 		lappend ::RDC::level $::RDC::j
 	    }
@@ -3069,6 +3069,7 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow } {
     if { $IsInStop } {
 	after 100 RamDebugger::CheckEvalEntries do
 	after 200 RamDebugger::CheckEvalEntriesL do
+	after 300 RamDebugger::InvokeAllDisplayVarWindows
 	rstack -handler RamDebugger::UpdateGUIStack
     } else {
 	$textST conf -state normal
@@ -3276,8 +3277,8 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 	} else {
 	    set i 0
 	    foreach "type val" [lindex $res 1] {
-		if { [string length $val] > 50 } {
-		    set val [string range $val 0 46]...
+		if { [string length $val] > 100 } {
+		    set val [string range $val 0 96]...
 		}
 		while { [info exists EvalEntries($i,left)] && \
 		            [string trim $EvalEntries($i,left)] == "" } {
@@ -3332,8 +3333,8 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		set res [list 0 [list variable $res]]
 	    }
 	    foreach "type val" [lindex $res 1] break
-	    if { [string length $val] > 50 } {
-		set val [string range $val 0 46]...
+	    if { [string length $val] > 100 } {
+		set val [string range $val 0 96]...
 	    }
 	    set RamDebugger::EvalEntries($i,right) $val
 	    if { $type == "error" } {
@@ -3409,14 +3410,14 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		foreach ::RDC::i [info locals] {
 		    if { [array exists $::RDC::i] } {
 		        set ::RDC::val [array get $::RDC::i]
-		        if { [string length $::RDC::val] > 50 } {
-		            set ::RDC::val [string range $::RDC::val 0 46]...
+		        if { [string length $::RDC::val] > 100 } {
+		            set ::RDC::val [string range $::RDC::val 0 96]...
 		        }
 		        lappend ::RDC::retval $::RDC::i array $::RDC::val
 		    } elseif { [info exists $::RDC::i] } {
 		        set ::RDC::val [set $::RDC::i]
-		        if { [string length $::RDC::val] > 50 } {
-		            set ::RDC::val [string range $::RDC::val 0 46]...
+		        if { [string length $::RDC::val] > 100 } {
+		            set ::RDC::val [string range $::RDC::val 0 96]...
 		        }
 		        lappend ::RDC::retval $::RDC::i variable $::RDC::val
 		    } else {
@@ -3487,8 +3488,8 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		set res [list 0 [list variable $res]]
 	    }
 	    foreach "type val" [lindex $res 1] break
-	    if { [string length $val] > 50 } {
-		set val [string range $val 0 46]...
+	    if { [string length $val] > 100 } {
+		set val [string range $val 0 96]...
 	    }
 	    set RamDebugger::EvalEntries($i,rightL) $val
 	    if { $type == "error" } {
@@ -4161,6 +4162,7 @@ proc RamDebugger::CheckText { command args } {
     variable instrumentedfilesInfo
     variable currentfile
     variable CheckTextSave
+    variable breakpoints
 
     foreach "l1 l2 txt NumlinesOld" $CheckTextSave break
     if { $txt == "" } { return }
@@ -4185,6 +4187,30 @@ proc RamDebugger::CheckText { command args } {
 	    set l2_new $l1
 	}
     }
+
+    set delta [expr {$l2_new-$l2_old}]
+    if { $delta != 0 } {
+	for { set i 0 } { $i < [llength $breakpoints] } { incr i } {
+	    set br [lindex $breakpoints $i]
+	    if { [AreFilesEqual [lindex $br 1] $currentfile] } {
+		set line [lindex $br 2]
+		if { $delta < 0 && $line >= $l2_new && $line < $l2_old } {
+		    UpdateArrowAndBreak $line 0 ""
+		    set breakpoints [lreplace $breakpoints $i $i]
+		    incr i -1 ;# breakpoints has now one element less
+		}
+		if { $line >= $l2_old } {
+		    UpdateArrowAndBreak $line 0 ""
+		    set line [expr {$line+$delta}]
+		    UpdateArrowAndBreak $line 1 ""
+		    set br [lreplace $br 2 2 $line]
+		    set breakpoints [lreplace $breakpoints $i $i $br]
+		}
+	    }
+	}
+	UpdateRemoteBreaks
+    }
+
     set Numlines [scan [$text index end] %d]
     set font [$text cget -font]
     $marker configure -scrollregion [list 0 0 [winfo reqwidth $marker] \
@@ -4793,7 +4819,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		        -command "RamDebugger::CenterDisplay"] \
 		    [list command "Search in files" {} "Search for pattern in given files" \
 		    "ShiftCtrl f" \
-			-command "RamDebugger::SearchInFiles"] \
+		        -command "RamDebugger::SearchInFiles"] \
 		    separator \
 		    [list command "&Save position" {} "Save position to stack" "Shift F2" \
 		        -command "RamDebugger::PositionsStack save"] \
@@ -4838,7 +4864,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		separator \
 		[list command "&Expressions..." debugentry \
 		    "Open a window to visualize expresions or variables" "" \
-		-command "RamDebugger::DisplayVarWindow"] \
+		-command "RamDebugger::DisplayVarWindow $w"] \
 		[list command "Breakpoints..." debugentry \
 		    "Open a window to visualize the breakpoints list" "Alt F9" \
 		-command "RamDebugger::DisplayBreakpointsWindow"] \

@@ -12,6 +12,34 @@ proc zipfile { zipname directory files } {
     cd $cwd
 }
 
+proc CheckHiddenFiles { directory files } {
+
+    set cwd [pwd]
+    cd $directory
+
+    set fail 0
+    for { set i 0 } { $i < [llength $files] } { incr i } {
+	set file [lindex $files $i]
+	if { [file isdir $file] } {
+	    eval lappend files [glob -nocomplain -dir $file *]
+	}
+	foreach j [glob -nocomplain -dir $file -types hidden *] {
+	    .t ins end "Hidden file: $j\n" ; .t see end ; update
+	    incr fail
+	    file attributes $j -hidden 0
+	}
+	if { [file attributes $file -hidden] } {
+	    .t ins end "Hidden file: $file\n" ; .t see end ; update
+	    incr fail
+	    file attributes $file -hidden 0
+	}
+    }
+    cd $cwd
+    if { $fail } {
+	error "There are hidden files"
+    }
+}
+
 proc MustCompile { file args } {
 
     if { ![file exists $file] } { return 1 }
@@ -38,7 +66,7 @@ set ZIP /utils/zip.exe
 set ZIPFILES [list RamDebugger/RamDebugger.tcl RamDebugger/license.terms RamDebugger/Readme \
     RamDebugger/addons RamDebugger/scripts RamDebugger/Examples RamDebugger/help]
 
-pack [text .t -width 70 -height 4]
+pack [text .t -width 80 -height 8] -fill both -expand 1
 
 if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     set oldcwd [pwd]
@@ -47,7 +75,8 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     cd $oldcwd
 }
 
-zipfile RamDebugger2.5.zip .. $ZIPFILES
+CheckHiddenFiles .. $ZIPFILES
+zipfile RamDebugger2.6.zip .. $ZIPFILES
 
 update
 after 500

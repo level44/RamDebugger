@@ -5,4 +5,5 @@
   and in makefile_win
 * check makefile_win.tcl to see if more things needed to be included in the ZIP file
 * Check the README
+* Put files in CVS
 * Clean CVS dirs from the ZIP file

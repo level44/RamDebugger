@@ -214,9 +214,51 @@ proc RamDebugger::GetSelOrWordInIndex { idx } {
     return $var
 }
 
-proc RamDebugger::DisplayVarWindow {} {
+proc RamDebugger::ToggleTransientWinAll { mainwindow } {
+    variable varwindows
+    
+    foreach i $varwindows {
+	ToggleTransientWin [winfo toplevel $i] $mainwindow
+    }
+}
+
+proc RamDebugger::ToggleTransientWin { w mainwindow } {
+    variable options
+
+    if { [info exists options(TransientVarWindow)] && $options(TransientVarWindow) } {
+	wm transient $w $mainwindow
+    } else {
+	wm transient $w ""
+    }
+    AddAlwaysOnTopFlag $w $mainwindow
+}
+
+proc RamDebugger::AddAlwaysOnTopFlag { w mainwindow } {
+    variable options
+
+    catch { destroy $w._topmenu }
+    menu $w._topmenu -tearoff 0
+    $w conf -menu $w._topmenu
+    menu $w._topmenu.system -tearoff 0
+    $w._topmenu add cascade -menu $w._topmenu.system
+    $w._topmenu.system add checkbutton -label "Always on top" -var \
+        RamDebugger::options(TransientVarWindow) -command \
+        "RamDebugger::ToggleTransientWinAll $mainwindow"
+}
+
+proc RamDebugger::InvokeAllDisplayVarWindows {} {
+    variable varwindows
+
+    if { ![info exists varwindows] } { return }
+    foreach i $varwindows {
+	DialogWinTop::InvokeOK $i
+    }
+}
+
+proc RamDebugger::DisplayVarWindow { mainwindow } {
     variable text
     variable options
+    variable varwindows
     
     set var [GetSelOrWordInIndex insert]
 
@@ -224,6 +266,13 @@ proc RamDebugger::DisplayVarWindow {} {
     set f [DialogWinTop::Init $text "View expression or variable" separator $commands \
 	       "" Eval Close]
     set w [winfo toplevel $f]
+
+    lappend varwindows $f
+    bind $f <Destroy> {
+	set ipos [lsearch $RamDebugger::varwindows %W]
+	set RamDebugger::varwindows [lreplace $RamDebugger::varwindows $ipos $ipos]
+    }
+    ToggleTransientWin $w $mainwindow
 
     Label $f.l1 -text "Expression:" -grid "0 px3"
 
@@ -1064,7 +1113,7 @@ proc RamDebugger::AboutWindow {} {
 
 
     $w.c create text 0 0 -anchor n -font "-family {new century schoolbook} -size 16 -weight bold"\
-	    -fill \#d3513d -text "Version 2.5" -tags text
+	    -fill \#d3513d -text "Version 2.6" -tags text
     RamDebugger::AboutMoveCanvas $w.c 0
 
 
