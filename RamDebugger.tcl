@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.10 2002/09/02 08:35:46 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.11 2002/09/09 19:30:04 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -93,6 +93,7 @@ namespace eval RamDebugger {
     variable progressvar
     variable status
     variable WindowFilesList ""
+    variable WindowFilesListLineNums ""
     variable WindowFilesListCurr -1
 
     ################################################################################
@@ -147,7 +148,10 @@ proc RamDebugger::Init { readprefs } {
     set options_def(indentsizeTCL) 4
     set options_def(indentsizeC++) 2
     set options_def(ConfirmStartDebugging) 1
+    set options_def(instrument_source) auto
+    set options_def(ConfirmModifyVariable) 1
     set options_def(LocalDebuggingType) tk
+    set options_def(executable_dirs) ""
 
     switch $::tcl_platform(platform) {
 	windows {
@@ -175,7 +179,7 @@ proc RamDebugger::Init { readprefs } {
     #    start up but is better when making remote debugging
 
     if { $::tcl_platform(platform) == "windows" } {
-	set options_def(CheckRemotes) 0
+	set options_def(CheckRemotes) 1
     }
 
 
@@ -202,35 +206,7 @@ proc RamDebugger::Init { readprefs } {
 	}
     }
 
-    ################################################################################
-    # Increasing the path variable (just to ckeck typical locations)
-    ################################################################################
-
-    if { $::tcl_platform(platform) == "windows" } {
-	set err [catch { set shortname [file native [file attributes [file join $MainDir addons] \
-		-shortname]] }]
-	if { !$err } {
-	    if { [info exists ::env(PATH)] && $::env(PATH) != "" } {
-		append ::env(PATH) ";$shortname"
-	    } else {
-		set ::env(PATH) "$shortname"
-	    }
-	}
-	set dirs [list "c:/tcltk/mingw1.1" "c:/mingw1.1" "c:/mingw" "c:/mingw32"]
-	foreach i $dirs {
-	    foreach j [list $i [file join $i bin] [file join $i mingw bin] \
-		[file join $i mingw32 bin]] {
-		set err [catch { set shortname [file native [file attributes $j -shortname]] }]
-		if { !$err } {
-		    if { [info exists ::env(PATH)] && $::env(PATH) != "" } {
-		        append ::env(PATH) ";$shortname"
-		    } else {
-		        set ::env(PATH) "$shortname"
-		    }
-		}
-	    }
-	}
-    }
+    UpdateExecDirs
 
     ################################################################################
     # Registering as remote server
@@ -251,6 +227,49 @@ proc RamDebugger::Init { readprefs } {
 	    wm withdraw .
 	}
 	set debuggerserver [tk appname $debuggerserver]
+    }
+}
+
+proc RamDebugger::UpdateExecDirs {} {
+    variable options
+    variable MainDir
+
+    if { $::tcl_platform(platform) == "windows" } {
+	set file [filenormalize [file join $MainDir addons]]
+	if { [lsearch $options(executable_dirs) $file] == -1 } {
+	    lappend options(executable_dirs) $file
+	}
+	foreach i [glob -nocomplain -dir c: mingw*] {
+	    set dirs_in [glob -nocomplain -dir $i mingw*]
+	    foreach j [concat [list $i] $dirs_in] {
+		if { [file exists [file join $j bin]] } {
+		    set file [filenormalize [file join $j bin]]
+		    if { [lsearch $options(executable_dirs) $file] == -1 } {
+			lappend options(executable_dirs) $file
+		    }
+		}
+	    }
+	}
+    }
+
+    if { ![info exists ::env(PATH)] } {
+	set list ""
+    } else {
+	set list [split $::env(PATH) \;]
+    }
+    set haschanged 0
+    foreach i $options(executable_dirs) {
+	if { $::tcl_platform(platform) == "windows" } {
+	    set err [catch { set shortname [file native [file attributes $i -shortname]] }]
+	    if { !$err } { set i $shortname }
+	}
+	if { [lsearch $list $i] == -1 } {
+	    lappend list $i
+	    set haschanged 1
+	}
+    }
+    if { $haschanged } {
+	set ::env(PATH) [join $list \;]
     }
 }
 
@@ -327,7 +346,7 @@ proc RamDebugger::rdebug { args } {
 
     if { $opts(-disconnect) } {
 	if { $remoteserver == "" } {
-	    error "error. There is no connected remote server"
+	    error "error. There is no debugging session active"
 	}
 	if { $remoteserverType == "local" } {
 	    interp delete local
@@ -351,8 +370,31 @@ proc RamDebugger::rdebug { args } {
 		after 3000 updatemaster
 	    }
 	}
-	interp alias local exit "" interp delete local
+	proc exit_slave { args } {
+	    if { [catch [list RamDebugger::rdebug -disconnect] errstring] } {
+		WarnWin $errstring
+	    } else {
+		set code 0
+		if { [llength $args] == 1 } { set code [lindex $args 0] }
+		TextOutRaise
+		TextOutInsertRed "Program exited with code $code"
+	    }
+	}
+	interp alias local exit "" RamDebugger::exit_slave
 	local eval { set argc 0 ; set argv "" }
+	local eval [list set argv0 $currentfile]
+
+	if { [info exists options(currentfileargs)] } {
+	    foreach "curr dir_in arg_in" $options(currentfileargs) {
+		if { $curr == $currentfile } {
+		    if { [file isdirectory $dir_in] } { cd $dir_in }
+		    local eval [list set argc [llength $arg_in]]
+		    local eval [list set argv $arg_in]
+		    break
+		}
+	    }
+	}
+
 	set err [catch {package present registry} ver]
 	if { !$err } {
 	    interp alias local registry "" registry
@@ -361,6 +403,7 @@ proc RamDebugger::rdebug { args } {
 	if { ![info exists options(LocalDebuggingType)] || $options(LocalDebuggingType) == "tk" } {
 	    interp eval local [list load {} Tk]
 	}
+	#local eval { catch { bind . <Destroy> exit } }
 	set remoteserverType local
 	if { $currentfile == "" } {
 	    error "Error. there is no current file"
@@ -407,7 +450,7 @@ proc RamDebugger::rdebug { args } {
 	set remoteserver [list $fid $opts(program) start]
 	fconfigure $fid -blocking 0 -buffering line
 	fileevent $fid readable RamDebugger::RecieveFromGdb
-        TakeArrowOutFromText
+	TakeArrowOutFromText
     } else {
 	if { $opts(program) == "" } {
 	    if { $remoteserver != "" } {
@@ -442,47 +485,6 @@ proc RamDebugger::rdebug { args } {
 	    variable lastprocname ""
 	    variable lastlevel 0
 	    variable currentfile ""
-	}
-	if { [info commands ::RDC::bgerror_base] == "" } {
-	    auto_import ::bgerror
-	    if { [info commands ::bgerror] != "" } {
-		rename ::bgerror ::RDC::bgerror_base
-	    }
-	    proc ::bgerror err {
-		RDC::SendDev [list RamDebugger::RecieveErrorFromProgram $err $::errorInfo]
-	    }
-	}
-	if { [info commands ::RDC::puts_base] == "" } {
-	    rename ::puts ::RDC::puts_base
-	    proc ::puts args {
-		set argsN $args
-		set hasnewline 1
-		if { [lindex $argsN 0] == "-nonewline" } {
-		    set hasnewline 0
-		    set argsN [lrange $argsN 1 end]
-		}
-		set channelId stdout
-		if { [llength $argsN] == 2 } {
-		    set channelId [lindex $argsN 0]
-		    set argsN [lrange $argsN 1 end]
-		}
-		if { [llength $argsN] == 1 && [regexp {stdout|stderr} $channelId] } {
-		    RDC::SendDev [list RamDebugger::RecieveOutputFromProgram $channelId \
-		        [lindex $argsN 0] $hasnewline]
-		} else {
-		    eval ::RDC::puts_base $args
-		}
-	    }
-	}
-	if { [info commands ::RDC::infoproc] == "" } {
-	    rename ::info ::RDC::infoproc
-	    proc ::info { args } {
-		set retval [uplevel 1 ::RDC::infoproc $args]
-		if { [lindex $args 0] == "script" && $retval == "" } {
-		    return $::RDC::currentfile
-		}
-		return $retval
-	    }
 	}
 	proc RDC::SendDev { comm } {
 	    SENDDEVBODY
@@ -570,6 +572,55 @@ proc RamDebugger::rdebug { args } {
 		}
 	    }
 	}
+	if { [info commands ::RDC::bgerror_base] == "" } {
+	    auto_import ::bgerror
+	    if { [info commands ::bgerror] != "" } {
+		rename ::bgerror ::RDC::bgerror_base
+	    }
+	    proc ::bgerror err {
+		RDC::SendDev [list RamDebugger::RecieveErrorFromProgram $err $::errorInfo]
+	    }
+	}
+	if { [info commands ::RDC::puts_base] == "" } {
+	    rename ::puts ::RDC::puts_base
+	    proc ::puts args {
+		set argsN $args
+		set hasnewline 1
+		if { [lindex $argsN 0] == "-nonewline" } {
+		    set hasnewline 0
+		    set argsN [lrange $argsN 1 end]
+		}
+		set channelId stdout
+		if { [llength $argsN] == 2 } {
+		    set channelId [lindex $argsN 0]
+		    set argsN [lrange $argsN 1 end]
+		}
+		if { [llength $argsN] == 1 && [regexp {stdout|stderr} $channelId] } {
+		    RDC::SendDev [list RamDebugger::RecieveOutputFromProgram $channelId \
+		        [lindex $argsN 0] $hasnewline]
+		} else {
+		    eval ::RDC::puts_base $args
+		}
+	    }
+	}
+	if { [info commands ::RDC::infoproc] == "" } {
+	    rename ::info ::RDC::infoproc
+	    proc ::info { args } {
+		set retval [uplevel 1 ::RDC::infoproc $args]
+		if { [lindex $args 0] == "script" && $retval == "" } {
+		    return $::RDC::currentfile
+		}
+		return $retval
+	    }
+	}
+	if { [info commands ::RDC::sourceproc] == "" } {
+	    rename ::source ::RDC::sourceproc
+	    proc ::source { file } {
+		set file [file join [pwd] $file]
+		set retval [RDC::SendDev [list RamDebugger::RecieveFromProgramSource $file]]
+		if { $retval != "" } { uplevel 1 $retval }
+	    }
+	}
     }
     if { $remoteserverType == "local" } {
 	set remotecomm [string map [list SENDDEVBODY "sendmaster \$comm"] \
@@ -580,7 +631,6 @@ proc RamDebugger::rdebug { args } {
 	if { [lindex $opts(program) 1] != "" } {
 	    append remotecomm "set args [lindex $opts(program) 2]"
 	}
-
     } elseif { $::tcl_platform(platform) == "windows" } {
 	set remotecomm [string map [list SENDDEVBODY "comm::comm send $debuggerserverNum \$comm"] \
 		            $remotecomm]
@@ -595,12 +645,21 @@ proc RamDebugger::rdebug { args } {
 	set debuggerstate debug
 	UpdateRemoteBreaks
     }
-    if { $opts(-currentfile) } {
-	EvalRemote [list set ::RDC::currentfile $currentfile]
-	after idle [list RamDebugger::rlist -quiet -asmainfile $currentfile]
-    }
-    if { $opts(-debugcplusplus) } {
-	EvalRemote "run"
+    if { $debuggerstate == "debug" } {
+	switch $remoteserverType {
+	    remote {
+		if { $currentfile != "" } {
+		    rlist -quiet $currentfile
+		}
+	    }
+	    local {
+		EvalRemote [list set ::RDC::currentfile $currentfile]
+		after idle [list RamDebugger::rlist -quiet -asmainfile $currentfile]
+	    }
+	    gdb {
+		EvalRemote "run"
+	    }
+	}
     }
     return "Begin debugging of program '$remoteserver'"
 }
@@ -711,6 +770,7 @@ proc RamDebugger::rcont { args } {
     variable currentline
     variable fileslist
     variable debuggerstate
+    variable remoteserver
     variable remoteserverType
 
     if { $debuggerstate == "time" } {
@@ -728,7 +788,7 @@ proc RamDebugger::rcont { args } {
     }
 
     if { $currentfile == "" } {
-	error "There is no file selected\$usagestring"
+	error "There is no file selected\n$usagestring"
     }
     if { $opts(line) != "" } {
 	set currentline $opts(line)
@@ -756,7 +816,9 @@ proc RamDebugger::rcont { args } {
 	EvalRemote ::RDC::Continue
     } else {
 	if { $opts(line) != "" } {
+	    set remoteserver [lreplace $remoteserver 2 2 setbreakpoints]
 	    EvalRemote "tbreak [file tail $currentfile]:$currentline"
+	    EvalRemote "printf \"FINISHED SET BREAKPOINTS\\n\""
 	}
 	EvalRemote "cont"
     }
@@ -1038,12 +1100,13 @@ proc RamDebugger::rlist { args } {
     variable options
 
     set usagestring {usage: rlist ?switches? ?file? ?line?
-	-h:       displays usage
-	-quiet: do not print anything
-	-force: force to reload file
+	-h:            displays usage
+	-quiet:        do not print anything
+	-force:        force to reload file
 	-reinstrument: force to reinstrument
 	-asmainfile:   When debugging locally, the first file, first time  must be list like this
-	--:     end of options
+	-returndata:   Instead of sending instr file, return it
+	--:            end of options
     }
     ParseArgs $args $usagestring opts
     set force $opts(-force)
@@ -1066,7 +1129,8 @@ proc RamDebugger::rlist { args } {
 	set filetype tcl
     }
 
-    if { $currentfileIsModified && ![info exists instrumentedfilesP($currentfile)] } {
+    if { ($currentfile == "New file" || $currentfileIsModified ) && \
+	    ![info exists instrumentedfilesP($currentfile)] } {
 	variable text
 	set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
 	set files($currentfile) [string map $map [$text get 1.0 end-1c]]
@@ -1194,20 +1258,31 @@ proc RamDebugger::rlist { args } {
 	SetMessage ""
     }
 
+    set retval ""
+
     if { $debuggerstate != "" && $remoteserver != "" && \
 	[info exists instrumentedfilesP($currentfile)] &&\
 	(![info exists instrumentedfilesSent($currentfile)] || \
-	    $instrumentedfilesSent($currentfile) != $debuggerstate || $force) } {
+	    $instrumentedfilesSent($currentfile) != $debuggerstate || $force || $opts(-returndata)) } {
 	if { [catch {
 	    if { $debuggerstate == "debug" } {
-		EvalRemote $instrumentedfilesP($currentfile)
+		if { $opts(-returndata) } {
+		    append retval $instrumentedfilesP($currentfile)\n
+		} else {
+		    EvalRemote $instrumentedfilesP($currentfile)
+		}
 		if { $opts(-asmainfile) } {
-		    EvalRemote $instrumentedfilesR($currentfile)
+		    if { $opts(-returndata) } {
+		        append retval $instrumentedfilesR($currentfile)
+		    } else {
+		        EvalRemote $instrumentedfilesR($currentfile)
+		    }
 		}
 	    } else {
 		EvalRemote $instrumentedfilesTime($currentfile)
 	    }
 	    set instrumentedfilesSent($currentfile) $debuggerstate
+
 	    FillListBox
 	} errstring] } {
 	    set err $::errorInfo
@@ -1222,7 +1297,9 @@ proc RamDebugger::rlist { args } {
     if { $opts(line) != "" } {
 	set currentline $opts(line)
     }
-    if { $opts(-quiet) } { return "" }
+    if { $opts(-returndata) || $opts(-quiet) } {
+	return $retval
+    }
 
     set lines [split $files($currentfile) \n]
     set retval ""
@@ -1407,19 +1484,22 @@ proc RamDebugger::rdel { args } {
 proc RamDebugger::filenormalize { file } {
 
     if { $file == "New file" } { return $file }
+    if { $file == "" } { return "" }
     
+    set pwd [pwd]
+    catch {
+	cd [file dirname $file]
+	set file [file join [pwd] [file tail $file]]
+    }
+    cd $pwd
+
     if { $::tcl_platform(platform) == "windows" } {
 	catch { set file [file attributes $file -longname] }
-    } else {
-	set pwd [pwd]
-	catch {
-	    cd [file dirname $file]
-	    set file [file join [pwd] [file tail $file]]
-	}
-	cd $pwd
     }
+
     return $file
 }
+
 proc RamDebugger::ParseArgs { args usagestring OptsName } {
     upvar 1 $OptsName opts
 
@@ -1482,7 +1562,7 @@ proc RamDebugger::ParseArgs { args usagestring OptsName } {
 
 proc RamDebugger::MyNameIs { name id } {
     variable services
-
+    SetMessage "Remote program: $name"
     set services($name) $id
 }
 
@@ -1520,7 +1600,7 @@ proc RamDebugger::FindActivePrograms { force } {
 	    RamDebugger::ProgressVar $iprogress
 	    set comm [list comm::comm send -async $i \
 		          [list catch [list comm::givename $debuggerserverNum]]]
-	    if { [catch $comm] && $force != 2 } { break }
+	    set err [catch $comm errstring]
 	}
 	# dirty trick to make array exist
 	set services(11) ""
@@ -1634,6 +1714,22 @@ proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
     update
 }
 
+proc RamDebugger::RecieveFromProgramSource { file } {
+    variable currentfile
+
+    set retval [RamDebugger::DoinstrumentThisfile $file]
+    if { $retval } {
+	TextOutRaise
+	TextOutInsertBlue "Sending Instrumented file '$file'\n"
+
+	set currentfile_save $currentfile
+	set retval [rlist -returndata -asmainfile $file]
+	set currentfile $currentfile_save
+	return $retval
+    }
+    return [list ::RDC::sourceproc $file]
+}
+
 proc RamDebugger::EvalRemote { comm } {
     variable remoteserver
     variable remoteserverNum
@@ -1660,6 +1756,8 @@ proc RamDebugger::EvalRemote { comm } {
 
 proc RamDebugger::GiveInstFile { file onlyifnewer filetype } {
     variable CacheDir
+
+    if { $file == "New file" } { return }
 
     if { [info exists CacheDir] } {
 	regsub -all {(/|:)} [file join [pwd] [file dirname $file]] \# modpath
@@ -1802,6 +1900,16 @@ proc RamDebugger::RecieveFromGdb {} {
 		    #puts ---$aa---
 		    #WarnWin "Could not do a '$state'"
 		}
+	    } else {
+		if { ![file exists $file] } {
+		    set fullfile [cproject::TryToFindPath $file]
+		    if { $fullfile != "" } {
+			set file $fullfile
+			if { [file exists $file] } {
+			    set file [filenormalize $file]
+			}
+		    }
+		}
 	    }
 	    if { $line != "" } {
 		set remoteserver [lreplace $remoteserver 2 2 ""]
@@ -1809,8 +1917,8 @@ proc RamDebugger::RecieveFromGdb {} {
 		if { $filenum == -1 } {
 		    set err [catch {OpenFileF $file} errstring]
 		    if { $err } {
-			WarnWin "Could not open file '$file' for stopping program"
-			return
+		        WarnWin "Could not open file '$file' for stopping program"
+		        return
 		    }
 		    set filenum [lsearch $fileslist $file]
 		}
@@ -1866,16 +1974,22 @@ proc RamDebugger::RecieveFromGdb {} {
 	    return
 	}
 	setbreakpoints {
-	    if { [regexp {FINISHED SET BREAKPOINTS\s*$} $aa] } {
+	    if { [regexp {FINISHED SET BREAKPOINTS\s*(.*)$} $aa {} rest] } {
 		set remoteserver [lreplace $remoteserver 2 2 ""]
-	    }
-	    return
+		if { [string trim $rest] == "" } { return }
+	    } else { return }
 	}
     }
 
-    if { [regexp {Breakpoint\s[0-9]+,\s+(\S+\s+\([^\)]*\))\s+at\s+([^:]+):([0-9]+)} \
-	    $aa {} procname file line] } {
+    if { [regexp {(Breakpoint\s[0-9]+,\s+)?(\S+\s+\([^\)]*\))\s+at\s+([^:]+):([0-9]+)} \
+	$aa {} {} procname file line] } {
 
+	if { ![file exists $file] } {
+	    set fullfile [cproject::TryToFindPath $file]
+	    if { $fullfile != "" } {
+		set file $fullfile
+	    }
+	}
 	if { [file pathtype $file] == "relative" } {
 	    set executable [lindex $options(debugcplusplus) 0]
 	    set dir [file dirname $executable]
@@ -1892,18 +2006,6 @@ proc RamDebugger::RecieveFromGdb {} {
 	    set file $drive$file
 	}
 	set file [filenormalize $file]
-	set found 0
-	foreach i $breakpoints {
-	    set breaknum [lindex $i 0]
-	    set line_in [lindex $i 2]
-	    set file_in [lindex $i 1]
-	    if { $line == $line_in && [AreFilesEqual $file $file_in] } {
-		set found 1
-		break
-	    }
-	    # CONDITION is forgotten by now
-	}
-	if { $found } {
 	    set filenum [lsearch $fileslist $file]
 	    if { $filenum == -1 } {
 		set err [catch {OpenFileF $file} errstring]
@@ -1913,12 +2015,36 @@ proc RamDebugger::RecieveFromGdb {} {
 		}
 		set filenum [lsearch $fileslist $file]
 	    }
-	    RecieveFromProgram $breaknum $filenum $line $procname "" ""
+	    RecieveFromProgram "" $filenum $line $procname "" ""
 	    return
-	} else {
-	    WarnWin "Problems finding breakpoint in file $file ($aa)"
-	}
-	return
+
+# 	set found 0
+# 	foreach i $breakpoints {
+# 	    set breaknum [lindex $i 0]
+# 	    set line_in [lindex $i 2]
+# 	    set file_in [lindex $i 1]
+# 	    if { $line == $line_in && [AreFilesEqual $file $file_in] } {
+# 		set found 1
+# 		break
+# 	    }
+# 	    # CONDITION is forgotten by now
+# 	}
+# 	if { $found } {
+# 	    set filenum [lsearch $fileslist $file]
+# 	    if { $filenum == -1 } {
+# 		set err [catch {OpenFileF $file} errstring]
+# 		if { $err } {
+# 		    WarnWin "Could not open file '$file' for stopping program"
+# 		    return
+# 		}
+# 		set filenum [lsearch $fileslist $file]
+# 	    }
+# 	    RecieveFromProgram $breaknum $filenum $line $procname "" ""
+# 	    return
+# 	} else {
+# 	    WarnWin "Problems finding breakpoint in file $file ($aa)"
+# 	}
+# 	return
     }
 
     if { [regexp {Program exited[^\n]*} $aa mess] } {
@@ -1931,959 +2057,11 @@ proc RamDebugger::RecieveFromGdb {} {
 	}
 	WarnWin $mess
     }
+    if { [string match "*No executable specified, use `target exec'.*" $aa] } {
+	WarnWin "Error defining the debugged executable. Use 'Utilities->gdb log' for details"
+    }
     TextOutInsert $aa
     TextOutRaise
-}
-
-################################################################################
-#               RamDebugger::Instrumenter
-################################################################################
-
-namespace eval RamDebugger::Instrumenter {
-    variable stack
-    variable words
-    variable currentword
-    variable wordtype
-    variable wordtypeline
-    variable wordtypepos
-    variable DoInstrument
-    variable OutputType
-    variable NeedsNamespaceClose
-    variable braceslevel
-
-    variable level
-    variable colors
-}
-
-proc RamDebugger::Instrumenter::InitState {} {
-    variable stack ""
-    variable words ""
-    variable currentword ""
-    variable wordtype ""
-    variable wordtypeline ""
-    variable wordtypepos ""
-    variable DoInstrument 0
-    variable OutputType
-    variable NeedsNamespaceClose 0
-    variable braceslevel 0
-    variable level 0
-    variable colors
-
-    foreach i [list return break while eval foreach for if else elseif error switch default \
-	    continue] {
-	set colors($i) magenta
-    }
-    foreach i [list variable set global] {
-	set colors($i) green
-    }
-}
-
-proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblocknameR } {
-    variable stack
-    variable words
-    variable currentword
-    variable wordtype
-    variable wordtypeline
-    variable wordtypepos
-    variable DoInstrument
-    variable OutputType
-    variable NeedsNamespaceClose
-    variable braceslevel
-    variable level
-
-    set NewDoInstrument 0
-    if { $OutputType == "P" } {
-	set NewOutputType PP
-    } else { set NewOutputType $OutputType }
-
-    set PushState 0
-    if { $type == "\[" } {
-	set PushState 1
-	if { $DoInstrument == 1 } {
-	    set NewDoInstrument 1
-	} else {
-	    set NewDoInstrument 0
-	}
-    } else {
-	if { [lindex $words 0] == "proc" && [llength $words] == 3 } {
-	    set NewDoInstrument 1
-	} elseif { $DoInstrument == 0 } {
-	    if { [lindex $words 0] == "namespace" && [lindex $words 1] == "eval" && \
-		     [llength $words] >= 3 } {
-		set PushState 1
-#                 if { $OutputType == "R" } {
-#                     upvar 2 $newblocknameP newblock
-#                 } else { upvar 2 $newblocknameR newblock }
-#                 append newblock "namespace eval [lindex $words 2] \{\n"
-#                 set NeedsNamespaceClose 1
-	    }
-	} elseif { $DoInstrument == 1 } {
-	    switch -- [lindex $words 0] {
-		"if" {
-		    if { [llength $words] == 2 } {
-		        set NewDoInstrument 1
-		    } elseif { [lindex $words end] == "then" || [lindex $words end] == "else" } {
-		        set NewDoInstrument 1
-		    } elseif { [lindex $words end-1] == "elseif" } {
-		        set NewDoInstrument 1
-		    }
-		}
-		"namespace" {
-		    if { [lindex $words 1] == "eval" && [llength $words] >= 3 } {
-		        set NewDoInstrument 1
-		        if { $OutputType == "R" } {
-		            upvar 2 $newblocknameP newblockP
-		            append newblockP "namespace eval [lindex $words 2] \{\n"
-		            set NeedsNamespaceClose 1
-		        }
-		    }
-		}
-		"catch" {
-		    if { [llength $words] == 1 } {
-		        set NewDoInstrument 1
-		    }
-		}
-		"while" {
-		    if { [llength $words] == 2 } {
-		        set NewDoInstrument 1
-		    }
-		}
-		"foreach" {
-		    if { [llength $words] >= 3 } {
-		        set NewDoInstrument 1
-		    }
-		}
-		"for" {
-		    if { [llength $words] == 4 } {
-		        set NewDoInstrument 1
-		    }
-		}
-		"eval" {
-		    set NewDoInstrument 1
-		}
-		"uplevel" {
-		    set len [llength $words]
-		    if { [regexp {[\#]?[0-9]+} [lindex $words 1]] } {
-		        incr len -1
-		    }
-		    if { $len > 0 } {
-		        set NewDoInstrument 1
-		    }
-		}
-		"switch" {
-		    for { set i 1 } { $i < [llength $words] } { incr i } {
-		        if { [lindex $words $i] == "--" } {
-		            incr i
-		            break
-		        } elseif { ![string match -* [lindex $words $i]] } { break }
-		    }
-		    set len [expr [llength $words]-$i]
-		    if { $len == 1 } {
-		        set NewDoInstrument 2
-		    }
-		}
-	    }
-	} elseif { $DoInstrument == 2 } {
-	    if { [llength $words]%2 } {
-		set NewDoInstrument 1
-	    }
-	}
-    }
-    if { !$PushState && !$NewDoInstrument } { return 1 }
-
-    incr level
-    lappend stack [list $words $currentword $wordtype $wordtypeline \
-	$wordtypepos $DoInstrument $OutputType $NeedsNamespaceClose $braceslevel $line $type]
-
-    set words ""
-    set currentword ""
-    set wordtype ""
-    set wordtypeline ""
-    set wordtypepos ""
-    set DoInstrument $NewDoInstrument
-    set OutputType $NewOutputType
-    set NeedsNamespaceClose 0
-    set braceslevel 0
-    return 0
-}
-
-proc RamDebugger::Instrumenter::PopState { type line newblocknameP newblocknameR } {
-    variable stack
-    variable wordtype
-    variable words
-    variable currentword
-    variable wordtype
-    variable wordtypeline
-    variable wordtypepos
-    variable DoInstrument
-    variable OutputType
-    variable NeedsNamespaceClose
-    variable braceslevel
-    variable level
-
-    set lasttype [lindex [lindex $stack end] end]
-    if { $type == "\]" && $lasttype != "\[" } { return 1 }
-
-    if { $type == "\}" } {
-	if { $wordtype == "w" } {
-	    set numopen 0
-	    for { set i 0 } { $i < [string length $currentword] } { incr i } {
-		switch -- [string index $currentword $i] {
-		    "\\" { incr i }
-		    \{ { incr numopen }
-		    \} { incr numopen -1 }
-		}
-	    }
-	    if { $numopen } { return 1 }
-	}
-	if { $lasttype != "\{" } {
-	    foreach i $stack {
-		if { [lindex $i end] == "\{" } {
-		    set text "Using a close brace (\}) in line $line when there is an open brace "
-		    append text "in line [lindex $i end-1] and an open bracket (\[) in line "
-		    append text "[lindex [lindex $stack end] end-1]"
-		    error $text
-		}
-		return 1
-	    }
-	} 
-    }
-    foreach [list words currentword wordtype wordtypeline wordtypepos DoInstrument OutputType \
-	NeedsNamespaceClose braceslevel] [lindex $stack end] break
-    set stack [lreplace $stack end end]
-    incr level -1
-
-    if { $NeedsNamespaceClose } {
-	upvar 2 $newblocknameP newblockP
-	append newblockP "\}\n"
-	set NeedsNamespaceClose 0
-    }
-
-    return 0
-}
-
-proc RamDebugger::Instrumenter::CheckEndOfFileState {} {
-    variable stack
-
-    set text ""
-    foreach i $stack {
-	set line [lindex $i end-1]
-	set type [lindex $i end]
-	append text "There is a block of type ($type) beginning at line $line "
-	append text "that is not closed at the end of the file\n"
-    }
-    if { $text != "" } {
-	error $text
-    }
-}
-
-# newblocknameP is for procs
-# newblocknameR is for the rest
-proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknameR blockinfoname } {
-
-    variable words
-    variable currentword
-    variable wordtype
-    variable wordtypeline
-    variable DoInstrument
-    variable OutputType
-    variable braceslevel
-    variable level
-    variable colors
-
-    set length [string length $block]
-    if { $length >= 1000 } {
-	RamDebugger::ProgressVar 0 1
-    }
-
-    # a trick: it is the same to use newblockP or newblockPP. Only convenience
-    upvar $newblocknameP newblockP
-    upvar $newblocknameP newblockPP
-    upvar $newblocknameR newblockR
-    upvar $blockinfoname blockinfo
-    set newblockP ""
-    set newblockR ""
-    set blockinfo ""
-    set blockinfocurrent [list 0 n]
-    InitState
-
-    set DoInstrument 1
-    set OutputType R
-
-    append newblockP "# RamDebugger instrumented file. InstrumentProcs=1\n"
-    append newblockR "# RamDebugger instrumented file. InstrumentProcs=0\n"
-
-    set braceslevelNoEval 0
-    set checkExtraCharsAfterCQB ""
-    set lastc ""
-    set lastinstrumentedline ""
-    set line 1
-    set ichar 0
-    set icharline 0
-    foreach c [split $block ""] {
-
-	if { $ichar%1000 == 0 } {
-	    RamDebugger::ProgressVar [expr $ichar*100/$length]
-	}
-	if { $checkExtraCharsAfterCQB != "" } {
-	    if { ![string is space $c] && $c != "\}" && $c != "\]" && $c != "\\" && $c != ";" } {
-		if { $c == "\"" && $checkExtraCharsAfterCQB == "\}" } {
-		    # nothing
-		} else {
-		    set text "There is a non valid character ($c) in line $line "
-		    append text "after a closing block with ($checkExtraCharsAfterCQB)"
-		    error $text
-		}
-	    }
-	    set checkExtraCharsAfterCQB ""
-	}
-	if { $DoInstrument == 1 && $lastinstrumentedline != $line && \
-	    ![string is space $c] && \
-	     $c != "\#" && $words == "" } {
-	    append newblock$OutputType "RDC::F $filenum $line ; "
-	    set lastinstrumentedline $line
-	}
-	set consumed 0
-	switch -- $c {
-	    \" {
-		if { $lastc != "\\" && [lindex $words 0] != "\#" } {
-		    if { $wordtype == "" } {
-		        set wordtype \"
-		        set wordtypeline $line
-		        set wordtypepos $icharline
-		        set consumed 1
-		    } elseif { $wordtype == "\"" } {
-		        set wordtype ""
-		        lappend words $currentword
-		        set currentword ""
-		        set consumed 1
-		        set checkExtraCharsAfterCQB \"
-
-		        if { $wordtypeline == $line } {
-		            lappend blockinfocurrent grey $wordtypepos [expr $icharline+1]
-		        } else {
-		            lappend blockinfocurrent grey 0 [expr $icharline+1]
-		        }
-		        set wordtypeline 0
-
-		        if { $OutputType == "R" && $words == "proc" } {
-		            if { $lastinstrumentedline == $line } {
-		                set numdel [expr 4+[string length "RDC::F $filenum $line ; "]]
-		            } else { set numdel 4 }
-		            set newblockR [string range $newblockR 0 end-$numdel]
-		            append newblockP $words
-		            set OutputType P
-		        }
-		    } elseif { $wordtype == "\{" } {
-		        if { ![info exists quoteintobraceline] } {
-		            set quoteintobraceline $line
-		            set quoteintobracepos $icharline
-		        } else {
-		            if { $line == $quoteintobraceline } {
-		                lappend blockinfocurrent grey $quoteintobracepos [expr $icharline+1]
-		            }
-		            unset quoteintobraceline quoteintobracepos
-		        }
-		    }
-		}
-	    }
-	    \{ {
-		if { $lastc != "\\" } {
-		    if { $wordtype == "\{" } {
-		        incr braceslevelNoEval
-		    } elseif { $wordtype == "\"" || $wordtype == "w" } {
-		        incr braceslevel
-		    } else {
-		        set consumed 1
-		        set fail [PushState \{ $line $newblocknameP $newblocknameR]
-		        if { $fail } {
-		            set wordtype \{
-		            set wordtypeline $line
-		            set braceslevelNoEval 1
-		        } else {
-		            set lastinstrumentedline $line
-		        }
-		    }
-		}
-	    }
-	    \} {
-		if { $lastc != "\\" } {
-		    if { $wordtype == "\{" } {
-		        incr braceslevelNoEval -1
-		        if { $braceslevelNoEval == 0 } {
-		            set wordtype ""
-		            lappend words $currentword
-		            set currentword ""
-		            set consumed 1
-		            if { [lindex $words 0] != "\#" } {
-		                set checkExtraCharsAfterCQB \}
-		            }
-		            if { $OutputType == "R" && $words == "proc" } {
-		                if { $lastinstrumentedline == $line } {
-		                    set numdel [expr 4+[string length "RDC::F $filenum $line ; "]]
-		                } else { set numdel 4 }
-		                set newblockR [string range $newblockR 0 end-$numdel]
-		                append newblockP $words
-		                set OutputType P
-		            }
-		        }
-		    } elseif { $braceslevel > 0 } {
-		        incr braceslevel -1
-		    } else {
-		        set wordtype_before $wordtype
-		        set fail [PopState \} $line $newblocknameP $newblocknameR]
-		        if { !$fail } {
-		            if { $wordtype_before == "\"" } {
-		                set text "Quoted text (\") in line $line "
-		                append text "contains and invalid brace (\})"
-		                error $text
-		            }
-		            set consumed 1
-		            lappend words ""
-		            if { [lindex $words 0] != "\#" } {
-		                set checkExtraCharsAfterCQB \}
-		            }
-		        }
-		    }
-		}
-	    }
-	    " " - \t {
-		if { $lastc != "\\" } {
-		    if { $wordtype == "w" } {
-		        set consumed 1
-		        set wordtype ""
-		        lappend words $currentword
-		        set currentword ""
-
-		        if { $OutputType == "R" && $words == "proc" } {
-		            if { $lastinstrumentedline == $line } {
-		                set numdel [expr 4+[string length "RDC::F $filenum $line ; "]]
-		            } else { set numdel 4 }
-		            set newblockR [string range $newblockR 0 end-$numdel]
-		            append newblockP $words
-		            set OutputType P
-		        }
-
-		        if { [lindex $words 0] == "proc" } {
-		            if { [llength $words] == 1 } {
-		                set icharlineold [expr $icharline-4]
-		                lappend blockinfocurrent magenta $icharlineold $icharline
-		            } elseif { [llength $words] == 2 } {
-		                set icharlineold [expr $icharline-[string length [lindex $words end]]]
-		                lappend blockinfocurrent blue $icharlineold $icharline
-		            }
-		        } elseif { [info exists colors([lindex $words end])] } {
-		            set icharlineold [expr $icharline-[string length [lindex $words end]]]
-		            lappend blockinfocurrent $colors([lindex $words end]) $icharlineold \
-		               $icharline
-		        }
-		    } elseif { $wordtype == "" } { set consumed 1 }
-		}
-	    }
-	    \[ {
-		if { $lastc != "\\" && $wordtype != "\{" } {
-		    if { $wordtype == "" } { set wordtype "w" }
-		    set consumed 1
-		    PushState \[ $line $newblocknameP $newblocknameR
-		    set lastinstrumentedline $line
-		}
-	    }
-	    \] {
-		if { $lastc != "\\" && $wordtype != "\"" && $wordtype != "\{" } {
-		    set fail [PopState \] $line $newblocknameP $newblocknameR]
-		    if { !$fail } {
-		        set consumed 1
-		    }
-		    # note: the word inside words is not correct when using []
-		}
-	    }
-	    \n {
-		if { [lindex $words 0] == "\#" } {
-		    lappend blockinfocurrent red $commentpos $icharline
-		} elseif { $wordtype == "\"" } {
-		    if { $wordtypeline == $line } {
-		        lappend blockinfocurrent grey $wordtypepos $icharline
-		    } else {
-		        lappend blockinfocurrent grey 0 $icharline
-		    }
-		} elseif { $wordtype == "w" && [info exists colors($currentword)] } {
-		    set icharlineold [expr $icharline-[string length $currentword]]
-		    lappend blockinfocurrent $colors($currentword) $icharlineold \
-		       $icharline
-		}
-		lappend blockinfo $blockinfocurrent
-		incr line
-		set blockinfocurrent [expr $level+$braceslevelNoEval]
-
-		if { ($wordtype == "w" || $wordtype == "\"") && $braceslevel > 0 } {
-		    lappend blockinfocurrent "n"
-		} elseif { $wordtype != "\{" } {
-		    set consumed 1
-		    if { $lastc != "\\" && $wordtype != "\"" } {
-#                         if { $wordtype == "\"" } {
-#                             set text "Quotes (\") in line [expr $line-1] "
-#                             append text "are not closed"
-#                             error $text
-#                         }
-		        set words ""
-		        set currentword ""
-		        set wordtype ""
-
-		        if { $OutputType == "P" } {
-		            append newblockP $c
-		            set OutputType R
-		        }
-		        lappend blockinfocurrent "n"
-		    } else {
-		        if { $wordtype == "w" } {
-		            set wordtype ""
-		            lappend words $currentword
-		            set currentword ""
-		        }
-		        lappend blockinfocurrent "c"
-		    }
-		} else { lappend blockinfocurrent "n" }
-	    }
-	    \# {
-		if { [llength $words] == 0 && $currentword == "" && $wordtype == "" } {
-		    set consumed 1
-		    lappend words \#
-		    set commentpos $icharline
-		}
-	    }
-	    ; {
-		if { $lastc != "\\" && $wordtype != "\"" && $wordtype != "\{"  && \
-		        [lindex $words 0] != "\#"} {
-		    set consumed 1
-		    set words ""
-		    set currentword ""
-		    set wordtype ""
-
-		    if { $OutputType == "P" } {
-		        append newblockP $c
-		        set OutputType R
-		    }
-		}
-	    }
-	}
-	append newblock$OutputType $c
-	if { !$consumed } {
-	    if { $wordtype == "" } {
-		set wordtype w
-		set wordtypeline $line
-	    }
-	    append currentword $c
-	}
-	if { $lastc == "\\" && $c == "\\" } {
-	    set lastc "\\\\"
-	} else { set lastc $c }
-	incr ichar
-
-	if { $c == "\t" } {
-	    incr icharline 8
-	} elseif { $c != "\n" } {
-	    incr icharline
-	} else { set icharline 0 }
-    }
-    lappend blockinfo $blockinfocurrent
-
-    if { $wordtype != "" && $wordtype != "w" } {
-	set text "There is a block of type ($wordtype) beginning at line $wordtypeline "
-	append text "that is not closed at the end of the file"
-	error $text
-    }
-    CheckEndOfFileState
-
-    if { $length >= 1000 } {
-	RamDebugger::ProgressVar 100
-    }
-}
-
-proc RamDebugger::Instrumenter::DoWorkForTime { block filename newblockname timedata } {
-
-    upvar $newblockname newblock
-    set newblock "# RamDebugger time instrumented file\n"
-
-    set lines [split $block \n]
-
-    set lastline ""
-    set lastpos ""
-    foreach i $timedata {
-	foreach "name file lineini lineend lasttime" $i {
-	    if { $file != $filename } { continue }
-	    if { $lineini != $lastline } { set lastpos 0 }
-	    set text "RDC::MeasureTime [list $name] \[time { "
-	    set linepos [expr $lineini-1]
-	    set line [lindex $lines $linepos]
-	    set newline [string range $line 0 [expr $lastpos-1]]
-	    append newline $text [string range $line $lastpos end]
-	    set lines [lreplace $lines $linepos $linepos $newline]
-	    set lastline $lineini
-	    set lastpos [expr $lastpos+[string length $text]]
-
-	    set linepos [expr $lineend-1]
-	    set newline "[lindex $lines $linepos] }]"
-	    set lines [lreplace $lines $linepos $linepos $newline]
-	}
-    }
-
-    regsub -all {RDC::F [0-9]+ [0-9+] ; } [join $lines \n] {} newblock2
-    append newblock $newblock2
-}
-
-
-proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname { braceslevelIni 0 } } {
-
-    set length [string length $block]
-    if { $length >= 5000 } {
-	RamDebugger::ProgressVar 0 1
-    }
-
-    upvar $blockinfoname blockinfo
-    set blockinfo ""
-    set blockinfocurrent [list $braceslevelIni n]
-
-
-    foreach i [list \#include static const if else new delete for return sizeof while continue \
-	    break class typedef struct \#else \#endif \#if] {
-	set colors($i) magenta
-    }
-    foreach i [list \#ifdef \#ifndef \#define \#undef] {
-	set colors($i) magenta2
-    }
-    foreach i [list char int double void ] {
-	set colors($i) green
-    }
-
-    set wordtype ""
-    set wordtypeline ""
-    # = -1 -> // ; > 0 -> comment type /*
-    set commentlevel 0
-    set braceslevel $braceslevelIni
-    set braceshistory ""
-    set lastc ""
-    set line 1
-    set ichar 0
-    set icharline 0
-    set finishedline 0
-    set nextiscyan 0
-    set simplechar ""
-    foreach c [split $block ""] {
-
-	if { $ichar%5000 == 0 } {
-	    RamDebugger::ProgressVar [expr $ichar*100/$length]
-	}
-
-	if { $simplechar != "" } {
-	    foreach "iline icharinto" $simplechar break
-	    if { $line > $iline } {
-		error "error in line $iline, position $icharinto. There is no closing (')"
-	    }
-	    if { $c == "'" } {
-		set simplechar ""
-	    }
-	    set lastc $c 
-	    incr ichar
-	
-	    if { $c == "\t" } {
-		incr icharline 8
-	    } elseif { $c != "\n" } {
-		incr icharline
-	    } else { set icharline 0 }
-	    continue
-	}
-
-	switch -- $c {
-	    \" {
-		if { $commentlevel } {
-		    # nothing
-		} elseif { $wordtype != "\"" } {
-		    set wordtype \"
-		    set wordtypeline $line
-		    set wordtypepos $icharline
-		    set finishedline 0
-		} elseif { $lastc != "\\" } {
-		    set wordtype ""
-		    lappend blockinfocurrent grey $wordtypepos [expr $icharline+1]
-		}
-	    }
-	    ' {
-		if { !$commentlevel && $wordtype != "\"" } {
-		    set simplechar [list $line $icharline]
-		}
-	    }
-	    \{ {
-		if { $commentlevel || $wordtype == "\"" } {
-		    #nothing
-		} else {
-		    if { $wordtype == "w" } {
-		        if { [info exists colors($currentword)] } {
-		            lappend blockinfocurrent $colors($currentword) $wordtypepos \
-		               $icharline
-		            if { $colors($currentword) == "green" } {
-		                set nextiscyan 1
-		            }
-		        } elseif { $nextiscyan } {
-		            lappend blockinfocurrent cyan $wordtypepos \
-		            $icharline
-		            set nextiscyan 0
-		        }
-		        set wordtype ""
-		    }
-		    incr braceslevel
-		    lappend braceshistory [list o $braceslevel $line $icharline]
-		    set finishedline 1
-		}
-	    }
-	    \} {
-		if { $commentlevel || $wordtype == "\"" } {
-		    #nothing
-		} else {
-		    if { $wordtype == "w" } {
-		        if { [info exists colors($currentword)] } {
-		            lappend blockinfocurrent $colors($currentword) $wordtypepos \
-		            $icharline
-		            if { $colors($currentword) == "green" || \
-		                    $colors($currentword) == "magenta2" } {
-		                set nextiscyan 1
-		            }
-		        } elseif { $nextiscyan } {
-		            lappend blockinfocurrent cyan $wordtypepos \
-		            $icharline
-		            set nextiscyan 0
-		        }
-		        set wordtype ""
-		    }
-		    incr braceslevel -1
-		    lappend braceshistory [list c $braceslevel $line $icharline]
-		    if { $braceslevel < 0 } {
-		        if { $braceslevelIni == 0 } {
-		            RamDebugger::TextOutClear
-		            RamDebugger::TextOutRaise
-		            RamDebugger::TextOutInsert "BRACES POSITIONS\n"
-		            set file $RamDebugger::currentfile
-		            foreach i $braceshistory {
-		                switch [lindex $i 0] {
-		                    o { set tt "open brace" }
-		                    c { set tt "close brace" }
-		                }
-		                set data "$file:[lindex $i 2] $tt pos=[lindex $i 3] "
-		                append data "Level after=[lindex $i 1]\n"
-		                RamDebugger::TextOutInsert $data
-		            }
-		        }
-		        error "error in line $line. There is one unmatched closing brace (\})"
-		    }
-		    set finishedline 1
-		}
-	    }
-	    * {
-		if { $commentlevel == -1  || $wordtype == "\"" } {
-		    #nothing
-		} elseif { $lastc == "/" } {
-		    if { $commentlevel == 0 } {
-		        set wordtype ""
-		        set wordtypepos [expr $icharline-1]
-		    }
-		    incr commentlevel
-		} elseif { !$commentlevel && $wordtype == "w" } {
-		    if { [info exists colors($currentword)] } {
-		        lappend blockinfocurrent $colors($currentword) $wordtypepos \
-		        $icharline
-		        if { $colors($currentword) == "green" || \
-		                    $colors($currentword) == "magenta2" } {
-		            set nextiscyan 1
-		        }
-		    } elseif { $nextiscyan } {
-		        lappend blockinfocurrent cyan $wordtypepos \
-		        $icharline
-		        set nextiscyan 0
-		    }
-		    set wordtype ""
-		}
-	    }
-	    / {
-		if { $commentlevel == -1  || $wordtype == "\"" } {
-		    #nothing
-		} elseif { !$commentlevel && $lastc == "/" } {
-		    set wordtype ""
-		    set wordtypepos [expr $icharline-1]
-		    set commentlevel -1
-		} elseif { $lastc == "*" } {
-		    set wordtype ""
-		    if { $commentlevel >= 1 } {
-		        incr commentlevel -1
-		        if { $commentlevel == 0 } {
-		            lappend blockinfocurrent red $wordtypepos [expr $icharline+1]
-		        }
-		    } 
-		} elseif { !$commentlevel && $wordtype == "w" } {
-		    if { [info exists colors($currentword)] } {
-		            lappend blockinfocurrent $colors($currentword) $wordtypepos \
-		        $icharline
-		        if { $colors($currentword) == "green" || \
-		                $colors($currentword) == "magenta2" } {
-		            set nextiscyan 1
-		        }
-		    } elseif { $nextiscyan } {
-		        lappend blockinfocurrent cyan $wordtypepos \
-		        $icharline
-		        set nextiscyan 0
-		    }
-		    set wordtype ""
-		}
-	    }
-	    \( {
-		if { !$commentlevel && $braceslevel == 0 && $wordtype != "\"" } {
-		    set ipos [string first :: $currentword]
-		    if { $ipos == -1 } {
-		        lappend blockinfocurrent blue $wordtypepos $icharline
-		    } else {
-		        lappend blockinfocurrent green $wordtypepos [expr $wordtypepos+$ipos+2]
-		        lappend blockinfocurrent blue [expr $wordtypepos+$ipos+2] $icharline
-		    }
-		    set nextiscyan 0
-		} elseif { $wordtype == "w" } {
-		    if { [info exists colors($currentword)] } {
-		        lappend blockinfocurrent $colors($currentword) $wordtypepos \
-		        $icharline
-		        if { $colors($currentword) == "green"  || \
-		                $colors($currentword) == "magenta2" } {
-		            set nextiscyan 1
-		        }
-		    } elseif { $nextiscyan } {
-		        lappend blockinfocurrent cyan $wordtypepos \
-		        $icharline
-		        set nextiscyan 0
-		    }
-		    set wordtype ""
-		}
-	    }
-	    ";" {
-		if { !$commentlevel && $wordtype == "w" } {
-		    if { [info exists colors($currentword)] } {
-		        lappend blockinfocurrent $colors($currentword) $wordtypepos \
-		           $icharline
-		        if { $colors($currentword) == "green" || \
-		                $colors($currentword) == "magenta2" } {
-		            set nextiscyan 1
-		        }
-		    } elseif { $nextiscyan } {
-		        lappend blockinfocurrent cyan $wordtypepos \
-		        $icharline
-		        set nextiscyan 0
-		    }
-		    set wordtype ""
-		}
-		if { !$commentlevel && $wordtype != "\"" } {
-		    set finishedline 1
-		}
-	    }
-	    \n {
-		if { $wordtype == "\"" } {
-		    lappend blockinfocurrent grey $wordtypepos $icharline
-		    set wordtypepos 0
-		} elseif { $wordtype == "w" } {
-		    if { [info exists colors($currentword)] } {
-		        set icharlineold [expr $icharline-[string length $currentword]]
-		        lappend blockinfocurrent $colors($currentword) $icharlineold \
-		           $icharline
-		        if { $colors($currentword) == "green" || \
-		                    $colors($currentword) == "magenta2" } {
-		            set nextiscyan 1
-		        }
-		    } elseif { $nextiscyan } {
-		        lappend blockinfocurrent cyan $wordtypepos \
-		           $icharline
-		        set nextiscyan 0
-		    }
-		    set wordtype ""
-		} elseif { $commentlevel } {
-		    lappend blockinfocurrent red $wordtypepos $icharline
-		    set wordtypepos 0
-		    if { $commentlevel == -1 } { set commentlevel 0 }
-		    set finishedline 1
-		}
-		lappend blockinfo $blockinfocurrent
-		incr line
-		set blockinfocurrent [expr $braceslevel]
-
-		if { $finishedline } {
-		    lappend blockinfocurrent "n"
-		} else { lappend blockinfocurrent "c" }
-	    }
-	    default {
-		if { $commentlevel || $wordtype == "\"" } {
-		    # nothing
-		} elseif { $wordtype == "" } {
-		    if { [string is wordchar $c] || $c == "\#" || $c == ":" || $c == "," } {
-		        set wordtype w
-		        set wordtypepos $icharline
-		        set currentword $c
-		        set finishedline 0
-		    }
-		} elseif { $wordtype == "w" } {
-		    if { [string is wordchar $c] || $c == "\#" || $c == ":" || $c == "," } {
-		        append currentword $c
-		    } else {
-		        if { [info exists colors($currentword)] } {
-		            lappend blockinfocurrent $colors($currentword) $wordtypepos \
-		               $icharline
-		            if { $colors($currentword) == "green" || \
-		                    $colors($currentword) == "magenta2" } {
-		                set nextiscyan 1
-		            }
-		        } elseif { $nextiscyan } {
-		            lappend blockinfocurrent cyan $wordtypepos \
-		               $icharline
-		            set nextiscyan 0
-		        }
-		        set wordtype ""
-		    }
-		}
-	    }
-	}
-	if { $lastc == "\\" && $c == "\\" } {
-	    set lastc "\\\\"
-	} else { set lastc $c }
-	incr ichar
-	
-	if { $c == "\t" } {
-	    incr icharline 8
-	} elseif { $c != "\n" } {
-	    incr icharline
-	} else { set icharline 0 }
-    }
-    lappend blockinfo $blockinfocurrent
-
-    if { $wordtype != "" && $wordtype != "w" } {
-	set text "There is a block of type ($wordtype) beginning at line $wordtypeline "
-	append text "that is not closed at the end of the file"
-	error $text
-    }
-    if { $commentlevel > 0 } {
-	error "error: There is a non-closed comment beginning at line $wordtypeline"
-    }
-    if { $braceslevel } {
-	if { $braceslevelIni == 0 } {
-	    RamDebugger::TextOutClear
-	    RamDebugger::TextOutRaise
-	    RamDebugger::TextOutInsert "BRACES POSITIONS\n"
-	    set file $RamDebugger::currentfile
-	    foreach i $braceshistory {
-		switch [lindex $i 0] {
-		    o { set tt "open brace" }
-		    c { set tt "close brace" }
-		}
-		set data "$file:[lindex $i 2] $tt pos=[lindex $i 3] Level after=[lindex $i 1]\n"
-		RamDebugger::TextOutInsert $data
-	    }
-	}
-	error "error: There is a non-closed brace at the end of the file (see Output for details)"
-    }
-    if { $length >= 1000 } {
-	RamDebugger::ProgressVar 100
-    }
 }
 
 ################################################################################
@@ -3150,9 +2328,9 @@ proc RamDebugger::SaveFile { what } {
 	set file $currentfile
 
 	if { [file mtime $file] > $filesmtime($file) } {
-	    set ret [DialogWin::messageBox -default yes -icon question -message \
+	    set ret [DialogWin::messageBox -default ok -icon question -message \
 		"File '$currentfile' has been modified outside RamDebugger. Loose external changes?" \
-		-parent $text -title "Warning" -type yescancel]
+		-parent $text -title "Warning" -type okcancel]
 	    if { $ret == "cancel" } { return -1 }
 	}
     }
@@ -3178,9 +2356,10 @@ proc RamDebugger::OpenFile {} {
 		  -title "Open source file"]
     if { $file == "" } { return }
     OpenFileF $file -1
+    FillListBox
 }
 
-proc RamDebugger::OpenFileF { file { force 0 } } {
+proc RamDebugger::OpenFileF { file { force 0 } { linenum 1 } } {
     variable marker
     variable text
     variable files
@@ -3188,6 +2367,7 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     variable currentfile
     variable currentfileIsModified
     variable WindowFilesList
+    variable WindowFilesListLineNums
     variable WindowFilesListCurr
     variable options
 
@@ -3198,6 +2378,12 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     }
 
     WaitState 1
+
+    if { [lsearch $WindowFilesList $currentfile] != -1 } {
+	set pos [lsearch $WindowFilesList $currentfile]
+	set line [scan [$text index insert] %d]
+	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
+    }
 
     if { !$force } {
 	set comm [list rlist -quiet $file {}]
@@ -3213,7 +2399,7 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     }
     if { $file == $currentfile } {
 	set idx [$text index insert]
-    } else { set idx 1.0 }
+    } else { set idx $linenum.0 }
 
     $marker delete arrow
     $marker delete break
@@ -3236,10 +2422,12 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     }
     UpdateRemoteBreaks
 
-    set Numlines [scan [$text index end-1c] %d]
+    set Numlines [scan [$text index end] %d]
+
     set font [$text cget -font]
     $marker configure -scrollregion [list 0 0 [winfo reqwidth $marker] \
 		                         [expr $Numlines*[font metrics $font -linespace]]]
+
     $text mark set insert $idx
     $text see $idx
 
@@ -3252,8 +2440,11 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
 	incr WindowFilesListCurr
 	if { $WindowFilesListCurr == [llength $WindowFilesList] } {
 	    lappend WindowFilesList $file
+	    lappend WindowFilesListLineNums 1
 	} else {
 	    set WindowFilesList [lreplace $WindowFilesList $WindowFilesListCurr end $file]
+	    set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $WindowFilesListCurr \
+		end 1]
 	}
     }
     $text conf -editable 1
@@ -3270,7 +2461,7 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
 	set options(RecentFiles) [lreplace $options(RecentFiles) 5 end]
     }
     set options(defaultdir) [file dirname $file]
-    FillListBox
+    #FillListBox
 
     WaitState 0
     return 0
@@ -3286,10 +2477,17 @@ proc RamDebugger::NewFile {} {
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListCurr
+    variable WindowFilesListLineNums
 
     if { [SaveFile ask] == -1 } { return }
 
     WaitState 1
+
+    if { [lsearch $WindowFilesList $currentfile] != -1 } {
+	set pos [lsearch $WindowFilesList $currentfile]
+	set line [scan [$text index insert] %d]
+	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
+    }
 
     set currentfile "New file"
     set currentfileIsModified 0
@@ -3307,7 +2505,7 @@ proc RamDebugger::NewFile {} {
 
     FillListBox
 
-    set Numlines [scan [$text index end-1c] %d]
+    set Numlines [scan [$text index end] %d]
     set font [$text cget -font]
     $marker configure -scrollregion [list 0 0 [winfo reqwidth $marker] \
 		                         [expr $Numlines*[font metrics $font -linespace]]]
@@ -3366,6 +2564,8 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     variable marker
     variable text
     variable currentfile
+    variable WindowFilesList
+    variable WindowFilesListLineNums
     variable instrumentedfilesP
     variable instrumentedfilesR
     variable instrumentedfilesInfo
@@ -3399,6 +2599,12 @@ proc RamDebugger::ViewInstrumentedFile { what } {
 	}
     }
     WaitState 1
+
+    if { [lsearch $WindowFilesList $currentfile] != -1 } {
+	set pos [lsearch $WindowFilesList $currentfile]
+	set line [scan [$text index insert] %d]
+	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
+    }
 
     set ed [$text cget -editable]
     $text conf -editable 1
@@ -3460,28 +2666,23 @@ proc RamDebugger::ViewHelpForWord {} {
 	while { [string is wordchar [$text get $idx0]] } {
 	    set word [$text get $idx0]$word
 	    set idx0 [$text index $idx0-1c]
+	    if { [$text compare $idx0 <= 1.0] } { break }
 	}
 	set idx1 [$text index $idx+1c]
 	while { [string is wordchar [$text get $idx1]] } {
 	    append word [$text get $idx1]
 	    set idx1 [$text index $idx1+1c]
+	    if { [$text compare $idx1 >= end-1c] } { break }
 	}
 	if { $word == "" } { return }
     }
     HelpViewer::HelpSearchWord $word
 }
 
-proc RamDebugger::DebugProgram { name } {
-    variable currentfile
-
-    rdebug $name
-    if { $currentfile != "" } {
-	rlist -quiet $currentfile
-    }
-}
 proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     variable mainframe
     variable remoteserver
+    variable remoteserverType
 
     WaitState 1
     SetMessage "Searching for active programs..."
@@ -3495,31 +2696,68 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     }
 
     $menu del 0 end
+
+    set fontbold [font actual [$menu cget -font]]
+    set ipos [lsearch $fontbold -weight]
+    incr ipos
+    set fontbold [lreplace $fontbold $ipos $ipos bold]
+
+    $menu add command -label "Remote TCL debugging" -font $fontbold -state disabled \
+       -background grey85
+
     if { [llength $services] == 0 } {
 	$menu add command -label "There are no active programs" -state disabled
+	$menu add command -label "Use 'Remote TCL update' to actualize" -state disabled
     } else {
 	foreach i $services {
-	    $menu add command -label $i -command [list RamDebugger::DebugProgram $i]
+	    if { $remoteserverType == "remote" && $i == $remoteserver } {
+		$menu add check -label $i -command [list RamDebugger::rdebug $i] \
+		   -variable ::checked 
+		set ::checked 1
+	    } else {
+		$menu add command -label $i -command [list RamDebugger::rdebug $i]
+	    }
 	}
     }
     $menu add separator
-    $menu add command -label "Current file" -command {
-	RamDebugger::rdebug -currentfile
-    }
-    $menu add command -label "Debug c++" -command "RamDebugger::DebugCplusPlusWindow"
-    $menu add command -label "Debug c++ (no ask)" -command "RamDebugger::DebugCplusPlusWindow 1"
 
     if { $::tcl_platform(platform) == "windows" } {
+	$menu add command -label "Remote TCL update" -font $fontbold -state disabled \
+	    -background grey85
 	$menu add command -label "Update remotes" -command \
-	     "RamDebugger::ActualizeActivePrograms $menu 1"
-	 $menu add command -label "Update remotes slow" -command \
-	     "RamDebugger::ActualizeActivePrograms $menu 2"
+	"RamDebugger::ActualizeActivePrograms $menu 1"
+	$menu add separator
     }
-    $menu add command -label Disconnect/Stop -command {
-	if { [catch [list RamDebugger::rdebug -disconnect] errstring] } {
-	    WarnWin $errstring
+
+    $menu add command -label "Local TCL debugging" -font $fontbold -state disabled \
+       -background grey85
+    if { $remoteserverType == "local" } {
+	$menu add check -label "Current file" -command {
+	    RamDebugger::rdebug -currentfile
+	} -variable ::checked 
+	set ::checked 1
+    } else {
+	$menu add command -label "Current file" -command {
+	    RamDebugger::rdebug -currentfile
 	}
     }
+    $menu add command -label "Current file args" -command {
+	RamDebugger::DebugCurrentFileArgsWindow
+    }
+    $menu add separator
+    $menu add command -label "Local c/c++ debugging" -font $fontbold -state disabled \
+       -background grey85
+    if { $remoteserverType == "gdb" } {
+	$menu add check -label "Debug c++" -command "RamDebugger::DebugCplusPlusWindow" \
+	   -variable ::checked 
+	set ::checked 1
+    } else {
+	$menu add command -label "Debug c++" -command "RamDebugger::DebugCplusPlusWindow"
+    }
+    $menu add command -label "Debug c++ (no ask)" -command "RamDebugger::DebugCplusPlusWindow 1"
+    $menu add separator
+    $menu add command -label Disconnect/Stop -command RamDebugger::DisconnectStop -acc "Shift+F5"
+
     if { $remoteserver == "" } {
 	$menu entryconfigure end -state disabled
     }
@@ -3527,8 +2765,15 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     WaitState 0
 }
 
+proc RamDebugger::DisconnectStop {} {
+    if { [catch [list RamDebugger::rdebug -disconnect] errstring] } {
+	WarnWin $errstring
+    }
+}
+
 proc RamDebugger::GotoPreviusNextInWinList { what } {
     variable WindowFilesList
+    variable WindowFilesListLineNums
     variable WindowFilesListCurr
 
     switch $what {
@@ -3537,24 +2782,30 @@ proc RamDebugger::GotoPreviusNextInWinList { what } {
 	    if { $WindowFilesListCurr < 0 } {
 		set WindowFilesListCurr [expr [llength $WindowFilesList]-1]
 	    }
-	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr]
+	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr] 0 \
+	       [lindex $WindowFilesListLineNums $WindowFilesListCurr]
 	}
 	next {
 	    incr WindowFilesListCurr 1
 	    if { $WindowFilesListCurr >= [llength $WindowFilesList] } {
 		set WindowFilesListCurr 0
 	    }
-	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr]
+	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr] 0 \
+	       [lindex $WindowFilesListLineNums $WindowFilesListCurr]
 	}
     }
 }
 
-proc RamDebugger::ActualizeWindowsList { menu } {
+proc RamDebugger::ActualizeViewMenu { menu } {
     variable WindowFilesList
+    variable WindowFilesListLineNums
     variable WindowFilesListCurr
     variable text
 
-    $menu del 0 end
+    if { [$menu index end] > 1 } {
+	$menu del 2 end
+    }
+
     $menu add command -label "Previus" -acc "Alt-Left" -command \
        "RamDebugger::GotoPreviusNextInWinList prev"
     $menu add command -label "Next" -acc "Alt-Right" -command \
@@ -3563,11 +2814,17 @@ proc RamDebugger::ActualizeWindowsList { menu } {
     $menu add separator
     set ipos 0
     foreach i $WindowFilesList {
+	set line [lindex $WindowFilesListLineNums $ipos]
 	if { $ipos == $WindowFilesListCurr } {
-	    $menu add checkbutton -label $i -variable ::pp -command [list RamDebugger::OpenFileF $i]
+	    set label $i
+	    if { [string length $label] > 25 } { set label ...[string range $label end-22 end] }
+	    $menu add checkbutton -label $label -variable ::pp -command \
+	       [list RamDebugger::OpenFileF $i 0 $line]
 	    set ::pp 1
 	} else {
-	    $menu add command -label $i -command [list RamDebugger::OpenFileF $i]
+	    set label $i
+	    if { [string length $label] > 25 } { set label ...[string range $label end-22 end] }
+	    $menu add command -label $label -command [list RamDebugger::OpenFileF $i 0 $line]
 	}
 	incr ipos
     }
@@ -3581,7 +2838,8 @@ proc RamDebugger::AddRecentfilesToMenu { menu } {
     if { ![info exists options(RecentFiles)] } { return }
 
     foreach i $options(RecentFiles) {
-	$menu add command -label $i -command [list RamDebugger::OpenFileF $i]
+	$menu add command -label $i -command \
+	   "[list RamDebugger::OpenFileF $i] ; RamDebugger::FillListBox"
     }
 }
 
@@ -3676,7 +2934,13 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow } {
     }
 
     if { $hasarrow } {
-	if { [focus] != $text } {
+	if { $::tcl_platform(platform) == "windows" } {
+	    set doit 1
+	} elseif { [focus] != $text } {
+	    # the horrible bug in Linux with the raise command
+	    set doit 1
+	} else { set doit 0 }
+	if { $doit } {
 	    after 100 "raise [winfo toplevel $text] ; focus -force $text"
 	}
 	$text see $line.0
@@ -3765,6 +3029,9 @@ proc RamDebugger::ContNextGUI { what } {
 	    WarnWin "Cannot start debugging. There is no currentfile" $text
 	    return
 	}
+	#if { $currentfile == "New file"  } {
+
+	#}
 	if { [regexp {\.(h|c|cc)$} $currentfile] } {
 	    if { $options(ConfirmStartDebugging) } {
 		set ret [DialogWin::messageBox -default yes -icon question -message \
@@ -3824,1438 +3091,13 @@ proc RamDebugger::TextMotion { X Y x y } {
     set TextMotionAfterId [after 500 RamDebugger::DisplayVar $X $Y $x $y]
 }
 
-proc RamDebugger::DisplayVar { X Y x y } {
-    variable text
-    variable remoteserverType
-    variable debuggerstate
-
-    if { $debuggerstate != "debug" } { return }
-
-    if { $X != [winfo pointerx $text] || $Y != [winfo pointery $text] } {
-	return
-    }
-    set idx [$text index @$x,$y]
-    set range [$text tag ranges sel]
-    if { $range != "" && [$text compare [lindex $range 0] <= $idx] && \
-	     [$text compare [lindex $range 1] >= $idx] } {
-	set var [eval $text get $range]
-    } else {
-	set var ""
-	set idx0 $idx
-	while { [string is wordchar [$text get $idx0]] } {
-	    set var [$text get $idx0]$var
-	    set idx0 [$text index $idx0-1c]
-	}
-	set idx1 [$text index $idx+1c]
-	while { [string is wordchar [$text get $idx1]] } {
-	    append var [$text get $idx1]
-	    set idx1 [$text index $idx1+1c]
-	}
-	if { $var == "" } { return }
-    }
-    if { $remoteserverType == "gdb" } {
-	set comm "$var"
-    } else {
-	set comm "if { \[array exists $var] } { array get $var } else { set $var }"
-    }
-    # catch is here for strange situations, like when changing source file
-    catch {
-	set res [reval -handler [list RamDebugger::DisplayVar2 $var $X $Y $x $y] $comm]
-    }
-}
-
-proc RamDebugger::DisplayVar2 { var X Y x y res } {
-    variable text
-
-    if { [lindex $res 0] == 0 } {
-	set w $text.help
-	if { [winfo exists $w] } { destroy $w }
-	toplevel $w
-	wm overrideredirect $w 1
-	wm transient $w $text
-	wm geom $w +$X+$Y
-	pack [label $w.l -bg white]
-	$w.l conf -bd 1 -relief solid
-	set val [lindex $res 1]
-	if { [string length $val] > 50 } {
-	    set val [string range $val 0 46]...
-	}
-	$w.l conf -text "$var=$val"
-    }
-}
-
-proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
-    variable remoteserver
-    variable remoteserverType
-
-    set w [winfo toplevel $f]
-
-    if { $what == "do" } {
-	if { [string trim $DialogWinTop::user($w,expression)] == "" } {
-	    set DialogWinTop::user($w,type) ""
-	    return
-	}
-	set var $DialogWinTop::user($w,expression)
-	if { $remoteserverType == "gdb" } {
-	    if { ![regexp {\[([0-9]+):([0-9]+)\]} $var {} ini1 end1] } {
-		set ini1 1
-		set end1 1
-	    }
-	    if { ![regexp {\[([0-9]+)::([0-9]+)\]} $var {} ini2 end2] } {
-		set ini2 1
-		set end2 1
-	    }
-	    set remoteserver [lreplace $remoteserver 2 2 [list getdata \
-		"RamDebugger::DisplayVarWindowEval res $f"]]
-
-	    set comm ""
-	    set isinit 0
-	    for { set i1 $ini1 } { $i1 <= $end1 } { incr i1 } {
-		regsub {\[([0-9]+):([0-9]+)\]} $var \[$i1\] varn
-		for { set i2 $ini2 } { $i2 <= $end2 } { incr i2 } {
-		    regsub {\[([0-9]+)::([0-9]+)\]} $varn \[$i2\] varn
-		    if { !$isinit } {
-		        if { $ini1 != $end1 || $ini2 != $end2 } {
-		            append comm "printf \"MULTIPLE RESULT\\n\"\n"
-		        }
-		        append comm "whatis $varn\n"
-		        set isinit 1
-		    }
-		    append comm "printf \"\\n$varn=\"\noutput $varn\nprintf \"\\n\"\n"
-		}
-	    }
-	    append comm "printf \"FINISHED GETDATA\\n\""
-	    EvalRemote $comm
-	    return
-	} else {
-	    set comm {
-		if { [array exists {VAR}] } {
-		    list array [array get {VAR}]
-		} elseif { [info exists {VAR}] } {
-		    list variable [set {VAR}]
-		} else {
-		    list expression [expr {VAR}]
-		}
-	    }
-	    set comm [string map [list VAR [string trim $var]] $comm]
-	}
-	reval -handler [list RamDebugger::DisplayVarWindowEval res $f] $comm
-    } else {
-	set var $DialogWinTop::user($w,expression)
-	$DialogWinTop::user($w,textv) conf -state normal
-	$DialogWinTop::user($w,textv) del 1.0 end
-
-	if { $remoteserverType == "gdb" } {
-	    if { [regexp {^(\s*MULTIPLE RESULT\s*type\s+=\s+char\s)(.*)} $res {} ini rest] } {
-		set res $ini
-		append res "   \""
-		foreach "i c" [regexp -all -inline {'(.)'\n} $rest] {
-		    append res "$c"
-		}
-		append res "\"\n$rest"
-	    }
-	    set res [list 0 [list variable $res]]
-	}
-
-	switch [lindex $res 0] {
-	    0 {
-		$DialogWinTop::user($w,textv) conf -fg black
-		set DialogWinTop::user($w,type) [lindex [lindex $res 1] 0]
-		if { $DialogWinTop::user($w,type) == "array" } {
-		    foreach "name val" [lindex [lindex $res 1] 1] {
-		        $DialogWinTop::user($w,textv) insert end "${var}($name) = $val\n"
-		    }
-		} elseif { $DialogWinTop::user($w,aslist) } {
-		    set DialogWinTop::user($w,type) list
-		    if { [catch { set list [lrange [lindex [lindex $res 1] 1] 0 end] }] } {
-		        $DialogWinTop::user($w,textv) insert end "Error: variable is not a list"
-		    } else {
-		        set ipos 0
-		        foreach i $list {
-		            $DialogWinTop::user($w,textv) insert end "$ipos = $i\n"
-		            incr ipos
-		        }
-		    }
-		} else {
-		    $DialogWinTop::user($w,textv) insert end [lindex [lindex $res 1] 1]
-		}
-	    }
-	    1 {
-		set DialogWinTop::user($w,type) error
-		$DialogWinTop::user($w,textv) conf -fg red
-		$DialogWinTop::user($w,textv) insert end [lindex $res 1]
-	    }
-	}
-	$DialogWinTop::user($w,textv) conf -state disabled
-    }
-}
-
-proc RamDebugger::DisplayVarWindowCancel { f } {
-    destroy [winfo toplevel $f]
-}
-
-proc RamDebugger::DisplayVarWindow {} {
-    variable text
-    
-    set range [$text tag ranges sel]
-    if { $range != "" } {
-	set var [eval $text get $range]
-    } else {
-	set idx [$text index insert]
-	if { $idx != "" } {
-	    set var ""
-	    set idx0 $idx
-	    while { [string is wordchar [$text get $idx0]] } {
-		set var [$text get $idx0]$var
-		set idx0 [$text index $idx0-1c]
-	    }
-	    set idx1 [$text index $idx+1c]
-	    while { [string is wordchar [$text get $idx1]] } {
-		append var [$text get $idx1]
-		set idx1 [$text index $idx1+1c]
-	    }
-	} else { set var "" }
-    }
-
-    set commands [list "RamDebugger::DisplayVarWindowEval do" RamDebugger::DisplayVarWindowCancel]
-    set f [DialogWinTop::Init $text "View expression or variable" separator $commands \
-	       "" Eval]
-    set w [winfo toplevel $f]
-
-    label $f.l1 -text "Expression:" -grid "0 px3"
-    entry $f.e1 -textvariable DialogWinTop::user($w,expression) -grid "1 px3"
-
-    set DialogWinTop::user($w,expression) $var
-    
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    set DialogWinTop::user($w,textv) [text $sw.text -background white -wrap word -width 40 -height 10 \
-		                       -exportselection 0 -font FixedFont -highlightthickness 0]
-    $sw setwidget $DialogWinTop::user($w,textv)
-
-    if { $::tcl_platform(platform) != "windows" } {
-	$sw.text conf -exportselection 1
-    }
-
-    label $f.l2 -textvar DialogWinTop::user($w,type) -grid "0 w" -bg [CCColorActivo [$w  cget -bg]]
-    checkbutton $f.cb1 -text "As list" -variable DialogWinTop::user($w,aslist) -grid "1 w" \
-       -command "DialogWinTop::InvokeOK $f"
-    set DialogWinTop::user($w,aslist) 0
-    supergrid::go $f
-
-    tkTabToWindow $f.e1
-    bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
-    $DialogWinTop::user($w,textv) conf -state disabled
-    bind $DialogWinTop::user($w,textv) <1> "focus $DialogWinTop::user($w,textv)"
-
-    DialogWinTop::CreateWindow $f
-    DialogWinTop::InvokeOK $f
-}
-
-proc RamDebugger::DisplayBreakpointsWindowSetCond {} {
-
-    set curr [$DialogWinBreak::user(list) curselection]
-    if { [llength $curr] != 1 } { return }
-
-    set DialogWinBreak::user(cond) [lindex [$DialogWinBreak::user(list) get $curr] 3]
-}
-
-proc RamDebugger::DisplayBreakpointsWindow {} {
-    variable text
-    variable breakpoints
-    variable currentfile
-    
-    CopyNamespace ::DialogWin ::DialogWinBreak
-
-    set f [DialogWinBreak::Init $text "Breakpoints window" separator [list Delete \
-	    "Delete all" View] "Apply Cond" Close]
-    set w [winfo toplevel $f]
-
-    label $f.l1 -text "Condition:" -grid 0
-    entry $f.e1 -textvariable DialogWinBreak::user(cond) -width 80 -grid "1 px3 py3"
-
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    
-    set DialogWinBreak::user(list) [tablelist::tablelist $sw.lb -width 55\
-		  -exportselection 0 \
-		  -columns [list \
-		                4  Num        left \
-		                15 File        right \
-		                5  Line left \
-		                40 Condition left \
-		                40 Path left
-		               ] \
-		  -labelcommand tablelist::sortByColumn \
-		  -background white \
-		  -selectbackground navy -selectforeground white \
-		  -stretch 1 -selectmode extended \
-		  -highlightthickness 0]
-
-    $sw setwidget $DialogWinBreak::user(list)
-
-    supergrid::go $f
-
-    focus $DialogWinBreak::user(list)
-    bind [$DialogWinBreak::user(list) bodypath] <Double-1> {
-	focus $DialogWinBreak::user(list)
-	RamDebugger::DisplayBreakpointsWindowSetCond
-    }
-    bind [$DialogWinBreak::user(list) bodypath] <ButtonPress-3> \
-	    [bind TablelistBody <ButtonPress-1>]
-
-    bind [$DialogWinBreak::user(list) bodypath] <ButtonRelease-3> {
-	catch { destroy %W.menu }
-	set menu [menu %W.menu]
-	$menu add command -label "Apply condition" -command "DialogWinBreak::InvokeOK"
-	$menu add command -label "View" -command "DialogWinBreak::InvokeButton 4"
-	$menu add separator
-	$menu add command -label "Delete" -command "DialogWinBreak::InvokeButton 2"
-	tk_popup $menu %X %Y
-    }
-
-    foreach i $breakpoints {
-	foreach "num file line cond" $i break
-	$DialogWinBreak::user(list) insert end [list $num [file tail $file] $line $cond \
-		[file dirname $file]]
-    }
-    set action [DialogWinBreak::CreateWindow]
-    while 1 {
-	switch $action {
-	    0 {
-		DialogWinBreak::DestroyWindow
-		namespace delete ::DialogWinBreak
-		return
-	    }
-	    1 {
-		set curr [$DialogWinBreak::user(list) curselection]
-		if { [llength $curr] != 1 } {
-		    WarnWin "Select just one breakpoint before applying condition" $w
-		} else {
-		    set val [$DialogWinBreak::user(list) get $curr]
-		    rcond [lindex $val 0] $DialogWinBreak::user(cond)
-		    $DialogWinBreak::user(list) delete $curr
-		    $DialogWinBreak::user(list) insert $curr [lreplace $val 3 3 \
-		            $DialogWinBreak::user(cond)]
-		    set file [file join [lindex $val 4 ] [lindex $val 1]]
-		    set line [lindex $val 2]
-		    if { $file == $currentfile } {
-		        $text mark set insert $line.0
-		        $text see $line.0
-		    }
-		}
-	    }
-	    2 {
-		foreach i [$DialogWinBreak::user(list) curselection] {
-		    set ent [$DialogWinBreak::user(list) get $i]
-		    set num [lindex $ent 0]
-		    set file [file join [lindex $ent 4 ] [lindex $ent 1]]
-		    set line [lindex $ent 2]
-		    if { $file == $currentfile } {
-		        UpdateArrowAndBreak $line 0 ""
-		    }
-		    rdel $num
-		}
-		$DialogWinBreak::user(list) del 0 end
-		foreach i $breakpoints {
-		    foreach "num file line cond" $i break
-		    $DialogWinBreak::user(list) insert end [list $num [file tail $file] $line $cond \
-		            [file dirname $file]]
-		}
-	    }
-	    3 {
-		set ret [DialogWinBreak::messageBox -default ok -icon warning -message \
-		             "Are you sure to delete all breakpoints?" -parent $f \
-		             -title "delete all breakpoints" -type okcancel]
-		if { $ret == "ok" } {
-		    $DialogWinBreak::user(list) del 0 end
-		    foreach i $breakpoints {
-		        set num [lindex $i 0]
-		        set file [lindex $i 1]
-		        set line [lindex $i 2]
-		        if { $file == $currentfile } {
-		            UpdateArrowAndBreak $line 0 ""
-		        }
-		        rdel $num
-		    }
-		}
-	    }
-	    4 {
-		set curr [$DialogWinBreak::user(list) curselection]
-		if { [llength $curr] != 1 } {
-		    WarnWin "Select just one breakpoint in order to see the file" $w
-		    return
-		}
-		set val [$DialogWinBreak::user(list) get $curr]
-		set file [file join [lindex $val 4 ] [lindex $val 1]]
-		set line [lindex $val 2]
-		if { $file != $currentfile } {
-		    OpenFileF $file
-		}
-		$text mark set insert $line.0
-		$text see $line.0
-	    }
-	}
-	set action [DialogWinBreak::WaitForWindow]
-    }
-}
-
-proc RamDebugger::CreateModifyFonts {} {
-    variable options
-
-    if { [lsearch [font names] NormalFont] == -1 } { font create NormalFont }
-    if { [lsearch [font names] FixedFont] == -1 } { font create FixedFont }
-    if { [lsearch [font names] HelpFont] == -1 } { font create HelpFont }
-
-    eval font configure NormalFont $options(NormalFont)
-    eval font configure FixedFont $options(FixedFont)
-    eval font configure HelpFont $options(HelpFont)
-
-    option add *font NormalFont
-
-}
-
-proc RamDebugger::UpdateFont { w but fontname } {
-
-    set newfont [SelectFont $w.fonts -type dialog -parent $w -sampletext \
-	"RamDebugger is nice" -title "Select font"]
-    if { $newfont == "" } { return }
-    set list [list family size weight slant underline overstrike]
-    foreach $list $newfont break
-
-    set comm "font configure"
-    lappend comm $fontname
-    foreach i [lrange $list 0 3] {
-	lappend comm -$i [set $i]
-    }
-    if { [info exists underline] && $underline != "" } {
-	lappend comm -underline 1
-    } else { lappend comm -underline 0 }
-
-    if { [info exists overstrike] && $overstrike != "" } {
-	lappend comm -overstrike 1
-    } else { lappend comm -overstrike 0 }
-
-    eval $comm
-
-    regexp {^[^:]+} [$but cget -text] type
-    set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
-    append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
-    $but configure -text $btext
-}
-
-proc RamDebugger::PreferencesWindow {} {
-    variable text
-    variable options
-    variable options_def
-    
-    set f [DialogWin::Init $text "Preferences window" separator [list Apply Defaults]]
-    set w [winfo toplevel $f]
-
-    TitleFrame $f.f1 -text [_ debugging] -grid 0
-    set f1 [$f.f1 getframe]
-
-    if { $::tcl_platform(platform) == "windows" } {
-	checkbutton $f1.cb0 -text "Automatically check remote files" -variable \
-	DialogWin::user(CheckRemotes) -grid "0 3 w"
-	DynamicHelp::register $f1.cb0 balloon [string trim {
-	    this variable is only used on windows. It can be:
-	    0: Only check remote programs on demand (useful if not making remote debugging, the
-	       start up is faster)
-	    1: Register as remote and check remote programs on start up. The start up can be slower
-		but is better when making remote debugging
-	}]
-	set DialogWin::user(CheckRemotes) $options(CheckRemotes)
-    }
-
-    checkbutton $f1.cb1 -text "Confirm start debugging" -variable \
-       DialogWin::user(ConfirmStartDebugging) -grid "0 3 w"
-    DynamicHelp::register $f1.cb1 balloon [string trim {
-	If this option is set, a confirmation window will be displayed
-	when starting the execution of the debugger
-    }]
-
-    set DialogWin::user(ConfirmStartDebugging) $options(ConfirmStartDebugging)
-
-    set helptext "When debugging locally, choose here if the debugged script is only TCL "
-    append helptext "or also TK"
-    Label $f1.l15 -text "Local debugging type:" -helptext $helptext -grid "0 e"
-    radiobutton $f1.r1 -text "TCL" -variable DialogWin::user(LocalDebuggingType) -value tcl \
-	    -grid "1 w"
-    radiobutton $f1.r2 -text "TK" -variable DialogWin::user(LocalDebuggingType) -value tk \
-	    -grid "2 w"
-
-    set DialogWin::user(LocalDebuggingType) $options(LocalDebuggingType)
-
-    Label $f1.l2 -text "Indent size TCL:" -helptext "Size used when indenting TCL with key: <Tab>" \
-       -grid "0 e"
-    SpinBox $f1.sb -range "0 10 1" -textvariable DialogWin::user(indentsizeTCL) \
-       -width 4 -grid "1 2 px3"
-    set DialogWin::user(indentsizeTCL) $options(indentsizeTCL)
-
-    Label $f1.l3 -text "Indent size c++:" -helptext "Size used when indenting c++ with key: <Tab>" \
-       -grid "0 e"
-    SpinBox $f1.sb2 -range "0 10 1" -textvariable DialogWin::user(indentsizeC++) \
-       -width 4 -grid "1 2 px3"
-    set DialogWin::user(indentsizeC++) $options(indentsizeC++)
-
-    TitleFrame $f.f2 -text [_ fonts] -grid 0
-    set f2 [$f.f2 getframe]
-    
-    foreach "but type fontname" [list $f2.b1 {GUI font} NormalFont $f2.b2 {Text font} FixedFont \
-	$f2.b3 {Help font} HelpFont] {
-	set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
-	append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
-	Button $but -text $btext -font $fontname -relief link -command \
-	    "RamDebugger::UpdateFont $w $but $fontname" -grid "0 w"
-    }
-
-    supergrid::go $f1
-    supergrid::go $f2
-    supergrid::go $f
-
-    focus $f1.cb1
-
-    set action [DialogWin::CreateWindow "" "" 200]
-    while 1 {
-	switch $action {
-	    0 {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    1 - 2 {
-		if { ![string is integer -strict $DialogWin::user(indentsizeTCL)] || \
-		    $DialogWin::user(indentsizeTCL) < 0 || $DialogWin::user(indentsizeTCL) > 10 } {
-		    WarnWin "Error: indent size must be between 0 and 10" $w
-		} elseif { ![string is integer -strict $DialogWin::user(indentsizeC++)] || \
-		    $DialogWin::user(indentsizeC++) < 0 || $DialogWin::user(indentsizeC++) > 10 } {
-		    WarnWin "Error: indent size must be between 0 and 10" $w
-		} else {
-		    set options(indentsizeTCL) $DialogWin::user(indentsizeTCL)
-		    set options(indentsizeC++) $DialogWin::user(indentsizeC++)
-		    set options(ConfirmStartDebugging) $DialogWin::user(ConfirmStartDebugging)
-		    set options(LocalDebuggingType) $DialogWin::user(LocalDebuggingType)
-		    if { [info exists options(CheckRemotes)] } {
-		        set options(CheckRemotes) $DialogWin::user(CheckRemotes)
-		    }
-		    if { $action == 1 } {
-		        DialogWin::DestroyWindow
-		        return
-		    }
-		}
-	    }
-	    3 {
-		foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging LocalDebuggingType \
-		        CheckRemotes NormalFont FixedFont HelpFont] {
-		    if { [info exists options_def($i)] } {
-		        set options($i) $options_def($i)
-		        set DialogWin::user($i) $options_def($i)
-		    }
-		}
-		CreateModifyFonts
-
-		foreach "but fontname" [list $f2.b1 NormalFont $f2.b2 FixedFont $f2.b3 HelpFont] {
-		    regexp {^[^:]+} [$but cget -text] type
-		    set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
-		    append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
-		    $but configure -text $btext
-		}
-	    }
-	}
-	set action [DialogWin::WaitForWindow]
-    }
-}
-
-proc RamDebugger::DisplayTimesWindowStart { f } {
-    rtime -start
-}
-
-proc RamDebugger::DisplayTimesWindowReport { f } {
-    variable text
-
-    set f [DialogWin::Init $text "Timing report" separator "" -]
-    set w [winfo toplevel $f]
-
-    ComboBox $f.cb1 -textvariable DialogWin::user(units) -editable 0 \
-       -modifycmd {
-	   $DialogWin::user(text) del 1.0 end
-	   $DialogWin::user(text) ins end [RamDebugger::rtime -display $DialogWin::user(units)]
-       } -width 10 -values [list microsec  milisec  sec  min] -grid "0 w"
-    set DialogWin::user(units) sec
-
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    text $sw.t
-    $sw setwidget $sw.t
-
-    set DialogWin::user(text) $sw.t
-
-    bind $sw.t <1> "focus $sw.t"
-    
-    supergrid::go $f
-
-    focus $sw.t
-
-    $sw.t ins end [rtime -display sec]
-
-    set action [DialogWin::CreateWindow]
-    DialogWin::DestroyWindow
-}
-
-proc RamDebugger::DisplayTimesWindowCancel { f } {
-
-    rtime -stop
-    destroy [winfo toplevel $f]
-}
-
-proc RamDebugger::PickSelection { w } {
-    variable text
-
-    if { [catch {
-	set DialogWinTop::user($w,lineini) [scan [$text index sel.first] %d]
-	set DialogWinTop::user($w,lineend) [scan [$text index sel.last] %d]
-    }]} {
-	WarnWin "It is necessary to select some text in main window" $w
-    }
-}
-
-proc RamDebugger::DrawSelection { w } {
-    variable text
-
-    if { [catch {
-	$text tag add sel "$DialogWinTop::user($w,lineini).0 linestart" \
-	   "$DialogWinTop::user($w,lineend).0 lineend"
-	$text see $DialogWinTop::user($w,lineini).0
-    }] } {
-	WarnWin "Lines are not correct" $w
-    }
-}
-
-proc RamDebugger::ModifyTimingBlock { w what } {
-    variable TimeMeasureData
-
-    set idx [$DialogWinTop::user($w,list) curselection]
-
-    switch $what {
-	create {
-	    set err [catch [list rtime -add $DialogWinTop::user($w,name) \
-		$DialogWinTop::user($w,lineini) $DialogWinTop::user($w,lineend)] errstring]
-	    if { $err } {
-		WarnWin [lindex [split $errstring \n] 0]
-		return $err
-	    } else {
-		ModifyTimingBlock $w update
-		return 0
-	    }
-	}
-	edit {
-	    set err [ModifyTimingBlock $w delete]
-	    if { !$err } { ModifyTimingBlock $w create }
-	}
-	delete {
-	    if { [llength $idx] != 1 } {
-		WarnWin "Error: it is necessary to select one block in list"
-		return 1
-	    }
-	    set selname [lindex [$DialogWinTop::user($w,list) get $idx] 0]
-	    set err [catch [list rtime -delete $selname] errstring]
-	    if { $err } {
-		WarnWin [lindex [split $errstring \n] 0]
-		return $err
-	    } else {
-		ModifyTimingBlock $w update
-		return 0
-	    }
-	}
-	updatecurrent {
-	    if { [llength $idx] != 1 } {
-		WarnWin "Error: it is necessary to select one block in list"
-		return 1
-	    }
-	    set DialogWinTop::user($w,name) [lindex [$DialogWinTop::user($w,list) get $idx] 0]
-	    set DialogWinTop::user($w,lineini) [lindex [$DialogWinTop::user($w,list) get $idx] 2]
-	    set DialogWinTop::user($w,lineend) [lindex [$DialogWinTop::user($w,list) get $idx] 3]
-	}
-	update {
-	    $DialogWinTop::user($w,list) del 0 end
-	    foreach i $TimeMeasureData {
-		$DialogWinTop::user($w,list) insert end [lrange $i 0 3]
-	    }
-	}
-    }
-}
-
-proc RamDebugger::DisplayTimesWindow {} {
-    variable text
-
-    set commands [list RamDebugger::DisplayTimesWindowStart RamDebugger::DisplayTimesWindowReport \
-	RamDebugger::DisplayTimesWindowCancel]
-    set f [DialogWinTop::Init $text "Timing control" separator $commands \
-	       [list Report] Start]
-    set w [winfo toplevel $f]
-
-    TitleFrame $f.f1 -text [_ "current block"] -grid "0 ew"
-    set f1 [$f.f1 getframe]
-
-    label $f1.l1 -text "Name" -grid 0
-    entry $f1.e1 -textvariable DialogWinTop::user($w,name) -grid "1 ew"
-    label $f1.l2 -text "Initial line:" -grid "0 e"
-    entry $f1.e2 -textvariable DialogWinTop::user($w,lineini) -grid "1 w py2" -width 8
-    label $f1.l3 -text "End line:" -grid "0 e"
-    entry $f1.e3 -textvariable DialogWinTop::user($w,lineend) -grid "1 w py2" -width 8
-    
-    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 2 w"]
-    $bbox add -text "Pick selection" \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Gets the selection from the text window"] \
-	 -command "RamDebugger::PickSelection $w"
-    $bbox add -text "Draw selection" \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Selects current block in text"] \
-	 -command "RamDebugger::DrawSelection $w"
-
-    TitleFrame $f.f2 -text [_ "blocks"] -grid 0
-    set f2 [$f.f2 getframe]
-
-    set sw [ScrolledWindow $f2.lf -relief sunken -borderwidth 0 -grid "0 ewns"]
-    
-    set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 \
-	-exportselection 0 \
-	-columns [list \
-	    10 "Name"        left \
-	    10 "File"        right \
-	     7 "Initial line"        right \
-	     7 "End line"  right \
-	   ] \
-	-labelcommand tablelist::sortByColumn \
-	-background white \
-	-selectbackground navy -selectforeground white \
-	-stretch "0 1" -selectmode browse \
-	-highlightthickness 0]
-
-    $sw setwidget $DialogWinTop::user($w,list)
-
-    bind [$DialogWinTop::user($w,list) bodypath] <Double-1> \
-       "RamDebugger::ModifyTimingBlock $w updatecurrent"
-
-    set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w"]
-    $bbox add -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Create new block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w create"
-    $bbox add -image edit16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Update selected block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w edit"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete selected block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w delete"
-
-    supergrid::go $f1
-    supergrid::go $f2
-    supergrid::go $f
-
-    tkTabToWindow $f1.e1
-    bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
-    ModifyTimingBlock $w update
-
-    DialogWinTop::CreateWindow $f
-    DialogWinTop::InvokeOK $f
-}
-
-proc RamDebugger::AboutWindow {} {
-    variable text
-    
-    set par [winfo toplevel $text]
-    set w $par.about
-    toplevel $w
-    wm protocol $w WM_DELETE_WINDOW {
-	  # nothing
-    }
-    
-    label $w.l -text RamDebugger -font "-family {new century schoolbook} -size 24 -weight bold" \
-	    -fg \#d3513d -grid 0
-
-    set tt "Author: Ramon Ribó (RAMSAN)\n"
-    append tt "ramsan@cimne.upc.es\nhttp://gid.cimne.upc.es/ramsan\n"
-    append tt "http://gid.cimne.upc.es/RamDebugger"
-
-    label $w.l2 -grid 0 -text $tt
-    canvas $w.c -height 50 -grid 0 -bg white -highlightthickness 0
-    ScrolledWindow $w.lf -relief sunken -borderwidth 0 -grid 0
-
-    tablelist::tablelist $w.lf.lb -width 55\
-		  -exportselection 0 \
-		  -columns [list \
-		                10 Package        left \
-		                10 Author        left \
-		                10 License right\
-		                4  Mod left \
-		               ] \
-		  -labelcommand tablelist::sortByColumn \
-		  -background white \
-		  -selectbackground navy -selectforeground white \
-		  -stretch 1 -selectmode extended \
-		  -highlightthickness 0
-
-
-    $w.lf setwidget $w.lf.lb
-
-    frame $w.buts -height 35 -bg [CCColorActivo [$w  cget -bg]] -grid 0
-
-    supergrid::go $w
-
-    button $w.close -text Close -width 10
-    place $w.close -in $w.buts -anchor n -y 3
-    
-    wm withdraw $w
-    update idletasks
-    set x [expr [winfo x $par]+[winfo width $par]/2-[winfo reqwidth $w]/2]
-    set y [expr [winfo y $par]+[winfo height $par]/2-[winfo reqheight $w]/2]
-    wm geom $w +$x+$y
-    wm deiconify $w
-    wm transient $w $par
-
-    bind $w.close <Enter> "RamDebugger::MotionInAbout $w.close ; break"
-    bind $w.close <ButtonPress-1> "WarnWin [list {Congratulations, you got it!!!}] ; destroy $w; break"
-
-
-    $w.c create text 0 0 -anchor n -font "-family {new century schoolbook} -size 16 -weight bold"\
-	    -fill \#d3513d -text "Version 1.3" -tags text
-    RamDebugger::AboutMoveCanvas $w.c 0
-
-
-    set data {
-	tkcon "Jeffrey Hobbs" BSD SLIGHTLY
-	comm "Open Group Res. Ins." BSD YES
-	BWidgets "Unifix" BSD YES
-	dialogwin  RAMSAN BSD NO
-	helpviewer RAMSAN BSD NO
-	supergrid  RAMSAN BSD NO
-	supertext  "Bryan Oakley" "FREE SOFT" YES
-	tablelist  "Csaba Nemethi" "FREE SOFT" NO
-	"visual regexp" "Laurent Riesterer" GPL NO
-	Tkhtml  "D. Richard Hipp" LGPL NO
-	tcllib Many BSD NO
-	icons "Adrian Davis" BSD NO
-    }
-    foreach "pack author lic mod" $data {
-	$w.lf.lb insert end [list $pack $author $lic $mod]
-    }
-
-
-}
-
-proc RamDebugger::AboutMoveCanvas { c t } {
-
-    if { ![winfo exists $c] } { return }
-    set w [winfo width $c]
-    set h [winfo height $c]
-
-    set x [expr $w/2*(1.0-sin($t))]
-    set y [expr $h/2*(cos($t)+1)]
-
-    $c coords text $x $y
-
-    set t [expr $t+.2]
-    after 100 [list RamDebugger::AboutMoveCanvas $c $t]
-}
-
-proc RamDebugger::MotionInAbout { but } {
-
-    if { ![winfo exists $but] } { return }
-
-    set w [winfo toplevel $but]
-
-    while 1 {
-	if { ![winfo exists $but] } { return }
-	set x [expr [winfo pointerx $w]-[winfo rootx $w]]
-	set y [expr [winfo pointery $w]-[winfo rooty $w]]
-	
-	set x1 [expr [winfo rootx $but]-[winfo rootx $w]]
-	set y1 [expr [winfo rooty $but]-[winfo rooty $w]]
-	set x2 [expr $x1+[winfo width $but]]
-	set y2 [expr $y1+[winfo height $but]]
-
-	if { $x < $x1-2 || $x > $x2+2 || $y < $y1-2 || $y > $y2+2 } { return }
-	
-	set xmax [winfo width $w]
-	set ymax [winfo height $w]
-	
-	if { $x < ($x1+$x2)/2 } {
-	    set newx [expr $x1+int((rand()-.2)*5.1)]
-	} else { set newx [expr $x1+int((rand()-.8)*5.1)] }
-	
-	if { $newx < 0 } { set newx 0 }
-	if { $newx > $xmax-[winfo width $but] } { set newx [expr $xmax-[winfo width $but]] }
-	
-	if { $y < ($y1+$y2)/2 } {
-	    set newy [expr $y1+int((rand()-.2)*5.1)]
-	} else { set newy [expr $y1+int((rand()-.8)*5.1)] }
-	
-	
-	if { $newy < 0 } { set newy 0 }
-	if { $newy > $ymax-[winfo height $but] } { set newy [expr $ymax-[winfo height $but]] }
-	place $but -in $w -x $newx -y $newy -anchor nw
-	update
-    }
-}
-
-proc RamDebugger::DisplayWindowsHierarchyInfo { canvas w x y } {
-    variable TextMotionAfterId
-    
-    after cancel $TextMotionAfterId
-    set TextMotionAfterId ""
-    if { [winfo exists $canvas.help] } { destroy $canvas.help }
-
-    if { $w != "" } {
-	set TextMotionAfterId [after 100 RamDebugger::DisplayWindowsHierarchyInfoDo \
-		$canvas $w $x $y]
-    }
-}
-
-proc RamDebugger::DisplayWindowsHierarchyInfoDo { canvas w x y } {
-    variable TextMotionAfterId
-
-    set TextMotionAfterId ""
-    set comm {
-	set retval "WIDGET\n\n"
-	if { [winfo class WIDGET] == "Toplevel" } {
-	    append retval "TITLE: [wm title WIDGET]\n"
-	}
-	if { [winfo class WIDGET] == "Label" || [winfo class WIDGET] == "Button" || \
-	   [winfo class WIDGET] == "Radiobutton" || [winfo class WIDGET] == "Checkbutton" } {
-	    if { [WIDGET cget -text] != "" } {
-		append retval "LABEL: [WIDGET cget -text]\n"
-	    }
-	}
-	foreach "cols rows" [grid size WIDGET] break
-	if { $cols > 0 } {
-	    append retval "GRID MASTER\n"
-	    for { set i 0 } { $i < $rows } { incr i } {
-		for { set j 0 } { $j < $cols } { incr j } {
-		    set slave [grid slaves WIDGET -row $i -column $j]
-		    if { $slave != "" } {
-		        append retval "    $i,$j $slave [grid info $slave]\n"
-		    }
-		}
-	    }
-	    append retval "  ROWS\n"
-	    for { set i 0 } { $i < $rows } { incr i } {
-		append retval "    $i [grid rowconfigure WIDGET $i]\n" 
-	    }
-	    append retval "  COLUMNS\n"
-	    for { set j 0 } { $j < $cols } { incr j } {
-		append retval "    $i [grid columnconfigure WIDGET $j]\n" 
-	    }
-	}
-	set info [grid info WIDGET]
-	if { $info != "" } {
-	    append retval "GRID SLAVE\n$info\n"
-	}
-	if { [pack slaves WIDGET] != "" } {
-	    append retval "PACK MASTER\n"
-	    foreach i [pack slaves WIDGET] {
-		append retval "    $i [pack info $i]\n"
-	    }
-	}
-	if { ![catch [list pack info WIDGET] info] } {
-	    append retval "PACK SLAVE\n$info\n"
-	}
-	append retval "OPTIONS\n"
-	set retval_in ""
-	foreach i [WIDGET configure] {
-	    append retval_in "[lindex $i 0] [WIDGET cget [lindex $i 0]] "
-	    while { [string length $retval_in] > 80 } {
-		append retval [string range $retval_in 0 79]\n
-		set retval_in [string range $retval_in 80 end]
-	    }
-	    if { [string length $retval_in] > 40 } {
-		append retval $retval_in\n
-		set retval_in ""
-	    }
-	}
-	if { [string index $retval_in end] != "\n" } {
-	    append retval_in \n
-	}
-	append retval $retval_in
-	append retval "SIZES\n"
-	append retval "    width=[winfo width WIDGET] reqwidth=[winfo reqwidth WIDGET]\n"
-	append retval "    height=[winfo height WIDGET] reqheight=[winfo reqheight WIDGET]\n"
-	EVAL
-    }
-    if { $DialogWinHier::user(type) == "ramdebugger" } {
-	set retcomm "RamDebugger::DisplayWindowsHierarchyInfoDo2 $canvas $w $x $y \[set retval]"
-    } else {
-	set retcomm "RDC::SendDev \[list RamDebugger::DisplayWindowsHierarchyInfoDo2 $canvas \
-		$w $x $y \[set retval]]"
-    }
-    set comm [string map [list EVAL $retcomm] $comm]
-    set comm [string map [list WIDGET $w] $comm]
-    if { $DialogWinHier::user(type) == "ramdebugger" } {
-	eval $comm
-    } else {
-	EvalRemote $comm
-    }
-}
-
-proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas w x y res } {
-
-    set w $canvas.help
-    if { [winfo exists $w] } { destroy $w }
-    toplevel $w
-    wm overrideredirect $w 1
-    wm transient $w $canvas
-
-    pack [label $w.l -bg white -justify left -anchor w]
-    $w.l conf -bd 1 -relief solid
-    $w.l conf -text $res
-    bind $w <Motion> "destroy $w"
-
-    wm withdraw $w
-    update idletasks
-
-    incr x 5
-    incr y 5
-
-    if { $x+[winfo reqwidth $w]+5 > [winfo screenwidth $w] } {
-	set x [expr [winfo screenwidth $w]-[winfo reqwidth $w]-5]
-    }
-    if { $x < 5 } { set x 5 }
-
-    if { $y+[winfo reqheight $w]+5 > [winfo screenheight $w] } {
-	set y [expr [winfo screenheight $w]-[winfo reqheight $w]-5]
-    }
-    if { $y < 0 } { set y 5 }
-
-    wm geom $w +$x+$y
-    wm deiconify $w
-
-    focus $w.l
-    bind $w.l <Control-c> "clipboard clear; clipboard append [list $res]"
-
-}
-
-proc RamDebugger::DisplayWindowsHierarchyDoDraw { canvas list x y linespace } {
-
-    set maxwidth 0
-    foreach "w info rest" $list {
-	foreach i $info {
-	    set width [font measure NormalFont $i]
-	    if { $width > $maxwidth } { set maxwidth $width }
-	}
-    }
-    set maxwidth [expr $maxwidth+10]
-
-    set maxx [expr $x+$maxwidth]
-    set maxy $y
-    set ty $y
-    set num 0
-    foreach "w info rest" $list {
-	if { $rest != "-" } { 
-	    foreach "newx newy" [DisplayWindowsHierarchyDoDraw $canvas $rest [expr $x+$maxwidth] \
-		$maxy $linespace] break
-	    if { $newx > $maxx } { set maxx $newx}
-	    set ty [expr ($maxy+$newy)/2-$linespace/2]
-	    set maxy $newy
-
-	    set width 0
-	    foreach i $info {
-		set widthi [font measure NormalFont $i]
-		if { $widthi > $width } { set width $widthi }
-	    }
-
-	    $canvas create line [expr $x+$width+2] [expr $ty+$linespace/2] \
-		[expr $x+$maxwidth-5] [expr $ty+$linespace/2] -width 2 -fill red -tags "items $w"
-	    incr maxy 12
-	}
-	set inum 0
-	foreach i $info {
-	    if { $i != "" } {
-		switch $inum {
-		    0 { set color black }
-		    1 { set color blue }
-		    2 { set color green }
-		}
-		$canvas create text $x $ty -text $i -tags "items $w" -font NormalFont -anchor nw \
-		    -fill $color
-		set ty [expr $ty+$linespace]
-	    }
-	    incr inum
-	}
-	$canvas bind $w <Enter> "RamDebugger::DisplayWindowsHierarchyInfo $canvas $w %X %Y"
-	$canvas bind $w <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $canvas {} %X %Y"
-
-	if { $ty > $maxy } {
-	    set maxy $ty
-	} else { set ty $maxy }
-
-	incr num
-    }
-    if { $num > 1 } {
-	$canvas create line [expr $x-5] $y [expr $x-1] [expr $y-4] -width 2 -fill red -tags items
-	$canvas create line [expr $x-5] $y [expr $x-5] $maxy -width 2 -fill red -tags items
-	$canvas create line [expr $x-5] $maxy [expr $x-1] [expr $maxy+4] -width 2 -fill red -tags items
-    }
-    return [list $maxx $maxy]
-}
-
-proc RamDebugger::DisplayWindowsHierarchyDo { what { res "" } } {
-    variable remoteserver
-
-    if { $what == "do" } {
-	set comm {
-	    namespace eval ::RDC {}
-	    proc ::RDC::WindowsHierarchy { w } {
-		set info [list "[winfo name $w] [winfo class $w]"]
-		if { [winfo class $w] == "Label" || [winfo class $w] == "Button" || \
-		    [winfo class $w] == "Radiobutton" || [winfo class $w] == "Checkbutton" } {
-		    if { [$w cget -text] != "" } {
-		        lappend info [$w cget -text]
-		    }
-		} elseif { [winfo class $w] == "Toplevel" && [wm title $w] != "" } {
-		    lappend info "" [wm title $w]
-		}
-		set retval [list $w $info]
-		set retval_in ""
-		foreach i [winfo children $w] {
-		    eval lappend retval_in [RDC::WindowsHierarchy $i]
-		}
-		if { $retval_in == "" } {
-		    lappend retval -
-		} else { lappend retval $retval_in }
-		return $retval
-	    }
-	    EVAL
-	}
-	if { $DialogWinHier::user(type) == "ramdebugger" } {
-	    set retcomm "RamDebugger::DisplayWindowsHierarchyDo res \[::RDC::WindowsHierarchy .]"
-	} else {
-	    set retcomm "RDC::SendDev \[list RamDebugger::DisplayWindowsHierarchyDo res \
-		        \[::RDC::WindowsHierarchy .]]"
-	}
-	set comm [string map [list EVAL $retcomm] $comm]
-
-	if { [info exists RamDebugger::DisplayWindowsHierarchyFindLastId] } {
-	    unset RamDebugger::DisplayWindowsHierarchyFindLastId
-	}
-
-	if { $DialogWinHier::user(type) == "ramdebugger" } {
-	    eval $comm
-	} else {
-	    if { $remoteserver == "" } {
-		after 100 [list WarnWin "Error: there is no debugged application" \
-		    $DialogWinHier::user(canvas)]
-		$DialogWinHier::user(canvas) delete items
-		return
-	    }
-	    EvalRemote $comm
-	}
-    } else {
-	$DialogWinHier::user(canvas) delete items
-	set linespace [expr [font metrics NormalFont -linespace]+1]
-
-	foreach "newx newy" [DisplayWindowsHierarchyDoDraw $DialogWinHier::user(canvas) $res \
-	    5 5 $linespace] break
-
-	$DialogWinHier::user(canvas) conf -scrollregion [list 0 0 $newx $newy]
-    }
-}
-
-proc RamDebugger::DisplayWindowsHierarchyFind {} {
-    variable DisplayWindowsHierarchyFindLastId
-
-    set canvas $DialogWinHier::user(canvas)
-
-    if { ![info exists DisplayWindowsHierarchyFindLastId] } {
-	set DisplayWindowsHierarchyFindLastId -1
-    }
-    set found 0
-    foreach i [$canvas find all] {
-	if { $DisplayWindowsHierarchyFindLastId > -1 && $i <= $DisplayWindowsHierarchyFindLastId } {
-	    continue
-	}
-	if { [$canvas type $i] == "text" } {
-	    set text [$canvas itemcget $i -text]
-	    if { [string match -nocase *$DialogWinHier::user(find)* $text] } {
-		set found 1
-		set DisplayWindowsHierarchyFindLastId $i
-		break
-	    }
-	}
-    }
-    if { $found } {
-	$canvas select from $i 0
-	$canvas select to $i end
-	foreach "x y" [$canvas coords $i] break
-	foreach "- - width height" [$canvas cget -scrollregion] break
-	
-	foreach "f1 f2" [$canvas xview] break
-	set xs [expr $x/double($width)-($f2-$f1)/2.0]
-	if { $xs < 0 } { set xs 0 }
-	$canvas xview moveto $xs
-
-	foreach "f1 f2" [$canvas yview] break
-	set ys [expr $y/double($height)-($f2-$f1)/2.0]
-	if { $ys < 0 } { set ys 0 }
-	$canvas yview moveto $ys
-    } else {
-	unset RamDebugger::DisplayWindowsHierarchyFindLastId
-	bell
-    }
-}
-
-proc RamDebugger::DisplayWindowsHierarchy {} {
-    variable text
-
-    CopyNamespace ::DialogWin ::DialogWinHier
-
-    set f [DialogWinHier::Init $text "Windows hierarchy" separator "" -]
-    set w [winfo toplevel $f]
-
-    radiobutton $f.r1 -text "In debugged app" -variable DialogWinHier::user(type) -value debug \
-       -command "RamDebugger::DisplayWindowsHierarchyDo do" -grid "0 w"
-    radiobutton $f.r2 -text "In RamDebugger" -variable DialogWinHier::user(type) -value ramdebugger \
-       -command "RamDebugger::DisplayWindowsHierarchyDo do" -grid "1 w"
-
-    frame $f.f -grid "0 2"
-    label $f.f.l -text "Find:" -grid 0
-    entry $f.f.e -textvar DialogWinHier::user(find) -grid 1
-
-    tkTabToWindow $f.f.e
-
-    button $f.f.b1 -text Go -width 5 -grid "2 px3 py3" -command \
-       "RamDebugger::DisplayWindowsHierarchyFind"
-    bind $f.f.e <Return> "$f.f.b1 invoke"
-
-    set DialogWinHier::user(type) debug
-
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    set DialogWinHier::user(canvas) [canvas $sw.t -width 600 -height 400 -bg white -bd 0 ]
-    $sw setwidget $DialogWinHier::user(canvas)
-
-    bind $DialogWinHier::user(canvas) <2> {
-	%W scan mark %x %y
-	set tkPriv(x) %x
-	set tkPriv(y) %y
-	set tkPriv(mouseMoved) 0
-    }
-    bind $DialogWinHier::user(canvas) <B2-Motion> {
-	if {(%x != $tkPriv(x)) || (%y != $tkPriv(y))} {
-	    set tkPriv(mouseMoved) 1
-	}
-	if {$tkPriv(mouseMoved)} {
-	    %W scan dragto %x %y
-	}
-    }
-
-    supergrid::go $f
-
-    DisplayWindowsHierarchyDo do
-
-    set action [DialogWinHier::CreateWindow]
-    DialogWinHier::DestroyWindow
-    namespace delete ::DialogWinHier
-}
-
-proc RamDebugger::GotoLine {} {
-    variable text
-
-    set f [DialogWin::Init $text "Goto line" separator ""]
-    set w [winfo toplevel $f]
-
-    label $f.l -text "Go to line:" -grid "0 px3 py5"
-    SpinBox $f.sb -range "1 1000 1" -textvariable DialogWin::user(line) \
-	    -width 8 -grid "1 px3"
-
-    checkbutton $f.cb1 -text "Relative to current line" -variable DialogWin::user(relative) \
-	    -grid "0 2 w"
-
-    set DialogWin::user(relative) 0
-
-    tkTabToWindow $f.sb
-
-    bind $w <Return> "DialogWin::InvokeOK"
-
-    supergrid::go $f
-
-    set action [DialogWin::CreateWindow]
-    while 1 {
-	switch $action {
-	    0 {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    1 {
-		set line $DialogWin::user(line)
-		set good 1
-		if { ![string is integer -strict $line] } {
-		    WarnWin "Line number must be a positive number" $w
-		    set good 0
-		}
-		if { $good && $DialogWin::user(relative) } {
-		    set insline [scan [$text index insert] %d]
-		    set lastline [scan [$text index end-1c] %d]
-		    set line [expr $insline+$line]
-		    if { $line < 1 || $line > $lastline } {
-		        WarnWin "Trying to go to line $line. Out of limits" $w
-		        set good 0
-		    }
-		}
-		if { $good } {
-		    set lastline [scan [$text index end-1c] %d]
-		    if { $line < 1 } { set line 1 }
-		    if { $line > $lastline } { set line $lastline }
-		    $text mark set insert $line.0
-		    $text see $line.0
-		    focus $text
-		    DialogWin::DestroyWindow
-		    return
-		}
-	    }
-	}
-	set action [DialogWin::WaitForWindow]
-    }
-}
-
-proc RamDebugger::DebugCplusPlusWindow { { tryautomatic 0 } } {
-    variable text
-    variable options
-
-    if { ![info exists options(debugcplusplus)] } {
-	set options(debugcplusplus) ""
-    }
-
-    set exes ""
-    set dirs ""
-    set args ""
-    foreach "exe dir arg" $options(debugcplusplus) {
-	lappend exes $exe
-	lappend dirs $dir
-	lappend args $arg
-    }
-
-    set exe ""
-    foreach "exe dir args" [cproject::GiveDebugData] break
-
-    if { $tryautomatic && $exe != "" } {
-	set found 0
-	set ipos 0
-	foreach "exe_in dir_in args_in" $options(debugcplusplus) {
-	    if { $exe == $exe_in && $dir == $dir_in && $args == $args_in } {
-		set found 1
-		break
-	    }
-	    incr ipos 3
-	}
-	if { $found && $ipos != 0 } {
-	    set options(debugcplusplus) [lreplace $options(debugcplusplus) $ipos \
-		    [expr $ipos+2]]
-	}
-	if { !$found || $ipos != 0 } {
-	    set options(debugcplusplus) [linsert $options(debugcplusplus) 0 \
-		    $exe $dir $args]
-	}
-
-	rdebug -debugcplusplus [list $exe $dir $args]
-	return
-    }
-    if { $tryautomatic && $options(debugcplusplus) != "" } {
-	rdebug -debugcplusplus [lrange $options(debugcplusplus) 0 2]
-	return
-    }
-
-    set f [DialogWin::Init $text "Debug c++" separator ""]
-    set w [winfo toplevel $f]
-    
-    label $f.l -text "Program to debug:" -grid "0 e px3 py5"
-    ComboBox $f.cb1 -textvariable DialogWin::user(executable) -width 40 -grid 1 -values \
-	    $exes
-    Button $f.b1 -image [Bitmap::get file] -width 16 -grid 2 -relief link
-
-
-    label $f.l2 -text "Directory:" -grid "0 e px3 py5"
-    ComboBox $f.cb2 -textvariable DialogWin::user(directory) -width 40 -grid "1" -values \
-	    $dirs
-    Button $f.b2 -image [Bitmap::get folder] -grid 2 -relief link
-
-    label $f.l3 -text "Arguments:" -grid "0 e"
-    ComboBox $f.cb3 -textvariable DialogWin::user(arguments) -width 40 -grid "1 2" -values \
-	    $args
-
-
-    set comm {
-	set DialogWin::user(executable) [tk_getOpenFile -filetypes {{{All Files} *}} \
-		-initialdir $RamDebugger::options(defaultdir) -initialfile \
-		$DialogWin::user(executable) -parent PARENT -title "Debug executable"]
-    }
-    set comm [string map [list PARENT $w] $comm]
-    $f.b1 configure -command $comm
-
-    set comm {
-	set initial $RamDebugger::options(defaultdir)
-	catch { set initial [file dirname $DialogWin::user(executable)] }
-	set DialogWin::user(directory) [tk_chooseDirectory   \
-	    -initialdir $initial -parent PARENT \
-	    -title "Debug directory" -mustexist 1]
-    }
-    set comm [string map [list PARENT $w] $comm]
-    $f.b2 configure -command $comm
-
-    if { [info exists options(debugcplusplus)] } {
-	set DialogWin::user(executable) [lindex $options(debugcplusplus) 0]
-	set DialogWin::user(directory) [lindex $options(debugcplusplus) 1]
-	set DialogWin::user(arguments) [lindex $options(debugcplusplus) 2]
-    }
-    tkTabToWindow $f.cb1
-
-    bind $w <Return> "DialogWin::InvokeOK"
-
-    supergrid::go $f
-
-    set action [DialogWin::CreateWindow]
-    while 1 {
-	switch $action {
-	    0 {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    1 {
-		set found 0
-		set ipos 0
-		foreach "exe dir args" $options(debugcplusplus) {
-		    if { $exe == $DialogWin::user(executable) && \
-		        $dir == $DialogWin::user(directory) && \
-		        $args == $DialogWin::user(arguments) } {
-		        set found 1
-		        break
-		    }
-		    incr ipos 3
-		}
-		if { $found && $ipos != 0 } {
-		    set options(debugcplusplus) [lreplace $options(debugcplusplus) $ipos \
-		            [expr $ipos+2]]
-		}
-		if { !$found || $ipos != 0 } {
-		    set options(debugcplusplus) [linsert $options(debugcplusplus) 0 \
-		        $DialogWin::user(executable) $DialogWin::user(directory) \
-		        $DialogWin::user(arguments)]
-		}
-
-		rdebug -debugcplusplus [list $DialogWin::user(executable) \
-		        $DialogWin::user(directory) $DialogWin::user(arguments)]
-		DialogWin::DestroyWindow
-		return
-	    }
-	}
-	set action [DialogWin::WaitForWindow]
-    }
-}
-
 proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
     variable EvalEntries
     variable IsInStop
     variable remoteserver
     variable remoteserverType
     variable gdblog
+    variable options
 
     if { !$IsInStop } { return }
     if { $name == "" } {
@@ -5377,6 +3219,14 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 	    set var [string trim $EvalEntries($i,left)]
 	    if { $var == "" } { return }
 	    set value [string trim $EvalEntries($name)]
+
+	    if { $options(ConfirmModifyVariable) } {
+		set ret [DialogWin::messageBox -default ok -icon question -message \
+		        "Are you sure to change variable '$var' to value '$value'?" \
+		        -title "Warning" -type okcancel]
+		if { $ret == "cancel" } { return }
+	    }
+
 	    if { $remoteserverType == "gdb" } {
 		set remoteserver [lreplace $remoteserver 2 2 setvariable]
 		EvalRemote "set variable $var=$value"
@@ -5400,8 +3250,10 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
     variable IsInStop
     variable remoteserver
     variable remoteserverType
+    variable options
 
     if { !$IsInStop } { return }
+
     if { $name == "" } {
 	if { $what == "do" } {
 	    if { $remoteserverType == "gdb" } {
@@ -5454,12 +3306,79 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		incr i
 	    }
 	}
+    } elseif { [string match *leftL $name] } {
+
+	if { $what == "do" } {
+	    regexp {[0-9]+} $name i
+	    set var $EvalEntries($name)
+	    if { [string trim $var] == "" } {
+		$RamDebugger::EvalEntries($i,rightentryL) conf -fg black
+		set RamDebugger::EvalEntries($i,rightL) ""
+		return
+	    }
+	    if { $remoteserverType == "gdb" } {
+		set remoteserver [lreplace $remoteserver 2 2 [list getdata \
+		        "RamDebugger::CheckEvalEntriesL res $name"]]
+		set comm "output $var\n"
+		append comm "printf \"FINISHED GETDATA\\n\""
+		EvalRemote $comm
+		return
+	    }
+	    set comm {
+		if { [array exists {VAR}] } {
+		    set ::RDC::retval [list array [array get {VAR}]]
+		} elseif { [info exists {VAR}] } {
+		    set ::RDC::retval [list variable [set {VAR}]]
+		} else {
+		    set ::RDC::err [catch {expr {VAR}} ::RDC::val]
+		    if { !$::RDC::err } {
+		        set ::RDC::retval [list expr $::RDC::val]
+		    } else {
+		        set ::RDC::retval [list error "variable or expr 'VAR' does not exist"]
+		    }
+		}
+		set ::RDC::retval
+	    }
+	    set comm [string map [list VAR [string trim $var]] $comm]
+	    reval -handler [list RamDebugger::CheckEvalEntriesL res $name] $comm
+	} else {
+	    regexp {[0-9]+} $name i
+	    if { $remoteserverType == "gdb" } {
+		set res [list 0 [list variable $res]]
+	    }
+	    foreach "type val" [lindex $res 1] break
+	    if { [string length $val] > 50 } {
+		set val [string range $val 0 46]...
+	    }
+	    set RamDebugger::EvalEntries($i,rightL) $val
+	    if { $type == "error" } {
+		$RamDebugger::EvalEntries($i,rightentryL) conf -fg red
+	    } else {
+		$RamDebugger::EvalEntries($i,rightentryL) conf -fg black
+	    }
+	}
     } else {
 	if { $what == "do" } {
 	    regexp {[0-9]+} $name i
 	    set var [string trim $EvalEntries($i,leftL)]
 	    if { $var == "" } { return }
 	    set value [string trim $EvalEntries($name)]
+
+	    if { $options(ConfirmModifyVariable) } {
+		# its necessary to take out the focus out binding to avoid interaction
+		# with this func
+		set comm [bind $RamDebugger::EvalEntries($i,rightentryL) <FocusOut>]
+		bind $RamDebugger::EvalEntries($i,rightentryL) <FocusOut> ""
+
+		set ret [DialogWin::messageBox -default ok -icon question -message \
+		        "Are you sure to change variable '$var' to value '$value'?" \
+		        -title "Warning" -type okcancel]
+
+		bind $RamDebugger::EvalEntries($i,rightentryL) <FocusOut> $comm
+
+		if { $ret == "cancel" } { return }
+	    }
+	    
 	    if { $remoteserverType == "gdb" } {
 		set remoteserver [lreplace $remoteserver 2 2 setvariable]
 		EvalRemote "set variable $var=$value"
@@ -5467,6 +3386,7 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 	    }
 	    set comm [list set $var $value]
 	    reval -handler [list RamDebugger::CheckEvalEntriesL res $name] $comm
+
 	} else {
 	    regexp {[0-9]+} $name i
 	    set RamDebugger::EvalEntries($i,rightR) [lindex $res 1]
@@ -5515,10 +3435,11 @@ proc RamDebugger::TextOutInsert { data } {
 
     if { ![info exists textOUT] || ![winfo exists $textOUT] } { return }
 
+    foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
     $textOUT ins end $data
     $textOUT conf -state disabled
-    $textOUT yview moveto 1
+    if { $yend == 1 } { $textOUT yview moveto 1 }
 }
 
 proc RamDebugger::TextOutInsertRed { data } {
@@ -5526,11 +3447,25 @@ proc RamDebugger::TextOutInsertRed { data } {
 
     if { ![info exists textOUT] || ![winfo exists $textOUT] } { return }
 
+    foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
     $textOUT ins end $data red
     $textOUT tag configure red -foreground red
     $textOUT conf -state disabled
-    $textOUT yview moveto 1
+    if { $yend == 1 } { $textOUT yview moveto 1 }
+}
+
+proc RamDebugger::TextOutInsertBlue { data } {
+    variable textOUT
+
+    if { ![info exists textOUT] || ![winfo exists $textOUT] } { return }
+
+    foreach "- yend" [$textOUT yview] break
+    $textOUT conf -state normal
+    $textOUT ins end $data blue
+    $textOUT tag configure blue -foreground blue
+    $textOUT conf -state disabled
+    if { $yend == 1 } { $textOUT yview moveto 1 }
 }
 
 proc RamDebugger::TextCompClear {} {
@@ -5548,10 +3483,24 @@ proc RamDebugger::TextCompInsert { data } {
 
     if { ![info exists textCOMP] || ![winfo exists $textCOMP] } { return }
 
+    foreach "- yend" [$textCOMP yview] break
     $textCOMP conf -state normal
     $textCOMP ins end $data
     $textCOMP conf -state disabled
-    $textCOMP yview moveto 1
+    if { $yend == 1 } { $textCOMP yview moveto 1 }
+}
+
+proc RamDebugger::TextCompInsertRed { data } {
+    variable textCOMP
+
+    if { ![info exists textCOMP] || ![winfo exists $textCOMP] } { return }
+
+    foreach "- yend" [$textCOMP yview] break
+    $textCOMP conf -state normal
+    $textCOMP ins end $data red
+    $textCOMP tag configure red -foreground red
+    $textCOMP conf -state disabled
+    if { $yend == 1 } { $textCOMP yview moveto 1 }
 }
 
 
@@ -5602,8 +3551,31 @@ proc RamDebugger::GiveListBoxItemName { listbox string } {
     return $item
 }
 
+proc RamDebugger::ConfigureLabel { label } {
+
+    set tt [$label cget -text]
+    if { [string match "...*" $tt] } {
+	set tt [$label cget -helptext]
+    }
+
+    set lwidth [expr [winfo width $label]-5]
+    if { [font measure [$label cget -font] $tt] <= $lwidth } {
+	$label configure -text $tt -helptext ""
+    } else {
+	$label configure -helptext $tt
+	while { [string length $tt] > 3 } {
+	    set tt [string range $tt 1 end]
+	    if { [font measure [$label cget -font] ...$tt] <= $lwidth } {
+		break
+	    }
+	}
+	$label configure -text ...$tt
+    }
+}
+
 proc RamDebugger::FillListBox {} {
     variable listbox
+    variable listboxlabel
     variable options
     variable instrumentedfilesP
     variable instrumentedfilesR
@@ -5613,8 +3585,11 @@ proc RamDebugger::FillListBox {} {
 
     if { $listbox == "" || ![winfo exists $listbox] } { return }
 
+    $listboxlabel configure -text $options(defaultdir)
+    ConfigureLabel $listboxlabel
+
     $listbox delete [$listbox items]
-    
+
     set parent [file dirname $options(defaultdir)]
     $listbox insert end .. -image [Bitmap::get folder] -text ".." -data [list folder $parent]
     set idxfolder 1
@@ -5641,7 +3616,7 @@ proc RamDebugger::FillListBox {} {
 		    debug { set img $images(file_blue) }
 		    time { set img $images(file_magenta) }
 		}
-	    } elseif { [GiveInstFile $fullpath 1 I] != "" } {
+	    } elseif { [GiveInstFile $fullpath 1 P] != "" } {
 		set img $images(file_yellow)
 	    } else { set img [Bitmap::get file] }
 
@@ -5654,30 +3629,38 @@ proc RamDebugger::FillListBox {} {
 proc RamDebugger::PrevNextCompileError { what } {
     variable textCOMP
 
-    set err [catch { $textCOMP index sel.first} idx]
+    $textCOMP tag conf sel2 -background [$textCOMP tag cget sel -background]
+    $textCOMP tag conf sel2 -foreground [$textCOMP tag cget sel -foreground]
+
+    set err [catch { $textCOMP index sel2.first} idx]
     if { $err } {
 	switch $what {
 	    next { set idx 1.0 }
 	    prev { set idx end-1c }
 	}
+	$textCOMP tag add sel2 "$idx linestart" "$idx lineend"
     } else {
-	switch $what {
-	    next {
-		set idx [$textCOMP index $idx+1l]
-		if { [$textCOMP compare $idx > end-1c] } {
-		    set idx 1.0
+	$textCOMP tag remove sel2 1.0 end
+	set idxini $idx
+	while { [$textCOMP tag range sel2] == "" } {
+	    switch $what {
+		next {
+		    set idx [$textCOMP index $idx+1l]
+		    if { [$textCOMP compare $idx > end-1c] } {
+		        set idx 1.0
+		    }
+		}
+		prev {
+		    set idx [$textCOMP index $idx-1l]
+		    if { [$textCOMP compare $idx < 1.0] } {
+		        set idx end-1c
+		    }
 		}
 	    }
-	    prev {
-		set idx [$textCOMP index $idx-1l]
-		if { [$textCOMP compare $idx < 1.0] } {
-		    set idx end-1c
-		}
-	    }
+	    $textCOMP tag add sel2 "$idx linestart" "$idx lineend"
+	    if { $idx == $idxini } { break }
 	}
     }
-    $textCOMP tag remove sel 1.0 end
-    $textCOMP tag add sel "$idx linestart" "$idx lineend"
     $textCOMP see $idx
     StackDouble1 $textCOMP $idx
 }
@@ -5694,6 +3677,12 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 	    {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)}] {
 
 	if { [regexp $pattern $data {} file line] } {
+
+	    # strange case in Windows mingw
+	    if { [regexp {^//([a-zA-Z])(/.*)} $file {} letter sfile] && \
+		[file exists $letter:$sfile] } {
+		set file $letter:$sfile
+	    }
 	    
 	    if { ![file exists $file] && [file exists [file join $options(defaultdir) \
 		    $file]] } {
@@ -5719,527 +3708,6 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     }
 }
 
-proc RamDebugger::Compile { name } {
-    variable text
-    variable mainframe
-    variable MainDir
-
-    $mainframe setmenustate debugentry disabled
-
-    set dir [file dirname $name]
-
-    set pwd [pwd]
-    cd $dir
-
-    if { [regexp {\.(c|cc)$} $name] } {
-	if { [auto_execok gcc] == "" } {
-	    $mainframe setmenustate debug normal
-	    cd $pwd
-
-	    set ret [DialogWin::messageBox -default yes -icon question -message \
-		"Could not find command 'gcc'. Do you want to see the help?" -parent $text \
-		-title "Command not found" -type yesno]
-	    if { $ret == "yes" } {
-		RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
-	    }
-	    return
-	}
-	set comm "gcc -c -I$dir $name"
-	set commS "gcc -c -I$dir $name"
-    } elseif { [regexp {Makefil.*[^~]$} $name] } {
-	$mainframe setmenustate debug normal
-	if { [auto_execok make] == "" } {
-	    cd $pwd
-	    set ret [DialogWin::messageBox -default yes -icon question -message \
-		"Could not find command 'make'. Do you want to see the help?" -parent $text \
-		-title "Command not found" -type yesno]
-	    if { $ret == "yes" } {
-		RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
-	    }
-	    return
-	}
-	set comm "make -f $name"
-	set commS "make -f $name"
-    }
-
-#     if {$::tcl_platform(platform) == "windows" && \
-#         [info exists ::env(COMSPEC)]} {
-#         set comm  "[file join $::env(COMSPEC)] /c $comm"
-#     }
-
-    if { $::tcl_platform(platform) == "windows" } {
-	    set cat [file join $MainDir addons cat.exe]
-    } else { set cat cat }
-
-    set fin [open "|$comm |& $cat" r]
-    fconfigure $fin -blocking 0
-    fileevent $fin readable [list RamDebugger::CompileFeedback $fin $name]
-    cd $pwd
-    
-    TextCompClear
-    TextCompRaise
-    TextCompInsert "[string repeat - 20]Compiling [file tail $name][string repeat - 20]\n"
-    TextCompInsert "--> $commS\n"
-    update
-}
-
-proc RamDebugger::CompileFeedback { fin name } {
-    variable text
-    variable mainframe
-
-    if { [eof $fin] } {
-	if { $name != "" } {
-	    TextCompInsert "End compilation of [file tail $name]\n"
-	    TextCompRaise
-	}
-
-	set err [catch { close $fin } errstring]
-	$mainframe setmenustate debugentry normal
-	if { $err } {
-	    TextCompInsert $errstring\n
-	    TextCompRaise
-	    set cproject::compilationstatus 1
-	} else {
-	    set cproject::compilationstatus 0
-	}
-	return
-    }
-    gets $fin aa
-
-    if { $aa != "" } {
-	TextCompInsert $aa\n
-	update
-    }
-}
-
-proc RamDebugger::FindFilesWithPattern { dir patternlist recurse } {
-
-    set retval [eval glob -nocomplain -dir [list $dir] -types f -- $patternlist]
-    if { $recurse } {
-	foreach i [glob -nocomplain -dir $dir -type d *] {
-	    set retval [concat $retval [FindFilesWithPattern $i $patternlist $recurse]]
-	}
-    }
-    return $retval
-}
-
-proc RamDebugger::SearchInFilesDo {} {
-    variable options
-    variable MainDir
-    
-#      if { $::tcl_platform(platform) == "windows" } {
-#          set grep [file join $MainDir addons grep.exe]
-#      } else { set grep grep }
-
-    set comm "\"grep\" -ns "
-    switch -- $::RamDebugger::searchmode {
-	-exact { append comm "-F " }
-	-regexp { append comm "-E " }
-    }
-    if { !$::RamDebugger::searchcase } {
-	append comm "-i "
-    }
-    append comm "\"$RamDebugger::searchstring\" "
-
-    set patternlist [regexp -inline -all {[^\s,;]+} $RamDebugger::searchextensions]
-
-    set files [FindFilesWithPattern $RamDebugger::searchdir $patternlist \
-	    $RamDebugger::searchrecursedirs]
-
-    if { [llength $files] == 0 } {
-	TextOutClear
-	TextOutInsert "No files found"
-	TextOutRaise
-	return
-    }
-
-    append comm "\"[join $files {" "}]\""
-
-    set fin [open "|$comm" r]
-
-    set result ""
-    while { ![eof $fin] } {
-	append result [gets $fin]\n
-    }
-    set err [catch { close $fin } errstring]
-    if { [string trim $result] == "" } { set result "Nothing found" }
-
-    TextOutClear
-    TextOutInsert $result
-    TextOutRaise
-    
-    foreach "i j search" [list texts RamDebugger::searchstring lsearch \
-	    exts RamDebugger::searchextensions lsearchfile \
-	    dirs RamDebugger::searchdir lsearchfile] {
-	set ipos [$search $options(SearchInFiles,$i) [set $j]]
-	if { $ipos != -1 } {
-	    set options(SearchInFiles,$i) [lreplace $options(SearchInFiles,$i) $ipos $ipos]
-	}
-	set options(SearchInFiles,$i) [linsert $options(SearchInFiles,$i) 0 [set $j]]
-	if { [llength $options(SearchInFiles,$i)] > 6 } {
-	    set options(SearchInFiles,$i) [lreplace $options(SearchInFiles,$i) 6 end]
-	}
-    }
-}
-
-proc RamDebugger::SearchInFiles {} {
-    variable options
-    variable text
-
-    set range [$text tag ranges sel]
-    if { $range != "" } {
-	set txt [eval $text get $range]
-    } else {
-	set idx [$text index insert]
-	if { $idx != "" } {
-	    set txt ""
-	    set idx0 $idx
-	    while { [string is wordchar [$text get $idx0]] } {
-		set txt [$text get $idx0]$txt
-		set idx0 [$text index $idx0-1c]
-		if { [$text compare $idx0 <= 1.0] } { break }
-	    }
-	    set idx1 [$text index $idx+1c]
-	    while { [string is wordchar [$text get $idx1]] } {
-		append txt [$text get $idx1]
-		set idx1 [$text index $idx1+1c]
-		if { [$text compare $idx1 >= end] } { break }
-	    }
-	} else { set txt "" }
-    }
-    
-    set f [DialogWin::Init $text "Search in files" separator]
-    set w [winfo toplevel $f]
-
-    if { ![info exists options(SearchInFiles,texts)] } {
-	set options(SearchInFiles,texts) ""
-	set options(SearchInFiles,exts) ""
-	set options(SearchInFiles,dirs) ""
-    }
-
-    label $f.l1 -text "Text:" -grid 0
-    ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -grid "1 2 px3 py3" \
-	    -values $options(SearchInFiles,texts) -width 30
-
-    if { [string trim $txt] != "" } {
-	set ::RamDebugger::searchstring $txt
-    } else { set ::RamDebugger::searchstring [lindex $options(SearchInFiles,texts) 0] }
-
-    label $f.l2 -text "File ext:" -grid 0
-    ComboBox $f.e2 -textvariable ::RamDebugger::searchextensions -grid "1 2 px3 py3" \
-	    -values [concat $options(SearchInFiles,exts) [list "*.tcl" "*.h,*.cc,*.c"]]
-
-    set ::RamDebugger::searchextensions [lindex [$f.e2 cget -values] 0]
-
-    label $f.l3 -text "Directory:" -grid 0
-    ComboBox $f.e3 -textvariable ::RamDebugger::searchdir -grid "1 1 px3 py3" \
-	    -values $options(SearchInFiles,dirs)
-    Button $f.b3 -image [Bitmap::get folder] -relief link -grid "2" 
-
-
-    set comm {
-	set initial $::RamDebugger::searchdir
-	set ::RamDebugger::searchdir [tk_chooseDirectory   \
-	    -initialdir $initial -parent PARENT \
-	    -title "Search directory" -mustexist 1]
-    }
-    set comm [string map [list PARENT $w] $comm]
-    $f.b3 configure -command $comm
-
-    set ::RamDebugger::searchdir $options(defaultdir)
-
-    set f1 [frame $f.f1 -bd 0 -grid "0 3 w"]
-    set f2 [frame $f1.f2 -bd 1 -relief ridge -grid "0 w px3"]
-    radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
-	-value -exact -grid "0 w"
-    radiobutton $f2.r2 -text Regexp -variable ::RamDebugger::searchmode \
-	-value -regexp -grid "0 w"
-
-    set f3 [frame $f1.f3 -grid "1 w"]
-    checkbutton $f3.cb1 -text "Consider case" -variable ::RamDebugger::searchcase \
-	-grid 0
-    checkbutton $f3.cb2 -text "Recurse dirs" -variable ::RamDebugger::searchrecursedirs \
-	-grid 0
-   
-    supergrid::go $f
-
-
-    set ::RamDebugger::searchmode -exact
-    set ::RamDebugger::searchcase 0
-    set ::RamDebugger::searchrecursedirs 1
-
-    tkTabToWindow $f.e1
-    bind $w <Return> "DialogWin::InvokeOK"
-    
-    set action [DialogWin::CreateWindow]
-    switch $action {
-	0 {
-	    DialogWin::DestroyWindow
-	    return
-	}
-	1 {
-	    if { $::RamDebugger::searchstring == "" } {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    DialogWin::DestroyWindow
-	    update
-	    SearchInFilesDo
-	    return
-	}
-    }
-}
-
-
-proc RamDebugger::SearchWindow {} {
-    variable text
-    
-    set f [DialogWin::Init $text "Search" separator]
-    set w [winfo toplevel $f]
-
-    label $f.l1 -text "Text:" -grid 0
-    entry $f.e1 -textvariable ::RamDebugger::searchstring -grid "1 2 px3 py3"
-
-    set f2 [frame $f.f2 -bd 1 -relief ridge -grid "0 2 w px3"]
-    radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
-	-value -exact -grid "0 w"
-    radiobutton $f2.r2 -text Regexp -variable ::RamDebugger::searchmode \
-	-value -regexp -grid "0 w"
-
-    set f25 [frame $f.f25 -bd 1 -relief ridge -grid "2 w px3"]
-    radiobutton $f25.r1 -text Forward -variable ::RamDebugger::SearchType \
-	-value -forwards -grid "0 w"
-    radiobutton $f25.r2 -text Backward -variable ::RamDebugger::SearchType \
-	-value -backwards -grid "0 w"
-
-    set f3 [frame $f.f3 -grid "0 3 w"]
-    checkbutton $f3.cb1 -text "Consider case" -variable ::RamDebugger::searchcase \
-	-grid 0
-    checkbutton $f3.cb2 -text "From beginning" -variable ::RamDebugger::searchFromBegin \
-	-grid 1
-   
-    supergrid::go $f
-
-    set ::RamDebugger::searchstring ""
-    catch { set ::RamDebugger::searchstring [$text get sel.first sel.last] }
-
-    set ::RamDebugger::searchmode -exact
-    set ::RamDebugger::searchcase 0
-    set ::RamDebugger::searchFromBegin 0
-    set ::RamDebugger::SearchType -forwards
-
-    tkTabToWindow $f.e1
-    bind $w <Return> "DialogWin::InvokeOK"
-    
-    set action [DialogWin::CreateWindow]
-    switch $action {
-	0 {
-	    DialogWin::DestroyWindow
-	    return
-	}
-	1 {
-	    if { $::RamDebugger::searchstring == "" } {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    if { $::RamDebugger::searchFromBegin } {
-		if { $::RamDebugger::SearchType == "-forwards" } {
-		    set idx 1.0
-		} else { set idx [$text index end] }
-	    } else {
-		set idx [$text index insert]
-	    }
-	    set ::RamDebugger::SearchIni $idx
-	    set ::RamDebugger::SearchPos $idx
-	    set ::RamDebugger::Lastsearchstring ""
-	    Search [winfo toplevel $text] any
-	    DialogWin::DestroyWindow
-	}
-    }
-}
-
-proc RamDebugger::Search { w { what {} } } {
-    variable text
-
-    if { ![winfo exists $w.search] && $what != "any" } {
-	entry $w.search -width 25 -textvariable RamDebugger::searchstring
-	place $w.search -in $w -x 0 -rely 1 -y -1 -anchor sw
-
-	focus $text
-	bindtags $text [linsert [bindtags $text] 0 $w.search]
-	bind $w.search <FocusOut> "destroy $w.search ; break"
-	bind $w.search <Escape> "destroy $w.search ; break"
-	bind $w.search <KeyPress> [list if { [string is wordchar %A] || [string is punct %A] \
-		                             || [string is space %A] } \
-	    "tkEntryInsert $w.search %A ; break" else "destroy $w.search ; break"]
-	bind $w.search <Delete> "$w.search delete insert ; break"
-	bind $w.search <BackSpace> "tkEntryBackspace $w.search ; break"
-	bind $w.search <1> "destroy $w.search ; break"
-	bind $w.search <3> "destroy $w.search ; break"
-	bind $w.search <Return> "destroy $w.search ; break"
-	bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
-	bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
-	bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
-
-	trace var RamDebugger::searchstring w "RamDebugger::Search $w ;#"
-	bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
-		                      "RamDebugger::Search $w ;#"]
-	bind $w.search <Destroy> "+ [list bindtags $text [lreplace [bindtags $text] 0 0]] ; break"
-
-	foreach i [bind Text] {
-	    if { [bind $w.search $i] == "" } {
-		if { [string match *nothing* [bind Text $i]] } {
-		    bind $w.search $i [bind Text $i]
-		} else {
-		    bind $w.search $i "destroy $w.search" }
-	    }
-	}
-	set idx [$text index insert]
-	if { $idx == "" } { set idx 1.0 }
-	set ::RamDebugger::SearchIni $idx
-	set ::RamDebugger::SearchPos $idx
-	set ::RamDebugger::searchcase -1
-	set ::RamDebugger::searchmode -exact
-	set ::RamDebugger::Lastsearchstring ""
-	set ::RamDebugger::searchstring ""
-    }
-
-    switch $what {
-	iforward {
-	    set ::RamDebugger::SearchType -forwards
-	}
-	ibackward {
-	    set ::RamDebugger::SearchType -backwards
-	}
-	any {
-	    if { ![info exists ::RamDebugger::Lastsearchstring] } {
-		WarnWin "Before using 'Continue search', use 'Search'" $w
-		return
-	    }
-	}
-	stop {
-	    destroy $w.search
-	    return
-	}
-    }
-    if { $RamDebugger::searchstring != "" || $RamDebugger::Lastsearchstring != "" } {
-	if { $RamDebugger::SearchType == "-forwards" } {
-	    set stopindex end
-	} else {
-	    set stopindex 1.0
-	}
-	if { $RamDebugger::searchstring == $RamDebugger::Lastsearchstring } {
-	    set len [string length $RamDebugger::searchstring]
-	    if { $RamDebugger::SearchType == "-forwards" } {
-		set idx [$text index $RamDebugger::SearchPos+${len}c]
-	    } else {
-		set idx [$text index $RamDebugger::SearchPos-${len}c]
-	    }
-	} elseif { [string length $RamDebugger::searchstring] < \
-		       [string length $RamDebugger::Lastsearchstring] } {
-	    set idx $RamDebugger::SearchIni
-	} else { set idx $RamDebugger::SearchPos }
-
-	set options $RamDebugger::SearchType
-	lappend options $::RamDebugger::searchmode
-
-	if { $::RamDebugger::searchcase == 1 } {
-	    # nothing
-	} elseif { $::RamDebugger::searchcase == 0 } {
-	    lappend options -nocase
-	} elseif { $RamDebugger::searchstring == [string tolower $RamDebugger::searchstring] } {
-	    lappend options -nocase
-	}
-	lappend options --
-
-	set idx [eval $text search $options [list $RamDebugger::searchstring] \
-		     $idx $stopindex]
-	if { $idx == "" } {
-	    bell
-	} else {
-	    set RamDebugger::SearchPos $idx
-	    set len [string length $RamDebugger::searchstring]
-	    if { $RamDebugger::SearchType == "-forwards" } {
-		set idx2 [$text index $RamDebugger::SearchPos+${len}c]
-	    } else {
-		set idx2 $RamDebugger::SearchPos
-		set RamDebugger::SearchPos [$text index $RamDebugger::SearchPos+${len}c]
-	    }
-	    set ed [$text cget -editable]
-	     $text conf -editable 1
-	    $text tag remove sel 1.0 end
-	    if { $RamDebugger::SearchType == "-forwards" } {
-		$text tag add sel $RamDebugger::SearchPos $idx2
-	    } else { $text tag add sel $idx2 $RamDebugger::SearchPos }
-	     $text conf -editable $ed
-	    $text mark set insert $idx2
-	    $text see $RamDebugger::SearchPos
-	}
-	set RamDebugger::Lastsearchstring $RamDebugger::searchstring
-    }
-}
-
-# proc RamDebugger::OpenVisualRegexp {} {
-#     variable MainDir
-
-#     exec [info nameofexecutable] [file join $MainDir addons visual_regexp-2.2 visual_regexp.tcl] &
-# }
-
-
-proc RamDebugger::OpenProgram { what } {
-    variable MainDir
-
-    switch $what {
-	visualregexp { set file [file join $MainDir addons visual_regexp-2.2 visual_regexp.tcl] }
-	tkcvs { set file [file join $MainDir addons tkcvs bin tkcvs.tcl] }
-	tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
-    }
-    if { [interp exists $what] } { interp delete $what }
-    interp create $what
-    interp alias $what exit "" interp delete $what
-    $what eval [list load {} Tk]
-    $what eval { set argc 0 ; set argv "" }
-    $what eval [list source $file]
-}
-
-proc RamDebugger::OpenConsole {} {
-    variable MainDir
-
-    set tkcon [file join $MainDir addons tkcon tkcon.tcl]
-
-    if { $tkcon == "" } {
-	WarnWin "Could not find tkcon"
-	return
-    }
-
-    set tkconprefs {
-	if { $::tcl_platform(platform) == "windows" } {
-	    tkcon font "MS Sans Serif" 8
-	} else {
-	    tkcon font "new century schoolbook" 12
-	}
-	# Keep 50 commands in history
-	set ::tkcon::OPT(history)  50
-	set ::tkcon::OPT(buffer) 5000
-	
-	# Use a pink prompt
-	set ::tkcon::COLOR(prompt) red
-	# set tkcon(autoload) "Tk"
-	set ::tkcon::OPT(cols)  80
-	set ::tkcon::OPT(rows) 24
-	set ::tkcon::OPT(gc-delay) 0
-	#set tkcon(cols) 60
-	#set tkcon(rows) 18
-	catch [list namespace import RamDebugger::*]
-	puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
-    }
-    if { [winfo exists .tkcon] } { destroy .tkcon }
-    set argv [list -rcfile "" -exec "" -root .tkcon -eval $tkconprefs]
-    uplevel \#0 [list source $tkcon]
-    uplevel \#0 ::tkcon::Init $argv
-    proc ::tkcon::FinalExit { args } { destroy .tkcon }
-}
-
 proc RamDebugger::CutCopyPasteText { what } {
     variable text
 
@@ -6258,7 +3726,6 @@ proc RamDebugger::CutCopyPasteText { what } {
 	}
     }
 }
-
 
 proc RamDebugger::ListBoxDouble1 { listb item } {
     variable options
@@ -6288,17 +3755,16 @@ proc RamDebugger::ListboxMenu { listb x y item } {
 	$menu add command -label Open -command [list RamDebugger::OpenFileF $name]
 	$menu add command -label Reinstrument -command [list RamDebugger::OpenFileF \
 		$name 2]
-	# by now, disconnected on windows
-	#if { $::tcl_platform(platform) != "windows" } {
-	    if { [regexp {\.(c|cc)$} $name] } {
-		$menu add separator
-		$menu add command -label Compile -command [list RamDebugger::Compile $name]
-	    }
-	    if { [regexp {Makefil.*[^~]$} $name] } {
-		$menu add separator
-		$menu add command -label Compile -command [list RamDebugger::Compile $name]
-	    }
-	#}
+
+	if { [regexp {\.(c|cc)$} $name] } {
+	    $menu add separator
+	    set w [winfo toplevel $listb]
+	    $menu add command -label Compile -command [list cproject::Compile $w $name]
+	}
+	if { [regexp {Makefil.*[^~]$} $name] } {
+	    $menu add separator
+	    $menu add command -label Compile -command [list RamDebugger::Compile $name]
+	}
     }
     tk_popup $menu $x $y
 }
@@ -6467,7 +3933,7 @@ proc RamDebugger::CheckText { command args } {
 	    set l2_new $l1
 	}
     }
-    set Numlines [scan [$text index end-1c] %d]
+    set Numlines [scan [$text index end] %d]
     set font [$text cget -font]
     $marker configure -scrollregion [list 0 0 [winfo reqwidth $marker] \
 	[expr $Numlines*[font metrics $font -linespace]]]
@@ -6741,8 +4207,7 @@ proc RamDebugger::UpdateLineNum { command args } {
     variable currentfile
     variable currentfileIsModified
 
-    if { $command == "index" } { return }
-
+    if { [regexp {index|bbox|get} $command] } { return }
     if { [regexp {^(ins|del)} $command] } { CheckText $command $args }
 
     if { [regexp {^(ins|del)} $command] && !$currentfileIsModified } {
@@ -6822,19 +4287,9 @@ proc RamDebugger::CreatePanedEntries { num pane1 pane2 suffix } {
 
 	} else { $EvalEntries($i,leftentry$suffix) configure -state disabled }
 
-	set comm {
-	    set w $pane2.e[expr $i+1]
-	    if { ![winfo exists $w] } {
-		RamDebugger::CreatePanedEntries [expr $i+2] $pane1 $pane2 {$suffix}
-	    }
-	    tkTabToWindow $w
-	}
-	set comm [string map [list \$i $i \$pane1 $pane1 \$pane2 $pane2 \
-	    \$suffix $suffix] $comm]
+	bind $pane2.e$i <Return> "RamDebugger::CheckEvalEntries$suffix do $i,right$suffix"
 
-	bind $pane2.e$i <Return> $comm
-
-	bind $pane2.e$i <FocusOut> "RamDebugger::CheckEvalEntries$suffix do $i,right$suffix"
+	bind $pane2.e$i <FocusOut> "RamDebugger::CheckEvalEntries$suffix do $i,left$suffix"
 	bind $pane2.e$i <ButtonRelease-1> {
 	    %W selection range 0 end
 	    %W icursor end
@@ -6856,343 +4311,6 @@ proc RamDebugger::CreatePanedEntries { num pane1 pane2 suffix } {
     after idle event generate $panew <Configure>
 }
 
-proc RamDebugger::CreateImages {} {
-    variable images
-   
-    set images(break) [image create photo -data {
-	R0lGODlhCwALAIQAAMQ4OMQ6OsZBQchGRsZCQslLS9NsbNd7e9RubspNTcU6
-	OuKfn+q5ueOiotRvb8dDQ/Xd3eu8vNl/f8lJSeSlpdVxccpPT///////////
-	/////////////////////////yH5BAEKAB8ALAAAAAALAAsAAAU94CcCJCme
-	ZYoCgTAQgUkGhXEgiZIKxsI0jkdqcGBAIpJJioBoRCgVIeDDSjgkFYtuSlI8
-	Jo/tKjU9jUqnEAA7
-    }]
-    set images(arrow) [image create photo -data {
-	R0lGODlhCwALAIQAAM/Ptbq6ltjYw8zMsb6+nby8ma2thLa2kd7ezb6+nKys
-	ga2tgrOzjM3Ns8DAn729m66uhLe3kt/fzrq6l9nZxdDQt///////////////
-	/////////////////////////yH5BAEKAB8ALAAAAAALAAsAAAUn4CeOZGme
-	H4CKgTAOREwUxoGIiaLvC6N8DYfQ8YBEJKgJZVVZOU0hADs=
-    }]
-    set images(arrowbreak) [image create photo -data {
-	R0lGODlhCwALAKUAAMQ4OMQ6OsZBQchGRsZCQs/PtclLS9NsbNd7e9Rubrq6
-	ltjYw8zMsb6+nby8ma2thLa2kd7ezb6+nKysga2tgrOzjM3Ns8DAn729m66u
-	hLe3kt/fzspNTdRvb9l/f9Vxcbq6l9nZxcU6OsdDQ8lJSdDQt///////////
-	////////////////////////////////////////////////////////////
-	/////////////////////////////////yH5BAEKAD8ALAAAAAALAAsAAAZF
-	wJ8QQCQKj8UkEhAQDAgFIzFgOCASikWR0eg2HA9IhCiZmM+UygRgubgvmIxm
-	A/gxOR3PBxSSAkQjJCMlRkNJhUd2RUdBADs=
-    }]
-
-    set images(blank) [image create photo -data {
-	R0lGODlhCwALAIAAAP///////yH5BAEKAAEALAAAAAALAAsAAAIKjI+py+0P
-	o5yhAAA7
-    }]
-    set images(file_blue) [image create photo -data {
-	R0lGODlhCwANAKEAAAAAAFl48v///////yH5BAEAAAMALAAAAAALAA0AAAIh
-	nI8Gy3sQogRCyelgmwNeri0X0H1g0HikZ67ohpZmnKYFADs=
-    }]
-    set images(file_magenta) [image create photo -data {
-	R0lGODlhCwANAKEAAAAAANw35f///////yH5BAEAAAMALAAAAAALAA0AAAIh
-	nI8Gy3sQogRCyelgmwNeri0X0H1g0HikZ67ohpZmnKYFADs=
-    }]
-    set images(file_yellow) [image create photo -data {
-	R0lGODlhCwANAKEAAAAAAOi/PP///////yH5BAEAAAMALAAAAAALAA0AAAIh
-	nI8Gy3sQogRCyelgmwNeri0X0H1g0HikZ67ohpZmnKYFADs=
-    }]
-    image create photo filenew16 -data {
-       R0lGODlhEAAQAIUAAPwCBFxaXNze3Ly2rJyanPz+/Ozq7GxqbPz6/GxubNTK
-       xDQyNIyKhHRydERCROTi3PT29Pz29Pzy7PTq3My2pPzu5PTi1NS+rPTq5PTe
-       zMyynPTm1Pz69OzWvMyqjPTu5PTm3OzOtOzGrMSehNTCtNS+tAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAQABAAAAZ/
-       QAAgQCwWhUhhQMBkDgKEQFIpKFgLhgMiOl1eC4iEYrtIer+MxsFRRgYe3wLk
-       MWC0qXE5/T6sfiMSExR8Z1YRFRMWF4RwYIcYFhkahH6AGBuRk2YCCBwSFZgd
-       HR6UgB8gkR0hpJsSGCAZoiEiI4QKtyQlFBQeHrVmC8HCw21+QQAh/mhDcmVh
-       dGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9uIDIuNQ0KqSBEZXZlbENvciAx
-       OTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQuDQpodHRwOi8vd3d3LmRl
-       dmVsY29yLmNvbQA7
-    }
-    
-    image create photo fileopen16 -data {
-       R0lGODlhEAAQAIUAAPwCBAQCBOSmZPzSnPzChPzGhPyuZEwyHExOTFROTFxa
-       VFRSTMSGTPT29Ozu7Nze3NTS1MzKzMTGxLy6vLS2tLSytDQyNOTm5OTi5Ly+
-       vKyqrKSmpIyOjLR+RNTW1MzOzJyenGxqZBweHKSinJSWlExKTMTCxKyurGxu
-       bBQSFAwKDJyanERCRERGRAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAQABAAAAaR
-       QIBwGCgGhkhkEWA8HpNPojFJFU6ryitTiw0IBgRBkxsYFAiGtDodDZwPCERC
-       EV8sEk0CI9FoOB4BEBESExQVFgEEBw8PFxcYEBIZGhscCEwdCxAPGA8eHxkU
-       GyAhIkwHEREQqxEZExUjJCVWCBAZJhEmGRUnoygpQioZGxsnxsQrHByzQiJx
-       z3EsLSwWpkJ+QQAh/mhDcmVhdGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9u
-       IDIuNQ0KqSBEZXZlbENvciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2
-       ZWQuDQpodHRwOi8vd3d3LmRldmVsY29yLmNvbQA7
-    }
-    image create photo folderopen16 -data {
-       R0lGODlhEAAQAIYAAPwCBAQCBExKTBQWFOzi1Ozq7ERCRCwqLPz+/PT29Ozu
-       7OTm5FRSVHRydIR+fISCfMTCvAQ6XARqnJSKfIx6XPz6/MzKxJTa9Mzq9JzO
-       5PTy7OzizJSOhIyCdOTi5Dy65FTC7HS2zMzm7OTSvNTCnIRyVNza3Dw+PASq
-       5BSGrFyqzMyyjMzOzAR+zBRejBxqnBx+rHRmTPTy9IyqvDRylFxaXNze3DRu
-       jAQ2VLSyrDQ2NNTW1NTS1AQ6VJyenGxqbMTGxLy6vGRiZKyurKyqrKSmpDw6
-       PDw6NAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAA
-       LAAAAAAQABAAAAfCgACCAAECg4eIAAMEBQYCB4mHAQgJCgsLDAEGDQGIkw4P
-       BQkJBYwQnRESEREIoRMUE6IVChYGERcYGaoRGhsbHBQdHgu2HyAhGSK6qxsj
-       JCUmJwARKCkpKsjKqislLNIRLS4vLykw2MkRMRAGhDIJMzTiLzDXETUQ0gAG
-       CgU2HjM35N3AkYMdAB0EbCjcwcPCDBguevjIR0jHDwgWLACBECRIBB8GJekQ
-       MiRIjhxEIlBMFOBADR9FIhiJ5OnAEQB+AgEAIf5oQ3JlYXRlZCBieSBCTVBU
-       b0dJRiBQcm8gdmVyc2lvbiAyLjUNCqkgRGV2ZWxDb3IgMTk5NywxOTk4LiBB
-       bGwgcmlnaHRzIHJlc2VydmVkLg0KaHR0cDovL3d3dy5kZXZlbGNvci5jb20A
-       Ow==
-    }
-
-    image create photo filesave16 -data {
-       R0lGODlhEAAQAIUAAPwCBAQCBFRSVMTCxKyurPz+/JSWlFRWVJyenKSipJSS
-       lOzu7ISChISGhIyOjHR2dJyanIyKjHx6fMzOzGRiZAQGBFxeXGRmZHRydGxq
-       bAwODOTm5ExOTERGRExKTHx+fGxubNza3Dw+PDQ2NAAAAAAAAAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-       AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAQABAAAAaA
-       QIAQECgOj0jBgFAoBpBHpaFAbRqRh0F1a30ClAhuNZHwZhViqgFhJizSjIZX
-       QCAoHOKHYw5xRBiAElQTFAoVQgINFBYXGBkZFxYHGRqIDBQbmRwdHgKeH2Yg
-       HpmkIR0HAhFeTqSZIhwCFIdIrBsjAgcPXlBERZ4Gu7xCRZVDfkEAIf5oQ3Jl
-       YXRlZCBieSBCTVBUb0dJRiBQcm8gdmVyc2lvbiAyLjUNCqkgRGV2ZWxDb3Ig
-       MTk5NywxOTk4LiBBbGwgcmlnaHRzIHJlc2VydmVkLg0KaHR0cDovL3d3dy5k
-       ZXZlbGNvci5jb20AOw==
-    }
-
-    image create photo acttick16 -data {
-	R0lGODlhEAAQAIIAAPwCBMT+xATCBASCBARCBAQCBEQCBAAAACH5BAEAAAAA
-	LAAAAAAQABAAAAM2CLrc/itAF8RkdVyVye4FpzUgJwijORCGUhDDOZbLG6Nd
-	2xjwibIQ2y80sRGIl4IBuWk6Af4EACH+aENyZWF0ZWQgYnkgQk1QVG9HSUYg
-	UHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29yIDE5OTcsMTk5OC4gQWxsIHJp
-	Z2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2ZWxjb3IuY29tADs=
-    }
-    image create photo edit16 -data {
-	R0lGODlhEAAQAIYAAPwCBFxaVMR+RPzKjNze3AQCBMR6RPzGjPyODPz+/MzO
-	zPyKDPyKBPz29OTWzPyGDPyGBOx6BOza1OR2BKROBNSOXKRKBBwOBOzu7PTW
-	xPzizOySZPyCDFxaXOy2lNRyRMxmJCQOBPTm1OzStPTKrMR+XIRWLFxGNCQS
-	BDQyNIRSNDQuJERGRLyqlNzSvIx6ZKRuVEw6LLSyrLymhKSShBwaFFROTJyW
-	jMS+vNzW1OTazNzKrHRqXOzezOTOpPTq3OzWvOTStLyedMS+rLy2pMSynMSu
-	lAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAA
-	LAAAAAAQABAAAAewgAAAAYSFhoQCA4IBBI2OjgUGBwiLBAmXlpcKkgsMlZcJ
-	BA0JDpIPEBGVjwkSBgOnExSfmBIVBxAMExYXswkYGRobHLq8gh2PHhoeHyAW
-	IYKzIiMkJSYnKCnQg5YNHtQqKywtK9qMBC4vMDEBMjIz2dCMDTQ1Njc4OToz
-	5PEEOzw3ZPToMcLHO23HfogQ0QMIkCA+hPBbhAPHECJFjMyYIUQIvEUpUqwQ
-	OXKkSEF+AgEAIf5oQ3JlYXRlZCBieSBCTVBUb0dJRiBQcm8gdmVyc2lvbiAy
-	LjUNCqkgRGV2ZWxDb3IgMTk5NywxOTk4LiBBbGwgcmlnaHRzIHJlc2VydmVk
-	Lg0KaHR0cDovL3d3dy5kZXZlbGNvci5jb20AOw==
-    }
-    image create photo actcross16 -data {
-	R0lGODlhEAAQAIIAAASC/PwCBMQCBEQCBIQCBAAAAAAAAAAAACH5BAEAAAAA
-	LAAAAAAQABAAAAMuCLrc/hCGFyYLQjQsquLDQ2ScEEJjZkYfyQKlJa2j7AQn
-	MM7NfucLze1FLD78CQAh/mhDcmVhdGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJz
-	aW9uIDIuNQ0KqSBEZXZlbENvciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVz
-	ZXJ2ZWQuDQpodHRwOi8vd3d3LmRldmVsY29yLmNvbQA7
-    }
-    image create photo filenew22 -data {
-	R0lGODlhFgAWAIUAAPwCBExOTERCRDw6PCwuLBwaHAwODAQCBOze1NTW1OTi
-	5Nze3MTGxLS2tJyanPz+/Ozu7OTi3BQSFCwqLDw+PDQyNFRSVPTu7MzKxLyy
-	rIR+fCQmJPz6/NTOxPz69Pzy7PTu5Pz29Pzu5PTq5PTm1My6pBQWFPTq3PTm
-	3NS+rAwKDPTi1PTezOzWxMy2pPz27PTazOzSvMyynOzaxOzOtPTaxOzKrMyq
-	jOzGpMymhPTizOTCpNzSzNTGvMymjMSihCH5BAEAAAAALAAAAAAWABYAAAbo
-	QIBwSCwaiYGAYEAgFAqGg/Q4DCASCsTiymgcHAcqQLB4mM+QiIQBppLPcMjk
-	wQ4bB2X4maKgt4sVCHpnFhQTElNFE3mDDxcYGRp2RBuMgxwIHX9EBZZwHh8g
-	CBmTQ52NISEiIyQlpUImng8hHyInKAgprwAqgnC0IKwrLLpGB4wctLYkwy0u
-	uwd9Z8AnJywsLcVFx2YcL7UnJCwwLTEy0GXJoSgrCCwzNDTnxgjeH9UrKzXw
-	NDY36LRGhEOwLx4NHDmgJbh3QoeOgv127EhojEeHDj16pEhRQoZHHzl+QJNC
-	sqTJSXaCAAAh/mhDcmVhdGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9uIDIu
-	NQ0KqSBEZXZlbENvciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQu
-	DQpodHRwOi8vd3d3LmRldmVsY29yLmNvbQA7
-    }
-    image create photo fileopen-22 -data {
-	R0lGODlhFgAWAIYAAPwCBAQCBCQWDCwaDDwmFPSubPzGhPzCfPy2dOSmZPzK
-	lPzSnPzOlPzKjBQODPzChPzWnPy2bPSmXPyuZOyeXIRSLEQuFEwyHEQqFDQi
-	FCweDKRuPFRSTPT29PTy9Ozq7OTi3Nze3NTW1MzOzMTGxMTCxLy6tLSytKyu
-	rDQyNMzKxOTm5OTi5Nza1NTS1MTCvLS2tLSyrKSmpJyenJSWlIyKjHx+fFxe
-	XBwaHKxuPMzKzLy6vIyOjHx6fDw6NPy6dGxubLy+vISChCQmJNza3KyqrBQS
-	FLR2RKSinJyanGxqZAwGBJSSlCwqLAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAA
-	LAAAAAAWABYAAAf/gACCg4SFhoeDAYqKiIeLj4wBjQCMhY+NkoiLk5qbhQID
-	oJyGBAUGBwgEo4MECQoLDA2pDrS1tKQPEAwHERITE77AvxKqhAQNDA8UFRYX
-	Fs8YBAQZGqGPxw0RGxwdHR4eHyAhIiMkJSYnKCgpBAYPEhcqHyssLS4kLzAx
-	MjM0NTY3cBA4UCAHBw8gVnhgEcKFjhc7UPDj0cMHAAI/KFgY4YLFio/jRpTY
-	sW8GDyCSCEQw2DChOHIqgsCQSEPIEEEEJFhAoUNECCJEyOk4d6KIyRtGcB7h
-	IJKjixEjHu4oimSGEIs4d8IIUoKECnNB0ElMwkNJJgBLlJBAcQKGiR07KGAU
-	RVGViY0mhIwwSTKjr99+THjUoIg0r48hTRIrRtxkiOMhDgrZCQQAIf5oQ3Jl
-	YXRlZCBieSBCTVBUb0dJRiBQcm8gdmVyc2lvbiAyLjUNCqkgRGV2ZWxDb3Ig
-	MTk5NywxOTk4LiBBbGwgcmlnaHRzIHJlc2VydmVkLg0KaHR0cDovL3d3dy5k
-	ZXZlbGNvci5jb20AOw==
-    }
-    image create photo filesave22 -data {
-	R0lGODlhFgAWAIUAAPwCBGxqbAQCBLy+vERCRExKTHRydIyKjMTCxFxaXGRi
-	ZFRSVFRWVPz6/Nze3Nzm5Pz+/JyanDw+PExOTHR2dMTGxBQWFLSytHx+fISC
-	hOzy9Ly6vAQGBJSWlMzKzAwODJSSlHx6fIyOjOTi5DQ2NISGhGxubCwuLOzq
-	7ERGRFxeXNTW1CwqLPT29Dw6PGRmZKSmpAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAb/
-	QIBQGBAMj8ikUDAgFAzKKCBwQCQUCcICKh0SEAhGw5EIZAmBrgCxeDQgcDJW
-	yz0GIggJfL+XGwQJRxNgC3yGDwwUFUZDFhdthnwMGAZNQwEZFwQakXANBBQb
-	HIIdERIBnRAOiR4ERx8gsSEMBBmGCyEGG3YGBwcgIr8UCwQHECOgG4xCtRkE
-	JAvBJRklJgkSFBQeJ68hJiEoESkFKiEZIbkGARsLlwEGExENGhorGSkpFAYm
-	66NDLAECpGiBYsUIFA8wLHBBQMWLVkdUCFCwaYVFBOymkVCgYEMgOykEpICB
-	ccMBAhhELFigTEqAAgIIwCiQ4eRKDyS6EAlJIAI0EpaudF4iIKDAAn9CkRT5
-	eMROEAAh/mhDcmVhdGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9uIDIuNQ0K
-	qSBEZXZlbENvciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQuDQpo
-	dHRwOi8vd3d3LmRldmVsY29yLmNvbQA7
-    }
-    image create photo wizard-22 -data {
-	R0lGODlhFgAWAIQAAPwCBNzaTPz6BAQCBPz+BExKBMzOTPz+rPz+3ISCBPTy
-	hISCLISChPz+xOTiVPz+/MTCxKSipKyqrExOTDw+PDQyNAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAV+ICCOZAkE
-	ZqoKqoqKAzHAb1sIxhAQwWAQhRaJd0AcdgkhqaBAOBUL5WjAaD6TUqog0DAi
-	ldqcg+cDtgaPACTCiM0AOhV6sG4DWOAHnf2uyfV1b1lsgVIwEgwTFHaGA2yK
-	FYJgiJCSQo6JFJGGcJSalkKPn5wimZukAJWoIgYhACH+aENyZWF0ZWQgYnkg
-	Qk1QVG9HSUYgUHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29yIDE5OTcsMTk5
-	OC4gQWxsIHJpZ2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2ZWxjb3Iu
-	Y29tADs=
-    }
-    image create photo actundo22 -data {
-	R0lGODlhFgAWAIUAAPwCBCReDJzGjMzivOTu3PT69MTivHy+VJTWbIzKZEym
-	JESmFESiHDyiHESqLAQCBFzKNGzWPFS2LNTmzCxqDDRqHPz+/KTGnBQqBAQO
-	BAwaBESCHHy2XBxGDOzy7HTCTEyyJDSqFHzWTAwSBBQ6BIy+dESKJFySPFSS
-	NAwiBCRGFBQmDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAal
-	QIBwSCwaj8ikMsBkKotMwYAwEDiXgYLhwD0gCFZiQKxNKBYMRqPh+D6G16y5
-	AYnYIxBJAyF4AwITTAUJdBESD4gPFBV6Fn6ABBcJDIYPGEQZGhQbHAIdfx4J
-	Hw2VSBodGwWfAR4LDSALfkgYAQurBiAhICKfSSMkvQElGyYnGyi9Rxkdj4nO
-	skUYyU9FpxnURikdGtjRKivdRKfQ2Inh5+jpRwZBACH+aENyZWF0ZWQgYnkg
-	Qk1QVG9HSUYgUHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29yIDE5OTcsMTk5
-	OC4gQWxsIHJpZ2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2ZWxjb3Iu
-	Y29tADs=
-    }
-    image create photo editcut22 -data {
-	R0lGODlhFgAWAIMAAPwCBAQCBAwCBPz+/OTi5JyanOzq7DQyNGxqbAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAARbEMhJq704gxBE
-	0Bf3cZo4kRJqBQNRfBucyudgvJS6VaxLzyMa6/bLiWA9HOg4VIIkL5vzuRkc
-	pkvRIIAorphJLzBW84WEuRZWp6uaT7J2Sh1Hit3OY/ZO7WvsEQAh/mhDcmVh
-	dGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9uIDIuNQ0KqSBEZXZlbENvciAx
-	OTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQuDQpodHRwOi8vd3d3LmRl
-	dmVsY29yLmNvbQA7
-    }
-    image create photo editcopy-22 -data {
-	R0lGODlhFgAWAIUAAPwCBBQSFPz+/DQyNISChDw6PMzKzMTGxERGRIyKjFxa
-	XMTCvKSmpHR2dPz6/Pz29PTq3MS2rPz69MTCxFxWVHx6dJyWjNzSzPz27Pzy
-	7Pzu5PTm3NTKvIR+fJyGfHxuZHxqXNTCtPTq5PTi1PTezNS+rExOTFRORMyy
-	lPTaxOzWxOzSvNze3NTOxMy2nMyulMyqjAQCBAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAbY
-	QIBwSCwahYGkUnk0BgTQ6IAQaBKfUWhBYKhaAU+CgXAQIAyChLeJzSIQhcH6
-	GFaM0QtGY5kstqEODw8QEQELAhJTc08KBBMEFBUWDRcBE1pca20SGBkaEBsc
-	AY5maFRIAgoLHRQRHh8gIQFlZnByqA8ZGSIQIyQjJQEmYgJ5p2ACrK4gJx4g
-	KIZZAgdeAQ4ZI9kjKSor0AwEjeAs1S0cHAslLi4vMDDRWeRIfEsxMeET4ATy
-	VoYLC5fizXEiAR84BeMG+pEm8EsAFhAjSlR4hR6fLxiF0AkCACH+aENyZWF0
-	ZWQgYnkgQk1QVG9HSUYgUHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29yIDE5
-	OTcsMTk5OC4gQWxsIHJpZ2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2
-	ZWxjb3IuY29tADs=
-    }
-    image create photo editpaste22 -data {
-	R0lGODlhFgAWAIYAAPwCBBQWFDw6FHRuFGRaBFxSBAQCBAQKBCQiBIx6HPz6
-	/NTOfKyiXDQuFOTm5Pz+/Ozu7PTq5Pz63PTyxNTOjKSeRExGLMTGxMzKzNTS
-	1NTW1Dw2NKSmpKyqrKSipJyanNzWlLy6ZLSuVIx6FISChIyKhJSSlCQiJLS2
-	tDw6NDQyNCQiFCQmHBQSDGRiZHRydGxubHx6dGxqbFxeXGRmZFxaXCwuLOzq
-	7KyurHx+fDwmFEQuFCweFCQWDBQODBwaHBweHKSinJSWlOTi5JyepHR2dDw6
-	PBQSFNze3ERGRIyKjIyOjISGhPz29Pzy7MS2rMzOzFRWVHx2dHxybDQiFPz2
-	7Pzu5PTq3PTm1NTCtJyGdHxuZHxqXPzq3PTaxNS6pFxWVFRKRNS2nPTi1PTS
-	tNSulNzOxNSynMymhAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAA
-	LAAAAAAWABYAAAf/gACCgwABAgMEBYSLggaOjgcICQoLDA2Pj4MGDg8QEZ4F
-	DxITFBUWFxcYGRobjQ8cHR4fCQ8gCyEiFSMWJCUkJieNEB4dKB4pKissK8wr
-	LS4vMDHBAAYQHx8dFx0fJDIzNDU0M+IyHzaNNyg43Ng5Ojs7Ojw9Pj9AMkCN
-	DiZB/h9CSOx4QLCgihItqBkYgqIDESElitAYWJCgkQcXjjRCgi1Ihw4BB5LA
-	QOLCgyQYHihpUU3DBw5ElpAgAYNixSRJjKjQaECDCRPZPDB5IbIGSQwKLnh4
-	wbInLA4kmJB4oaPiAwVNnER40hRK1BIAaVatUZJEFCkmpmjgCeWDCalFe4q4
-	oFKwSRUrEa5gycLzwq8lUnPQ4PEgSpYcUZ5o2cIlS1O/JHLEDdfjQZMIVrpg
-	weLFy5e+M6WSmBGlxYMYYBRzCaOFi5imHWBIfOEiShLTVjaP6eyFTBmN1TA5
-	OvLDjJksWb58OVMGDRqWjAYdmU79SIvpjqJr104nEAAh/mhDcmVhdGVkIGJ5
-	IEJNUFRvR0lGIFBybyB2ZXJzaW9uIDIuNQ0KqSBEZXZlbENvciAxOTk3LDE5
-	OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQuDQpodHRwOi8vd3d3LmRldmVsY29y
-	LmNvbQA7
-    }
-    image create photo find-22 -data {
-	R0lGODlhFgAWAIYAAPwCBBQSFJSWlFxaXJyanKy2tLzCxDw+PHyChNTa3Nzq
-	7Nz29NTy9Mzu9OT29Nzi5Oz6/Mzy9Kzi7Jze5Lze5Nzy9JyenIyKjHR2dMTu
-	9Kzm7JzW3ITW3ISChGxubERGROz+/Lzq9IzW5HzK1LTm7FRSVHTS3GS+zLTS
-	1DQ2NMzOzMTq7Lzq7ITW5FS2vMTi5ExOTKTm7EzCzEy2vEyutJTa5FTK1ESi
-	rGy+zMzi5ESerESmtITa5OTy9KTe5KyqrAz+/Azi3ASutERCRExKTFRWVAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAA
-	LAAAAAAWABYAAAf/gACCggGFhYOIAAIDiYUEBQYFAoeJAweKhAgJCgsLDA0O
-	CAGJg4wBCA8QDhENEhMUFaKDFhcYgwEJCxAQDBkaGxwSFaMAFh0eAx8AAQIK
-	ECAODCEaIiMjJJMAtQMlygEGEBkVva4mJycTKKMYJd0pyyoOKyssGhMtIycu
-	Gi/EMB/vlhmoQEFDjHsmZMygUUMdqWUCGgCbYMKEjRk3cEjI9jBADg3Wzs3Q
-	sYOHA2IdO1SQkI/GjRMtFhBA2RFBDwk+OASrMPMHkIe3AhBA8QLFzAAHgvyg
-	2dEQMSEHPCwltQgooSFSmVpSxKjjh6wPtwINgHVqsVpWESEFeywZ17RkED2s
-	40YEgFirlIq4SwvUQCAAIf5oQ3JlYXRlZCBieSBCTVBUb0dJRiBQcm8gdmVy
-	c2lvbiAyLjUNCqkgRGV2ZWxDb3IgMTk5NywxOTk4LiBBbGwgcmlnaHRzIHJl
-	c2VydmVkLg0KaHR0cDovL3d3dy5kZXZlbGNvci5jb20AOw==
-    }
-
-    image create photo player_end-22 -data {
-	R0lGODlhFgAWAIUAAPwCBDQyNFxeXAQCBMTCxGReZBQSFOzm7AwKDKymrJSS
-	lFRSVCwqLLy6vPTy9OTe5Ozq7CQiJLSytOTi5BwaHPz+/HRydMzKzKSepJSO
-	lKSipJyanIyGjIyKjKyurISGhMzGzJyWnHR2dISChIyOjLSutDw+PERCRHx6
-	fJSWlIR+hJyenGRmZHx2fAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAa6
-	QIBwSCwaj8ikMBBQKgOCgRMZIBSkxYHWoDVWD9EigpBQLLBERsPxCA8NDUhj
-	gTBGJJNGG02RVBQWdUV3FxgZe0IGfoAGdhoXGxwdiAYef4FGFBoeHB8dGSBR
-	ihUhIo1FBhkbIyMkJRYmAwYal4JEBh2RChIWJ1IIGxUZFqdECCgkHR6wWAYp
-	FR2YWSobvL5vFgfDaEMDIivMRBEsD9HcQgMWvecDLB0tZ0btsfJa9vLXU/X6
-	/P3+b0EAACH+aENyZWF0ZWQgYnkgQk1QVG9HSUYgUHJvIHZlcnNpb24gMi41
-	DQqpIERldmVsQ29yIDE5OTcsMTk5OC4gQWxsIHJpZ2h0cyByZXNlcnZlZC4N
-	Cmh0dHA6Ly93d3cuZGV2ZWxjb3IuY29tADs=
-    }
-    image create photo player_stop-22 -data {
-	R0lGODlhFgAWAIUAAPwCBAQCBAwKDBQSFBwaHCQmJJSSlISChJSOlJSWlGxq
-	bGRiZNTS1PTy9Pz+/Ozm7OTi5FRSVIyKjOTe5MTCxIR+hExOTHR2dLy6vLSy
-	tLy2vHRydFxWXIyGjIyOjPz2/FRWVHx6fExKTMzOzJyanKSmpKyqrKSipAQG
-	BLSutHx2fDw6PAwODAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAa1
-	QIBwSCwaj8ikcslsAgKCAWEQjQ4KgSwyYDAcugZEQqFYYJECA6PhaLcfEEUk
-	gJZAGJB8fkKpWOhHAxcOGBQZGBoaGQgbHIBGAhUOGR0SBxISBh4Xf0iCHxQS
-	lRIIXhsgj0UCIaCXmJgHGyKpRJ+hmB5dHQqOaCENIx0epBIkBhdzngoPGCQl
-	JifQJBvJRygRKRcKGxcXGypys1srEREc5SLnICLiR1koLFVUWfRO9vf4+Uwy
-	QQAh/mhDcmVhdGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9uIDIuNQ0KqSBE
-	ZXZlbENvciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQuDQpodHRw
-	Oi8vd3d3LmRldmVsY29yLmNvbQA7
-    }
-    image create photo finish-22 -data {
-	R0lGODlhFgAWAIUAAPwCBAw2VAQCBBxCXDR+nIS21Aw+XJTC1Nzu/KzO3Pz+
-	/Nzq9Pz6/MTe7KTW5FzC1Nzu9CRKZMzi7IzK3Lzi7LTe7HzG3Gy+3AyuzAye
-	xFzC3DRSbHy+1Dy61CSqzAySvAyStLze7IzO5AyGrEze7BRmjCTC1ETS3ETa
-	5BTC3Bx2nAyWvAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAak
-	QIBwSCwaj8hkMqBsBgTN5IAAJQqqykCBasUmDQcEV3gtBs7oATihGJeJgcOC
-	QWc0HA8Ig/seRiQTFAsVFhcYGRp6VH1CGwscHQ8dGB4fIBkPIWKMAAMLIiAj
-	IJcgH5gkGSWcARIiJicoJikpHikoHqqrKiW8JSogKymoqgCrV8cCARgkuFWc
-	RwYeqVjPRgEExEPVRQbZ2l5IBuBRQ0zk5+hRBkEAIf5oQ3JlYXRlZCBieSBC
-	TVBUb0dJRiBQcm8gdmVyc2lvbiAyLjUNCqkgRGV2ZWxDb3IgMTk5NywxOTk4
-	LiBBbGwgcmlnaHRzIHJlc2VydmVkLg0KaHR0cDovL3d3dy5kZXZlbGNvci5j
-	b20AOw==
-    }
-    image create photo down-22 -data {
-	R0lGODlhFgAWAIUAAPwCBAw2VCRKZDRSbBxCXJTC1Mzi7Nzq9NTm9Bx2nAQC
-	BNzu9JzG3Hy+1HzG3IzO5BRmjPz6/LTe7Dy61AyStCTC1FzC1AyGrETS3ETC
-	1ETa5BRulAyuzBRylAw+XMTe7Gy+3CSqzAyexBTC3DR+nIS21KTW5Nzu/KzO
-	3FzC3Pz+/ByixEze7AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-	AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAWABYAAAaR
-	QIBwSCwaj8ikcnkMBAQDgjPAFAYKhsMBkVBUAYEFo+F4QLzVQEQyoVTOX/XB
-	csHA0+vMRbNBMwkRDhxuHX5GTlIeHh8gISIjFAEeiVRECiQlDAUmgxQjIhwi
-	JHdFlycoKSIUFCEjGiGkRpcqCxYijxorsUezcxYsuoZJsxLAu0qXB7DCTJfH
-	VQrMX9PU1Uh0QQAh/mhDcmVhdGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9u
-	IDIuNQ0KqSBEZXZlbENvciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2
-	ZWQuDQpodHRwOi8vd3d3LmRldmVsY29yLmNvbQA7
-    }
-}
-
 proc RamDebugger::TkBackCompatibility {} {
 
     set comms [list tkButtonInvoke tkTextSelectTo tkEntryInsert tkEntryBackspace \
@@ -7207,6 +4325,42 @@ proc RamDebugger::TkBackCompatibility {} {
     }
 }
 
+proc RamDebugger::MoveCanvas { text canvas } {
+
+    $canvas yview moveto [lindex [$text yview] 0]
+
+    # fine adjustment
+    # as the text widget adds arbitrarily more space at the end of the text,
+    # it is necessary to fine tune by hand
+
+    set yb1 [$canvas canvasy 0]
+    set yb2 [$canvas canvasy [winfo height $text]]
+    foreach i [$canvas find overlapping 0 $yb1 20 $yb2] {
+	regexp {l([0-9]+)} [$canvas gettags $i] {} line
+	set yline ""
+	foreach "- yline - -" [$text bbox $line.0] break
+	if { $yline == "" } { continue }
+	set yline [$canvas canvasy $yline]
+	foreach "- ycanvas - -" [$canvas bbox [$canvas find withtag l$line]] break
+	incr ycanvas -3
+	foreach "cy1 cy2" [$canvas yview] break
+	set 1p [expr ($cy2-$cy1)/double([winfo height $text])]
+	$canvas yview moveto [expr $cy1+($ycanvas-$yline)*$1p]
+	return
+    }
+}
+
+proc RamDebugger::ScrollTextAndCanvas { text canvas args } {
+    eval $text yview $args
+    MoveCanvas $text $canvas
+}
+
+proc RamDebugger::ScrollScrollAndCanvas { text yscroll canvas args } {
+    eval $yscroll set $args
+    $canvas yview moveto [lindex [$text yview] 0]
+    MoveCanvas $text $canvas
+}
+
 proc RamDebugger::InitGUI { { w .gui } } {
     variable options
     variable options_def
@@ -7214,6 +4368,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     variable text
     variable mainframe
     variable listbox
+    variable listboxlabel
     variable pane2in1
     variable images
     variable textST
@@ -7223,11 +4378,13 @@ proc RamDebugger::InitGUI { { w .gui } } {
     variable MainDir
 
     proc ::bgerror { errstring } {
-	RamDebugger::TextOutRaise
-	RamDebugger::TextOutInsertRed "-------------ERROR FROM RAMDEBUGGER-----------\n"
-	RamDebugger::TextOutInsertRed $::errorInfo
-	RamDebugger::TextOutInsertRed "----------------------------------------------\n"
-	WarnWin $errstring
+	if { [info command RamDebugger::TextOutRaise] != "" } {
+	    RamDebugger::TextOutRaise
+	    RamDebugger::TextOutInsertRed "-------------ERROR FROM RAMDEBUGGER-----------\n"
+	    RamDebugger::TextOutInsertRed $::errorInfo
+	    RamDebugger::TextOutInsertRed "----------------------------------------------\n"
+	    WarnWin $errstring
+	} else { puts "$errstring ($::errorInfo)" }
     }
 
     package require Tablelist
@@ -7311,7 +4468,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		"Toggle between viewing all windows or only text window" "Ctrl t" \
 		-command "RamDebugger::ViewOnlyTextOrAll"] \
 		separator \
-		[list cascad "&Windows" {} windowslist 0 {}] \
 		] \
 		"&Debug" all debug 0 [list \
 		[list command "&Continue/Go" debugentry "begin/continue execution" "F5" \
@@ -7338,18 +4494,22 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		"&C++ project" all c++ 0 [list \
 		[list command "&Create/Edit" c++entry "Create or edit a c++ compile project" "Alt F7" \
 		-command "cproject::Create $w"] \
-		[list cascad "&Active configuration" {} activeconfiguration 0 [list \
-			[list radiobutton "Debug" {} "Compile debug version" "" \
-			-variable ::cproject::debugrelease -value debug] \
-			[list radiobutton "Release" {} "Compile release version" "" \
-			-variable ::cproject::debugrelease -value release] \
-			] \
+		[list cascad "C&onfiguration" {} activeconfiguration 0 [list \
+		        [list radiobutton "Debug" {} "Compile debug version" "" \
+		        -variable ::cproject::debugrelease -value debug -selectcolor black] \
+		        [list radiobutton "Release" {} "Compile release version" "" \
+		        -variable ::cproject::debugrelease -value release -selectcolor black] \
+		        ] \
 		] \
-		[list command "&Compile" c++entry "Compile project" "F7" \
+		[list command "Co&mpile" c++entry "Compile project" "F7" \
 		-command "cproject::Compile $w"] \
+		[list command "Compile all" c++entry "Compile project, all targets" "" \
+		-command "cproject::CompileAll $w"] \
 		separator \
-		[list command "&Clean" c++entry "Clean compiled project files" "" \
-		-command "cproject::CompileClean $w"] \
+		[list command "&Touch files" c++entry "Actualize date for all compilation files" "" \
+		-command "cproject::TouchFiles $w"] \
+		[list command "Cl&ean" c++entry "Clean compiled project files" "" \
+		-command "cproject::CleanCompiledFiles $w"] \
 		] \
 		"&Utilities" all utilities 0 [list \
 		[list command "&Open console" {} "Open console" "" \
@@ -7397,12 +4557,15 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
     bind $label <1> "tk_popup $menu %X %Y"
 
-    set menu [$mainframe getmenu windowslist]
-    $menu configure -postcommand [list RamDebugger::ActualizeWindowsList $menu]
+    set menu [$mainframe getmenu view]
+    $menu configure -postcommand [list RamDebugger::ActualizeViewMenu $menu]
 
     set menu [$mainframe getmenu recentfiles]
     $menu configure -postcommand [list RamDebugger::AddRecentfilesToMenu $menu]
 
+    # very dirty. Without it, the radiobutton indicator is not drawn. Why???
+    set menu [$mainframe getmenu activeconfiguration]
+    $menu conf -postcommand "$menu conf -selectcolor black"
 
     ################################################################################
     #     The toolbar
@@ -7487,8 +4650,9 @@ proc RamDebugger::InitGUI { { w .gui } } {
     if { ![info exists options(defaultdir)] } {
 	set options(defaultdir) [pwd]
     }
-    label $pane1.l -textvar RamDebugger::options(defaultdir) -anchor e -relief raised -bd 1 \
-	-padx 5 -grid "0 ew"
+    set listboxlabel [Label $pane1.l -anchor e -relief raised -bd 1 \
+	-padx 5 -grid "0 ew"]
+    bind $listboxlabel <Configure> "RamDebugger::ConfigureLabel $listboxlabel"
 
     set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0 -grid 0]
     set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
@@ -7535,15 +4699,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	$text conf -exportselection 1 -selectbackground \#48c96f -selectforeground white
     }
 
-    proc ScrollTextAndCanvas { text canvas args } {
-	 eval $text yview $args
-	$canvas yview moveto [lindex [$text yview] 0]
-    }
-    proc ScrollScrollAndCanvas { text yscroll canvas args } {
-	eval $yscroll set $args
-	$canvas yview moveto [lindex [$text yview] 0]
-    }
-
     set pane2in2 [$pwin add -weight $weight2in]
 
     NoteBook $pane2in2.nb -homogeneous 1 -bd 1 -internalborderwidth 0 \
@@ -7554,7 +4709,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     set sw2 [ScrolledWindow $f1.lf2 -relief sunken -borderwidth 0 -grid "0" \
 	    -scrollbar both -auto both]
     set textST [text $sw2.text2 -background white -wrap none -width 80 -height 4 \
-	    -highlightthickness 0]
+	    -highlightthickness 0 -exportselection 0]
     $sw2 setwidget $textST
 
     supergrid::go $f1
@@ -7564,7 +4719,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     set sw2 [ScrolledWindow $f2.lf2 -relief sunken -borderwidth 0 -grid "0" \
 	    -scrollbar both -auto both]
     set textOUT [text $sw2.text2 -background white -wrap none -width 80 -height 4 \
-	    -highlightthickness 0]
+	    -highlightthickness 0 -exportselection 0]
     $sw2 setwidget $textOUT
 
     supergrid::go $f2
@@ -7574,7 +4729,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     set sw2 [ScrolledWindow $f3.lf3 -relief sunken -borderwidth 0 -grid "0" \
 	    -scrollbar both -auto both]
     set textCOMP [text $sw2.text2 -background white -wrap none -width 80 -height 4 \
-	    -highlightthickness 0]
+	    -highlightthickness 0 -exportselection 0]
     $sw2 setwidget $textCOMP
 
     supergrid::go $f3
@@ -7683,6 +4838,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
     supergrid::go $f
     supergrid::go $w
 
+    ################################################################################
+    # the bindings
+    ################################################################################
+
     if {[string equal "unix" $::tcl_platform(platform)]} {
 	foreach "but units" [list 4 -5 5 5] {
 	    set comm {
@@ -7786,6 +4945,15 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
     bind all <Control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"
 
+    # BWidgets automatically sets these because they are in the main main
+    # we only want them individually in every widget
+    bind $w <Control-c> ""
+    bind $w <Control-v> ""
+
+    ################################################################################
+    # start up options
+    ################################################################################
+
     if { ![info exists options(maingeometry)] } {
 	set options(maingeometry) 800x600
     }
@@ -7793,7 +4961,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
     if { [info exists options(ViewOnlyTextOrAll)] && $options(ViewOnlyTextOrAll) == "OnlyText" } {
 	RamDebugger::ViewOnlyTextOrAll
     }
-
 
     # trick to know if we are debugging RamDebugger
     if { [info command sendmaster] != "" } {
@@ -7814,6 +4981,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	}
     }
 
+    set menu [$mainframe getmenu recentfiles]
     ActualizeActivePrograms $menu
 
     if { [info exists options(breakpoints)] } {
@@ -7831,6 +4999,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	    [file exists $options(currentfile)] } {
 	SetMessage "Opening file '$options(currentfile)'..."
 	OpenFileF $options(currentfile)
+	FillListBox
 
 	if { [winfo exists options(currentidx)] } {
 	    $text see $options(currentidx)
@@ -7840,7 +5009,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
     } else { NewFile }
     
     focus $text
-
     cproject::Init $w
 
     # for tkcon

@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.5 $
+@set Version  $Revision: 1.6 $
 @set Date August 2002
 
 @ifinfo
@@ -93,6 +93,7 @@ RamDebugger: A graphical and interactive debugger for Tcl-TK
 * Introduction and Setup::      
 * Using RamDebugger::           
 * How does it work?::           
+* Known bugs::                  
 * Additional packages included in the distribution::  
 * License::                     
 
@@ -136,7 +137,7 @@ CN @value{Version} @value{Date}
 * Starting RamDebugger::        
 @end menu
 
-@node Introduction, , Introduction and Setup, Introduction and Setup
+@node Introduction, Changes, Introduction and Setup, Introduction and Setup
 @section Introduction
 
 RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK. It can operate
@@ -186,7 +187,8 @@ Changes From version 1 to version 2
 @itemize @bullet
 @item Tested for Tcl/Tk @b{8.3.4} and @b{8.4}
 @item When @b{Tkhtml} is not compiled for the given platform, gives message and continues
-@item Added contextual help for programming commands
+@item Added contextual help for programming commands. If there are manual pages (UNIX), it
+also uses them if @b{man2html} is found in the system.
 @item When debugging local, possibility to choose debug TCL or TK
 @item Improved the build process and the debugging for C/C++
 @item Improved several windows, like the @b{Breakpoints window} and @b{Goto line}
@@ -205,8 +207,8 @@ RamDebugger can be download from @url{http://gid.cimne.upc.es/RamDebugger/RamDeb
 @section Installation and prerequisites
 
 The only prerequisite before executing RamDebugger is to have Tcl-Tk installed. The tested
-version is Tcl-Tk 8.3.4
-It can be obtained from @url{http://tcl.activestate.com}.
+version are Tcl-Tk 8.3.4 and 8.4b2
+They can be obtained from @url{http://tcl.activestate.com}.
 @sp 1
 RamDebugger has been tested on Windows and on Linux. For other UNIXes and MAC, it is necessary
 to obtain, separately, the package Tkhtml compiled for the platform. Without it, the help
@@ -315,7 +317,9 @@ having the cursor in the desired line.
 @item Start debugging remotely with @b{File->Debug on->example2}
 @sp 1
 @strong{Note:} Depending on the preferences, it may be necessary to do
-@code{File->Debug on->Update} before finding the remote program in the menu list.
+@code{File->Debug on->Update remotes} before finding the remote program in the menu list.
+Depending on the computer (in Windows), it can be necessary to wait for several seconds
+for RamDebugger to find the remote program.
 @item Press button @b{Go} in the remote application
 @item Program should stop in line 29. From now, it is possible to use similar commands
 than in local debugging (@pxref{Debugging locally})
@@ -331,7 +335,8 @@ of your program):
     comm::register application_name 1
 @end example
 @strong{Note:} The package @t{commR} included in RamDebugger is based on the package @b{comm} 
-in tcllib with some modifications. Use always @b{commR} instead of @b{comm}
+in tcllib with some modifications. Use always @b{commR} instead of @b{comm}. This package uses
+sockets for communication. If you have a firewall in your computer, maybe it will not work.
 @sp 1
 In Linux/Unix, the communication is made with the command @b{send}, So, it is only necessary
 to have this command enabled in the program, which is true by default.
@@ -359,13 +364,15 @@ Check section @ref{Debugging remotely} for the rest of the steps to follow.
 
 As a good debugger must do, RamDebugger permmits to debugger itself. As it is not a simple
 code, this is a good testing of the program capabilities.
-
+@sp 1
 It can be debugged either locally or remotely. To debug itself locally,
 open TCL source file @b{RamDebugger.tcl} and choose @code{File->Debug
 on->Currentfile}. See @ref{Debugging locally} for details.
-
+@sp 1
 To debug itself remotely, open two RamDebuggers. From one of them, connect to the other
-with @code{File->Debug on->RamDebugger}.
+with @code{File->Debug on->RamDebugger}. In @b{Windows}, if option @code{Automatically
+check remote files} is unset (the default), it can be necessary to use @code{Debug on->
+Update remotes} on both RamDebuggers.
 
 @node  Compiling/Debugging c++, Timing control, Debugging RamDebugger, Using RamDebugger
 @section Compiling/Debugging c++
@@ -373,18 +380,16 @@ with @code{File->Debug on->RamDebugger}.
 RamDebugger can also compile and debug c/c++ projects. It uses as a backend the program
 gdb. It is necessary to have @code{gdb} and/or @code{gcc} installed in the computer.
 @sp 1
-@strong{CODE FOR COMPILING AND DEBUGGING C++ IS STILL EXPERIMENTAL AND NEEDS FINE TUNING}
-Use at your own risk.
-@sp 1
 @strong{Note:} It can also be used in Windows, if the @b{mingw} compiler and debugger
 have been previously installed. In this case, the directories where the executables are,
 must be in the @b{PATH}. Use something similar to:
 @example
 SET PATH=C:\mingw\bin
 @end example
-in file @b{AUTOEXEC.BAT} or search for environment variables in Windows200/XP. Using
-mingw causes some very dirty black windows to appear from time to time.
-
+in file @b{AUTOEXEC.BAT} or search for environment variables in Windows200/XP.
+@sp 1
+Alternatively, it is possible to set in the Preferences window @code{Edit->Preferences},
+the directories where the @b{mingw} tools can be found.
 
 @node Timing control, Windows hierarchy, Compiling/Debugging c++, Using RamDebugger
 @section Timing control
@@ -415,7 +420,7 @@ use the example located in @b{<RamDebugger directory>/Examples/example3.tcl}
 </center><p>
 @end ifhtml
 
-@node Windows hierarchy, , Timing control, Using RamDebugger
+@node Windows hierarchy, Expressions window, Timing control, Using RamDebugger
 @section Windows hierarchy
 
 With this command, it is possible to draw a graph of the widgets hierarchy in either
@@ -432,20 +437,21 @@ Examples of possible expressions in TCL:
 
 @itemize @bullet
 @item @b{variablename}: Enter the name of a variable 
-@item @b{$variablename+4}: Enter a expression like the ones accepted by @b{expr}.
+@item @b{$variablename+4}: Enter a expression like the ones accepted by @b{expr}
 @item @b{[lindex $variablename 2]}: Enter any command between brackets
+@item @b{[set variablename 6]}: modify variable
 @end itemize
 
 Examples of possible expressions in C++:
 
 @itemize @bullet
 @item @b{variablename}: Enter the name of a variable 
-@item @b{$variablename+4}: Enter any expression that @b{gdb} accepts.
+@item @b{$variablename+4}: Enter any expression that @b{gdb} accepts
 @item @b{$variablename[4:2][6::8]}: One extension to the @b{gdb} expressions. Permmits to
-print part of a string or vector.
+print part of a string or vector
 @end itemize
 
-@node How does it work?, Additional packages included in the distribution, Using RamDebugger, Top
+@node How does it work?, Known bugs, Using RamDebugger, Top
 @chapter How does it work?
 
 RamDebugger instruments the source code TCL files in order to make the debugging. Instrumenting
@@ -476,7 +482,20 @@ Due to the high dynamics nature of TCL, it is unpossible to make a direct correl
 between source code lines and execution lines. Anyway, it works quite well for normal
 TCL code. Try and comment.
 
-@node Additional packages included in the distribution, License, How does it work?, Top
+@node Known bugs, Additional packages included in the distribution, How does it work?, Top
+@chapter Known bugs
+
+That's for sure that there are many not listed bugs. This is only a list of known
+bugs that the author could not fix at the time of the release.
+
+@itemize @bullet
+@item TCL code that returns a value without using @code{return}, will fail when being
+debugged
+@item When using help, program crashes from time to time. This is probably a bug in
+the @b{tkhtml} package
+@end itemize
+
+@node Additional packages included in the distribution, License, Known bugs, Top
 @chapter Additional packages included in the distribution
 
 RamDebugger needs several packages to work properly. Other packages are just included

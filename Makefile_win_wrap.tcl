@@ -49,7 +49,7 @@ set ZIP /utils/zip.exe
 set ZIPFILES [list RamDebugger/RamDebugger.tcl RamDebugger/license.terms RamDebugger/Readme \
     RamDebugger/addons RamDebugger/scripts RamDebugger/Examples RamDebugger/help]
 
-set files [list RamDebugger.tcl]
+set files [concat [list RamDebugger.tcl] [glob -dir scripts *.tcl]]
 
 pack [text .t -width 70 -height 4]
 
