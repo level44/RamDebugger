@@ -252,7 +252,7 @@ CopyPackages $files install_temp/RamDebugger/addons $packages $packagesout
 set tclfiles ""
 foreach i $files { lappend tclfiles RamDebugger/$i }
 zipfile RamDebugger$Version.zip install_temp $tclfiles
-file delete install_temp
+file delete -force install_temp
 puts -nonewline DONE\n
 #.t see end
 update
