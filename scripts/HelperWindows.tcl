@@ -974,7 +974,7 @@ proc RamDebugger::AboutWindow {} {
 
 
     $w.c create text 0 0 -anchor n -font "-family {new century schoolbook} -size 16 -weight bold"\
-	    -fill \#d3513d -text "Version 1.3" -tags text
+	    -fill \#d3513d -text "Version 2.0" -tags text
     RamDebugger::AboutMoveCanvas $w.c 0
 
 

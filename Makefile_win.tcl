@@ -47,7 +47,7 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     cd $oldcwd
 }
 
-zipfile RamDebugger1.3.zip .. $ZIPFILES
+zipfile RamDebugger2.0.zip .. $ZIPFILES
 
 update
 after 500

@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.11 2002/09/09 19:30:04 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.12 2002/09/10 11:10:45 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -2707,7 +2707,9 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
 
     if { [llength $services] == 0 } {
 	$menu add command -label "There are no active programs" -state disabled
-	$menu add command -label "Use 'Remote TCL update' to actualize" -state disabled
+	if { $::tcl_platform(platform) == "windows" } {
+	    $menu add command -label "Use 'Remote TCL update' to actualize" -state disabled
+	}
     } else {
 	foreach i $services {
 	    if { $remoteserverType == "remote" && $i == $remoteserver } {

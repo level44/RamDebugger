@@ -357,6 +357,10 @@ proc cproject::OpenProject { w { ask 1 } } {
     } else { set file $project }
 
     set project $file
+
+    trace vdelete ::cproject::group w "cproject::SetGroupActive;#"
+    trace vdelete ::cproject::debugrelease w "cproject::SetDebugReleaseActive;#"
+
     
     set err [catch {
 	interp create cproject_tmp
@@ -390,6 +394,9 @@ proc cproject::OpenProject { w { ask 1 } } {
     # to activate the trace
     set groupbefore ""
     set debugreleasebefore ""
+
+    trace var ::cproject::group w "cproject::SetGroupActive;#"
+    trace var ::cproject::debugrelease w "cproject::SetDebugReleaseActive;#"
 
     set group $group
 
@@ -1364,164 +1371,173 @@ proc cproject::CompileDo { w debugrelease { unique_file "" } } {
 
     set cproject::compilationstatus -1
 
-    if { $unique_file != "" } {
-	set found 0
-	set unique_file [RamDebugger::filenormalize $unique_file]
-	foreach i $files {
-	    foreach "file_in type group_in path" $i break
-	    set file_in2 [RamDebugger::filenormalize [file join [file dirname $project] $path $file_in]]
-	    if { [string equal $file_in2 $unique_file] } {
-		set compfiles [list $i]
-		set found 1
-		break
-	    }
-	}
-	if { !$found } {
-	    WarnWin "error: file '$unique_file' is not included in the compile project"
-	    set cproject::compilationstatus 1
-	    set compfiles ""
-	}
-	set forcecompile 1
-	set project_short "$file_in $debugrelease"
-    } else {
-	set compfiles $files
-	set forcecompile 0
-	set project_short "[file root [file tail $project]] $debugrelease"
-    }
-    
-    RamDebugger::TextCompRaise
-    RamDebugger::TextCompInsert "[string repeat - 20]Compiling $project_short"
-    RamDebugger::TextCompInsert "[string repeat - 20]\n"
-    update
-
-    set make [file join $objdir Makefile.ramdebugger]
-    if { $unique_file != "" } { append make 1 }
-
-    set fout [open $make w]
-    
-    puts -nonewline  $fout "\n# Makefile  -*- makefile -*- "
-    puts $fout "Created: [clock format [clock seconds] -format {%Y-%m-%d %H:%M:%S}]"
-    puts $fout "\n[string repeat # 80]"
-    puts $fout "# Makefile automatically made by RamDebugger"
-    puts $fout "#     execute it from the upper directory"
-    puts $fout "[string repeat # 80]\n"
-
-    if { $unique_file == "" } {
-	puts -nonewline $fout "all: "
-	foreach link $links {
-	    puts -nonewline $fout "[file join $objdir $dataL($debugrelease,$link,linkexe)] "
-	}
-	puts $fout "\n"
-    }
-
-    foreach i $compfiles {
-	foreach "file_in type group_in path" $i break
-
-	if { [string trim $dataC($group_in,$debugrelease,compiler)] == "" } { continue }
-
-	set file [file join $path $file_in]
-	set objfile [file join $objdir [file root $file_in].o]
-	
-	if { $forcecompile && [file exists $objfile] } {
-	    file delete $objfile
-	}
-	set dependencies [ScanHeaders $file]
-	puts $fout "$objfile: $file $dependencies"
-	puts -nonewline $fout "\t$dataC($group_in,$debugrelease,compiler) "
-	foreach j $dataC($group_in,$debugrelease,flags) {
-	    puts -nonewline $fout "$j "
-	}
-	foreach j $dataC($group_in,$debugrelease,includedirs) {
-	    puts -nonewline $fout "-I$j "
-	}
-	foreach j $dataC($group_in,$debugrelease,defines) {
-	    puts -nonewline $fout "-D$j "
-	}
-	puts -nonewline $fout "\\\n\t\t-o $objfile "
-	puts $fout "$file\n"
-    }
-    if { $unique_file == "" } {
-	foreach link $links {
-	    set objfiles ""
+    set catch_err [catch {
+	if { $unique_file != "" } {
+	    set found 0
+	    set unique_file [RamDebugger::filenormalize $unique_file]
 	    foreach i $files {
 		foreach "file_in type group_in path" $i break
-		if { [lsearch $dataL($debugrelease,$link,linkgroups) $group_in] != -1 || \
-		    [lsearch $dataL($debugrelease,$link,linkgroups) All] != -1 } {
-		    if { [file ext $file_in] == ".rc" } {
-		        lappend objfiles [file join $path $file_in]
-		    } else {
-		        lappend objfiles [file join $objdir [file root $file_in].o]
-		    }
+		set file_in2 [RamDebugger::filenormalize [file join [file dirname $project] \
+			$path $file_in]]
+		if { [string equal $file_in2 $unique_file] } {
+		    set compfiles [list $i]
+		    set found 1
+		    break
 		}
 	    }
-	    set outputname  [file join $objdir $dataL($debugrelease,$link,linkexe)]
+	    if { !$found } {
+		WarnWin "error: file '$unique_file' is not included in the compile project"
+		set cproject::compilationstatus 1
+		set compfiles ""
+	    }
+	    set forcecompile 1
+	    set project_short "$file_in $debugrelease"
+	} else {
+	    set compfiles $files
+	    set forcecompile 0
+	    set project_short "[file root [file tail $project]] $debugrelease"
+	}
+	
+	RamDebugger::TextCompRaise
+	RamDebugger::TextCompInsert "[string repeat - 20]Compiling $project_short"
+	RamDebugger::TextCompInsert "[string repeat - 20]\n"
+	update
 
-	    set target [string toupper OBJFILES_$link]
-	    set string "$target = "
-	    foreach i $objfiles {
-		append string "$i "
-		if { [string length $string] > 70 } {
-		    puts $fout "$string \\"
-		    set string ""
-		}
-	    }
-	    puts $fout "$string\n"
+	set make [file join $objdir Makefile.ramdebugger]
+	if { $unique_file != "" } { append make 1 }
 
-	    puts $fout "$outputname: \$($target)"
-	    puts -nonewline $fout "\t$dataL($debugrelease,$link,linker) "
-	    foreach j $dataL($debugrelease,$link,linkflags) {
-		puts -nonewline $fout  "$j "
-	    }
-	    puts -nonewline $fout "-o $outputname \$($target) "
-	    foreach j $dataL($debugrelease,$link,librariesdirs) {
-		if { $dataL($debugrelease,$link,linker) != "windres" } {
-		    puts -nonewline $fout "-L$j "
-		} else {
-		    puts -nonewline $fout "--include $j "
-		}
-	    }
-	    if { $dataL($debugrelease,$link,linker) != "windres" } {
-		puts -nonewline $fout "-L$objdir "
-	    }
-	    foreach j $dataL($debugrelease,$link,libraries) {
-		if { [regexp {^lib([^.]+)} $j {} j2] } {
-		    puts -nonewline $fout "-l$j2 "
-		} elseif { [file exists $j] } {
-		    puts -nonewline $fout "$j "
-		} else {
-		    puts -nonewline $fout "[file join $objdir $j] "
-		}
+	set fout [open $make w]
+	
+	puts -nonewline  $fout "\n# Makefile  -*- makefile -*- "
+	puts $fout "Created: [clock format [clock seconds] -format {%Y-%m-%d %H:%M:%S}]"
+	puts $fout "\n[string repeat # 80]"
+	puts $fout "# Makefile automatically made by RamDebugger"
+	puts $fout "#     execute it from the upper directory"
+	puts $fout "[string repeat # 80]\n"
+
+	if { $unique_file == "" } {
+	    puts -nonewline $fout "all: "
+	    foreach link $links {
+		puts -nonewline $fout "[file join $objdir $dataL($debugrelease,$link,linkexe)] "
 	    }
 	    puts $fout "\n"
 	}
-    }
-    close $fout
 
-    if { $::tcl_platform(platform) == "windows" } {
-	set comm [list start /w /m make -f $make]
-    } else {
-	set comm [list make -f $make]
-    }
-    RamDebugger::TextCompInsert "make -f $make\n"
-    set fin [open "|$comm |& cat" r]
-    
-    fconfigure $fin -blocking 0
-    fileevent $fin readable [list cproject::CompileFeedback $fin]
-    
-    vwait cproject::compilationstatus
-    
-    if { $compilationstatus == 2 } {
-	if { $::tcl_platform(platform) == "windows" } {
-	    # maybe it kills also other compilations from other RamDebugger's or manual make's
-	    # but that's live and that's windows
-	    foreach i [split [exec tlist] \n] {
-		if { [string match -nocase "*make.exe*" $i] } {
-		    catch { exec kill /f [scan $i %d] }
+	foreach i $compfiles {
+	    foreach "file_in type group_in path" $i break
+
+	    if { [string trim $dataC($group_in,$debugrelease,compiler)] == "" } { continue }
+
+	    set file [file join $path $file_in]
+	    set objfile [file join $objdir [file root $file_in].o]
+	    
+	    if { $forcecompile && [file exists $objfile] } {
+		file delete $objfile
+	    }
+	    set dependencies [ScanHeaders $file]
+	    puts $fout "$objfile: $file $dependencies"
+	    puts -nonewline $fout "\t$dataC($group_in,$debugrelease,compiler) "
+	    foreach j $dataC($group_in,$debugrelease,flags) {
+		puts -nonewline $fout "$j "
+	    }
+	    foreach j $dataC($group_in,$debugrelease,includedirs) {
+		puts -nonewline $fout "-I$j "
+	    }
+	    foreach j $dataC($group_in,$debugrelease,defines) {
+		puts -nonewline $fout "-D$j "
+	    }
+	    puts -nonewline $fout "\\\n\t\t-o $objfile "
+	    puts $fout "$file\n"
+	}
+	if { $unique_file == "" } {
+	    foreach link $links {
+		set objfiles ""
+		foreach i $files {
+		    foreach "file_in type group_in path" $i break
+		    if { [lsearch $dataL($debugrelease,$link,linkgroups) $group_in] != -1 || \
+			    [lsearch $dataL($debugrelease,$link,linkgroups) All] != -1 } {
+			if { [file ext $file_in] == ".rc" } {
+			    lappend objfiles [file join $path $file_in]
+			} else {
+			    lappend objfiles [file join $objdir [file root $file_in].o]
+			}
+		    }
 		}
+		set outputname  [file join $objdir $dataL($debugrelease,$link,linkexe)]
+
+		set target [string toupper OBJFILES_$link]
+		set string "$target = "
+		foreach i $objfiles {
+		    append string "$i "
+		    if { [string length $string] > 70 } {
+			puts $fout "$string \\"
+			set string ""
+		    }
+		}
+		puts $fout "$string\n"
+
+		puts $fout "$outputname: \$($target)"
+		puts -nonewline $fout "\t$dataL($debugrelease,$link,linker) "
+		foreach j $dataL($debugrelease,$link,linkflags) {
+		    puts -nonewline $fout  "$j "
+		}
+		puts -nonewline $fout "-o $outputname \$($target) "
+		foreach j $dataL($debugrelease,$link,librariesdirs) {
+		    if { $dataL($debugrelease,$link,linker) != "windres" } {
+			puts -nonewline $fout "-L$j "
+		    } else {
+			puts -nonewline $fout "--include $j "
+		    }
+		}
+		if { $dataL($debugrelease,$link,linker) != "windres" } {
+		    puts -nonewline $fout "-L$objdir "
+		}
+		foreach j $dataL($debugrelease,$link,libraries) {
+		    if { [regexp {^lib([^.]+)} $j {} j2] } {
+			puts -nonewline $fout "-l$j2 "
+		    } elseif { [file exists $j] } {
+			puts -nonewline $fout "$j "
+		    } else {
+			puts -nonewline $fout "[file join $objdir $j] "
+		    }
+		}
+		puts $fout "\n"
 	    }
 	}
-	catch { close $fin }
+	close $fout
+
+	if { $::tcl_platform(platform) == "windows" } {
+	    set comm [list start /w /m make -f $make]
+	} else {
+	    set comm [list make -f $make]
+	}
+	RamDebugger::TextCompInsert "make -f $make\n"
+	set fin [open "|$comm |& cat" r]
+	
+	fconfigure $fin -blocking 0
+	fileevent $fin readable [list cproject::CompileFeedback $fin]
+	
+	vwait cproject::compilationstatus
+	
+	if { $compilationstatus == 2 } {
+	    if { $::tcl_platform(platform) == "windows" } {
+		# maybe it kills also other compilations from other RamDebugger's or manual make's
+		# but that's live and that's windows
+		foreach i [split [exec tlist] \n] {
+		    if { [string match -nocase "*make.exe*" $i] } {
+			catch { exec kill /f [scan $i %d] }
+		    }
+		}
+	    }
+	    catch { close $fin }
+	}
+    } catch_string]
+	
+    if { $catch_err } {
+	WarnWin $catch_string
+	set compilationstatus 1
     }
+
     switch -- $compilationstatus {
 	-1 {
 	    RamDebugger::TextCompInsert "Project '$project_short' is up to date"

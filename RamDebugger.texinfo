@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.6 $
+@set Version  $Revision: 1.7 $
 @set Date August 2002
 
 @ifinfo
@@ -66,7 +66,7 @@ Copyright 2002 Ramon Ribó
 @end ifinfo
 
 @titlepage
-@title RamDebugger 1.3:
+@title RamDebugger 2.0:
 @subtitleA graphical and interactive debugger for Tcl-TK
 @author Copyright 2002 Ramon Ribó
 @c The following two commands start the copyright page.
@@ -104,6 +104,7 @@ Introduction and Setup
 
 * Introduction::                
 * Changes::                     
+* web page::                    
 * Download::                    
 * Installation and prerequisites::  
 * Starting RamDebugger::        
@@ -132,6 +133,7 @@ CN @value{Version} @value{Date}
 @menu
 * Introduction::                
 * Changes::                     
+* web page::                    
 * Download::                    
 * Installation and prerequisites::  
 * Starting RamDebugger::        
@@ -164,6 +166,7 @@ variables and expression values, as well as change them.
 @item Works in Linux and Windows
 @item Includes additional packages, like Tkcon and VisualRegexp, developed by third party
 people, as a convenience for RamDebugger users.
+@item The same program is an IDE for compiling and debugging @b{c} and @b{c++}
 @end itemize 
 
 
@@ -179,7 +182,7 @@ people, as a convenience for RamDebugger users.
 @b{Note:} RamDebugger can also be an IDE for compiling and debugging c/c++ code. It
 uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 
-@node Changes, Download, Introduction, Introduction and Setup
+@node Changes, , Introduction, Introduction and Setup
 @section Changes
 
 Changes From version 1 to version 2
@@ -198,10 +201,15 @@ also uses them if @b{man2html} is found in the system.
 @item Fixed many bugs related to parsing files and other.
 @end itemize 
 
-@node  Download, Installation and prerequisites, Changes, Introduction and Setup
+@node web page, Download, Changes, Introduction and Setup
+@section web page
+
+RamDebugger web page is at: @url{http://gid.cimne.com/RamDebugger}
+
+@node  Download, Installation and prerequisites, web page, Introduction and Setup
 @section Download
 
-RamDebugger can be download from @url{http://gid.cimne.upc.es/RamDebugger/RamDebugger1.3.zip}
+RamDebugger can be download from @url{http://gid.cimne.com/RamDebugger/RamDebugger2.0.zip}
 
 @node Installation and prerequisites, Starting RamDebugger, Download, Introduction and Setup
 @section Installation and prerequisites
