@@ -1367,7 +1367,7 @@ proc RamDebugger::AboutWindow {} {
 	    -fg \#d3513d -grid 0
 
     set tt "Author: Ramon Ribó (RAMSAN)\n"
-    append tt "ramsan@cimne.upc.es\nhttp://gid.cimne.upc.es/ramsan\n"
+    append tt "ramsan@compassis.com\nhttp://gid.cimne.com/ramsan\n"
     append tt "http://gid.cimne.com/RamDebugger"
 
     text $w.l2 -grid "0 px20 py10" -bd 0 -bg [$w cget -bg] -width 10 -height 4 \
@@ -1917,9 +1917,10 @@ proc RamDebugger::Compile { name } {
 #         set comm  "[file join $::env(COMSPEC)] /c $comm"
 #     }
 
-    if { $::tcl_platform(platform) == "windows" } {
-	    set cat [file join $MainDir addons cat.exe]
-    } else { set cat cat }
+    set cat cat
+#     if { $::tcl_platform(platform) == "windows" } {
+#             set cat [file join $MainDir addons cat.exe]
+#     } else { set cat cat }
 
     set fin [open "|$comm |& $cat" r]
     fconfigure $fin -blocking 0
@@ -1981,10 +1982,11 @@ proc RamDebugger::SearchInFilesDo {} {
     variable options
     variable MainDir
     
-     if { $::tcl_platform(platform) == "windows" } {
-	 set grep [file join $MainDir addons grep.exe]
-     } else { set grep grep }
-
+    set grep grep
+#     if { $::tcl_platform(platform) == "windows" } {
+#         set grep [file join $MainDir addons grep.exe]
+#     } else { set grep grep }
+    
     set comm [list $grep -ns]
     switch -- $::RamDebugger::searchmode {
 	-exact { lappend comm -F }
@@ -2172,12 +2174,16 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 
     set istoplevel 0
 
+    if { ![info exists options(SearchToolbar_autoclose)] } {
+	set options(SearchToolbar_autoclose) 1
+    }
+
     if { [info exists SearchToolbar] } {
 	set f [$mainframe gettoolbar 1]
 	set ::RamDebugger::searchstring [GetSelOrWordInIndex insert]
 	if { $replace != [lindex $SearchToolbar 1] } {
 	    #nothing
-	} elseif { [lindex $SearchToolbar 0] } {
+	} elseif { [lindex $SearchToolbar 0] && $options(SearchToolbar_autoclose) } {
 	    $mainframe showtoolbar 1 0
 	    focus $text
 	    set SearchToolbar [list 0 $replace]
@@ -2188,9 +2194,6 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	    set SearchToolbar [list 1 $replace]
 	    return
 	}
-    }
-    if { ![info exists options(SearchToolbar_autoclose)] } {
-	set options(SearchToolbar_autoclose) 1
     }
 
     if { !$replace && [info exists text_secondary] && [focus -lastfor $text] eq \
