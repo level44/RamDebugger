@@ -18,10 +18,42 @@ proc CopyPackages { files todir packages packagesout } {
     }
     foreach i [fileutil::grep package $tclfiles] {
 	foreach "filename number contents" [split $i :] break
-	if { [regexp {package\s+require\s+(\w+)} $contents {} package] && \
-		 ![regexp {^\s*#} $contents] } {
-	    lappend packages $package
+	foreach "- - p" [regexp -inline -all {(^|\n)\s*package\s+require\s+(\w*)} \
+			     $contents] {
+	    if { $p == "smtp" } { set p mime }
+	    puts "package $p from file '$filename'"
+	    lappend packages $p
 	}
+    }
+    if { [interp exists temp] } { interp delete temp }
+    interp create temp
+    temp eval { package require Tk ; wm withdraw . }
+    temp eval [list set argv0 [set ::argv0]]
+    temp eval [list set auto_path $::auto_path]
+    foreach i $packages {
+        if { [lsearch "tkdnd BLT RamDebugger tcllib" $i] != -1 } { continue }
+        temp eval package require $i
+    }
+    set packages ""
+    foreach i [temp eval package names] {
+        if { ![catch {temp eval package present $i} pversion] && \
+            [temp eval [list package ifneeded $i $pversion]] != "" } {
+            lappend packages $i
+        }
+    }
+    interp delete temp
+    set packages [lsort -dictionary -unique [string tolower $packages]]
+    foreach i [list tcl tk http registry ramdebugger img::* jpegtcl \
+            pngtcl tifftcl zlibtcl] {
+        while { [set ipos [lsearch $packages $i]] != -1 } {
+            set packages [lreplace $packages $ipos $ipos]
+        }
+    }
+    foreach i [list tkdnd cmdline base64] {
+        set ipos [lsearch $packages $i]
+        if { $ipos == -1 } {
+            lappend packages $i
+        }
     }
     set packages [lsort -unique -dictionary $packages]
 
@@ -208,7 +240,7 @@ proc Execute { args } {
 set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
 		              -split_node -menu]
 set ZIP zip.exe
-set Version 5.0
+set Version 5.2
 set Date "January 2005"
 set Copyright "2002-2005 Ramon Ribó"
 
@@ -217,8 +249,9 @@ set files [list RamDebugger.tcl license.terms Readme addons scripts Examples hel
 
 set deletefiles [list help/02TclTk8.5 help/wordindex]
 
-set packages [list tcllib Img tkhtml]
-set packagesout [list Tcl Tk bwidget1.6 reg1.1]
+set packages [list Img Tkhtml treectrl]
+set packagesout [list Tcl Tk bwidget1.6 reg1.1 RamDebugger tcllib \
+		     resizer trf]
 
 set tclkitdir "C:/TclTk/tclkit"
 
