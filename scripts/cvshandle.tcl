@@ -337,6 +337,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 #     }
     RamDebugger::WaitState 0
     set w $RamDebugger::text._openrev
+    destroy $w
     dialogwin_snit $w -title "Choose revision file" -entrytext \
 	"Choose a revision file to check its revisions or to remove revisions history" \
 	-morebuttons [list "Remove..." "Purge..."]
@@ -349,7 +350,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 	set size [file size $i]
 	incr totalsize $size
 	set size_show [format "%.3g KB" [expr {$size/1024.0}]]
-	set file [base64::decode [string range [file extension $i] 0 end-2]]
+	set file [base64::decode [string range [file extension $i] 1 end-2]]
 	set dirname [file dirname $file]
 	if { $dirname eq "." } { set dirname "" }
 	lappend list [list [file tail $file] $dirname $size_show]
