@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.31 2004/02/12 16:55:59 jsperez Exp $        
+#         $Id: RamDebugger.tcl,v 1.32 2004/02/20 17:04:47 jsperez Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -610,6 +610,10 @@ proc RamDebugger::rdebug { args } {
 	    set ::RDC::code $comm
 	    update
 	}
+        proc RDC::GetLastVisited { } {
+            variable data
+            list $data(visited,filenum) $data(visited,line)
+        }
 	proc RDC::F { filenum line } {
 	    variable code
 	    variable evalhandler
@@ -621,8 +625,10 @@ proc RamDebugger::rdebug { args } {
 	    variable lastprocstack
 	    variable linecounter
 
-            RDC::SendDev [list RamDebugger::SetLastVisited $filenum $line]
- 
+            variable data
+            set data(visited,filenum) $filenum
+            set data(visited,line) $line
+
 	    set procstack ""
 	    set procname ""
 	    for { set i [expr {[info level]-1}] } { $i >= 1 } { incr i -1 } {
@@ -1793,13 +1799,6 @@ proc RamDebugger::rdel { args } {
 	incr ipos
     }
     error "breakpoint $opts(breakpointnum) not found"
-}
-
-proc RamDebugger::SetLastVisited { filenum line } {
-    variable data
-
-    set data(visited,filenum) $filenum
-    set data(visited,line) $line
 }
 
 ################################################################################
@@ -3662,10 +3661,9 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
     if { $line == -1 } {
         # called from bgerror
         variable fileslist
-        variable data 
         
-        set file [lindex $fileslist $data(visited,filenum)]
-        set line $data(visited,line)
+        foreach {filenum line} [EvalRemoteAndReturn ::RDC::GetLastVisited] break;
+        set file [lindex $fileslist $filenum]
     }
     if { ![info exists text] || ![winfo exists $text] } { return }
 
