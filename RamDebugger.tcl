@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-# 	$Id: RamDebugger.tcl,v 1.3 2002/08/02 09:33:47 ramsan Exp $	
+#         $Id: RamDebugger.tcl,v 1.4 2002/08/02 17:39:01 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jul-2002
 
 
@@ -13,7 +13,7 @@ namespace eval RamDebugger {
     ################################################################################
 
     namespace export rhelp rdebug rlist reval rcont rnext rstep rbreak rcond rinfo rdel \
-            rstack routput rtime
+	    rstack routput rtime
 
     ################################################################################
     # communications issues
@@ -131,8 +131,8 @@ proc RamDebugger::rhelp { args } {
 	-h:       displays usage
 	--:     end of options
 
-        To obtain more information of a command, use 'rhelp command' or 'command -h'.
-        To begin debugging, use rdebug.
+	To obtain more information of a command, use 'rhelp command' or 'command -h'.
+	To begin debugging, use rdebug.
     }
     ParseArgs $args $usagestring opts
 
@@ -172,9 +172,9 @@ proc RamDebugger::rdebug { args } {
 	-currentfile:  execute and debug currentfile
 	--:            end of options
 
-        To begin debugging a TCL file, select the file with 'rlist' and use 'rdebug -currentfile'.
-        To begin debugging a remote program, use 'rdebug program', where program is one active
-        program, that must belong to the services list.
+	To begin debugging a TCL file, select the file with 'rlist' and use 'rdebug -currentfile'.
+	To begin debugging a remote program, use 'rdebug program', where program is one active
+	program, that must belong to the services list.
     }
     ParseArgs $args $usagestring opts
 
@@ -296,7 +296,7 @@ proc RamDebugger::rdebug { args } {
 		if { $outputline } {
 		    set procname [lindex [info level -1] 0]
 		    SendDev [list RamDebugger::RecieveFromProgram output \
-			    $filenum $line $procname "" ""]
+		            $filenum $line $procname "" ""]
 		    
 		}
 		return
@@ -330,13 +330,13 @@ proc RamDebugger::rdebug { args } {
     }
     if { $remoteserverIsLocal } {
 	set remotecomm [string map [list SENDDEVBODY "sendmaster \$comm"] \
-			    $remotecomm]
+		            $remotecomm]
     } elseif { $::tcl_platform(platform) == "windows" } {
 	set remotecomm [string map [list SENDDEVBODY "comm::comm send $debuggerserverNum \$comm"] \
-			    $remotecomm]
+		            $remotecomm]
     } else {
 	set remotecomm [string map [list SENDDEVBODY "send $debuggerserver \$comm"] \
-			    $remotecomm]
+		            $remotecomm]
     }
     EvalRemote $remotecomm
     catch { unset instrumentedfilesSent }
@@ -347,7 +347,7 @@ proc RamDebugger::rdebug { args } {
     }
     if { $opts(-currentfile) } {
 	EvalRemote [list set ::RDC::currentfile $currentfile]
-    	after idle [list RamDebugger::rlist -quiet $currentfile]
+	    after idle [list RamDebugger::rlist -quiet $currentfile]
     }
     return "Begin debugging of program '$remoteserver'"
 }
@@ -366,9 +366,9 @@ proc RamDebugger::reval { args } {
 	-handler comm: returns inmediately and calls later to 'comm' with the results as argument
 	--:           end of options
 
-        This command is typically use when the program has already stopped in one breakpoint.
-        Permmits to evaluate one expresion in the context level of the breakpoint. The expression
-        can also change the value of one variable.
+	This command is typically use when the program has already stopped in one breakpoint.
+	Permmits to evaluate one expresion in the context level of the breakpoint. The expression
+	can also change the value of one variable.
     }
     ParseArgs $args $usagestring opts
     set ExpressionResult ""
@@ -543,7 +543,7 @@ proc RamDebugger::rtime { args } {
 	This function is used to obtain absolute and relative times of several blocks
 	of the code. The process is: define one or several blocks giving the block name,
 	the beginning line and the end line with option -add. After, select option -start.
-        When finished measuring times, use option -display to see the results. Use -delete
+	When finished measuring times, use option -display to see the results. Use -delete
 	to finish.
     }
     ParseArgs $args $usagestring opts
@@ -709,6 +709,7 @@ proc RamDebugger::rtime { args } {
 proc RamDebugger::rlist { args } {
     variable currentfile
     variable currentline
+    variable currentfileIsModified
     variable files
     variable filesmtime
     variable fileslist
@@ -740,6 +741,15 @@ proc RamDebugger::rlist { args } {
 
     if { $currentfile == "" } {
 	error "it is necessary to enter a file name\n$usagestring"
+    }
+
+    if { $currentfileIsModified } {
+	variable text
+	set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
+	set files($currentfile) [string map $map [$text get 1.0 end-1c]]
+	if { [info exists instrumentedfiles($currentfile)] } {
+	    unset instrumentedfiles($currentfile)
+	}
     }
 
     if { ![info exists files($currentfile)] || $force} {
@@ -796,7 +806,7 @@ proc RamDebugger::rlist { args } {
 	    }
 	    set instfile [GiveInstFile $currentfile 1 $IsLocal]
 
-	    if { $instfile != "" } {
+	    if { $instfile != "" && !$currentfileIsModified } {
 		set fin [open $instfile r]
 		gets $fin instrumentedfiles($currentfile)
 		set InstrumentOnlyProcs -1
@@ -816,9 +826,9 @@ proc RamDebugger::rlist { args } {
 		    append instrumentedfiles($currentfile) \n[read $fin]
 		    regexp {RDC::F ([0-9]+)} $instrumentedfiles($currentfile) {} oldfilenum
 		    if { $oldfilenum != $filenum } {
-			set instrumentedfiles($currentfile) \
-			    [string map [list "RDC::F $oldfilenum " "RDC::F $filenum "] \
-				 $instrumentedfiles($currentfile)]
+		        set instrumentedfiles($currentfile) \
+		            [string map [list "RDC::F $oldfilenum " "RDC::F $filenum "] \
+		                 $instrumentedfiles($currentfile)]
 		    }
 		} else {
 		    unset instrumentedfiles($currentfile)
@@ -851,13 +861,15 @@ proc RamDebugger::rlist { args } {
 	    }
 		
 	    set instfile [GiveInstFile $currentfile 0 $IsLocal]
-	    if { $instfile != "" && [info exists instrumentedfiles($currentfile)] } {
+	    if { $instfile != "" && [info exists instrumentedfiles($currentfile)] && \
+		  !$currentfileIsModified } {
 		set fout [open $instfile w]
 		puts -nonewline $fout $instrumentedfiles($currentfile)
 		close $fout
 	    }
 	    set infofile [GiveInstFile $currentfile 0 -1]
-	    if { $infofile != "" && [info exists instrumentedfilesInfo($currentfile)] } {
+	    if { $infofile != "" && [info exists instrumentedfilesInfo($currentfile)] && \
+		  !$currentfileIsModified } {
 		set fout [open $infofile w]
 		puts -nonewline $fout $instrumentedfilesInfo($currentfile)
 		close $fout
@@ -868,7 +880,7 @@ proc RamDebugger::rlist { args } {
     if { $debuggerstate == "time" && [info exists instrumentedfiles($currentfile)] && \
 	    (![info exists instrumentedfilesTime($currentfile)] || $force) } {
 	SetMessage "Instrumenting file '$currentfile' for time measure..."
-    	Instrumenter::DoWorkForTime $files($currentfile) $currentfile \
+	    Instrumenter::DoWorkForTime $files($currentfile) $currentfile \
 	   instrumentedfilesTime($currentfile) $TimeMeasureData
 	SetMessage ""
     }
@@ -962,10 +974,12 @@ proc RamDebugger::rbreak { args } {
     }
 
     set usagestring {usage: rbreak ?switches? ?file? line
-	-h:       displays usage
+	-h:     displays usage
 	-quiet: do not print anything
 	-force: force to reload file
 	--:     end of options
+
+	This command sets a breakpoint in the given line.
     }
     ParseArgs $args $usagestring opts
 
@@ -984,12 +998,7 @@ proc RamDebugger::rbreak { args } {
     if { $ipos == -1 } {
 	error "error: line $currentline is not instrumented"
     }
-
-#     if { ![info exists instrumentedfilesSent($currentfile)] && $remoteserver != "" } {
-# 	EvalRemote $instrumentedfiles($currentfile)
-# 	set instrumentedfilesSent($currentfile) 1
-#     }
-    
+   
     set NumBreakPoint 1
     foreach i $breakpoints {
 	if { [lindex $i 0] >= $NumBreakPoint } {
@@ -1010,7 +1019,10 @@ proc RamDebugger::rinfo { args } {
 
     set usagestring {usage: rinfo ?switches? ?line?
 	-h:       displays usage
-	--:     end of options
+	--:       end of options
+
+	Display active breakpoints. If line is entered, it refers to the
+	currentfile.
     }
     ParseArgs $args $usagestring opts
 
@@ -1042,12 +1054,14 @@ proc RamDebugger::rdel { args } {
 	-h:     displays usage
 	-all:   delete all breakpoints 
 	--:     end of options
+
+	Delete one previusly defined breakpoints
     }
     ParseArgs $args $usagestring opts
 
     if { $opts(-all) } {
 	if { $opts(breakpointnum) != "" } {
-	    error "when using -all, no breakpoint num must be written\n$usagestring"
+	    error "when using -all, no breakpointnum must be written\n$usagestring"
 	}
 	set breakpoints ""
 	UpdateRemoteBreaks
@@ -1063,6 +1077,7 @@ proc RamDebugger::rdel { args } {
 	    UpdateRemoteBreaks
 	    return "deleted breakpoint $opts(breakpointnum)"
 	}
+	incr ipos
     }
     error "breakpoint $opts(breakpointnum) not found"
 }
@@ -1111,7 +1126,7 @@ proc RamDebugger::ParseArgs { args usagestring OptsName } {
 	} else {
 	    set canhaveflags 0
 	    while { [regexp {^[?].*[?]$} [lindex $normalargs $i]] && \
-			[llength $args]-$i < [llength $normalargs]-$iargs && \
+		        [llength $args]-$i < [llength $normalargs]-$iargs && \
 		    ![regexp {^[?].*[?]$} [lindex $normalargs end]] } {
 		if { $iargs >= [llength $normalargs] } { error "error. $usagestring" }
 		set opts([string trim [lindex $normalargs $iargs] ?]) ""
@@ -1155,7 +1170,7 @@ proc RamDebugger::FindActivePrograms { force } {
 	for { set i 12350 } { $i < 12360 } { incr i } {
 	    if { $i == $debuggerserverNum } { continue }
 	    set comm [list comm::comm send -async $i \
-			  [list catch [list comm::givename $debuggerserverNum]]]
+		          [list catch [list comm::givename $debuggerserverNum]]]
 	    if { [catch $comm] } { break }
 	}
 	# dirty trick to make array exist
@@ -1207,7 +1222,7 @@ proc RamDebugger::RecieveFromProgram { breaknum filenum line procname textline c
 	if { $breaknum == "output" } {
 	    puts "output line $breaknum $file $line"
 	} elseif { $breaknum } {
-	    puts "break $breaknum at $procname $file $line"	
+	    puts "break $breaknum at $procname $file $line"        
 	    if { $textline != "" } { puts "---> $textline" }
 	} elseif { $filenum >= 0 } {
 	    puts "break at $procname $file $line"
@@ -1248,25 +1263,25 @@ proc RamDebugger::EvalRemote { comm } {
     } elseif { $::tcl_platform(platform) == "windows" } {
 	comm::comm send $remoteserverNum $comm
 
-# 	if { $remoteserver == "Project" } {
-# 	    dde poke GIDDDE Project TclCommand $comm
-# 	    dde request GIDDDE Project TclCommand
-# 	} else {
-# 	    set len [string length $comm]
-# 	    if { $len < 2100 } {
-# 		dde eval $remoteserver $comm
-# 		Pause
-# 	    } else {
-# 		dde eval $remoteserver [list namespace eval RDC [list variable codetoeval ""]]
-# 		for { set i 0 } { $i < $len } { incr i 2000 } {
-# 		    dde eval $remoteserver [list append RDC::codetoeval [string range $comm \
-# 			    $i [expr $i+1999]]]
-# 		    Pause
-# 		}
-# 		dde eval $remoteserver {after idle [set RDC::codetoeval]}
-# 		Pause
-# 	    }
-# 	}
+#         if { $remoteserver == "Project" } {
+#             dde poke GIDDDE Project TclCommand $comm
+#             dde request GIDDDE Project TclCommand
+#         } else {
+#             set len [string length $comm]
+#             if { $len < 2100 } {
+#                 dde eval $remoteserver $comm
+#                 Pause
+#             } else {
+#                 dde eval $remoteserver [list namespace eval RDC [list variable codetoeval ""]]
+#                 for { set i 0 } { $i < $len } { incr i 2000 } {
+#                     dde eval $remoteserver [list append RDC::codetoeval [string range $comm \
+#                             $i [expr $i+1999]]]
+#                     Pause
+#                 }
+#                 dde eval $remoteserver {after idle [set RDC::codetoeval]}
+#                 Pause
+#             }
+#         }
     } else {
 	send $remoteserver $comm
     }
@@ -1384,36 +1399,36 @@ proc RamDebugger::Instrumenter::PushState { type line } {
 	    switch -- [lindex $words 0] {
 		"if" {
 		    if { [llength $words] == 2 } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    } elseif { [lindex $words end] == "then" || [lindex $words end] == "else" } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    } elseif { [lindex $words end-1] == "elseif" } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    }
 		}
 		"namespace" {
 		    if { [lindex $words 1] == "eval" && [llength $words] >= 3 } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    }
 		}
 		"catch" {
 		    if { [llength $words] == 1 } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    }
 		}
 		"while" {
 		    if { [llength $words] == 2 } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    }
 		}
 		"foreach" {
 		    if { [llength $words] >= 3 } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    }
 		}
 		"for" {
 		    if { [llength $words] == 4 } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    }
 		}
 		"eval" {
@@ -1425,19 +1440,19 @@ proc RamDebugger::Instrumenter::PushState { type line } {
 		        incr len -1
 		    }
 		    if { $len > 0 } {
-			set NewDoInstrument 1
+		        set NewDoInstrument 1
 		    }
 		}
 		"switch" {
 		    for { set i 1 } { $i < [llength $words] } { incr i } {
-			if { [lindex $words $i] == "--" } {
-			    incr i
-			    break
-			} elseif { ![string match -* [lindex $words $i]] } { break }
+		        if { [lindex $words $i] == "--" } {
+		            incr i
+		            break
+		        } elseif { ![string match -* [lindex $words $i]] } { break }
 		    }
 		    set len [expr [llength $words]-$i]
 		    if { $len == 1 } {
-			set NewDoInstrument 2
+		        set NewDoInstrument 2
 		    }
 		}
 	    }
@@ -1503,7 +1518,7 @@ proc RamDebugger::Instrumenter::PopState { type line } {
 	} 
     }
     foreach "words currentword wordtype wordtypeline wordtypepos DoInstrument DoOutput" \
-        [lindex $stack end] break
+	[lindex $stack end] break
     set stack [lreplace $stack end end]
     incr level -1
 
@@ -1593,113 +1608,113 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 	    \" {
 		if { $lastc != "\\" && [lindex $words 0] != "\#" } {
 		    if { $wordtype == "" } {
-			set wordtype \"
-			set wordtypeline $line
-			set wordtypepos $icharline
-			set consumed 1
+		        set wordtype \"
+		        set wordtypeline $line
+		        set wordtypepos $icharline
+		        set consumed 1
 		    } elseif { $wordtype == "\"" } {
-			set wordtype ""
-			lappend words $currentword
-			set currentword ""
-			set consumed 1
-			set checkExtraCharsAfterCQB \"
+		        set wordtype ""
+		        lappend words $currentword
+		        set currentword ""
+		        set consumed 1
+		        set checkExtraCharsAfterCQB \"
 
-			if { $wordtypeline == $line } {
-			    lappend blockinfocurrent grey $wordtypepos [expr $icharline+1]
-			} else {
-			    lappend blockinfocurrent grey 0 [expr $icharline+1]
-			}
+		        if { $wordtypeline == $line } {
+		            lappend blockinfocurrent grey $wordtypepos [expr $icharline+1]
+		        } else {
+		            lappend blockinfocurrent grey 0 [expr $icharline+1]
+		        }
 
-			if { $DoOutput == 0 && $words == "proc" } {
-			    append newblock $words
-			    set DoOutput 1
-			}
+		        if { $DoOutput == 0 && $words == "proc" } {
+		            append newblock $words
+		            set DoOutput 1
+		        }
 		    } elseif { $wordtype == "\{" } {
-			if { ![info exists quoteintobraceline] } {
-			    set quoteintobraceline $line
-			    set quoteintobracepos $icharline
-			} else {
-			    if { $line == $quoteintobraceline } {
-				lappend blockinfocurrent grey $quoteintobracepos [expr $icharline+1]
-			    }
-			    unset quoteintobraceline quoteintobracepos
-			}
+		        if { ![info exists quoteintobraceline] } {
+		            set quoteintobraceline $line
+		            set quoteintobracepos $icharline
+		        } else {
+		            if { $line == $quoteintobraceline } {
+		                lappend blockinfocurrent grey $quoteintobracepos [expr $icharline+1]
+		            }
+		            unset quoteintobraceline quoteintobracepos
+		        }
 		    }
 		}
 	    }
 	    \{ {
 		if { $lastc != "\\" } {
 		    if { $wordtype == "\{" } {
-			incr braceslevel
+		        incr braceslevel
 		    } elseif { $wordtype != "\"" && $wordtype != "w" } {
-			set consumed 1
-			set fail [PushState \{ $line]
-			if { $fail } {
-			    set wordtype \{
-			    set wordtypeline $line
-			    set braceslevel 0
-			} else {
-			    set lastinstrumentedline $line
-			}
+		        set consumed 1
+		        set fail [PushState \{ $line]
+		        if { $fail } {
+		            set wordtype \{
+		            set wordtypeline $line
+		            set braceslevel 0
+		        } else {
+		            set lastinstrumentedline $line
+		        }
 		    }
 		}
 	    }
 	    \} {
 		if { $lastc != "\\" } {
 		    if { $wordtype == "\{" } {
-			if { $braceslevel } {
-			    incr braceslevel -1
-			} else {
-			    set wordtype ""
-			    lappend words $currentword
-			    set currentword ""
-			    set consumed 1
-			    if { [lindex $words 0] != "\#" } {
-				set checkExtraCharsAfterCQB \}
-			    }
-			    if { $DoOutput == 0 && $words == "proc" } {
-				append newblock $words
-				set DoOutput 1
-			    }
-			}
+		        if { $braceslevel } {
+		            incr braceslevel -1
+		        } else {
+		            set wordtype ""
+		            lappend words $currentword
+		            set currentword ""
+		            set consumed 1
+		            if { [lindex $words 0] != "\#" } {
+		                set checkExtraCharsAfterCQB \}
+		            }
+		            if { $DoOutput == 0 && $words == "proc" } {
+		                append newblock $words
+		                set DoOutput 1
+		            }
+		        }
 		    } elseif { $wordtype != "\"" } {
-			set fail [PopState \} $line]
-			if { !$fail } {
-			    set consumed 1
-			    lappend words ""
-			    if { [lindex $words 0] != "\#" } {
-				set checkExtraCharsAfterCQB \}
-			    }
-			}
+		        set fail [PopState \} $line]
+		        if { !$fail } {
+		            set consumed 1
+		            lappend words ""
+		            if { [lindex $words 0] != "\#" } {
+		                set checkExtraCharsAfterCQB \}
+		            }
+		        }
 		    }
 		}
 	    }
 	    " " - \t {
 		if { $lastc != "\\" } {
 		    if { $wordtype == "w" } {
-			set consumed 1
-			set wordtype ""
-			lappend words $currentword
-			set currentword ""
+		        set consumed 1
+		        set wordtype ""
+		        lappend words $currentword
+		        set currentword ""
 
-			if { $DoOutput == 0 && $words == "proc" } {
-			    append newblock $words
-			    set DoOutput 1
-			}
+		        if { $DoOutput == 0 && $words == "proc" } {
+		            append newblock $words
+		            set DoOutput 1
+		        }
 
-			if { [lindex $words 0] == "proc" } {
-			    if { [llength $words] == 1 } {
-				set icharlineold [expr $icharline-4]
-				lappend blockinfocurrent magenta $icharlineold $icharline
-			    } elseif { [llength $words] == 2 } {
-				set icharlineold [expr $icharline-[string length [lindex $words end]]]
-				lappend blockinfocurrent blue $icharlineold $icharline
-			    }
-			} elseif { [info exists colors([lindex $words end])] } {
-			    set icharlineold [expr $icharline-[string length [lindex $words end]]]
-			    lappend blockinfocurrent $colors([lindex $words end]) $icharlineold \
-			       $icharline
-			}
+		        if { [lindex $words 0] == "proc" } {
+		            if { [llength $words] == 1 } {
+		                set icharlineold [expr $icharline-4]
+		                lappend blockinfocurrent magenta $icharlineold $icharline
+		            } elseif { [llength $words] == 2 } {
+		                set icharlineold [expr $icharline-[string length [lindex $words end]]]
+		                lappend blockinfocurrent blue $icharlineold $icharline
+		            }
+		        } elseif { [info exists colors([lindex $words end])] } {
+		            set icharlineold [expr $icharline-[string length [lindex $words end]]]
+		            lappend blockinfocurrent $colors([lindex $words end]) $icharlineold \
+		               $icharline
+		        }
 		    } elseif { $wordtype == "" } { set consumed 1 }
 		}
 	    }
@@ -1715,7 +1730,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		if { $lastc != "\\" && $wordtype != "\"" && $wordtype != "\{" } {
 		    set fail [PopState \] $line]
 		    if { !$fail } {
-			set consumed 1
+		        set consumed 1
 		    }
 		    # note: the word inside words is not correct when using []
 		}
@@ -1733,27 +1748,27 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		if { $wordtype != "\{" } {
 		    set consumed 1
 		    if { $lastc != "\\" } {
-			if { $wordtype == "\"" } {
-			    set text "Quotes (\") in line $line "
-			    append text "are not closed"
-			    error $text
-			}
-			set words ""
-			set currentword ""
-			set wordtype ""
+		        if { $wordtype == "\"" } {
+		            set text "Quotes (\") in line $line "
+		            append text "are not closed"
+		            error $text
+		        }
+		        set words ""
+		        set currentword ""
+		        set wordtype ""
 
-			if { $DoOutput == 1 } {
-			    append newblock $c
-			    set DoOutput 0 
-			}
-			lappend blockinfocurrent "n"
+		        if { $DoOutput == 1 } {
+		            append newblock $c
+		            set DoOutput 0 
+		        }
+		        lappend blockinfocurrent "n"
 		    } else {
-			if { $wordtype == "w" } {
-			    set wordtype ""
-			    lappend words $currentword
-			    set currentword ""
-			}
-			lappend blockinfocurrent "c"
+		        if { $wordtype == "w" } {
+		            set wordtype ""
+		            lappend words $currentword
+		            set currentword ""
+		        }
+		        lappend blockinfocurrent "c"
 		    }
 		} else { lappend blockinfocurrent "n" }
 	    }
@@ -1771,8 +1786,8 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		    set wordtype ""
 
 		    if { $DoOutput == 1 } {
-			append newblock $c
-			set DoOutput 0
+		        append newblock $c
+		        set DoOutput 0
 		    }
 		}
 	    }
@@ -2052,7 +2067,7 @@ proc RamDebugger::ColorizeSlow {} {
 		      $string|$magentas|$greens|$comments $idx end]
 	if { $idx2 == "" } { break }
 	foreach "rex tag icr" [list $string grey 1 $magentas magenta 0 $greens green 0 \
-				   $comments red 0] {
+		                   $comments red 0] {
 	    set idx3 [$text search -regexp $rex $idx2 $idx2+${RamDebugger::count}c]
 	    if { $idx3 == $idx2 } {
 		$text tag add $tag $idx2+${icr}c $idx2+${RamDebugger::count}c
@@ -2156,6 +2171,7 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     $marker delete arrowbreak
     set ed [$text cget -editable]
     $text conf -editable 1
+    $text clearundo
     set textO [$text original]
     $textO del 1.0 end
     $textO ins end [string map [list "\t" "        "] $files($file)]
@@ -2175,7 +2191,7 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     set Numlines [scan [$text index end-1c] %d]
     set font [$text cget -font]
     $marker configure -scrollregion [list 0 0 [winfo reqwidth $marker] \
-					 [expr $Numlines*[font metrics $font -linespace]]]
+		                         [expr $Numlines*[font metrics $font -linespace]]]
     $text mark set insert $idx
     $text see $idx
 
@@ -2220,6 +2236,7 @@ proc RamDebugger::NewFile {} {
     $marker delete arrowbreak
     set ed [$text cget -editable]
     $text conf -editable 1
+    $text clearundo
     set textO [$text original]
     $textO del 1.0 end
     $textO tag add normal 1.0 end
@@ -2230,7 +2247,7 @@ proc RamDebugger::NewFile {} {
     set Numlines [scan [$text index end-1c] %d]
     set font [$text cget -font]
     $marker configure -scrollregion [list 0 0 [winfo reqwidth $marker] \
-					 [expr $Numlines*[font metrics $font -linespace]]]
+		                         [expr $Numlines*[font metrics $font -linespace]]]
     $text mark set insert 1.0
     $text see 1.0
     set instrumentedfilesInfo($currentfile) ""
@@ -2287,6 +2304,8 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     variable instrumentedfiles
     variable instrumentedfilesInfo
 
+    if { [SaveFile ask] == -1 } { return }
+
     if { $currentfile == "" } {
 	WarnWin "There is no file to see its instrumented file"
 	return
@@ -2306,6 +2325,7 @@ proc RamDebugger::ViewInstrumentedFile { what } {
 
     set ed [$text cget -editable]
     $text conf -editable 1
+    $text clearundo
     set textO [$text original]
     $textO del 1.0 end
     if { $what == "instrumented" } {
@@ -2451,10 +2471,10 @@ proc RamDebugger::SetGUIBreakpoint {} {
     $text see $idx
     set line [scan $idx "%d"]
 
-    set hasbreak 0
-    foreach i [$marker gettags l$line] {
-	switch $i arrowbreak - break { set hasbreak 1 }
-    }
+    if { [rinfo $line] != "" } {
+	set hasbreak 1
+    } else { set hasbreak 0 }
+
     if { $hasbreak } {
 	set hasbreak 0
 	foreach num [rinfo $line] {
@@ -2718,18 +2738,18 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 		set DialogWinTop::user($w,type) [lindex [lindex $res 1] 0]
 		if { $DialogWinTop::user($w,type) == "array" } {
 		    foreach "name val" [lindex [lindex $res 1] 1] {
-			$DialogWinTop::user($w,textv) insert end "${var}($name) = $val\n"
+		        $DialogWinTop::user($w,textv) insert end "${var}($name) = $val\n"
 		    }
 		} elseif { $DialogWinTop::user($w,aslist) } {
 		    set DialogWinTop::user($w,type) list
 		    if { [catch { set list [lrange [lindex [lindex $res 1] 1] 0 end] }] } {
-			$DialogWinTop::user($w,textv) insert end "Error: variable is not a list"
+		        $DialogWinTop::user($w,textv) insert end "Error: variable is not a list"
 		    } else {
-			set ipos 0
-			foreach i $list {
-			    $DialogWinTop::user($w,textv) insert end "$ipos = $i\n"
-			    incr ipos
-			}
+		        set ipos 0
+		        foreach i $list {
+		            $DialogWinTop::user($w,textv) insert end "$ipos = $i\n"
+		            incr ipos
+		        }
 		    }
 		} else {
 		    $DialogWinTop::user($w,textv) insert end [lindex [lindex $res 1] 1]
@@ -2784,7 +2804,7 @@ proc RamDebugger::DisplayVarWindow {} {
     
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     set DialogWinTop::user($w,textv) [text $sw.text -background white -wrap word -width 40 -height 10 \
-				       -exportselection 0 -font FixedFont -highlightthickness 0]
+		                       -exportselection 0 -font FixedFont -highlightthickness 0]
     $sw setwidget $DialogWinTop::user($w,textv)
 
     label $f.l2 -textvar DialogWinTop::user($w,type) -grid "0 w" -bg [CCColorActivo [$w  cget -bg]]
@@ -2827,11 +2847,11 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     set DialogWin::user(list) [tablelist::tablelist $sw.lb -width 55\
 		  -exportselection 0 \
 		  -columns [list \
-				4 Num	left \
-				40 File	right \
-				5 Line left \
-				40 Condition left \
-			       ] \
+		                4 Num        left \
+		                40 File        right \
+		                5 Line left \
+		                40 Condition left \
+		               ] \
 		  -labelcommand tablelist::sortByColumn \
 		  -background white \
 		  -selectbackground navy -selectforeground white \
@@ -2883,7 +2903,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		    set file [lindex $ent 1]
 		    set line [lindex $ent 2]
 		    if { $file == $currentfile } {
-			UpdateArrowAndBreak $line 0 ""
+		        UpdateArrowAndBreak $line 0 ""
 		    }
 		    rdel $num
 		}
@@ -2894,18 +2914,18 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	    }
 	    3 {
 		set ret [tk_messageBox -default ok -icon warning -message \
-			     "Are you sure to delete all breakpoints?" -parent $f \
-			     -title "delete all breakpoints" -type okcancel]
+		             "Are you sure to delete all breakpoints?" -parent $f \
+		             -title "delete all breakpoints" -type okcancel]
 		if { $ret == "ok" } {
 		    $DialogWin::user(list) del 0 end
 		    foreach i $breakpoints {
-			set num [lindex $i 0]
-			set file [lindex $i 1]
-			set line [lindex $i 2]
-			if { $file == $currentfile } {
-			    UpdateArrowAndBreak $line 0 ""
-			}
-			rdel $num
+		        set num [lindex $i 0]
+		        set file [lindex $i 1]
+		        set line [lindex $i 2]
+		        if { $file == $currentfile } {
+		            UpdateArrowAndBreak $line 0 ""
+		        }
+		        rdel $num
 		    }
 		}
 	    }
@@ -2998,10 +3018,10 @@ proc RamDebugger::PickSelection { w } {
     variable text
 
     if { [catch {
-	set DialogWinTop::user($w,lineini) [scan %d [$text index sel.first]]
-	set DialogWinTop::user($w,lineend) [scan %d [$text index sel.last]]
+	set DialogWinTop::user($w,lineini) [scan [$text index sel.first] %d]
+	set DialogWinTop::user($w,lineend) [scan [$text index sel.last] %d]
     }]} {
-	WarnWin "It is necessary to select some text in main window"
+	WarnWin "It is necessary to select some text in main window" $w
     }
 }
 
@@ -3009,11 +3029,11 @@ proc RamDebugger::DrawSelection { w } {
     variable text
 
     if { [catch {
-	$text tag add sel "$DialogWinTop::user($w,lineini) linestart" \
-	   "$ DialogWinTop::user($w,lineend) lineend"
+	$text tag add sel "$DialogWinTop::user($w,lineini).0 linestart" \
+	   "$DialogWinTop::user($w,lineend).0 lineend"
 	$text see $DialogWinTop::user($w,lineini)
     }] } {
-	WarnWin "Lines are not correct"
+	WarnWin "Lines are not correct" $w
     }
 }
 
@@ -3065,7 +3085,7 @@ proc RamDebugger::ModifyTimingBlock { w what } {
 	update {
 	    $DialogWinTop::user($w,list) del 0 end
 	    foreach i $TimeMeasureData {
-		$DialogWinTop::user($w,list) ins end [lrange $i 0 2]
+		$DialogWinTop::user($w,list) insert end [lrange $i 0 3]
 	    }
 	}
     }
@@ -3092,13 +3112,13 @@ proc RamDebugger::DisplayTimesWindow {} {
     
     set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 2 w"]
     $bbox add -text "Pick selection" \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext [_ "Gets the selection from the text window"] \
-         -command "RamDebugger::PickSelection $w"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Gets the selection from the text window"] \
+	 -command "RamDebugger::PickSelection $w"
     $bbox add -text "Draw selection" \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext [_ "Selects current block in text"] \
-         -command "RamDebugger::DrawSelection $w"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Selects current block in text"] \
+	 -command "RamDebugger::DrawSelection $w"
 
     TitleFrame $f.f2 -text [_ "blocks"] -grid 0
     set f2 [$f.f2 getframe]
@@ -3108,14 +3128,15 @@ proc RamDebugger::DisplayTimesWindow {} {
     set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 \
 	-exportselection 0 \
 	-columns [list \
-	    10 Name	left \
-	    10 "Initial line"	right \
-	    10 "End line"  right \
+	    10 "Name"        left \
+	    10 "File"        right \
+	     5 "Initial line"        right \
+	     5 "End line"  right \
 	   ] \
 	-labelcommand tablelist::sortByColumn \
 	-background white \
 	-selectbackground navy -selectforeground white \
-	-stretch 0 -selectmode browse \
+	-stretch "0 1" -selectmode browse \
 	-highlightthickness 0]
 
     $sw setwidget $DialogWinTop::user($w,list)
@@ -3124,17 +3145,17 @@ proc RamDebugger::DisplayTimesWindow {} {
 
     set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w"]
     $bbox add -image acttick16 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext [_ "Create new block"] \
-         -command "proc RamDebugger::ModifyTimingBlock $w create"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Create new block"] \
+	 -command "RamDebugger::ModifyTimingBlock $w create"
     $bbox add -image edit16 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext [_ "Update selected block"] \
-         -command "proc RamDebugger::ModifyTimingBlock $w edit"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Update selected block"] \
+	 -command "RamDebugger::ModifyTimingBlock $w edit"
     $bbox add -image actcross16 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext [_ "Delete selected block"] \
-         -command "proc RamDebugger::ModifyTimingBlock $w delete"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Delete selected block"] \
+	 -command "RamDebugger::ModifyTimingBlock $w delete"
 
     supergrid::go $f1
     supergrid::go $f2
@@ -3182,7 +3203,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { canvas w x y } {
 		for { set j 0 } { $j < $cols } { incr j } {
 		    set slave [grid slaves WIDGET -row $i -col $j]
 		    if { $slave != "" } {
-			append retval "    $i,$j $slave [grid info $slave]\n"
+		        append retval "    $i,$j $slave [grid info $slave]\n"
 		    }
 		}
 	    }
@@ -3306,7 +3327,7 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { canvas list x y linespace } {
 	    }
 
 	    $canvas create line [expr $x+$width+2] [expr $ty+$linespace/2] \
-	        [expr $x+$maxwidth-5] [expr $ty+$linespace/2] -width 2 -fill red -tags "items $w"
+		[expr $x+$maxwidth-5] [expr $ty+$linespace/2] -width 2 -fill red -tags "items $w"
 	    incr maxy 12
 	}
 	set inum 0
@@ -3351,7 +3372,7 @@ proc RamDebugger::DisplayWindowsHierarchyDo { what { res "" } } {
 		if { [winfo class $w] == "Label" || [winfo class $w] == "Button" || \
 		    [winfo class $w] == "Radiobutton" || [winfo class $w] == "Checkbutton" } {
 		    if { [$w cget -text] != "" } {
-			lappend info [$w cget -text]
+		        lappend info [$w cget -text]
 		    }
 		} elseif { [winfo class $w] == "Toplevel" && [wm title $w] != "" } {
 		    lappend info "" [wm title $w]
@@ -3372,7 +3393,7 @@ proc RamDebugger::DisplayWindowsHierarchyDo { what { res "" } } {
 	    set retcomm "RamDebugger::DisplayWindowsHierarchyDo res \[::RDC::WindowsHierarchy .]"
 	} else {
 	    set retcomm "RDC::SendDev \[list RamDebugger::DisplayWindowsHierarchyDo res \
-	    	    \[::RDC::WindowsHierarchy .]]"
+		        \[::RDC::WindowsHierarchy .]]"
 	}
 	set comm [string map [list EVAL $retcomm] $comm]
 
@@ -3501,7 +3522,7 @@ proc RamDebugger::GotoLine {} {
 	    }
 	    1 {
 		if { ![string is integer -strict $DialogWin::user(line)] || \
-			$DialogWin::user(line) < 1 } {
+		        $DialogWin::user(line) < 1 } {
 		    WarnWin "Line number must be a positive number" $w
 		} else {
 		    $text mark set insert $DialogWin::user(line).0
@@ -3535,16 +3556,16 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		set ::RDC::retval ""
 		foreach ::RDC::i [list VARS] {
 		    if { [array exists $::RDC::i] } {
-			lappend ::RDC::retval array [array get $::RDC::i]
+		        lappend ::RDC::retval array [array get $::RDC::i]
 		    } elseif { [info exists $::RDC::i] } {
-			lappend ::RDC::retval variable [set $::RDC::i]
+		        lappend ::RDC::retval variable [set $::RDC::i]
 		    } else {
-			set ::RDC::err [catch {expr [set ::RDC::i]} ::RDC::val]
-			if { !$::RDC::err } {
-			    lappend ::RDC::retval expr $::RDC::val
-			} else {
-			    lappend ::RDC::retval error "variable or expr $::RDC::i does not exist"
-			}
+		        set ::RDC::err [catch {expr [set ::RDC::i]} ::RDC::val]
+		        if { !$::RDC::err } {
+		            lappend ::RDC::retval expr $::RDC::val
+		        } else {
+		            lappend ::RDC::retval error "variable or expr $::RDC::i does not exist"
+		        }
 		    }
 		}
 		set ::RDC::retval
@@ -3558,7 +3579,7 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		    set val [string range $val 0 46]...
 		}
 		while { [info exists EvalEntries($i,left)] && \
-			    [string trim $EvalEntries($i,left)] == "" } {
+		            [string trim $EvalEntries($i,left)] == "" } {
 		    incr i
 		}
 		set RamDebugger::EvalEntries($i,right) $val
@@ -3587,9 +3608,9 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		} else {
 		    set ::RDC::err [catch {expr {VAR}} ::RDC::val]
 		    if { !$::RDC::err } {
-			set ::RDC::retval [list expr $::RDC::val]
+		        set ::RDC::retval [list expr $::RDC::val]
 		    } else {
-			set ::RDC::retval [list error "variable or expr 'VAR' does not exist"]
+		        set ::RDC::retval [list error "variable or expr 'VAR' does not exist"]
 		    }
 		}
 		set ::RDC::retval
@@ -3640,19 +3661,19 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		set ::RDC::retval ""
 		foreach ::RDC::i [info locals] {
 		    if { [array exists $::RDC::i] } {
-			set ::RDC::val [array get $::RDC::i]
-			if { [string length $::RDC::val] > 50 } {
-			    set ::RDC::val [string range $::RDC::val 0 46]...
-			}
-			lappend ::RDC::retval $::RDC::i array $::RDC::val
+		        set ::RDC::val [array get $::RDC::i]
+		        if { [string length $::RDC::val] > 50 } {
+		            set ::RDC::val [string range $::RDC::val 0 46]...
+		        }
+		        lappend ::RDC::retval $::RDC::i array $::RDC::val
 		    } elseif { [info exists $::RDC::i] } {
-			set ::RDC::val [set $::RDC::i]
-			if { [string length $::RDC::val] > 50 } {
-			    set ::RDC::val [string range $::RDC::val 0 46]...
-			}
-			lappend ::RDC::retval $::RDC::i variable $::RDC::val
+		        set ::RDC::val [set $::RDC::i]
+		        if { [string length $::RDC::val] > 50 } {
+		            set ::RDC::val [string range $::RDC::val 0 46]...
+		        }
+		        lappend ::RDC::retval $::RDC::i variable $::RDC::val
 		    } else {
-			lappend ::RDC::retval $::RDC::i error "error"
+		        lappend ::RDC::retval $::RDC::i error "error"
 		    }
 		}
 		set ::RDC::retval
@@ -3869,7 +3890,7 @@ proc RamDebugger::Search { w { what {} } } {
 	bind $w.search <FocusOut> "destroy $w.search ; break"
 	bind $w.search <Escape> "destroy $w.search ; break"
 	bind $w.search <KeyPress> [list if { [string is wordchar %A] || [string is punct %A] \
-					     || [string is space %A] } \
+		                             || [string is space %A] } \
 	    "tkEntryInsert $w.search %A ; break" else "destroy $w.search ; break"]
 	bind $w.search <Delete> "$w.search delete insert ; break"
 	bind $w.search <BackSpace> "tkEntryBackspace $w.search ; break"
@@ -3882,7 +3903,7 @@ proc RamDebugger::Search { w { what {} } } {
 
 	trace var RamDebugger::searchstring w "RamDebugger::Search $w ;#"
 	bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
-				      "RamDebugger::Search $w ;#"]
+		                      "RamDebugger::Search $w ;#"]
 	bind $w.search <Destroy> "+ [list bindtags $text [lreplace [bindtags $text] 0 0]] ; break"
 
 	foreach i [bind Text] {
@@ -3965,12 +3986,12 @@ proc RamDebugger::Search { w { what {} } } {
 		set RamDebugger::SearchPos [$text index $RamDebugger::SearchPos+${len}c]
 	    }
 	    set ed [$text cget -editable]
- 	    $text conf -editable 1
+	     $text conf -editable 1
 	    $text tag remove sel 1.0 end
 	    if { $RamDebugger::SearchType == "-forwards" } {
 		$text tag add sel $RamDebugger::SearchPos $idx2
 	    } else { $text tag add sel $idx2 $RamDebugger::SearchPos }
- 	    $text conf -editable $ed
+	     $text conf -editable $ed
 	    $text mark set insert $idx2
 	    $text see $RamDebugger::SearchPos
 	}
@@ -4047,14 +4068,25 @@ proc RamDebugger::SearchInListbox { ev char } {
 	if { $sel == "" } { return }
 	set idx [$listbox index $sel]
 	$listbox selection clear
+	set idxend [$listbox index [$listbox items end]]
 	if { $ev == "Up" } {
 	    incr idx -1
-	    if { $idx < 0 } { set idx [$listbox index end] }
+	    if { $idx < 0 } { set idx $idxend }
 	} else {
 	    incr idx 
-	    if { $idx > [$listbox index end] } { set idx 0 }
+	    if { $idx > $idxend } { set idx 0 }
 	}
-	$listbox selection set $idx
+	$listbox selection set [$listbox items $idx]
+	$listbox see [$listbox items $idx]
+	return
+    } elseif { $ev == "Home" } {
+	$listbox selection clear
+	$listbox selection set [$listbox items 0]
+	$listbox see [$listbox items 0]
+    } elseif { $ev == "End" } {
+	$listbox selection clear
+	$listbox selection set [$listbox items end]
+	$listbox see [$listbox items end]
 	return
     }
     if { [string is wordchar -strict $char] || [string is punct -strict $char] \
@@ -4137,6 +4169,7 @@ proc RamDebugger::CheckTextBefore { command args } {
 proc RamDebugger::CheckText { command args } {
     variable marker
     variable text
+    variable instrumentedfiles
     variable instrumentedfilesInfo
     variable currentfile
     variable CheckTextSave
@@ -4194,7 +4227,11 @@ proc RamDebugger::CheckText { command args } {
     set instrumentedfilesInfo($currentfile) [eval lreplace [list $instrumentedfilesInfo($currentfile)] \
 	[expr $l1_old-1] [expr $l2_old-1] $blockinfo2]
 
-    ColorizeLines $l1_new $l2_new 
+    ColorizeLines $l1_new $l2_new
+
+    if { [info exists instrumentedfiles($currentfile)] } {
+	unset instrumentedfiles($currentfile)
+    }
 
 # puts ll=[llength $instrumentedfilesInfo($currentfile)]
 # puts l1=$l1_new
@@ -4210,13 +4247,34 @@ proc RamDebugger::CheckText { command args } {
 
 proc RamDebugger::IndentCurrent {} {
     variable text
+
+    scan [$text index insert] "%d.%d" line pos
+    IndentLine $line $pos
+}
+
+proc RamDebugger::IndentSelection {} {
+    variable text
+
+    if { [catch {
+	scan [$text index sel.first] "%d" line1
+	scan [$text index sel.last] "%d" line2
+    }] } {
+	WarnWin "Select something first" $text
+	return
+    }
+    for { set i $line1 } { $i <= $line2 } { incr i } {
+	IndentLine $i
+    }
+}
+
+proc RamDebugger::IndentLine { line { pos -1 } } {
+    variable text
     variable instrumentedfilesInfo
     variable currentfile
     variable options
 
     set indent_val $options(indentsize)
 
-    scan [$text index insert] "%d.%d" line pos
     set level 0
     set type ""
     foreach "level type" [lindex $instrumentedfilesInfo($currentfile) [expr $line-1]] break
@@ -4226,24 +4284,24 @@ proc RamDebugger::IndentCurrent {} {
 	c { set indent [expr $level*$indent_val+$indent_val] }
 	"" { set indent 0 }
     }
-    for { set i 0 } { $i < $indent } { incr i } {
+    for { set i 0 } { $i < [$text index "$line.0 lineend"] } { incr i } {
 	if { [$text get $line.$i] != " " } {
-	    $text insert $line.$i " "
-	}
-    }
-    for { set i $indent } { $i < [$text index "$line.0 lineend"] } { incr i } {
-	if { [$text get $line.$i] == " " } {
-	    $text delete $line.$i
-	} else {
-	    if { [$text get $line.$i] == "\#" } {
-		$text delete $line.0 "$line.$i"
-	    } elseif { [$text get $line.$i] == "\}" } {
-		$text delete "$line.$i-${indent_val}c" "$line.$i"
-	    }
+	    set FirstPos $i
+	    set FirstChar [$text get $line.$i]
 	    break
 	}
     }
-    if { $pos < $indent } { $text mark set insert $line.$indent }
+    if { $FirstChar == "\#" } {
+	set indent 0
+    } elseif { $FirstChar == "\}" && $indent >= $indent_val } {
+	set indent [expr $indent-$indent_val]
+    }
+    if { $FirstPos < $indent } {
+	$text insert $line.0 [string repeat " " [expr $indent-$FirstPos]]
+    } else {
+	$text delete $line.0 $line.[expr $FirstPos-$indent]        
+    }
+    if { $pos >= 0 && $pos < $indent } { $text mark set insert $line.$indent }
 }
 
 proc RamDebugger::UpdateLineNum { command args } {
@@ -4630,10 +4688,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		separator \
 		[list cascad "&Debug on" {} activeprograms 0 {}] \
 		separator \
-                [list command "&Quit" {} "Exit program" "Ctrl q" \
+		[list command "&Quit" {} "Exit program" "Ctrl q" \
 		-command RamDebugger::ExitGUI] \
 		] \
-                "&Edit" all edit 0 [list \
+		"&Edit" all edit 0 [list \
 		[list command "&Undo" {} "Undo previus insert/delete operation" "Ctrl z" \
 		-command "RamDebugger::CutCopyPasteText undo"] \
 		separator \
@@ -4643,7 +4701,13 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::CutCopyPasteText copy"] \
 		[list command "&Paste" {} "Past text from clipboard" "Ctrl v" \
 		-command "RamDebugger::CutCopyPasteText paste"] \
-                separator \
+		separator \
+		[list cascad "&Advanced" {} editadvanced 0 [list \
+		    [list command "&Indent region" {} "Indents selected region" "" \
+		        -command "RamDebugger::IndentSelection"] \
+		    ] \
+		] \
+		separator \
 		[list command "Search..." {} "Search text in source file" "Ctrl f" \
 		-command "RamDebugger::SearchWindow"] \
 		[list command "Continue search" {} "Continue searching text" "F3" \
@@ -4657,13 +4721,13 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		separator \
 		[list command "&Preferences" {} "Choose preferences for RamDebugger" "" \
 		-command "RamDebugger::PreferencesWindow"] \
-                ] \
-	        "&View" all view 0 [list \
-	        [list command "&View text/all" {} \
+		] \
+		"&View" all view 0 [list \
+		[list command "&View text/all" {} \
 		"Toggle between viewing all windows or only text window" "Ctrl t" \
 		-command "RamDebugger::ViewOnlyTextOrAll"] \
 		separator \
-                [list cascad "&Windows" {} windowslist 0 {}] \
+		[list cascad "&Windows" {} windowslist 0 {}] \
 		] \
 		"&Debug" all debug 0 [list \
 		[list command "&Continue/Go" {} "begin/continue execution" "F5" \
@@ -4678,13 +4742,13 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::ContNextGUI rcontto"] \
 		separator \
 		[list command "Expressions..." {} \
-                    "Open a window to visualize expresions or variables" "" \
+		    "Open a window to visualize expresions or variables" "" \
 		-command "RamDebugger::DisplayVarWindow"] \
 		[list command "Breakpoints..." {} \
-                    "Open a window to visualize the breakpoints list" "" \
+		    "Open a window to visualize the breakpoints list" "" \
 		-command "RamDebugger::DisplayBreakpointsWindow"] \
 		[list command "&Timing control..." {} \
-                    "Open a window to control execution times" "" \
+		    "Open a window to control execution times" "" \
 		-command "RamDebugger::DisplayTimesWindow"] \
 		] \
 		"&Utilities" all utilites 0 [list \
@@ -4735,61 +4799,61 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
     set bbox [ButtonBox $toolbar.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w"]
     $bbox add -image filenew22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Begin new file" \
-         -command "RamDebugger::NewFile"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Begin new file" \
+	 -command "RamDebugger::NewFile"
     $bbox add -image fileopen-22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Open source file" \
-         -command "RamDebugger::OpenFile"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Open source file" \
+	 -command "RamDebugger::OpenFile"
     $bbox add -image filesave22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Save file" \
-         -command "RamDebugger::SaveFile save"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Save file" \
+	 -command "RamDebugger::SaveFile save"
 
     Separator $toolbar.sep -orient vertical -grid "1 ns px3"
     set bbox [ButtonBox $toolbar.bbox2 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "2 w"]
 
     $bbox add -image actundo22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Undo previus insert/delete operation" \
-         -command "RamDebugger::CutCopyPasteText undo"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Undo previus insert/delete operation" \
+	 -command "RamDebugger::CutCopyPasteText undo"
     $bbox add -image editcut22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Cut selected text to clipboard" \
-         -command "RamDebugger::CutCopyPasteText cut"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Cut selected text to clipboard" \
+	 -command "RamDebugger::CutCopyPasteText cut"
     $bbox add -image editcopy-22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Copy selected text to clipboard" \
-         -command "RamDebugger::CutCopyPasteText copy"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Copy selected text to clipboard" \
+	 -command "RamDebugger::CutCopyPasteText copy"
     $bbox add -image editpaste22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Past text from clipboard" \
-         -command "RamDebugger::CutCopyPasteText paste"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Past text from clipboard" \
+	 -command "RamDebugger::CutCopyPasteText paste"
     $bbox add -image find-22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "Search text in source file" \
-         -command "RamDebugger::SearchWindow"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Search text in source file" \
+	 -command "RamDebugger::SearchWindow"
 
     Separator $toolbar.sep2 -orient vertical -grid "3 ns px3"
     set bbox [ButtonBox $toolbar.bbox3 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "4 w"]
 
     $bbox add -image player_end-22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "begin/continue execution" \
-         -command "RamDebugger::ContNextGUI rcont"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "begin/continue execution" \
+	 -command "RamDebugger::ContNextGUI rcont"
     $bbox add -image player_stop-22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext [_ "Set/unset &breakpoint"] \
-         -command "RamDebugger::SetGUIBreakpoint"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Set/unset &breakpoint"] \
+	 -command "RamDebugger::SetGUIBreakpoint"
     $bbox add -image finish-22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "continue one command" \
-         -command "RamDebugger::ContNextGUI rnext"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "continue one command" \
+	 -command "RamDebugger::ContNextGUI rnext"
     $bbox add -image down-22 \
-         -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-         -helptext "continue one command, entering in subcommands" \
-         -command "RamDebugger::ContNextGUI rstep"
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "continue one command, entering in subcommands" \
+	 -command "RamDebugger::ContNextGUI rstep"
 
     supergrid::go $toolbar
 
@@ -4836,12 +4900,12 @@ proc RamDebugger::InitGUI { { w .gui } } {
     set marker [canvas $fulltext.can -bg grey90 -grid "0 wns" -width 14 -bd 0 -highlightthickness 0]
     set text [text $fulltext.text -background white -wrap none -width 80 -height 40 \
 		  -exportselection 0 -font FixedFont -highlightthickness 0 -editable 0 \
-	          -preproc RamDebugger::CheckTextBefore \
+		  -preproc RamDebugger::CheckTextBefore \
 		  -postproc RamDebugger::UpdateLineNum -bd 0 -grid 1 \
-	          -undocallback "RamDebugger::UndoCallback" \
+		  -undocallback "RamDebugger::UndoCallback" \
 		  -xscrollcommand [list $fulltext.xscroll set] \
 		  -yscrollcommand [list RamDebugger::ScrollScrollAndCanvas $fulltext.text \
-				       $fulltext.yscroll $fulltext.can]]
+		                       $fulltext.yscroll $fulltext.can]]
     scrollbar $fulltext.yscroll -orient vertical -grid 2 -command \
 	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can]
     scrollbar $fulltext.xscroll -orient horizontal -grid "0 2" -command "$fulltext.text xview"
@@ -4851,7 +4915,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     }
 
     proc ScrollTextAndCanvas { text canvas args } {
- 	eval $text yview $args
+	 eval $text yview $args
 	$canvas yview moveto [lindex [$text yview] 0]
     }
     proc ScrollScrollAndCanvas { text yscroll canvas args } {
@@ -4902,10 +4966,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
     label $pane2_vars.l -text Values -relief raised -bd 1 -grid "0 ew"
     for { set i 0 } { $i < 20 } { incr i } {
 	set RamDebugger::EvalEntries($i,leftentry) [entry $pane1_vars.e$i -textvariable \
-            RamDebugger::EvalEntries($i,left) -bd 0 \
+	    RamDebugger::EvalEntries($i,left) -bd 0 \
 	    -highlightthickness 1 -highlightbackground grey90 -grid 0]
 	set RamDebugger::EvalEntries($i,rightentry) [entry $pane2_vars.e$i -textvariable \
-            RamDebugger::EvalEntries($i,right) -bd 0 \
+	    RamDebugger::EvalEntries($i,right) -bd 0 \
 	    -highlightthickness 1 -highlightbackground grey90 -grid 0]
 
 	bind $pane1_vars.e$i <Return> {tkTabToWindow [tk_focusNext %W]}
@@ -4954,10 +5018,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
     label $pane2_varsL.l -text Values -relief raised -bd 1 -grid "0 ew"
     for { set i 0 } { $i < 20 } { incr i } {
 	set RamDebugger::EvalEntries($i,leftentryL) [entry $pane1_varsL.e$i -textvariable \
-            RamDebugger::EvalEntries($i,leftL) -bd 0 \
+	    RamDebugger::EvalEntries($i,leftL) -bd 0 \
 	    -highlightthickness 1 -highlightbackground grey90 -state disabled -grid 0]
 	set RamDebugger::EvalEntries($i,rightentryL) [entry $pane2_varsL.e$i -textvariable \
-            RamDebugger::EvalEntries($i,rightL) -bd 0 \
+	    RamDebugger::EvalEntries($i,rightL) -bd 0 \
 	    -highlightthickness 1 -highlightbackground grey90 -grid 0]
 
 	bind $pane2_varsL.e$i <Return> {tkTabToWindow [tk_focusNext %W]}
@@ -4995,9 +5059,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
     $listbox bindText <Double-1> "RamDebugger::ListBoxDouble1"
     bind $listbox <KeyPress> [list RamDebugger::SearchInListbox %K %A]
     bind $listbox <Return> "RamDebugger::ListBoxDouble1 \[$listbox selection get]"
-    bind $listbox <Home> "$listbox see 0"
-    bind $listbox <End> "$listbox see end"
-    bind $listbox <Up> "$listbox see 0"
     set menudev [$mainframe getmenu debug]
     bind $text <3> "%W mark set insert @%x,%y ; tk_popup $menudev %X %Y"
 
@@ -5008,13 +5069,15 @@ proc RamDebugger::InitGUI { { w .gui } } {
     # in linux, F10 makes some stupid thing
     bind all <F10> ""
 
-    bind $text <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev"
+    bind $text <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev ; break"
     bind $text <Control-Tab> "RamDebugger::GotoPreviusNextInWinList prev ; break"
-    bind $text <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next"
+    bind $text <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Tab> "RamDebugger::IndentCurrent ; break"
-    bind $text <Control-t> ""
 
+    foreach i [bind $w] {
+	bind $text $i "[bind $w $i] ;break"
+    }
     bind $marker <1> {
 	set tkPriv(x) 0
 	set tkPriv(y) %y
