@@ -2626,7 +2626,7 @@ proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
 	set options(MacrosDocument) [read $fin]
 	close $fin
     }
-    if { [namespace exists Macros] } { namespace delete Macros }
+    catch { namespace delete Macros }
     namespace eval Macros {}
     set Macros::menu $menu
     set Macros::mainframe $mainframe
