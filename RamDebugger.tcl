@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.46 2004/12/21 10:58:58 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.47 2004/12/21 11:37:32 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2004
 
 package require Tcl 8.4
@@ -238,6 +238,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(saved_positions_stack) ""
     set options_def(showstatusbar) 1
     set options_def(showbuttonstoolbar) 1
+    set options_def(CompileFastInstrumenter) -1
 
     switch $::tcl_platform(platform) {
 	windows {
