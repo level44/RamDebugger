@@ -4,7 +4,7 @@ exec wish "$0" "$@"
 
 package require Tcl 8.4
 
-#         $Id: RamDebugger.tcl,v 1.33 2004/02/24 20:52:54 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.34 2004/02/26 21:33:37 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -616,7 +616,9 @@ proc RamDebugger::rdebug { args } {
 	}
         proc RDC::GetLastVisited { } {
             variable data
-            list $data(visited,filenum) $data(visited,line)
+	    if { [info exists data(visited,filenum)] } {
+		return [list $data(visited,filenum) $data(visited,line)]
+	    } else { return "" }
         }
 	proc RDC::F { filenum line } {
 	    variable code
@@ -3731,19 +3733,23 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
     variable currentfile
     variable text
 
+    set forceraise 1
     if { $line == -1 } {
         # called from bgerror
         variable fileslist
         
+	set filenum ""
         foreach {filenum line} [EvalRemoteAndReturn ::RDC::GetLastVisited] break;
+	if { $filenum eq "" } { return }
         set file [lindex $fileslist $filenum]
+	set forceraise 0
     }
     if { ![info exists text] || ![winfo exists $text] } { return }
 
     foreach j [concat [$marker gettags arrow] [$marker gettags arrowbreak]] {
 	if { [string match l* $j] } {
 	    regexp {l([0-9]+)} $j {} arrowline
-	    UpdateArrowAndBreak $arrowline "" 0
+	    UpdateArrowAndBreak $arrowline "" 0 $forceraise
 	}
     }
     if { $file == "" } {
@@ -3754,7 +3760,7 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
     if { ![AreFilesEqual $file $currentfile] } {
 	OpenFileF $file 
     }
-    UpdateArrowAndBreak $line "" 1
+    UpdateArrowAndBreak $line "" 1 $forceraise
 
     RamDebugger::SetMessage "" ;# to take out old SetMessageFlash
     if { $condinfo != "" } {
