@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.42 2004/08/02 13:16:39 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.43 2004/08/02 13:23:00 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 package require Tcl 8.4
@@ -2667,7 +2667,7 @@ proc RamDebugger::ViewSecondText {} {
 
 	panedwindow $f.textpane -orient vertical -bd 0
 	frame $f.textpane.f
-	set text_secondary [text $f.textpane.f.fulltext_secondary -bg grey95 -state disabled \
+	set text_secondary [text $f.textpane.f.fulltext_secondary -bg grey90 -state disabled \
 		                -font FixedFont -highlightthickness 1 -bd 0 -wrap none\
 		                -yscrollcommand [list $f.textpane.f.yscroll set]]
 	scrollbar $f.textpane.f.yscroll -orient vertical -command [list $text_secondary yview]
