@@ -1,0 +1,79 @@
+
+################################################################################
+ License and copyright
+################################################################################
+
+This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
+(http://gid.cimne.upc.es/ramsan) The following terms apply to all files 
+associated with the software unless explicitly disclaimed in individual files.
+See license.terms for details.
+
+################################################################################
+ Introduction
+################################################################################
+
+RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK. It can operate
+basically in two modes:
+
+* GUI mode:  The normal one, is the one that appears when opening normally
+             the program and has a Graphical User Interface.
+* Text mode: In this mode, the GUI is not displayed and the debugger is
+             executed as a set of text commands, similar to GDB. To use 
+             RamDebugger in this mode, load it inside Tkcon.
+
+With RamDebugger, it is possible to make 'Local Debugging', where the debugger starts
+the program to be debugged. and 'Remote debugging', where the program to debug is already
+started and RamDebugger connects to it.
+
+RamDebugger has additional capabilities like:
+
+* Editing the code. It is possible to edit the code inside its own editor and resend
+  the new code without closing the debugged program.
+* The TCL-TK source code is colorized and supports automatic indentation.
+* When stopping the debugger is one source code line, it is possible to view all the
+  variables and expression values, as well as change them.
+* It has additional options to measure execution times in the debugged program.
+* Works in Linux and Windows
+* Includes additional packages, like Tkcon and VisualRegexp, developed by third party
+  people, as a convenience for RamDebugger users.
+
+################################################################################
+ Installation and prerequisites
+################################################################################
+
+The only prerequisite before executing RamDebugger is to have Tcl-Tk installed. The tested
+version is Tcl-Tk 8.3.4
+It can be obtained from http://tcl.activestate.com.
+
+RamoDebugger has been tested on Windows and on Linux. For other UNIXes and MAC, it is necessary
+to obtain, separately, the package Tkhtml compiled for the platform. Without it, the help
+cannot be visualized.
+
+All the additional packages that RamDebugger uses, are already contained in the distribution.
+
+The distribution comes in a ZIP file. Once it is unpacked in one directory, RamDebugger is
+realy to begin to work.
+
+################################################################################
+ Starting RamDebugger
+################################################################################
+
+To start RamDebugger on Windows, double-click over RamDebugger.tcl.
+
+To start Ramdebugger on UNIX, in the command line use something similar to:
+     wish RamDebugger.tcl
+
+To start RamDebugger in text mode inside Tkcon, one of the following possibilities can
+be done:
+*  Open Tkcon and do:
+
+		source RamDebugger.tcl
+ 		namespace import RamDebugger::*
+		rhelp
+
+* Modify the Tkcon initialization file (@t{tkcon.cfg} or @t{.tkconrc}) and add:
+	set ::tkcon::OPT(slaveeval) {
+    		source "<Path to RamDebugger>/RamDebugger.tcl"
+    		namespace import RamDebugger::*
+    		puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
+	}

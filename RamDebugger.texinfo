@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.2 $
+@set Version  $Revision: 1.3 $
 @set Date August 2002
 
 @ifinfo
@@ -75,7 +75,7 @@ Copyright 2002 Ramon Ribó
 
 Copyright @copyright{} 2002 Ramon Ribó
 
-@url{http://gid.cimne.upc.es}
+@url{http://gid.cimne.upc.es/ramsan}
 
 @end titlepage
 
@@ -88,7 +88,6 @@ Copyright @copyright{} 2002 Ramon Ribó
 
 
 RamDebugger: A graphical and interactive debugger for Tcl-TK
-
 
 @menu
 * Introduction and Setup::      
@@ -103,6 +102,7 @@ RamDebugger: A graphical and interactive debugger for Tcl-TK
 Introduction and Setup
 
 * Introduction::                
+* Download::                    
 * Installation and prerequisites::  
 * Starting RamDebugger::        
 
@@ -110,7 +110,10 @@ Using RamDebugger
 
 * Debugging locally::           
 * Debugging remotely::          
+* Debugging GiD::               
+* Debugging RamDebugger::       
 * Timing control::              
+* Windows hierarchy::           
 
 @end detailmenu
 @end menu
@@ -124,11 +127,12 @@ CN @value{Version} @value{Date}
 
 @menu
 * Introduction::                
+* Download::                    
 * Installation and prerequisites::  
 * Starting RamDebugger::        
 @end menu
 
-@node Introduction, Installation and prerequisites, Introduction and Setup, Introduction and Setup
+@node Introduction, , Introduction and Setup, Introduction and Setup
 @section Introduction
 
 RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK. It can operate
@@ -167,7 +171,12 @@ people, as a convenience for RamDebugger users.
 </center><p>
 @end ifhtml
 
-@node Installation and prerequisites, Starting RamDebugger, Introduction, Introduction and Setup
+@node  Download, Installation and prerequisites, Introduction, Introduction and Setup
+@section Download
+
+RamDebugger can be download from @url{http://gid.cimne.upc.es/RamDebugger/RamDebugger1.0.zip}
+
+@node Installation and prerequisites, Starting RamDebugger, Download, Introduction and Setup
 @section Installation and prerequisites
 
 The only prerequisite before executing RamDebugger is to have Tcl-Tk installed. The tested
@@ -181,7 +190,7 @@ cannot be visualized.
 All the additional packages that RamDebugger uses, are already contained in the distribution.
 
 The distribution comes in a ZIP file. Once it is unpacked in one directory, RamDebugger is
-realy to begin to work.
+ready to begin to work.
 
 @node Starting RamDebugger,  , Installation and prerequisites, Introduction and Setup
 @section Starting RamDebugger
@@ -210,13 +219,16 @@ set ::tkcon::OPT(slaveeval) {
 @end example
 @end itemize 
 
-@node  Using RamDebugger, , Introduction and Setup, Top
+@node  Using RamDebugger, How does it work?, Introduction and Setup, Top
 @chapter Using RamDebugger
 
 @menu
 * Debugging locally::           
 * Debugging remotely::          
+* Debugging GiD::               
+* Debugging RamDebugger::       
 * Timing control::              
+* Windows hierarchy::           
 @end menu
 
 @node Debugging locally, Debugging remotely, Using RamDebugger, Using RamDebugger
@@ -239,7 +251,7 @@ write: @code{[string length $i]+3}
 defined variables}, enter the new value in the right column and pres @code{Return}.
 @end itemize 
 
-@node Debugging remotely, Timing control, Debugging locally, Using RamDebugger
+@node Debugging remotely, Debugging GiD, Debugging locally, Using RamDebugger
 @section Debugging remotely
 
 To debug a TCL file remotely, apply the following steps:
@@ -274,7 +286,34 @@ to have this command enabled in the program, which is true by default.
 able to use @b{send}. As a fast workaround, write command @b{xhost -} in the UNIX command
 line.
 
-@node Timing control,  , Debugging remotely, Using RamDebugger
+@node  Debugging GiD, Debugging RamDebugger, Debugging remotely, Using RamDebugger
+@section Debugging GiD
+
+GiD is a pre/postprocessing program for Finite Element Analysis that uses TCL/TK as its
+extension language @url{http://gid.cimne.upc.es}.
+
+To debug GiD in Windows, it is necessary to load the @b{comm} package. Do it in file:
+@code{<GiD installation dir>/scripts/tclfile-opengl}.
+
+In UNIX, it should work directly.
+
+Check section @ref{Debugging remotely} for the rest of the steps to follow.
+
+@node  Debugging RamDebugger, Timing control, Debugging GiD, Using RamDebugger
+@section Debugging RamDebugger
+
+As a good debugger must do, RamDebugger permmits to debugger itself. As it is not a simple
+code, this is a good testing of the program capabilities.
+
+It can be debugged either locally or remotely. To debug itself locally, open TCL source
+file @b{RamDebugger.tcl} and choose @code{File->Debug on->Currentfile}. See @xref{Debugging locally}
+for details.
+
+To debug itself remotely, open two RamDebuggers. From one of them, connect to the other
+with @code{File->Debug on->RamDebugger}.
+
+
+@node Timing control, Windows hierarchy, Debugging RamDebugger, Using RamDebugger
 @section Timing control
 An additional feature of RamDebugger is the possibility of controlling the computing time
 of several parts of the program.
@@ -303,6 +342,14 @@ use the example located in @b{<RamDebugger directory>/Examples/example3.tcl}
 </center><p>
 @end ifhtml
 
+@node Windows hierarchy,  , Timing control, Using RamDebugger
+@section Windows hierarchy
+
+With this command, it is possible to draw a graph of the widgets hierarchy in either
+the debugged program or in RamDebugger. Moving the cursor over the widgets names, it
+is possible to obtain some information on the widget and on its packing/gridding
+options.
+
 @node How does it work?, Additional packages included in the distribution, Using RamDebugger, Top
 @chapter How does it work?
 
@@ -329,9 +376,11 @@ work but has a very very slow startup time.
 in speed when trying connections. Also, it has been necessary to make some trick in order
 to identify the interps. This is the package chosen in Windows.
  
+Due to the high dynamics nature of TCL, it is unpossible to make a direct correlation
+between source code lines and execution lines. Anyway, it works quite well for normal
+TCL code. Try and comment.
 
-
-@node Additional packages included in the distribution, , How does it work?, Top
+@node Additional packages included in the distribution, License, How does it work?, Top
 @chapter Additional packages included in the distribution
 
 RamDebugger needs several packages to work properly. Other packages are just included

@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.6 2002/08/07 18:07:37 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.7 2002/08/07 21:04:00 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jul-2002
 
 
@@ -252,6 +252,11 @@ proc RamDebugger::rdebug { args } {
 	interp create local
 	interp alias local sendmaster "" eval
 	interp alias local exit "" interp delete local
+	set err [catch {package present registry} ver]
+	if { !$err } {
+	    interp alias local registry "" registry
+	    interp eval local package provide registry $ver
+	}
 	interp eval local [list load {} Tk]
 	set remoteserverIsLocal 1
 	if { $currentfile == "" } {
@@ -4310,11 +4315,12 @@ proc RamDebugger::Search { w { what {} } } {
 }
 
 proc RamDebugger::OpenVisualRegexp {} {
+    variable MainDir
 
-    exec [info nameofexecutable] [file join [info script] addons visual_regexp-2.2 visual_regexp.tcl] &
+    exec [info nameofexecutable] [file join $MainDir addons visual_regexp-2.2 visual_regexp.tcl] &
 }
 
-
+# not used now, but in future...
 proc RamDebugger::OpenProgram { what } {
     variable MainDir
 
@@ -5177,10 +5183,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::OpenConsole"] \
 		[list command "O&pen VisualRegexp" {} "Open VisualRegexp" "" \
 		-command "RamDebugger::OpenVisualRegexp"] \
-		[list command "Open tkcvs" {} "Open tkcvs a CVS browser" "" \
-		-command "RamDebugger::OpenProgram tkcvs"] \
-		[list command "Open tkdiff" {} "Open tkdiff" "" \
-		-command "RamDebugger::OpenProgram tkdiff"] \
 		separator \
 		[list command "&View instrumented file" {} "View instrumented file" "" \
 		-command "RamDebugger::ViewInstrumentedFile instrumented"] \
@@ -5485,8 +5487,25 @@ proc RamDebugger::InitGUI { { w .gui } } {
     supergrid::go $w
 
     if {[string equal "unix" $::tcl_platform(platform)]} {
-	bind $listbox.c <4> { %W yview scroll -5 units }
-	bind $listbox.c <5> { %W yview scroll 5 units }
+	foreach "but units" [list 4 -5 5 5] {
+	    bind all <$but> {
+		set w %W
+		while { $w != [winfo toplevel $w] } {
+		    set err [catch { $w yview scroll [expr $units units }]
+		    if { !$err } { break }
+		    set w [winfo parent $w]
+		}
+	    }
+	}
+    } else {
+	bind all <MouseWheel> {
+	    set w %W
+	    while { $w != [winfo toplevel $w] } {
+		set err [catch { $w yview scroll [expr int(-1*%D/36)] units }]
+		if { !$err } { break }
+		set w [winfo parent $w]
+	    }
+	}
     }
 
     $listbox bindImage <1> "+focus $listbox ;#"
