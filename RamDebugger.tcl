@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.39 2004/08/02 10:07:18 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.40 2004/08/02 10:34:44 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 package require Tcl 8.4
@@ -6593,7 +6593,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "cproject::CleanCompiledFiles $w"] \
 		] \
 		"&Utilities" all utilities 0 [list \
-		[list command "&Open console" {} "Open console" "ShiftCtrl ?" \
+		[list command "&Open console" {} "Open console" "" \
 		-command "RamDebugger::OpenConsole"] \
 		[list command "O&pen VisualRegexp" {} "Open VisualRegexp" "" \
 		-command "RamDebugger::OpenProgram visualregexp"] \
