@@ -199,12 +199,14 @@ set FREEWRAPTCLSH /utils/freewrapTCLSH
 set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
 		              -split_node -menu]
 set ZIP zip.exe
-set Version 3.2
-set Date "July 2003"
-set Copyright "2002-2003 Ramon Ribó"
+set Version 4.0
+set Date "June 2004"
+set Copyright "2002-2004 Ramon Ribó"
 
 set files [list RamDebugger.tcl license.terms Readme addons scripts Examples help \
 	       pkgIndex.tcl]
+
+set deletefiles [list help/02TclTk8.5]
 
 set packages [list tcllib Img tkhtml]
 set packagesout [list Tcl Tk bwidget1.6]
@@ -248,6 +250,9 @@ file delete RamDebugger$Version.zip
 foreach i $files {
     file copy $i install_temp/RamDebugger/.
 }
+foreach i $deletefiles {
+    file delete -force [file join install_temp RamDebugger $i]
+}
 CleanCVSdirs install_temp/RamDebugger
 CopyPackages $files install_temp/RamDebugger/addons $packages $packagesout
 
@@ -277,7 +282,7 @@ cd install_temp
 puts -nonewline "creating starkit..." ; update
 exec [file join $tclkitdir tclkit-win32-sh.upx.exe] [file join $tclkitdir sdx.kit] \
             wrap RamDebugger
-file copy -force RamDebugger ../RamDebugger.kit
+file copy -force RamDebugger ../RamDebugger$Version.kit
 puts "done\n" ; update
 cd $pwd
 

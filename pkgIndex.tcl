@@ -1,15 +1,16 @@
 
-set Version 3.2
+set Version 4.0
 
 proc LoadRamDebugger { dir version } {
 
-#     if { [interp exists ramdebugger] } { interp delete ramdebugger }
+    if { [interp exists ramdebugger] } { interp delete ramdebugger }
 #     interp create ramdebugger
     if { ![interp exists ramdebugger] } {
 	interp create ramdebugger
     }
     interp alias ramdebugger master "" eval
-    ramdebugger eval [list load {} Tk]
+    #ramdebugger eval [list load {} Tk]
+    ramdebugger eval package require Tk
     if { ![ramdebugger eval info exists argv] } {
 	ramdebugger eval { set argc 0 ; set argv "" }
     }

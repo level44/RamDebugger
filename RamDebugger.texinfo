@@ -58,11 +58,11 @@
 
 @set photo
 
-@set Version 3.2
-@set Date July 2003
-@set Copyright 2002-2003 Ramon Ribó
+@set Version 4.0
+@set Date June 2004
+@set Copyright 2002-2004 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.22 $
+@set CVSVersion  $Revision: 1.23 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -122,6 +122,8 @@ Using RamDebugger
 * Timing control::              
 * Windows hierarchy::           
 * Expressions window::          
+* Revisions::                   
+* Auto save::                   
 
 @end detailmenu
 @end menu
@@ -188,6 +190,9 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
+Implemented auto save, based on file revisions
+RamDebugger can automatically manage revisions of files (based internally on CVS)
+Added program @code{tkdiff} for visualizing file differences
 New option in Help to associate RamDebugger as command in the .tcl extension in Windows
 When TCL raises and error, RamDebugger shows last visited line
 If files contain, in first lines something like @code{# -*- coding: utf-8;-*-} they are
@@ -285,6 +290,7 @@ RamDebugger web page is at: @url{http://gid.cimne.com/RamDebugger}
 
 RamDebugger can be download from
 @url{http://gid.cimne.com/RamDebugger/RamDebugger@value{Version}.zip}
+@url{http://gid.cimne.com/RamDebugger/RamDebugger@value{Version}.kit}
 
 @node Installation and prerequisites, Starting RamDebugger, Download, Introduction and Setup
 @section Installation and prerequisites
@@ -350,6 +356,8 @@ rhelp
 * Timing control::              
 * Windows hierarchy::           
 * Expressions window::          
+* Revisions::                   
+* Auto save::                   
 @end menu
 
 @node Debugging locally, Debugging remotely, Using RamDebugger, Using RamDebugger
@@ -520,7 +528,7 @@ the debugged program or in RamDebugger. Moving the cursor over the widgets names
 is possible to obtain some information on the widget and on its packing/gridding
 options.
 
-@node  Expressions window,  , Windows hierarchy, Using RamDebugger
+@node  Expressions window, , Windows hierarchy, Using RamDebugger
 @section Expressions window
 
 To open the window use: @code{Debug->Expressions...}
@@ -542,6 +550,30 @@ Examples of possible expressions in C++:
 @item @b{$variablename[4:2][6::8]}: One extension to the @b{gdb} expressions. Permmits to
 print part of a string or vector
 @end itemize
+
+@node  Revisions, , Expressions window, Using RamDebugger
+@section Revisions
+
+@code{RamDebugger} uses program @code{cvs} in order to maintain revisions of the edited
+files. It creates automatically a CVS repository in a hidden directory and saves revisions
+of the files to that repository.
+
+It is possible to visualize the differences between two revisions or between one revision
+and current file by using menu command: Files->Revisions->Open revisions list. (it uses
+program @code{Tkdiff} to visualize the differences.
+
+It is possible to remove revisions history for a set of selected files (in Files->Revision->
+View revised files). The history is removed but the file is not modified. It can save
+disk space.
+
+It is possible to activate or deactivate the @code{Auto save} feature in the preferences
+window (Edit->Preferences->Auto save). If activated, instead of making backups of the
+files it saves automatically revisions of the edited file at fixed intervals.
+
+@node  Auto save,  , Revisions, Using RamDebugger
+@section Auto save
+
+@pxref{Revisions}
 
 @node How does it work?, Known bugs, Using RamDebugger, Top
 @chapter How does it work?
@@ -657,6 +689,10 @@ some capabilities. The packages that have been modified are marked below.
 @item tkdnd 
 @tab George Petasis
 @tab BSD 
+@tab NO
+@item tkdiff 
+@tab John M. Klassa
+@tab GPL
 @tab NO
 @end multitable
 

@@ -72,17 +72,37 @@ proc "Insert rectangular text" { w } {
     if { $range == "" } { bell; return }
     scan [lindex $range 0] "%d.%d" l1 c1
     scan [lindex $range 1] "%d.%d" l2 c2
-    if { $c2 < $c1 } {
-	set tmp $c1
-	set c1 $c2
-	set c2 $tmp
-    }
+    if { $c2 < $c1 } { set tmp $c1 ; set c1 $c2 ; set c2 $tmp }
+    if { $l2 < $l1 } { set tmp $l1 ; set l1 $l2 ; set l2 $tmp }
 
     for { set i $l1 } { $i <= $l2 } { incr i } {
-	$w delete $i.$c1 $i.$c2
-	$w insert $i.$c1 $txt
+        $w delete $i.$c1 $i.$c2
+        $w insert $i.$c1 $txt
     }
 }
+
+################################################################################
+#    proc Kill rectangular text
+################################################################################
+
+set "macrodata(Kill rectangular text,inmenu)" 1
+set "macrodata(Kill rectangular text,accelerator)" ""
+set "macrodata(Kill rectangular text,help)" "Kills all text contained in the rectangular part of the selection"
+
+proc "Kill rectangular text" { w } {
+
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range == "" } { bell; return }
+    scan [lindex $range 0] "%d.%d" l1 c1
+    scan [lindex $range 1] "%d.%d" l2 c2
+    if { $c2 < $c1 } { set tmp $c1 ; set c1 $c2 ; set c2 $tmp }
+    if { $l2 < $l1 } { set tmp $l1 ; set l1 $l2 ; set l2 $tmp }
+
+    for { set i $l1 } { $i <= $l2 } { incr i } {
+        $w delete $i.$c1 $i.$c2
+    }
+}
+
 
 ################################################################################
 #    proc Macro regsub
@@ -96,8 +116,8 @@ proc "Macro regsub" { w } {
 
     set range [$w tag nextrange sel 1.0 end]
     if { $range == "" } { 
-	WarnWin "Select a region to modify"
-	return
+        WarnWin "Select a region to modify"
+        return
     }
 
     set f [DialogWin::Init $w "Macro regsub" separator ""]
@@ -121,8 +141,8 @@ proc "Macro regsub" { w } {
     set sel [eval $w get $range]
     set err [catch { eval $reg } errstring]
     if { $err } {
-	WarnWin "Error applying regsub: $errstring"
-	return
+        WarnWin "Error applying regsub: $errstring"
+        return
     }
     eval $w delete $range
     $w insert [lindex $range 0] $sel

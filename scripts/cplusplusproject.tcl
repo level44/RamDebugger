@@ -664,7 +664,7 @@ proc cproject::Create { par } {
 	 -command "cproject::SaveProject $w"
  
     Label $f1.l2 -text "Group:" -grid "0 py3" -helptext \
-       "A group is a set of files with common compilation options. The special group all\
+       "A group is a set of files with common compilation options. The special group 'all'\
 	always exists and affects all files"
     ComboBox $f1.cb2 -textvariable cproject::group -grid 1 -values $cproject::groups \
        -editable 0
@@ -685,7 +685,7 @@ proc cproject::Create { par } {
 	 -helptext [_ "Delete group"] \
 	 -command "cproject::CreateModifyGroup $w delete"
 
-    frame $f1.f1 -grid "3 2 px3 py3" -bd 2 -relief raised
+    frame $f1.f1 -grid "3 2 px3 py3 ew" -bd 2 -relief raised
     radiobutton $f1.f1.r1 -text Debug -variable cproject::debugrelease -value debug \
 	    -grid 0
     radiobutton $f1.f1.r2 -text Release -variable cproject::debugrelease -value release \
@@ -766,11 +766,11 @@ proc cproject::Create { par } {
     TitleFrame $f21.f1 -text "include directories" -grid 0
     set f121 [$f21.f1 getframe]
 
-    set sw [ScrolledWindow $f121.lf -relief sunken -borderwidth 0 -grid "0"]
+    set sw [ScrolledWindow $f121.lf -relief sunken -borderwidth 0]
     listbox $sw.lb -listvariable cproject::thisdataC(includedirs)
     $sw setwidget $sw.lb
 
-    set bbox [ButtonBox $f121.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 wn"]
+    set bbox [ButtonBox $f121.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
     $bbox add -image folderopen16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Add include directory"] \
@@ -779,6 +779,11 @@ proc cproject::Create { par } {
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Delete include directory"] \
 	 -command "cproject::AddDelDirectories $sw.lb delete"
+
+    grid $f121.lf -sticky nsew
+    grid $bbox -sticky nw
+    grid rowconfigure $f121 0 -weight 1
+    grid columnconfigure $f121 0 -weight 1
     
     TitleFrame $f21.f15 -text "compiler" -grid "0 n"
     set f1215 [$f21.f15 getframe]
@@ -839,7 +844,6 @@ proc cproject::Create { par } {
     $pane2.nb raise compilation
  
     supergrid::go $pane1
-    supergrid::go $f121
     supergrid::go $f1215
     supergrid::go $f122
     supergrid::go $f123
@@ -911,7 +915,7 @@ proc cproject::AddGroupInLinkGroups { but entry } {
 
 proc cproject::AddLinkTab { f link } {
 
-    TitleFrame $f.f0 -text "link groups" -grid "0 n"
+    TitleFrame $f.f0 -text "link groups"
     set f0 [$f.f0 getframe]
     entry $f0.e -grid 0 -textvariable cproject::thisdataL($link,linkgroups)
 
@@ -920,14 +924,14 @@ proc cproject::AddLinkTab { f link } {
 	 -helptext [_ "Add group"] -grid 1
     bind $f0.b1 <ButtonPress-1> "cproject::AddGroupInLinkGroups $f0.b1 $f0.e" 
 
-    TitleFrame $f.f1 -text "libraries directories" -grid 0
+    TitleFrame $f.f1 -text "libraries directories"
     set f1 [$f.f1 getframe]
 
-    set sw [ScrolledWindow $f1.lf -relief sunken -borderwidth 0 -grid "0"]
+    set sw [ScrolledWindow $f1.lf -relief sunken -borderwidth 0]
     listbox $sw.lb -listvariable cproject::thisdataL($link,librariesdirs)
     $sw setwidget $sw.lb
 
-    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 wn"]
+    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
     $bbox add -image folderopen16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Add link directories"] \
@@ -937,7 +941,12 @@ proc cproject::AddLinkTab { f link } {
 	 -helptext [_ "Delete link directories"] \
 	 -command "cproject::AddDelDirectories $sw.lb delete"
 
-    TitleFrame $f.f2 -text "libraries" -grid "0 n"
+    grid $f1.lf -sticky nsew
+    grid $bbox -sticky nw
+    grid rowconfigure $f1 0 -weight 1
+    grid columnconfigure $f1 0 -weight 1
+
+    TitleFrame $f.f2 -text "libraries"
     set f2 [$f.f2 getframe]
 
     set values [list gcc g++ ar]
@@ -949,11 +958,11 @@ proc cproject::AddLinkTab { f link } {
 
     entry $f2.e -grid 1 -textvariable cproject::thisdataL($link,libraries)
 
-    TitleFrame $f.f3 -text "additional link flags" -grid "0 n"
+    TitleFrame $f.f3 -text "additional link flags"
     set f3 [$f.f3 getframe]
     entry $f3.e -grid 0 -textvariable cproject::thisdataL($link,linkflags)
 
-    TitleFrame $f.f4 -text "output name" -grid "0 n"
+    TitleFrame $f.f4 -text "output name"
     set f4 [$f.f4 getframe]
     entry $f4.e -grid 0 -textvariable cproject::thisdataL($link,linkexe)
 
@@ -971,13 +980,21 @@ proc cproject::AddLinkTab { f link } {
 	 -helptext [_ "Rename link tab"] \
 	 -command [list cproject::CreateDeleteLinkTab $link rename]
 
+    grid $f.f0 -sticky new
+    grid $f.f1 -sticky nsew
+    grid $f.f2 -sticky new
+    grid $f.f3 -sticky new
+    grid $f.f4 -sticky new
+    grid $f.bbox -sticky nw
+
+    grid rowconfigure $f 1 -weight 1
+    grid columnconfigure $f 0 -weight 1
+
 
     supergrid::go $f0
-    supergrid::go $f1
     supergrid::go $f2
     supergrid::go $f3
     supergrid::go $f4
-    supergrid::go $f
 }
 
 proc cproject::CreateDeleteLinkTab { currentlink what } {
