@@ -2,12 +2,11 @@
 
 proc zipfile { zipname directory files } {
 
-    set excludefiles "CVS *~"
     set cwd [pwd]
     file delete $zipname
     cd $directory
     .t ins end zipping... ; update
-    set comm "exec \"$::ZIP\" \"[file join $cwd $zipname]\" -r $files -x $excludefiles"
+    set comm "exec \"$::ZIP\" \"[file join $cwd $zipname]\" -r $files"
     eval $comm
     .t ins end "done\n" ; update
     cd $cwd

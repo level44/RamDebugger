@@ -146,6 +146,11 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		        set NewDoInstrument 2
 		    }
 		}
+		"bind" {
+		    if { [llength $words] == 3 } {
+		        set NewDoInstrument 1
+		    }
+		}
 	    }
 	} elseif { $DoInstrument == 2 } {
 	    if { [llength $words]%2 } {

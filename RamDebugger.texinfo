@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.11 $
+@set Version  $Revision: 1.12 $
 @set Date February 2003
 
 @ifinfo
@@ -191,6 +191,7 @@ Changes From version 2.6 to version 2.7
 @itemize @bullet
 @item Option to instrument last line in proc (to avoid error when not using return)
 @item corrected error when brackets are not paired in comments
+@item Script of command @b{bind} is now instrumented
 @end itemize
 
 Changes From version 2 to version 2.6

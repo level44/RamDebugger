@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.19 2003/02/25 15:26:49 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.20 2003/02/25 15:52:50 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -666,7 +666,8 @@ proc RamDebugger::rdebug { args } {
 		set file [file join [pwd] $file]
 		set retval [RDC::SendDev [list RamDebugger::RecieveFromProgramSource $file]]
 		if { $retval != "" } {
-		    info script $file
+		    # catch is here for version 8.3
+		    catch { info script $file }
 		    uplevel 1 $retval
 		}
 	    }
