@@ -388,9 +388,9 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		                                [string length "RDC::F $filenum $line ; "]]
 		            } else { set numdel [string length $words] }
 		            set newblockR [string range $newblockR 0 end-$numdel]
-			    if { [NeedsToInsertSnitPackage $words] } {
-				append newblockP "package require snit\n"
-			    }
+		            if { [NeedsToInsertSnitPackage $words] } {
+		                append newblockP "package require snit\n"
+		            }
 		            append newblockP $words
 		            set OutputType P
 		        }
@@ -444,9 +444,9 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		                                    [string length "RDC::F $filenum $line ; "]]
 		                } else { set numdel [string length $words] }
 		                set newblockR [string range $newblockR 0 end-$numdel]
-				if { [NeedsToInsertSnitPackage $words] } {
-				    append newblockP "package require snit\n"
-				}
+		                if { [NeedsToInsertSnitPackage $words] } {
+		                    append newblockP "package require snit\n"
+		                }
 		                append newblockP $words
 		                set OutputType P
 		            }
@@ -485,9 +485,9 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		                                [string length "RDC::F $filenum $line ; "]]
 		            } else { set numdel [string length $words] }
 		            set newblockR [string range $newblockR 0 end-$numdel]
-			    if { [NeedsToInsertSnitPackage $words] } {
-				append newblockP "package require snit\n"
-			    }
+		            if { [NeedsToInsertSnitPackage $words] } {
+		                append newblockP "package require snit\n"
+		            }
 		            append newblockP $words
 		            set OutputType P
 		        }
@@ -1193,34 +1193,3 @@ proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress
 	RamDebugger::ProgressVar 100
     }
 }
-
-# proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" { braceslevelIni 0 } } {
-
-#     set length [string length $block]
-#     if { $length >= 5000 && $progress } {
-# 	RamDebugger::ProgressVar 0 1
-#     }
-#     set lines [split $block \n]
-#     set nlines [llength $lines]
-#     #set nlines [regexp {\n} $block]
-#     set blockinfo ""
-#     for { set i 0 } { $i < $nlines } { incr i } {
-# 	lappend blockinfo [list 0 n]
-#     }
-#     dom parse $block doc
-#     set root [$doc documentElement]
-#     foreach node [$doc selectNodes //.] {
-# 	switch -- [$node nodeType] {
-# 	    ELEMENT_NODE {
-# 		set line [$node getLine]
-# 		set col [$node getColumn]
-# 	    COMMENT_NODE {
-
-# 	    }
-# 	}
-#     }
-
-
-
-
-# }

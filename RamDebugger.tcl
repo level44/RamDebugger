@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.38 2004/07/30 19:59:43 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.39 2004/08/02 10:07:18 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 package require Tcl 8.4
@@ -186,6 +186,8 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	if { [lsearch -exact $list $shortname] == -1 } {
 	    lappend list $shortname
 	    set ::env(PATH) [join $list \;]
+	    # this is a variable from the TCL library
+            array unset ::auto_execs
 	}
     }
 
@@ -317,13 +319,13 @@ proc RamDebugger::UpdateExecDirs {} {
 
     if { $::tcl_platform(platform) == "windows" } {
 	set file [filenormalize [file join $MainDir addons]]
-	if { [lsearch -exact $options(executable_dirs) $file] == -1 } {
+	if { [file isdirectory $file] && [lsearch -exact $options(executable_dirs) $file] == -1 } {
 	    lappend options(executable_dirs) $file
 	}
 	foreach i [glob -nocomplain -dir c: mingw*] {
 	    set dirs_in [glob -nocomplain -dir $i mingw*]
 	    foreach j [concat [list $i] $dirs_in] {
-		if { [file exists [file join $j bin]] } {
+		if { [file isdirectory [file join $j bin]] } {
 		    set file [filenormalize [file join $j bin]]
 		    if { [lsearch -exact $options(executable_dirs) $file] == -1 } {
 		        lappend options(executable_dirs) $file
@@ -351,6 +353,8 @@ proc RamDebugger::UpdateExecDirs {} {
     }
     if { $haschanged } {
 	set ::env(PATH) [join $list \;]
+	# this is a variable from the TCL library
+	array unset ::auto_execs
     }
 }
 
@@ -517,7 +521,7 @@ proc RamDebugger::rdebug { args } {
 		        set txt "Executing '$filetodebug'\nin directory: $dir_in"
 		    } else { set txt "Executing '$filetodebug'" }
 		    TextOutInsertBlue $txt
-		    SetMessage $txt
+		    SetMessage "Executing '$filetodebug'"
 		    local eval [list set argc [llength $arg_in]]
 		    local eval [list set argv $arg_in]
 		    TextOutInsertBlue "Using arguments: '$arg_in'"
@@ -2632,6 +2636,21 @@ proc RamDebugger::_secondtextsavepos {} {
     }
 }
 
+proc RamDebugger::ToggleViews {} {
+    variable text
+    variable text_secondary
+    variable currentfile
+    variable currentfile_secondary
+
+    if { ![info exists text_secondary] } { return }
+
+    focus $text
+    
+    set new_currentfile_secondary $currentfile
+    OpenFileF $currentfile_secondary
+    OpenFileSecondary $new_currentfile_secondary
+}
+
 proc RamDebugger::ViewSecondText {} {
     variable mainframe
     variable text
@@ -2644,7 +2663,7 @@ proc RamDebugger::ViewSecondText {} {
     if { ![winfo exists $f.textpane] } {
 	panedwindow $f.textpane -orient vertical -bd 0
 	frame $f.textpane.f
-	set text_secondary [text $f.textpane.f.fulltext_secondary -bg grey90 -state disabled \
+	set text_secondary [text $f.textpane.f.fulltext_secondary -bg grey95 -state disabled \
 		                -font FixedFont -highlightthickness 1 -bd 0 -wrap none\
 		                -yscrollcommand [list $f.textpane.f.yscroll set]]
 	scrollbar $f.textpane.f.yscroll -orient vertical -command [list $text_secondary yview]
@@ -2752,7 +2771,8 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	grid rowconf $f 0 -weight 1
 	grid columnconf $f 0 -weight 1
 
-	set x [expr {[winfo x $t]+[winfo width $pane1]}]
+	if { [info exist pane1] } { set wpane1 [winfo width $pane1] } else { set wpane1 0 }
+	set x [expr {[winfo x $t]+$wpane1}]
 	wm geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
 	
 	set options(ViewOnlyTextOrAll) OnlyText
@@ -2765,7 +2785,7 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 
 	set width [winfo width $fulltext]
 
-	if { [winfo width $pane1] <= 1 } {
+	if { [info exist pane1] && [winfo width $pane1] <= 1 } {
 	    set panedw [winfo parent [winfo parent $pane1]] ;# dirty hack
 	    foreach "weight1 weight2 weight3" [ManagePanes $panedw h "1 6 2"] break
 	    set w1 [expr int($weight1/double($weight2)*$width+0.5)]
@@ -2774,9 +2794,10 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	    incr width $w3
 	    set x [expr {[winfo x $t]-$w1+0}]
 	} else {
-	    incr width [winfo width $pane1]
+	    if { [info exist pane1] } { incr width [winfo width $pane1] }
 	    incr width [winfo width $pane3]
-	    set x [expr {[winfo x $t]-[winfo width $pane1]+0}]
+	    if { [info exist pane1] } { set wpane1 [winfo width $pane1] } else { set wpane1 0 }
+	    set x [expr {[winfo x $t]-$wpane1+0}]
 	}
 	incr width 8
 	wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
@@ -3103,7 +3124,7 @@ proc RamDebugger::OpenFile {} {
 
     set w [winfo toplevel $text]
 
-    if { ![info exists text_secondary] || [focus] ne $text_secondary } {
+    if { ![info exists text_secondary] || [focus -lastfor $text] ne $text_secondary } {
 	if { [SaveFile ask] == -1 } { return }
     }
 
@@ -3918,12 +3939,14 @@ proc RamDebugger::GotoPreviusNextInWinList { what { force 0 } } {
 proc RamDebugger::ChooseViewFile { w what args } {
     variable WindowFilesList
     variable WindowFilesListCurr
+    variable text
     variable text_secondary
     variable currentfile
     variable currentfile_secondary
     variable options
 
-    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+    if { [info exists text_secondary] && [focus -lastfor $text] eq \
+	$text_secondary } {
 	set file $currentfile_secondary
     } else {
 	set file $currentfile
@@ -4333,6 +4356,7 @@ proc RamDebugger::ManagePositionsImages {} {
 	    $marker lower $id
 	}
     }
+    MoveCanvas $text $marker
 }
 
 proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
@@ -4803,14 +4827,14 @@ proc RamDebugger::WaitState { what { w . } } {
 
     if { $what == 1 } {
 	$text configure -cursor watch
-	$listbox configure -cursor watch
+	if { [winfo exists $listbox] } { $listbox configure -cursor watch }
 	$w configure -cursor watch
 	if { [winfo toplevel $w] != $w } {
 	    [winfo toplevel $w] configure -cursor watch
 	}
     } else {
 	$text configure -cursor xterm
-	$listbox configure -cursor ""
+	if { [winfo exists $listbox] } { $listbox configure -cursor "" }
 	$w configure -cursor ""
 	if { [winfo toplevel $w] != $w } {
 	    [winfo toplevel $w] configure -cursor ""
@@ -5967,6 +5991,18 @@ proc RamDebugger::CreatePanedEntries { num pane1 pane2 suffix } {
 
 	} else { $EvalEntries($i,leftentry$suffix) configure -state disabled }
 
+	bind $pane1.e$i <3> {
+	    set menu %W.menu
+	    destroy $menu
+	    menu $menu -tearoff 0
+	    $menu add command -label "Expressions..." -command \
+		[list RamDebugger::DisplayVarWindow [winfo toplevel %W] \
+		    [%W get]]
+	    focus %W
+	    %W selection range 0 end
+	    tk_popup $menu %X %Y
+	}
+
 	bind $pane2.e$i <Return> "RamDebugger::CheckEvalEntries$suffix do $i,right$suffix"
 
 	bind $pane2.e$i <FocusOut> "RamDebugger::CheckEvalEntries$suffix do $i,left$suffix"
@@ -6235,6 +6271,7 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
 
     foreach i $options(saved_positions_stack) {
 	foreach "file line context" $i break
+	if { $context ne "" } { set context "-- $context" }
 	set txt "[file tail $file]:$line $context"
 	if { [string length $txt] > 60 } {
 	    set txt [string range $txt 0 56]...
@@ -6325,6 +6362,17 @@ proc RamDebugger::RegisterExtension {} {
     }] } {
 	tk_messageBox -message "Error in the operation. Check your permissions and/or enter as administrator"
     }
+}
+
+proc RamDebugger::ExtractExamplesDir {} {
+    variable MainDir
+    variable text 
+
+    set dir [tk_chooseDirectory -initialdir $MainDir -parent $text \
+		 -title "Select directory where to extract the Examples directory"]
+    if { $dir eq "" } { return }
+    file copy -force [file join $MainDir Examples] $dir
+    SetMessage "Copied examples directory into directory '$dir'"
 }
 
 
@@ -6444,12 +6492,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		    "ShiftCtrl f" \
 		        -command "RamDebugger::SearchInFiles"] \
 		    separator \
-		    [list command "&Save position" {} "Save position to stack" "Shift F2" \
+		    [list command "&Save position" {} \
+		        "Save position to stack or clear position" "Shift F2" \
 		        -command "RamDebugger::PositionsStack save"] \
 		    [list command "&Go to position" {} "Recover position from stack" "F2" \
 		        -command "RamDebugger::PositionsStack go"] \
-		    [list command "&Delete position" {} "Delete position at current line" \
-		         "ShiftCtrl F2" -command "RamDebugger::PositionsStack clean"] \
 		    [list command "&Display positions stack" {} "Display positions stack" "Ctrl F2" \
 		        -command "RamDebugger::DisplayPositionsStack"] \
 		   ] \
@@ -6486,6 +6533,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command "&Toggle focus" {} \
 		"Toggle between activating the main or the secondary view" "Ctrl 3" \
 		-command "RamDebugger::FocusSecondTextToggle"] \
+		[list command "&Toggle views" {} \
+		"Toggle files between the main and the secondary view" "Ctrl 4" \
+		-command "RamDebugger::ToggleViews"] \
 		separator \
 		] \
 		"&Debug" all debug 0 [list \
@@ -6572,6 +6622,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ViewHelpFile"] \
 		[list command "&Contextual help" {} "Gives help for commands in editor" "F1" \
 		-command "RamDebugger::ViewHelpForWord"] \
+                separator \
+		[list command "&Extract examples" {} \
+                     "Extracts examples directory to a user-selectable directory" "" \
+		-command "RamDebugger::ExtractExamplesDir"] \
 		[list command "&Register cmd extension..." registerextension \
 		     "Register RamDebugger as command in the .tcl extension" "" \
 		-command "RamDebugger::RegisterExtension"] \
@@ -6698,25 +6752,30 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     set pw [PanedWindow $f.pw -side top -pad 0 -weights available -grid 0 -activator line]
 
-    foreach "weight1 weight2 weight3" [ManagePanes $pw h "1 6 2"] break
-
-    set pane1 [$pw add -weight $weight1]
-
-    if { ![info exists options(defaultdir)] } {
-	set options(defaultdir) [pwd]
+    if { [llength [ManagePanes $pw h "6 2"]] == 3 } {
+	foreach "weight2 weight3" [list 6 2] break
+    } else {
+	foreach "weight2 weight3" [ManagePanes $pw h "6 2"] break
     }
-    set listboxlabel [Label $pane1.l -anchor e -relief raised -bd 1 \
-	-padx 5 -grid "0 ew"]
-    bind $listboxlabel <Configure> "RamDebugger::ConfigureLabel $listboxlabel"
 
-    bind $listboxlabel <ButtonPress-1> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
-    bind $listboxlabel <ButtonPress-3> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
-
-    set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0 -grid 0]
-    set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
-    $sw setwidget $listbox
-
-    $sw.lb configure -deltay [expr [font metrics [$sw.lb cget -font] -linespace]]
+#     set pane1 [$pw add -weight $weight1]
+# 
+#     if { ![info exists options(defaultdir)] } {
+#         set options(defaultdir) [pwd]
+#     }
+#     set listboxlabel [Label $pane1.l -anchor e -relief raised -bd 1 \
+#         -padx 5 -grid "0 ew"]
+#     bind $listboxlabel <Configure> "RamDebugger::ConfigureLabel $listboxlabel"
+# 
+#     bind $listboxlabel <ButtonPress-1> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
+#     bind $listboxlabel <ButtonPress-3> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
+# 
+#     set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0 -grid 0]
+#     set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
+#     $sw setwidget $listbox
+# 
+#     $sw.lb configure -deltay [expr [font metrics [$sw.lb cget -font] -linespace]]
+#    ListBoxEvents $listbox RamDebugger::ListBoxDouble1 RamDebugger::ListboxMenu
 
     set pane2 [$pw add -weight $weight2]
 
@@ -6904,7 +6963,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     supergrid::go $f1L
     supergrid::go $fulltext
     supergrid::go $pane2in2
-    supergrid::go $pane1
+    if { [info exists pane1] } { supergrid::go $pane1 }
     supergrid::go $pane2
     supergrid::go $pane3
     supergrid::go $f
@@ -6949,7 +7008,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	}
     }
 
-    ListBoxEvents $listbox RamDebugger::ListBoxDouble1 RamDebugger::ListboxMenu
 
     set menudev [$mainframe getmenu debug]
 

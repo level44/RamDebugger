@@ -38,14 +38,12 @@ proc RamDebugger::CreateImages {} {
 	AAQCGc2G0/EEAoBAIBD4BECBAAAAAAaEwwAQIBwGAoHAMAgAOw==
     }]
     set images(bookmark) [image create photo actbookmark16 -data {
-	    R0lGODlhEAAQAIQAAPwCBCwqLLSytLy+vERGRFRWVDQ2NKSmpAQCBKyurMTG
-	    xISChJyanHR2dIyKjGxubHRydGRmZIyOjFxeXHx6fAAAAAAAAAAAAAAAAAAA
-	    AAAAAAAAAAAAAAAAAAAAAAAAACH5BAEAAAAALAAAAAAQABAAAAVbICACwWie
-	    Y1CibCCsrBkMb0zchSEcNYskCtqBBzshFkOGQFk0IRqOxqPBODRHCMhCQKte
-	    Rc9FI/KQWGOIyFYgkDC+gPR4snCcfRGKOIKIgSMQE31+f4OEYCZ+IQAh/mhD
-	    cmVhdGVkIGJ5IEJNUFRvR0lGIFBybyB2ZXJzaW9uIDIuNQ0KqSBEZXZlbENv
-	    ciAxOTk3LDE5OTguIEFsbCByaWdodHMgcmVzZXJ2ZWQuDQpodHRwOi8vd3d3
-	    LmRldmVsY29yLmNvbQA7
+	    R0lGODlhCwALANUAANnZ2SwqLJuam0RGRKeop5KRkgQCBHt7e6ChoJqZmp6dnpSTlGJhYoCA
+	    gJSVlKSjpIiIiGhoaIaGhn5/foiJiIqLilhYWJGQkY+Pj4uLi4GAgVpbWnZ2dnZ3dlZXVlRU
+	    VElJSf//////////////////////////////////////////////////////////////////
+	    /////////////////////////////////////////////////////////yH5BAEAAAAALAAA
+	    AAALAAsAAAZSQIAwIBQKhcJAQCgUCgEBQUAoBAwGgQChEBAKAYYDIqFYBIRCgIHRcDwgAaEQ
+	    YIhIJpRKQCgEGICWCyajCQABQqFhw+l4DMOh4QMyDIdCg0EYBAA7
 	}]
     
     set images(blank) [image create photo -data {

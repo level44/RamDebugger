@@ -75,9 +75,11 @@ proc regsubfile { args } {
     }
 
     #file copy -force $file $file~
-    set fout [open $file w]
-    puts -nonewline $fout $data_out
-    close $fout
+    if { $data ne $data_out } {
+	set fout [open $file w]
+	puts -nonewline $fout $data_out
+	close $fout
+    } else { set retval 0 }
     return $retval
 }
 
@@ -124,7 +126,7 @@ proc CleanCVSdirs { dir } {
 
 	    if { $savebackups == "ask" } {
 		set retval [tk_dialog .__temp question "Do you want to save backup file '$destname'?" \
-				question 0 Yes "Yes to all" No "No to all" Cancel]
+		                question 0 Yes "Yes to all" No "No to all" Cancel]
 		switch $retval {
 		    -1 - 4 { exit }
 		    0 { set retval yes }
@@ -209,7 +211,7 @@ set files [list RamDebugger.tcl license.terms Readme addons scripts Examples hel
 set deletefiles [list help/02TclTk8.5]
 
 set packages [list tcllib Img tkhtml]
-set packagesout [list Tcl Tk bwidget1.6]
+set packagesout [list Tcl Tk bwidget1.6 reg1.1]
 
 set tclkitdir "C:/TclTk/tclkit"
 
@@ -281,7 +283,7 @@ cd install_temp
 
 puts -nonewline "creating starkit..." ; update
 exec [file join $tclkitdir tclkit-win32-sh.upx.exe] [file join $tclkitdir sdx.kit] \
-            wrap RamDebugger
+	    wrap RamDebugger
 file copy -force RamDebugger ../RamDebugger$Version.kit
 puts "done\n" ; update
 cd $pwd

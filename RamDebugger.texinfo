@@ -62,14 +62,14 @@
 @set Date July 2004
 @set Copyright 2002-2004 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.25 $
+@set CVSVersion  $Revision: 1.26 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
 
 @titlepage
 @title RamDebugger @value{Version}:
-@subtitleA graphical and interactive debugger for Tcl-TK
+@subtitle graphical and interactive debugger for Tcl-TK
 @author Copyright @value{Copyright}
 @c The following two commands start the copyright page.
 @page
@@ -340,13 +340,13 @@ namespace import RamDebugger::*
 rhelp
 @end example
 @item Modify the Tkcon initialization file (@t{tkcon.cfg} or @t{.tkconrc}) and add:
-@example
+@verbatim
    set ::tkcon::OPT(slaveeval) {
        source "<Path to RamDebugger>/RamDebugger.tcl"
        namespace import RamDebugger::*
        puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
    }
-@end example
+@end verbatim
 @end itemize 
 
 @node  Using RamDebugger, How does it work?, Introduction and Setup, Top
@@ -534,7 +534,7 @@ the debugged program or in RamDebugger. Moving the cursor over the widgets names
 is possible to obtain some information on the widget and on its packing/gridding
 options.
 
-@node  Expressions window, , Windows hierarchy, Using RamDebugger
+@node  Expressions window, Revisions, Windows hierarchy, Using RamDebugger
 @section Expressions window
 
 To open the window use: @code{Debug->Expressions...}
@@ -557,7 +557,7 @@ Examples of possible expressions in C++:
 print part of a string or vector
 @end itemize
 
-@node  Revisions, , Expressions window, Using RamDebugger
+@node  Revisions, Auto save, Expressions window, Using RamDebugger
 @section Revisions
 
 @code{RamDebugger} uses program @code{cvs} in order to maintain revisions of the edited

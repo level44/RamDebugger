@@ -113,9 +113,9 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     wm overrideredirect $w 1
     wm transient $w $canvas
 
-    $w configure -highlightthicknes 2 -highlightbackground grey \
+    $w configure -highlightthicknes 1 -highlightbackground grey \
 	-highlightcolor grey
-    pack [label $w.l -bg white -justify left -anchor w -bg grey90]
+    pack [label $w.l -fg black -justify left -anchor w -bg grey95]
     $w.l conf -bd 0
 
     append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all"

@@ -60,11 +60,13 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 	wm overrideredirect $w 1
 	wm transient $w $text
 	wm geom $w +$X+$Y
-	pack [label $w.l -bg white]
-	$w.l conf -bd 1 -relief solid
+	$w configure -highlightthicknes 1 -highlightbackground grey \
+	    -highlightcolor grey
+	pack [label $w.l -fg black -bg grey95 -wraplength 400 -justify left]
+	#$w.l conf -bd 1 -relief solid
 	set val [lindex $res 1 1]
-	if { [string length $val] > 50 } {
-	    set val [string range $val 0 46]...
+	if { [string length $val] > 500 } {
+	    set val [string range $val 0 496]...
 	}
 	$w.l conf -text "$var=$val"
     }
@@ -271,16 +273,18 @@ proc RamDebugger::InvokeAllDisplayVarWindows {} {
 
     if { ![info exists varwindows] } { return }
     foreach i $varwindows {
-	DialogWinTop::InvokeOK $i
+	catch { DialogWinTop::InvokeOK $i }
     }
 }
 
-proc RamDebugger::DisplayVarWindow { mainwindow } {
+proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     variable text
     variable options
     variable varwindows
     
-    set var [GetSelOrWordInIndex insert]
+    if { $var eq "" } {
+	set var [GetSelOrWordInIndex insert]
+    }
 
     set commands [list "RamDebugger::DisplayVarWindowEval do" RamDebugger::DisplayVarWindowCancel]
     set f [DialogWinTop::Init $text "View expression or variable" separator $commands \
@@ -824,13 +828,14 @@ proc RamDebugger::PreferencesWindow {} {
 	set DialogWin::user(AutoSaveRevisions) $options(AutoSaveRevisions)
     }
 
-    grid $lb.c1 - - -sticky w
-    grid $lb.l1 $lb.cb1 $lb.l2 -sticky w
-    grid $lb.l3 $lb.cb2 $lb.l4 -sticky w
+    grid $lb.c1 - - -sticky nw
+    grid $lb.l1 $lb.cb1 $lb.l2 -sticky nw
+    grid $lb.l3 $lb.cb2 $lb.l4 -sticky nw
 
-    grid configure $lb.cb1 $lb.cb2 -sticky ew
+    grid configure $lb.cb1 $lb.cb2 -sticky new
     grid configure $lb.l1 $lb.l3 -padx "10 0"
     grid columnconfigure $lb 1 -weight 1
+    grid rowconfigure $lb 2 -weight 1
 
     grid $lb -sticky nsew
     grid columnconfigure $fas 0 -weight 1
@@ -1404,7 +1409,7 @@ proc RamDebugger::GotoLine {} {
     variable text
     variable text_secondary
 
-    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+    if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	set active_text $text_secondary
     } else { set active_text $text }
 
@@ -2050,7 +2055,7 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     variable options
     variable text_secondary
 
-    if { !$replace && [info exists text_secondary] && [focus] eq $text_secondary } {
+    if { !$replace && [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	set active_text $text_secondary
     } else { set active_text $text }
 
@@ -2255,7 +2260,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
 	    bind $w.search <1> "destroy $w.search"
 	    bind $w.search <3> "destroy $w.search"
-	    foreach i [list F5 F9 F10 F11] {
+	    foreach i [list F2 F5 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
 	    }
 	    bind $w.search <Return> "destroy $w.search ; break"
@@ -2611,7 +2616,7 @@ proc RamDebugger::DisplayPositionsStack { args } {
 	return
     }
 
-    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+    if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	set curr_text $text_secondary
     } else {
 	set curr_text $text
@@ -2815,7 +2820,7 @@ proc RamDebugger::PositionsStack { what args } {
     variable currentfile
     variable currentfile_secondary
 
-    if { [info exists text_secondary] && [focus] eq $text_secondary } {
+    if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	set curr_text $text_secondary
     } else {
 	set curr_text $text
@@ -2836,19 +2841,14 @@ proc RamDebugger::PositionsStack { what args } {
 	    set ipos 0
 	    foreach i $options(saved_positions_stack) {
 		if { $file eq [lindex $i 0] && $line == [lindex $i 1] } {
-		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) \
-		            $ipos $ipos]
-		    break
+		    return [eval PositionsStack clean $args]
 		}
 		incr ipos
 	    }
-	    set idx [$curr_text search -backwards -regexp -count count \
-		    {^\s*(proc|method)} "$line.0 lineend"]
+	    set idx $line.0
 	    set procname ""
-	    if { $idx ne "" } {
-		regexp {^\s*(?:proc|method)\s+(\S+)} [$curr_text get $idx "$idx lineend"]\
-		    {} procname
-	    }
+	    regexp -all -line {^\s*(?:proc|method)\s+(\S+)} [$text get \
+		    "$idx-200l linestart" "$idx lineend"] {} procname
 	    lappend options(saved_positions_stack) [list $file $line $procname]
 	    SetMessage "Saved position in line $line"
 	    catch { RamDebugger::DisplayPositionsStackDo refresh }
