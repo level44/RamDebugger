@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.47 2004/12/21 11:37:32 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.48 2004/12/21 12:03:21 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2004
 
 package require Tcl 8.4
@@ -6756,7 +6756,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command "&Contextual help" {} "Gives help for commands in editor" "F1" \
 		-command "RamDebugger::ViewHelpForWord"] \
 		separator \
-		[list command "&Extract examples" {} \
+		[list command "&Extract examples" "extractexamples" \
 		     "Extracts examples directory to a user-selectable directory" "" \
 		-command "RamDebugger::ExtractExamplesDir"] \
 		[list command "&Register cmd extension..." registerextension \
@@ -6777,6 +6777,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     if { $::tcl_platform(platform) ne "windows" } {
 	$mainframe setmenustate registerextension disabled
+    }
+
+    if { ![info exists ::starkit::topdir] } {
+	$mainframe setmenustate extractexamples disabled
     }
 
     set label [$mainframe addindicator -textvariable RamDebugger::debuggerstate -width 6 \
