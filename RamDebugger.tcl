@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.15 2002/10/15 12:13:50 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.16 2003/01/13 14:45:50 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -50,7 +50,7 @@ namespace eval RamDebugger {
 
     # can be: remote; local; master; or gdb
     variable remoteserverType ""
-    # when remoteserverType is master, it can be master, "master proc" or "master all"
+    # when remoteserverType is master, it can be master, "master proc", or "master all"
     variable remoteserver ""
     variable remoteserverNum ""
     variable debuggerserver ""
@@ -942,6 +942,7 @@ proc RamDebugger::rtime { args } {
     variable remoteserverType
     variable TimeMeasureData
     variable currentfile
+    variable instrumentedfilesTime
 
     set usagestring {usage: rtime ?switches? ?name? ?lineini? ?lineend?
 	-h:             displays usage
@@ -999,6 +1000,9 @@ proc RamDebugger::rtime { args } {
 	    foreach "name file lineini lineend lasttime" $i {
 		if { $name == $opts(name) } {
 		    set TimeMeasureData [lreplace $TimeMeasureData $ipos $ipos]
+		    if { [info exists instrumentedfilesTime($file)] } {
+			unset instrumentedfilesTime($file)
+		    }
 		    return "deleted time block '$opts(name)'"
 		}
 	    }
@@ -1121,6 +1125,10 @@ proc RamDebugger::rtime { args } {
     }
     lappend TimeMeasureData [list $opts(name) $currentfile $opts(lineini) $opts(lineend) ""]
     set TimeMeasureData [lsort -command RamDebugger::SortTimeMeasureData $TimeMeasureData]
+
+    if { [info exists instrumentedfilesTime($currentfile)] } {
+	unset instrumentedfilesTime($currentfile)
+    }
     return "Added time block '$opts(name)'"
 }
 
@@ -1147,6 +1155,7 @@ proc RamDebugger::rlist { args } {
 	-quiet:        do not print anything
 	-force:        force to reload file
 	-reinstrument: force to reinstrument
+	-resend:       force to send again
 	-asmainfile:   When debugging locally, the first file, first time  must be list like this
 	-returndata:   Instead of sending instr file, return it
 	--:            end of options
@@ -1298,6 +1307,9 @@ proc RamDebugger::rlist { args } {
 	SetMessage "Instrumenting file '$currentfile' for time measure..."
 	    Instrumenter::DoWorkForTime $files($currentfile) $currentfile \
 		instrumentedfilesTime($currentfile) $TimeMeasureData
+	if { [info exists instrumentedfilesSent($currentfile)] } {
+	    unset instrumentedfilesSent($currentfile)
+	}
 	SetMessage ""
     }
 
@@ -1311,7 +1323,7 @@ proc RamDebugger::rlist { args } {
     if { $dosend != 0 && ![info exists instrumentedfilesSent($currentfile)] } { set dosend 1 }
     if { $dosend != 0 && [info exists instrumentedfilesSent($currentfile)] && \
 	$instrumentedfilesSent($currentfile) != $debuggerstate  } { set dosend 1 }
-    if { $dosend != 0 && ($force || $opts(-returndata)) } { set dosend 1 }
+    if { $dosend != 0 && ($opts(-resend) || $force || $opts(-returndata)) } { set dosend 1 }
 
     if { $dosend == 1 } {
 	set err [catch {
@@ -2185,6 +2197,7 @@ proc RamDebugger::ExitGUI {} {
     variable currentline
     variable breakpoints
     variable TimeMeasureData
+    variable debuggerstate
 
     if { [SaveFile ask] == -1 } { return }
 
@@ -2199,6 +2212,8 @@ proc RamDebugger::ExitGUI {} {
     if { [info exists remoteserver] && [string match master* $remoteserver] } {
 	set options(master_type) $remoteserver
     }
+
+    set options(debuggerstate) $debuggerstate
 
     set options(watchedvars) ""
     set i 0
@@ -2230,9 +2245,7 @@ proc RamDebugger::ExitGUI {} {
 	    lappend options(breakpoints) $i
 	}
     }
-    if { $TimeMeasureData != "" } {
-	set options(TimeMeasureData) $TimeMeasureData
-    }
+    set options(TimeMeasureData) $TimeMeasureData
     set options(remoteserverType) $remoteserverType
     set options(remoteserver) $remoteserver
     if { [wm state [winfo toplevel $text]] == "zoomed" } {
@@ -2383,7 +2396,7 @@ proc RamDebugger::SaveFile { what } {
 	}
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
 	set file [tk_getSaveFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
-	    -title "Savefile"]
+	    -title "Save file"]
 	if { $file == "" } { return }
 	set options(defaultdir) [file dirname $file]
     } else {
@@ -3146,7 +3159,7 @@ proc RamDebugger::ContNextGUI { what } {
 	    }
 	} else {
 	    if { $options(ConfirmStartDebugging) } {
-		if { $remoteserverType == "local" } {
+		if { $remoteserverType == "local" || $remoteserverType == "" } {
 		    set tt "Do you want to start to debug locally '$currentfile'?"
 		} else {
 		    set tt "Do you want to execute file '$currentfile'?"
@@ -3157,11 +3170,10 @@ proc RamDebugger::ContNextGUI { what } {
 	    } else { set ret yes }
 	    if { $ret == "cancel" } { return }
 	    if { $ret == "yes" } {
-		if { $remoteserverType == "local" } {
+		if { $remoteserverType == "local" || $remoteserverType == "" } {
 		    rdebug -currentfile
 		} else {
-
-		    rlist -force -quiet
+		    rlist -resend -quiet
 		}
 		return
 	    }
@@ -4235,7 +4247,8 @@ proc RamDebugger::SearchBraces { x y } {
 	$text tag add sel insert insert+1c
     }
     if {[lsearch -exact [list \[ \] \{ \}] $sel] == -1 } {
-	set ::tkPriv(selectMode) word
+	set ::tkPriv(selectMode) word ;# tcl8.3
+	catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
 	tkTextSelectTo $text $x $y
 	catch { $text mark set insert sel.last}
 	catch { $text mark set anchor sel.first}
@@ -4340,7 +4353,8 @@ proc RamDebugger::CommentSelection { what } {
     }
     if { [catch {
 	scan [$text index sel.first] "%d" line1
-	scan [$text index sel.last] "%d" line2
+	scan [$text index sel.last] "%d.%d" line2 pos2
+	if { $pos2 == 0 } { incr line2 -1 }
     }] } {
 	scan [$text index insert] "%d" line1
 	set line2 $line1
@@ -4612,10 +4626,11 @@ proc RamDebugger::InitOptions {} {
 	option add *selectBackground \#48c96f
 	option add *selectForeground white
     } else {
-	option add *selectBackground navy
+	option add *selectBackground \#48c96f
 	option add *selectForeground white
     }
     option add *Menu*TearOff 0
+
 }
 
 proc RamDebugger::InitGUI { { w .gui } } {
@@ -4888,7 +4903,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	 -command "RamDebugger::ContNextGUI rcont"
     $bbox add -image player_stop-22 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Set/unset &breakpoint"] \
+	 -helptext "Set/unset &breakpoint" \
 	 -command "RamDebugger::SetGUIBreakpoint"
     $bbox add -image finish-22 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
@@ -5271,6 +5286,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
     }
     if { [info exists options(TimeMeasureData)] } {
 	set TimeMeasureData $options(TimeMeasureData)
+    }
+
+    if { [info exists options(debuggerstate)] && $options(debuggerstate) == "time" } {
+	RamDebugger::DisplayTimesWindow
     }
 
 #     if { [info exists options(remoteserverType)] && $options(remoteserverType) == "remote" && \
