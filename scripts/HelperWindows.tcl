@@ -179,6 +179,7 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 		$DialogWinTop::user($w,textv) insert end [lindex $res 1]
 	    }
 	}
+	$DialogWinTop::user($w,textv) see end
 	$DialogWinTop::user($w,textv) conf -state disabled
     }
 }
@@ -304,7 +305,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow } {
     }
 
     set DialogWinTop::user($w,combo) [ComboBox $f.e1 -textvariable DialogWinTop::user($w,expression) \
-	-values $options(old_expressions) -grid "1 px3"]
+	-values $options(old_expressions) -grid "1 ew px3"]
 
     set DialogWinTop::user($w,expression) $var
     
@@ -318,7 +319,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow } {
     }
 
     label $f.l2 -textvar DialogWinTop::user($w,type) -grid "0 w" -bg [CCColorActivo [$w  cget -bg]]
-    checkbutton $f.cb1 -text "As list" -variable DialogWinTop::user($w,aslist) -grid "1 w" \
+    checkbutton $f.cb1 -text "As list" -variable DialogWinTop::user($w,aslist) -grid "1 wwe" \
        -command "DialogWinTop::InvokeOK $f"
     set DialogWinTop::user($w,aslist) 0
     supergrid::go $f
@@ -342,7 +343,7 @@ proc RamDebugger::DisplayBreakpointsWindowSetCond {} {
     set curr [$DialogWinBreak::user(list) curselection]
     if { [llength $curr] != 1 } { return }
 
-    set DialogWinBreak::user(cond) [lindex [$DialogWinBreak::user(list) get $curr] 3]
+    set DialogWinBreak::user(cond) [lindex [$DialogWinBreak::user(list) get $curr] 4]
 }
 
 proc RamDebugger::DisplayBreakpointsWindow {} {
@@ -412,6 +413,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		[file dirname $file]]
 	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
 	    $DialogWinBreak::user(list) selection set end
+	    $DialogWinBreak::user(list) see end
 	}
     }
 
@@ -653,7 +655,7 @@ proc RamDebugger::PreferencesWindow {} {
     set DialogWin::user(ConfirmModifyVariable) $options(ConfirmModifyVariable)
 
     label $f1.isf -text "Instrument sourced files" -grid "0 e"
-    tk_optionMenu $f1.cb3 DialogWin::user(instrument_source) auto always never ask
+    tk_optionMenu $f1.cb3 DialogWin::user(instrument_source) auto autoprint always never ask
     $f1.cb3 conf -width 10
     supergrid::gridinfo $f1.cb3 "1 w"
     DynamicHelp::register $f1.isf balloon "\
@@ -1820,7 +1822,7 @@ proc RamDebugger::SearchInFilesDo {} {
 	while { ![eof $fin] } {
 	    append result [gets $fin]\n
 	}
-	set result [string trim $result]
+	set result [string trim $result]\n
 	set err [catch { close $fin } errstring]
     }
     if { [string trim $result] == "" } { set result "Nothing found" }
@@ -2142,7 +2144,9 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
 	    bind $w.search <1> "destroy $w.search"
 	    bind $w.search <3> "destroy $w.search"
-	    bind $w.search <F9> "destroy $w.search"
+	    foreach i [list F5 F9 F10 F11] {
+		bind $w.search <$i> "destroy $w.search"
+	    }
 	    bind $w.search <Return> "destroy $w.search ; break"
 	    bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
@@ -2384,10 +2388,12 @@ proc RamDebugger::DoinstrumentThisfile { file } {
     if { ![info exists options(instrument_source)] } {
 	set options(instrument_source) auto
     }
-    if { $options(instrument_source) == "auto" } {
+    if { [string match auto* $options(instrument_source)] } {
 	set file [filenormalize $file]
 	if { [lsearch -exact $WindowFilesList $file] != -1 } {
 	    return 1
+	} elseif { $options(instrument_source) eq "autoprint" } {
+	    return 2
 	} else { return 0 }
     } elseif { $options(instrument_source) == "always" } {
 	return 1
@@ -2418,6 +2424,8 @@ proc RamDebugger::DoinstrumentThisfile { file } {
 	-value never
     radiobutton $f1.r5 -text "Instrument only load files (auto)" -grid "0 w" -var DialogWin::user(opt) \
 	-value auto
+    radiobutton $f1.r6 -text "... and print source" -grid "0 w" -var DialogWin::user(opt) \
+	-value autoprint
 
     if { $options(instrument_source) == "ask_yes" } {
 	set DialogWin::user(opt) thisfile
@@ -2446,10 +2454,12 @@ proc RamDebugger::DoinstrumentThisfile { file } {
     
     set options(instrument_source) $DialogWin::user(opt)
 
-    if { $options(instrument_source) == "auto" } {
+    if { [string match auto* $options(instrument_source)] } {
 	set file [filenormalize $file]
 	if { [lsearch -exact $WindowFilesList $file] != -1 || [GiveInstFile $file 1 P] != "" } {
 	    return 1
+	} elseif { $options(instrument_source) eq "autoprint" } {
+	    return 2
 	} else { return 0 }
     } elseif { $options(instrument_source) == "always" } {
 	return 1
@@ -2808,6 +2818,11 @@ proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
     if { ![info exists options(MacrosDocument)] } {
 	set file [file join $MainDir scripts Macros_default.tcl]
 	set fin [open $file r]
+	set header [read $fin 256]
+	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+	    fconfigure $fin -encoding utf-8
+	}
+	seek $fin 0
 	set options(MacrosDocument) [read $fin]
 	close $fin
     }
@@ -2829,6 +2844,11 @@ proc RamDebugger::GiveMacrosDocument {} {
     if { ![info exists options(MacrosDocument)] } {
 	set file [file join $MainDir scripts Macros_default.tcl]
 	set fin [open $file r]
+	set header [read $fin 256]
+	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+	    fconfigure $fin -encoding utf-8
+	}
+	seek $fin 0
 	set options(MacrosDocument) [read $fin]
 	close $fin
     }
@@ -2989,12 +3009,17 @@ proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
     foreach i $files {
 	ProgressVar [expr {int($ifiles*100/$numfiles)}]
 	set fin [open $i r]
+	set header [read $fin 256]
+	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+	    fconfigure $fin -encoding utf-8
+	}
+	seek $fin 0
 	set txt [read $fin]
 	close $fin
 
 	set numlines [llength [split $txt "\n"]]
 	set numblank [regexp -all -line {^\s*$} $txt]
-	# comments are only an approximation to full comment lines of tipe: # or // or /* */
+	# comments are only an approximation to full comment lines of type: # or // or /* */
 	set numcomments [regexp -all -line {^\s*(#|//)} $txt]
 	incr numcomments [regexp -all -lineanchor {^\s*/\*.*?\*/\s*$} $txt]
 

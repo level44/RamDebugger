@@ -209,6 +209,8 @@ set files [list RamDebugger.tcl license.terms Readme addons scripts Examples hel
 set packages [list tcllib Img tkhtml]
 set packagesout [list Tcl Tk bwidget1.6]
 
+set tclkitdir "C:/TclTk/tclkit"
+
 
 ################################################################################
 #  CREATING THE ZIP
@@ -240,7 +242,7 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
 auto_mkindex scripts *.tcl
 
 
-file delete -force install_temp/RamDebugger
+file delete -force install_temp
 file mkdir install_temp/RamDebugger
 file delete RamDebugger$Version.zip
 foreach i $files {
@@ -252,6 +254,37 @@ CopyPackages $files install_temp/RamDebugger/addons $packages $packagesout
 set tclfiles ""
 foreach i $files { lappend tclfiles RamDebugger/$i }
 zipfile RamDebugger$Version.zip install_temp $tclfiles
+
+################################################################################
+#  CREATING THE STARKIT
+################################################################################
+
+file mkdir install_temp/RamDebugger.vfs/lib
+file rename install_temp/RamDebugger install_temp/RamDebugger.vfs/lib/app-RamDebugger
+
+set fout [open install_temp/RamDebugger.vfs/main.tcl w]
+
+puts $fout {
+    package require starkit
+    starkit::startup
+    source [file join $::starkit::topdir lib app-RamDebugger RamDebugger.tcl]
+}
+close $fout
+
+set pwd [pwd]
+cd install_temp
+
+puts -nonewline "creating starkit..." ; update
+exec [file join $tclkitdir tclkit-win32-sh.upx.exe] [file join $tclkitdir sdx.kit] \
+            wrap RamDebugger
+file copy -force RamDebugger ../RamDebugger.kit
+puts "done\n" ; update
+cd $pwd
+
+################################################################################
+#  CLEAN UP
+################################################################################
+
 file delete -force install_temp
 puts -nonewline DONE\n
 #.t see end

@@ -128,3 +128,122 @@ proc "Macro regsub" { w } {
     $w insert [lindex $range 0] $sel
     eval $w tag add sel $range
 }
+
+################################################################################
+#    proc Comment header
+################################################################################
+
+set "macrodata(Comment header,inmenu)" 1
+set "macrodata(Comment header,accelerator)" ""
+set "macrodata(Comment header,help)" "This commands inserts a comment menu for TCL"
+
+proc "Comment header" { w } {
+    $w mark set insert "insert linestart"
+    $w insert insert "[string repeat # 80]\n"
+    set idx [$w index insert]
+    $w insert insert "#    Comment\n"
+    $w insert insert "[string repeat # 80]\n"
+    $w tag add sel "$idx+5c" "$idx+12c"
+    $w mark set insert $idx+12c
+}
+
+################################################################################
+#    proc Go to proc
+################################################################################
+
+set "macrodata(Go to proc,inmenu)" 1
+set "macrodata(Go to proc,accelerator)" "<Control-G>"
+set "macrodata(Go to proc,help)" "This commands permmits to select a proc to go"
+
+proc "Go to proc" { w } {
+
+    set procs ""
+    set numline 1
+    foreach line [split [$w get 1.0 end-1c] \n] {
+        set types {proc|method|constructor|onconfigure|snit::type|snit::widget|snit::widgetadaptor}
+
+        if { [regexp "^\\s*(?:::)?($types)\\s+(\[\\w:]+)" $line {} type name] } {
+            lappend procs [list $name $type $numline]
+        }
+        incr numline
+    }
+    
+    set f [DialogWin::Init $w "Go to proc" separator]
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    
+    set DialogWin::user(list) [tablelist::tablelist $sw.lb -width 55\
+            -exportselection 0 \
+        -columns [list \
+                25  "Proc name"        left \
+                10  "Proc type"        center \
+                5  "line"     right \
+                ] \
+            -labelcommand tablelist::sortByColumn \
+            -background white \
+            -selectbackground navy -selectforeground white \
+            -stretch 0 -selectmode browse \
+            -highlightthickness 0]
+        
+    $sw setwidget $DialogWin::user(list)
+    foreach i $procs {
+        $DialogWin::user(list) insert end $i
+        if { [string match *snit* [lindex $i 1]] } {
+            $DialogWin::user(list) rowconfigure end -background orange
+        }
+    }
+    $DialogWin::user(list) selection set 0
+    $DialogWin::user(list) activate 0
+
+    bind [$DialogWin::user(list) bodypath] <Double-1> {
+        DialogWin::InvokeOK
+    }
+    bind [$DialogWin::user(list) bodypath] <Return> {
+        DialogWin::InvokeOK
+    }
+    bind [$DialogWin::user(list) bodypath] <KeyPress> {
+        set w [winfo parent %W]
+        set idx [$w index active]
+        if { [string is wordchar -strict %A] } {
+            if { ![info exists ::searchstring] } { set ::searchstring "" }
+            if { ![string equal $::searchstring %A] } {
+                append ::searchstring %A
+            }
+            set found 0
+            for { set i [expr {$idx+1}] } { $i < [$w index end] } { incr i } {
+                if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
+                    set found 1
+                    break
+                }
+            }
+            if { !$found } {
+                for { set i 0 } { $i < $idx } { incr i } {
+                    if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
+                        set found 1
+                        break
+                    }
+                }
+            }
+            if { $found } {
+                $w selection clear 0 end
+                $w selection set $i
+                $w activate $i
+                $w see $i
+            }
+            after 500 unset -nocomplain ::searchstring
+        }
+    }
+    supergrid::go $f
+    focus $sw.lb
+
+    set action [DialogWin::CreateWindow]
+
+    if { $action == 1 } {
+        set curr [$DialogWin::user(list) curselection]
+        if { [llength $curr] != 1 } { return }
+        set line [lindex [$DialogWin::user(list) get $curr] 2]
+        $w mark set insert $line.0
+        $w see $line.0
+        focus $w
+    }
+    DialogWin::DestroyWindow
+}

@@ -62,7 +62,7 @@
 @set Date July 2003
 @set Copyright 2002-2003 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.20 $
+@set CVSVersion  $Revision: 1.21 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -188,6 +188,14 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
+When TCL raises and error, RamDebugger shows last visited line
+If files contain, in first lines something like @code{# -*- coding: utf-8;-*-} they are
+considered as in utf-8 encoding
+RamDebugger works only for TCL version 8.4
+Open file and save file browser follow the preferences extensions for file types
+Added new macro for going to function names
+Corrections for when several pop-up windows appear at the same time
+
 Changes From version 3.1 to version 3.2
 
 @itemize @bullet
@@ -253,7 +261,7 @@ package tkdnd compiled).
 Changes From version 1 to version 2
 
 @itemize @bullet
-@item Tested for Tcl/Tk @b{8.3.4} and @b{8.4}
+@item Tested for Tcl/Tk @b{8.4}
 @item When @b{Tkhtml} is not compiled for the given platform, gives message and continues
 @item Added contextual help for programming commands. If there are manual pages (UNIX), it
 also uses them if @b{man2html} is found in the system.
@@ -281,7 +289,7 @@ RamDebugger can be download from
 @section Installation and prerequisites
 
 The only prerequisite before executing RamDebugger is to have Tcl-Tk installed. The tested
-version are Tcl-Tk 8.3.4 and 8.4b2
+version is Tcl-Tk8.4
 They can be obtained from @url{http://tcl.activestate.com}.
 @sp 1
 RamDebugger has been tested on Windows and on Linux. For other UNIXes and MAC, it is necessary

@@ -201,6 +201,12 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } 
 		 $canvas $widget %X %Y"
 	#$canvas bind $widget <Leave> "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
 
+# 	$canvas bind $widget <ButtonRelease-3> {
+# 	    set menu %W.menu
+# 	    catch { destroy $menu }
+# 	    menu $menu
+# 	    $menu add command -label "Draw red" -command "RamDebugger::DisplayWindowsHierarchyInfo $w $canvas {} %X %Y"
+# 	}
 	if { $ty > $maxy } {
 	    set maxy $ty
 	} else { set ty $maxy }
@@ -234,6 +240,7 @@ proc RamDebugger::DisplayWindowsHierarchyDo { w what { res "" } } {
 		set retval [list $w $info]
 		set retval_in ""
 		foreach i [winfo children $w] {
+		    if { [regexp {^#BWidget} [winfo name $i]] } { continue }
 		    eval lappend retval_in [RDC::WindowsHierarchy $i]
 		}
 		if { $retval_in == "" } {

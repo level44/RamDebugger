@@ -2,7 +2,9 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.32 2004/02/20 17:04:47 jsperez Exp $        
+package require Tcl 8.4
+
+#         $Id: RamDebugger.tcl,v 1.33 2004/02/24 20:52:54 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -115,6 +117,7 @@ namespace eval RamDebugger {
     # Preferences
     ################################################################################
 
+    variable readwriteprefs
     variable options
     variable options_def
 
@@ -124,13 +127,14 @@ namespace eval RamDebugger {
 #   Init proc
 ################################################################################
 
-proc RamDebugger::Init { readprefs { registerasremote 1 } } {
+proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     variable debuggerserver
     variable debuggerserverNum
     variable MainDir
     variable CacheDir
     variable options_def
     variable options
+    variable readwriteprefs $_readwriteprefs
 
     if { [info exists ::freewrap::scriptFile] } {
 	set dir $::argv0
@@ -238,12 +242,12 @@ proc RamDebugger::Init { readprefs { registerasremote 1 } } {
 
     array set options [array get options_def]
 
-    if { $readprefs } {
+    if { $readwriteprefs } {
 	catch {
 	    if { $::tcl_platform(platform) == "windows" } {
 		set data [registry get {HKEY_CURRENT_USER\Software\RamDebugger} IniData]
 	    } else {
-		set fin [open ~/.ramdebugger r]
+		set fin [open ~/.ramdebugger_prefs r]
 		set data [read $fin]
 		close $fin
 	    }
@@ -758,9 +762,9 @@ proc RamDebugger::rdebug { args } {
 	}
 	if { [info commands ::RDC::sourceproc] == "" } {
 	    rename ::source ::RDC::sourceproc
-	    proc ::source { file } {
-		set file [file join [pwd] $file]
-		set retval [RDC::SendDev [list RamDebugger::RecieveFromProgramSource $file]]
+	    proc ::source { args } {
+		set args [lreplace $args end end [file join [pwd] [lindex $args end]]]
+		set retval [RDC::SendDev "RamDebugger::RecieveFromProgramSource $args"]
 		if { $retval != "" } {
 		    if { ![string match "::RDC::sourceproc*" $retval] } {
 		        set oldfile [info script]
@@ -1312,6 +1316,7 @@ proc RamDebugger::rlist { args } {
 	-resend:       force to send again
 	-asmainfile:   When debugging locally, the first file, first time  must be list like this
 	-returndata:   Instead of sending instr file, return it
+	-encoding enc: open file with the given encoding
 	--:            end of options
     }
     ParseArgs $args $usagestring opts
@@ -1373,6 +1378,15 @@ proc RamDebugger::rlist { args } {
 	    set currentfile $currentfile_save
 	    error "file '$filetry' does not exist\n$usagestring"
 	}
+	if { $opts(-encoding) != 0 && $opts(-encoding) != "" } {
+	    fconfigure $fin -encoding $opts(-encoding)
+	} else {
+	    set header [read $fin 256]
+	    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+		fconfigure $fin -encoding utf-8
+	    }
+	    seek $fin 0
+	}
 	set files($currentfile) [read $fin]
 	close $fin
 	if { [lsearchfile $fileslist $currentfile] == -1 } {
@@ -1399,6 +1413,15 @@ proc RamDebugger::rlist { args } {
 
 	    if { $instfile != "" } {
 		set fin [open $instfile r]
+		if { $opts(-encoding) != 0 && $opts(-encoding) != "" } {
+		    fconfigure $fin -encoding $opts(-encoding)
+		} else {
+		    set header [read $fin 256]
+		    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+			fconfigure $fin -encoding utf-8
+		    }
+		    seek $fin 0
+		}
 		set instrumentedfiles${i}($currentfile) [read $fin]
 		
 		set oldfilenum 0 ;# for files that do not have any instrum. line
@@ -1480,6 +1503,14 @@ proc RamDebugger::rlist { args } {
 	    if { $instfile != "" && [info exists instrumentedfiles${i}($currentfile)] && \
 		!$currentfileIsModified } {
 		set fout [open $instfile w]
+		if { $opts(-encoding) != 0 && $opts(-encoding) != "" } {
+		    fconfigure $fout -encoding $opts(-encoding)
+		} else {
+		    set header [string range [set instrumentedfiles${i}($currentfile)] 0 255]
+		    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+			fconfigure $fout -encoding utf-8
+		    }
+		}
 		puts -nonewline $fout [set instrumentedfiles${i}($currentfile)]
 		close $fout
 	    }
@@ -1707,7 +1738,7 @@ proc RamDebugger::rbreak { args } {
     } elseif { $filetype == "C/C++" } {
 	# nothing
     } else {
-	set errormessage "error: this type of file does not admit debugging"
+	set errormessage "error: this type of file does not permmit debugging"
 	set currentfile $currentfile_save
 	error $errormessage
     }
@@ -1822,6 +1853,23 @@ proc RamDebugger::filenormalize { file } {
     }
 
     return $file
+}
+
+proc RamDebugger::GiveFileTypeForFileBrowser {} {
+    variable options
+
+    set types ""
+    set exts [array names options extensions,*]
+    set ipos [lsearch $exts extensions,TCL]
+    set elm [lindex $exts $ipos]
+    set exts [lreplace $exts $ipos $ipos]
+    set exts [linsert $exts 0 $elm]
+    foreach i $exts {
+	regexp {,(.*)} $i {} type
+	lappend types [list $type $options($i)]
+    }
+    lappend types [list "All Files" "*"]
+    return $types
 }
 
 proc RamDebugger::GiveFileType { filename } {
@@ -2051,7 +2099,7 @@ proc RamDebugger::RecieveErrorFromProgram { err errInfo args } {
     TextOutRaise
     after idle [string map [list %e $err %n \n] {
         WarnWin {Recieved Error from Debugged program:%n%e%nCheck Output for details}
-        RamDebugger::StopAtGUI "" -1
+	RamDebugger::StopAtGUI "" -1
     }]
 }
 
@@ -2069,23 +2117,30 @@ proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
     update
 }
 
-proc RamDebugger::RecieveFromProgramSource { file } {
+proc RamDebugger::RecieveFromProgramSource { args } {
     variable currentfile
 
+    if { [lindex $args 0] eq "-encoding" } {
+	set encoding [lindex $args 1]
+    } else { set encoding "" }
+    set file [lindex $args end]
     set retval [RamDebugger::DoinstrumentThisfile $file]
-    if { $retval } {
+    if { $retval == 1 } {
 	TextOutRaise
 	TextOutInsertBlue "Sending Instrumented file '$file'\n"
 
 	set currentfile_save $currentfile
 	set err [catch {
-	    set retval [rlist -returndata -asmainfile $file]
+	    set retval [rlist -returndata -encoding $encoding -asmainfile $file]
 	} errstring]
 	set currentfile $currentfile_save
 	if { $err } {
 	    error $errstring
 	}
 	return $retval
+    } elseif { $retval == 2 } {
+	TextOutRaise
+	TextOutInsertBlue "Sourcing file '$file'\n"
     }
     return [list ::RDC::sourceproc $file]
 }
@@ -2539,11 +2594,11 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	set options(ViewOnlyTextOrAll) All
     }
 
-    wm withdraw $t
-    update
-    after 0 wm deiconify $t
-
-
+    if { [[winfo toplevel $t] cget -use] == "" } {
+	wm withdraw $t
+	update
+	after 0 wm deiconify $t
+    }
 }
 
 # orient must be: h or v
@@ -2573,6 +2628,7 @@ proc RamDebugger::ExitGUI {} {
     variable TimeMeasureData
     variable debuggerstate
     variable SavedPositionsStack
+    variable readwriteprefs
 
     if { [SaveFile ask] == -1 } { return }
 
@@ -2635,12 +2691,19 @@ proc RamDebugger::ExitGUI {} {
     } else {
 	set options(maingeometry) [wm geometry [winfo toplevel $text]]
     }
-    if { $::tcl_platform(platform) == "windows" } {
-	registry set {HKEY_CURRENT_USER\Software\RamDebugger} IniData [array get options]
-    } else {
-	set fout [open ~/.ramdebugger w]
-	puts -nonewline $fout [array get options]
-	close $fout
+    if { $readwriteprefs } {
+	set err [catch {
+	    if { $::tcl_platform(platform) == "windows" } {
+		registry set {HKEY_CURRENT_USER\Software\RamDebugger} IniData [array get options]
+	    } else {
+		set fout [open ~/.ramdebugger_prefs w]
+		puts -nonewline $fout [array get options]
+		close $fout
+	    }
+	} errstring]
+	if { $err } {
+	    WarnWin "Could not save preferences: $errstring"
+	}
     }
     if { $remoteserverType == "master" } {
 	EvalRemote [list package forget RamDebugger]
@@ -2782,12 +2845,13 @@ proc RamDebugger::SaveFile { what } {
     if { $what == "saveas" || $currentfile == "*New file*" || $currentfile == "" } {
 	set NeedsReinstrument 1
 	set w [winfo toplevel $text]
-	set types {
-	    {{TCL Scripts}      {.tcl}        }
-	    {{C,C++ files}      {.cc .c .h}   }
-	    {{GiD files}      {.bas .prb .mat .cnd}   }
-	    {{All Files}        *             }
-	}
+	set types [GiveFileTypeForFileBrowser]
+# 	set types {
+# 	    {{TCL Scripts}      {.tcl}        }
+# 	    {{C,C++ files}      {.cc .c .h}   }
+# 	    {{GiD files}      {.bas .prb .mat .cnd}   }
+# 	    {{All Files}        *             }
+# 	}
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
 	set file [tk_getSaveFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
 	    -title "Save file"]
@@ -2819,12 +2883,14 @@ proc RamDebugger::OpenFile {} {
 
     if { [SaveFile ask] == -1 } { return }
 
-    set types {
-	{{TCL Scripts}      {.tcl}        }
-	{{C,C++ files}      {.cc .c .h}   }
-	{{GiD files}      {.bas .prb .mat .cnd}   }
-	{{All Files}        *             }
-    }
+    set types [GiveFileTypeForFileBrowser]
+
+#     set types {
+# 	{{TCL Scripts}      {.tcl}        }
+# 	{{C,C++ files}      {.cc .c .h}   }
+# 	{{GiD files}      {.bas .prb .mat .cnd}   }
+# 	{{All Files}        *             }
+#     }
     if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
     set file [tk_getOpenFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
 		  -title "Open source file"]
@@ -3057,7 +3123,7 @@ proc RamDebugger::CloseFile {} {
 	if { $WindowFilesListCurr >= $pos } { incr WindowFilesListCurr -1 }
     }
     if { [llength $WindowFilesList] > 0 } {
-	GotoPreviusNextInWinList prev
+	GotoPreviusNextInWinList prev 1
     } else { NewFile }
 }
 
@@ -3150,6 +3216,10 @@ proc RamDebugger::SaveFileF { file } {
 	    SetMessage ""
 	    WarnWin "Error saving file '$file'" $text
 	    return
+	}
+	set header [string range $files($file) 0 255]
+	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+	    fconfigure $fout -encoding utf-8
 	}
 	puts -nonewline $fout $files($file)
 	close $fout
@@ -3412,15 +3482,18 @@ proc RamDebugger::DisconnectStop {} {
     }
 }
 
-proc RamDebugger::GotoPreviusNextInWinList { what } {
+proc RamDebugger::GotoPreviusNextInWinList { what { force 0 } } {
     variable WindowFilesList
     variable WindowFilesListLineNums
     variable WindowFilesListCurr
+    variable currentfile
 
     if { [llength $WindowFilesList] < 1 } { return }
     switch $what {
 	prev {
-	    incr WindowFilesListCurr -1
+	    if { $force || $currentfile eq [lindex $WindowFilesList $WindowFilesListCurr] } {
+		incr WindowFilesListCurr -1
+	    }
 	    if { $WindowFilesListCurr < 0 } {
 		set WindowFilesListCurr [expr [llength $WindowFilesList]-1]
 	    }
@@ -5439,12 +5512,14 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
     }
 }
 
-proc lrepeat { element count } {
-    set retval ""
-    for { set i 0 } { $i < $count } { incr i } {
-	lappend retval $element
+if { [llength [info command lrepeat]] == 0 } {
+    proc lrepeat { count element } {
+	set retval ""
+	for { set i 0 } { $i < $count } { incr i } {
+	    lappend retval $element
+	}
+	return $retval
     }
-    return $retval
 }
 
 proc RamDebugger::MarkerContextualSubmenuDo { line what } {
@@ -5517,7 +5592,7 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
     tk_popup $menu $X $Y
 }
 
-proc RamDebugger::InitGUI { { w .gui } } {
+proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } { topleveluse "" } } {
     variable options
     variable options_def
     variable marker
@@ -5567,7 +5642,11 @@ proc RamDebugger::InitGUI { { w .gui } } {
     CreateModifyFonts
     InitOptions
 
-    toplevel $w
+    if { $topleveluse == "" } {
+	toplevel $w
+    } else {
+	toplevel $w -use $topleveluse
+    }
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
     ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
@@ -6195,10 +6274,15 @@ proc RamDebugger::InitGUI { { w .gui } } {
     # start up options
     ################################################################################
 
-    if { ![info exists options(maingeometry)] } {
+    if { $geometry != "" } {
+	set options(maingeometry) $geometry
+    } elseif { ![info exists options(maingeometry)] } {
 	set options(maingeometry) 800x600
     }
 
+    if { $ViewOnlyTextOrAll == "OnlyText" } {
+	set options(ViewOnlyTextOrAll) "OnlyText"
+    }
     if { [info exists options(ViewOnlyTextOrAll)] && $options(ViewOnlyTextOrAll) == "OnlyText" } {
 	RamDebugger::ViewOnlyTextOrAll
     }
@@ -6328,13 +6412,29 @@ if { [info command master] != "" } {
     set registerasremote 0
 } else { set registerasremote 1 }
 
-if { [lsearch $argv "-noprefs"] != -1 } {
-    set readprefs 0
-    set ipos [lsearch $argv "-noprefs"]
+if { [set ipos [lsearch $argv "-noprefs"]] != -1 } {
+    set readwriteprefs 0
     set argv [lreplace $argv $ipos $ipos]
-} else { set readprefs 1 }
+} else { set readwriteprefs 1 }
 
-RamDebugger::Init $readprefs $registerasremote
+if { [set ipos [lsearch $argv "-onlytext"]] != -1 } {
+    set ViewOnlyTextOrAll OnlyText
+    set argv [lreplace $argv $ipos $ipos]
+} else { set ViewOnlyTextOrAll "" }
+
+if { [set ipos [lsearch $argv "-rgeom*"]] != -1 } {
+    set iposm1 [expr {$ipos+1}]
+    set geometry [lindex $argv $iposm1]
+    set argv [lreplace $argv $ipos $iposm1]
+} else { set geometry "" }
+
+if { [set ipos [lsearch $argv "-ruse"]] != -1 } {
+    set iposm1 [expr {$ipos+1}]
+    set topleveluse [lindex $argv $iposm1]
+    set argv [lreplace $argv $ipos $iposm1]
+} else { set topleveluse "" }
+
+RamDebugger::Init $readwriteprefs $registerasremote
 
 ################################################################################
 #     Init the GUI part
@@ -6342,13 +6442,15 @@ RamDebugger::Init $readprefs $registerasremote
 
 if { [info command wm] != "" && [info commands tkcon_puts] == "" } {
     wm withdraw .
-    RamDebugger::InitGUI
-    RamDebugger::OpenDefaultFile
-    bind all <Control-x><Control-l> "source [info script] ; WarnWin reload"
-}
-if { [info command master] != "" } {
-    #RamDebugger::rdebug -master
-}
-if { [llength $argv] } {
-    RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
+    RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
+    if { [llength $argv] } {
+	RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
+    } else {
+	RamDebugger::OpenDefaultFile
+    }
+    bind all <Control-x><Control-l> "[list source [info script]] ; WarnWin reload"
+
+    if { [info command master] != "" } {
+	#RamDebugger::rdebug -master
+    }
 }

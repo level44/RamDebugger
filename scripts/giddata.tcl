@@ -174,7 +174,7 @@ proc RamDebugger::Wizard::CondMatPage1 { what f } {
 	label $f.f1.l1 -text "Geometry assign:" -grid "0 e py2"
 	ComboBox $f.f1.cb1 -textvariable DialogWin::user(CONDTYPE) \
 	    -values [list "over points" "over lines" "over surface" "over volumes" \
-			 "over layers"] -grid "1 px2" -editable 0
+		         "over layers"] -grid "1 px2" -editable 0
 	label $f.f1.l2 -text "Mesh assign:" -grid "0 e py2"
 	ComboBox $f.f1.cb12 -textvariable DialogWin::user(CONDMESHTYPE) \
 	    -values [list "over nodes" "over body elements" "over face elements"] \
@@ -333,7 +333,7 @@ proc RamDebugger::Wizard::CondMatPage3 { what f } {
 		set values ""
 		foreach "j post" [list global "#G#" automatic "#A#" automatic_alt "#L#"] {
 		    if { $DialogWin::user(AXESTYPE,$j,$i) } {
-			lappend values $DialogWin::user(AXESNAME,$j,$i)$post
+		        lappend values $DialogWin::user(AXESNAME,$j,$i)$post
 		    }
 		}
 		set fo [join $values ","]
@@ -348,7 +348,7 @@ proc RamDebugger::Wizard::CondMatPage3 { what f } {
 	    append txt "VALUE: $DialogWin::user(DEFAULTVALUE,$i)\n"
 	} else {
 	    set len_fo [llength $DialogWin::user(FIELDVALUES,$i)]
-	    append txt "VALUE: #N# $len_fo [lrepeat 0.0 $len_fo]\n"
+	    append txt "VALUE: #N# $len_fo [lrepeat $len_fo 0.0]\n"
 	}
     }
     switch $what {
@@ -475,27 +475,27 @@ proc RamDebugger::Wizard::CondMatWizard { text filename } {
 		            combobox {
 		                if { [lsearch $DialogWin::user(FIELDVALUES,$n) $DialogWin::user(DEFAULTVALUE,$n)] \
 		                    == -1 } {
-				    set val $DialogWin::user(DEFAULTVALUE,$n)
+		                    set val $DialogWin::user(DEFAULTVALUE,$n)
 		                    WarnWin "Default value: '$val' is not contained in options"
 		                    continue
 		                }
 		            }
-			    matrix {
-				if { [llength $DialogWin::user(FIELDVALUES,$n)] < 1 } {
-				    WarnWin "There are no column names for matrix field type"
+		            matrix {
+		                if { [llength $DialogWin::user(FIELDVALUES,$n)] < 1 } {
+		                    WarnWin "There are no column names for matrix field type"
 		                    continue
-				}
-			    }
-			    localaxes {
-				set values ""
-				foreach i [list global automatic automatic_alt] {
-				    if { $DialogWin::user(AXESTYPE,$i,$n) } { lappend values $i }
-				}
-				if { [llength $values] == 0 } {
-				    WarnWin "At least an option in local axes must be selected"
+		                }
+		            }
+		            localaxes {
+		                set values ""
+		                foreach i [list global automatic automatic_alt] {
+		                    if { $DialogWin::user(AXESTYPE,$i,$n) } { lappend values $i }
+		                }
+		                if { [llength $values] == 0 } {
+		                    WarnWin "At least an option in local axes must be selected"
 		                    continue
-				}
-			    }
+		                }
+		            }
 		        }
 		        if { [llength $DialogWin::user(FIELDNAMES)] < $n } {
 		            lappend DialogWin::user(FIELDNAMES) $DialogWin::user(FIELDNAME,$n)

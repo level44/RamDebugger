@@ -14,6 +14,7 @@ namespace eval RamDebugger::Instrumenter {
     variable OutputType
     variable NeedsNamespaceClose
     variable braceslevel
+    variable snitpackageinserted
 
     variable level
     variable colors
@@ -76,15 +77,15 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 	    set NewDoInstrument 1
 	} elseif { [lindex $words 0] == "destructor" && [llength $words] == 1 } {
 	    set NewDoInstrument 1
-	} elseif { [lindex $words 0] == "method" && [llength $words] == 3 } {
-	    set NewDoInstrument 1
-	} elseif { [lindex $words 0] == "proc" && [llength $words] == 3 } {
+	} elseif { [regexp {^(proc|method|typemethod|onconfigure|oncget)$} [lindex $words 0]] && \
+		       [llength $words] == 3 } {
 	    set NewDoInstrument 1
 	} elseif { $DoInstrument == 0 } {
-	    if { [regexp {snit::(type|widget|widgetadaptor)$} [lindex $words 0]] && [llength $words] == 2 } {
+	    if { [regexp {^(::)?snit::(type|widget|widgetadaptor)$} [lindex $words 0]] && \
+		     [llength $words] == 2 } {
 		set PushState 1
 	    } elseif { [lindex $words 0] == "namespace" && [lindex $words 1] == "eval" && \
-			    [llength $words] >= 3 } {
+		            [llength $words] >= 3 } {
 		set PushState 1
 #                 if { $OutputType == "R" } {
 #                     upvar 2 $newblocknameP newblock
@@ -274,8 +275,18 @@ proc RamDebugger::Instrumenter::GiveCommandUplevel {} {
 }
 
 proc RamDebugger::Instrumenter::IsProc { name } {
-    if { [regexp {snit::(type|widget|widgetadaptor)$} $name] } { return 1 }
-    return [regexp {^(proc|method|constructor|destructor)$} $name]
+    if { [regexp {^(::)?snit::(type|widget|widgetadaptor)$} $name] } { return 1 }
+    return [regexp {^(proc|method|typemethod|onconfigure|oncget|constructor|destructor)$} $name]
+}
+
+proc RamDebugger::Instrumenter::NeedsToInsertSnitPackage { name } {
+    variable snitpackageinserted
+
+    if { !$snitpackageinserted && [regexp {^(::)?snit::(type|widget|widgetadaptor)$} $name] } {
+	set snitpackageinserted 1
+	return 1
+    } else { return 0 }
+
 }
 
 # newblocknameP is for procs
@@ -289,6 +300,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
     variable DoInstrument
     variable OutputType
     variable braceslevel
+    variable snitpackageinserted
     variable level
     variable colors
 
@@ -314,6 +326,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
     append newblockP "# RamDebugger instrumented file. InstrumentProcs=1\n"
     append newblockR "# RamDebugger instrumented file. InstrumentProcs=0\n"
 
+    set snitpackageinserted 0
     set braceslevelNoEval 0
     set checkExtraCharsAfterCQB ""
     set lastc ""
@@ -372,9 +385,12 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		        if { $OutputType == "R" && [IsProc $words] } {
 		            if { $lastinstrumentedline == $line } {
 		                set numdel [expr [string length $words]+\
-						[string length "RDC::F $filenum $line ; "]]
+		                                [string length "RDC::F $filenum $line ; "]]
 		            } else { set numdel [string length $words] }
 		            set newblockR [string range $newblockR 0 end-$numdel]
+			    if { [NeedsToInsertSnitPackage $words] } {
+				append newblockP "package require snit\n"
+			    }
 		            append newblockP $words
 		            set OutputType P
 		        }
@@ -425,9 +441,12 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		            if { $OutputType == "R" && [IsProc $words] } {
 		                if { $lastinstrumentedline == $line } {
 		                    set numdel [expr [string length $words]+\
-						    [string length "RDC::F $filenum $line ; "]]
+		                                    [string length "RDC::F $filenum $line ; "]]
 		                } else { set numdel [string length $words] }
 		                set newblockR [string range $newblockR 0 end-$numdel]
+				if { [NeedsToInsertSnitPackage $words] } {
+				    append newblockP "package require snit\n"
+				}
 		                append newblockP $words
 		                set OutputType P
 		            }
@@ -463,9 +482,12 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		        if { $OutputType == "R" && [IsProc $words] } {
 		            if { $lastinstrumentedline == $line } {
 		                set numdel [expr [string length $words]+\
-						[string length "RDC::F $filenum $line ; "]]
+		                                [string length "RDC::F $filenum $line ; "]]
 		            } else { set numdel [string length $words] }
 		            set newblockR [string range $newblockR 0 end-$numdel]
+			    if { [NeedsToInsertSnitPackage $words] } {
+				append newblockP "package require snit\n"
+			    }
 		            append newblockP $words
 		            set OutputType P
 		        }
@@ -1172,3 +1194,33 @@ proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress
     }
 }
 
+# proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" { braceslevelIni 0 } } {
+
+#     set length [string length $block]
+#     if { $length >= 5000 && $progress } {
+# 	RamDebugger::ProgressVar 0 1
+#     }
+#     set lines [split $block \n]
+#     set nlines [llength $lines]
+#     #set nlines [regexp {\n} $block]
+#     set blockinfo ""
+#     for { set i 0 } { $i < $nlines } { incr i } {
+# 	lappend blockinfo [list 0 n]
+#     }
+#     dom parse $block doc
+#     set root [$doc documentElement]
+#     foreach node [$doc selectNodes //.] {
+# 	switch -- [$node nodeType] {
+# 	    ELEMENT_NODE {
+# 		set line [$node getLine]
+# 		set col [$node getColumn]
+# 	    COMMENT_NODE {
+
+# 	    }
+# 	}
+#     }
+
+
+
+
+# }
