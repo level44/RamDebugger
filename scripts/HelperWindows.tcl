@@ -1064,7 +1064,7 @@ proc RamDebugger::AboutWindow {} {
 
 
     $w.c create text 0 0 -anchor n -font "-family {new century schoolbook} -size 16 -weight bold"\
-	    -fill \#d3513d -text "Version 2.0" -tags text
+	    -fill \#d3513d -text "Version 2.5" -tags text
     RamDebugger::AboutMoveCanvas $w.c 0
 
 
@@ -1835,8 +1835,8 @@ proc RamDebugger::Search { w { what {} } } {
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
-	    bind $w.search <1> "destroy $w.search ; break"
-	    bind $w.search <3> "destroy $w.search ; break"
+	    bind $w.search <1> "destroy $w.search"
+	    bind $w.search <3> "destroy $w.search"
 	    bind $w.search <Return> "destroy $w.search ; break"
 	    bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
