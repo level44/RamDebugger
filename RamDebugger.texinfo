@@ -62,7 +62,7 @@
 @set Date July 2003
 @set Copyright 2002-2003 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.18 $
+@set CVSVersion  $Revision: 1.19 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -187,6 +187,12 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
+
+
+@item Added zoom option to @b{Display Windows hierarchy}
+@item Cache directory created in user directories
+@item Option @b{Pick window} in Windows hierarchy
+
 
 Changes From version 3.0 to version 3.1
 

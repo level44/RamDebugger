@@ -1930,6 +1930,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     if { ![info exists ::RamDebugger::searchFromBegin] } {
 	set ::RamDebugger::searchFromBegin 1
     }
+    if { $replace } { set ::RamDebugger::searchFromBegin 0 }
+
     set ::RamDebugger::replacestring ""
 
     set w [winfo toplevel $text]

@@ -113,6 +113,10 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 
     pack [label $w.l -bg white -justify left -anchor w]
     $w.l conf -bd 1 -relief solid
+
+
+    append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all"
+
     $w.l conf -text $res
     bind $w <Motion> "destroy $w"
 
@@ -136,7 +140,9 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     wm deiconify $w
 
     focus $w.l
-    bind $w.l <Control-c> "clipboard clear; clipboard append [list $res]"
+    set widgetname [lindex [split $res \n] 0]
+    bind $w.l <Control-x> "clipboard clear; [list clipboard append $widgetname]"
+    bind $w.l <Control-c> "clipboard clear; [list clipboard append $res]"
 
 }
 
@@ -145,7 +151,7 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } 
     set maxwidth 0
     foreach "widget info rest" $list {
 	foreach i $info {
-	    set width [font measure NormalFont $i]
+	    set width [font measure WindowsHierarchyFont $i]
 	    if { $width > $maxwidth } { set maxwidth $width }
 	}
     }
@@ -165,7 +171,7 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } 
 
 	    set width 0
 	    foreach i $info {
-		set widthi [font measure NormalFont $i]
+		set widthi [font measure WindowsHierarchyFont $i]
 		if { $widthi > $width } { set width $widthi }
 	    }
 
@@ -182,7 +188,7 @@ proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } 
 		    1 { set color blue }
 		    2 { set color green }
 		}
-		$canvas create text $x $ty -text $i -tags "items $widget" -font NormalFont \
+		$canvas create text $x $ty -text $i -tags "items $widget" -font WindowsHierarchyFont \
 		    -anchor nw \
 		    -fill $color
 		set ty [expr $ty+$linespace]
@@ -261,7 +267,16 @@ proc RamDebugger::DisplayWindowsHierarchyDo { w what { res "" } } {
 	}
     } else {
 	$DialogWinTop::user($w,canvas) delete items
-	set linespace [expr [font metrics NormalFont -linespace]+1]
+	if { $DialogWinTop::user($w,fontsize) < 1 } {
+	    bell
+	    set DialogWinTop::user($w,fontsize) 1
+	}
+	if { [lsearch [font names] WindowsHierarchyFont] == -1 } {
+	    font create WindowsHierarchyFont -size $DialogWinTop::user($w,fontsize)
+	} else {
+	    font configure WindowsHierarchyFont -size $DialogWinTop::user($w,fontsize)
+	}
+	set linespace [expr [font metrics WindowsHierarchyFont -linespace]+0]
 
 	foreach "newx newy" [DisplayWindowsHierarchyDoDraw $w $DialogWinTop::user($w,canvas) $res \
 	    5 5 $linespace] break
@@ -280,7 +295,8 @@ proc RamDebugger::DisplayWindowsHierarchyFind { w } {
     }
     set found 0
     foreach i [$canvas find all] {
-	if { $DisplayWindowsHierarchyFindLastId > -1 && $i <= $DisplayWindowsHierarchyFindLastId } {
+	if { $DisplayWindowsHierarchyFindLastId > -1 && \
+		 $i <= $DisplayWindowsHierarchyFindLastId } {
 	    continue
 	}
 	if { [$canvas type $i] == "text" } {
@@ -291,10 +307,19 @@ proc RamDebugger::DisplayWindowsHierarchyFind { w } {
 		break
 	    }
 	}
+	set tags [$canvas gettags $i]
+	if { [string match *.* $DialogWinTop::user(find)] && \
+		 [lsearch $tags $DialogWinTop::user(find)] != -1 } {
+	    set found 1
+	    set DisplayWindowsHierarchyFindLastId $i
+	    break
+	}
     }
     if { $found } {
-	$canvas select from $i 0
-	$canvas select to $i end
+	catch {
+	    $canvas select from $i 0
+	    $canvas select to $i end
+	}
 	foreach "x y" [$canvas coords $i] break
 	foreach "- - width height" [$canvas cget -scrollregion] break
 	
@@ -313,6 +338,83 @@ proc RamDebugger::DisplayWindowsHierarchyFind { w } {
     }
 }
 
+proc RamDebugger::DisplayWindowsPickWindow { w button } {
+    variable remoteserver
+
+    set l [winfo parent $button].__l
+    set comm {
+	set widgets [list .]
+	set curr 0
+	while { $curr < [llength $widgets] } {
+	    set wi [lindex $widgets $curr]
+	    bindtags $wi [concat givemeyourname [bindtags $wi]]
+	    eval lappend widgets [winfo children $wi]
+	    incr curr
+	}
+	bind givemeyourname <1> EVAL
+    }
+    if { $DialogWinTop::user($w,type) == "ramdebugger" } {
+	set retcomm [list RamDebugger::DisplayWindowsPickWindowDo $w $button %W]
+    } else {
+	set retcomm [list RDC::SendDev [list RamDebugger::DisplayWindowsPickWindowDo \
+		                            $w $l %W]]
+    }
+    set comm [string map [list EVAL [list $retcomm]] $comm]
+    
+    if { $DialogWinTop::user($w,type) == "ramdebugger" } {
+	eval $comm
+    } else {
+	if { $remoteserver == "" } {
+	    after 100 [list WarnWin "Error: there is no debugged application" \
+		           $DialogWinTop::user($w,canvas)]
+	    $DialogWinTop::user($w,canvas) delete items
+	    return
+	}
+	EvalRemote $comm
+    }
+    label $l -text "Pick a widget to find its name" -height 2
+    place $l -in [winfo parent $button] -x [winfo x $button] -y [winfo y $button] -anchor nw
+    bind $l <1> "[list RamDebugger::DisplayWindowsPickWindowDo $w $l ""] ; break"
+}
+
+proc RamDebugger::DisplayWindowsPickWindowDo { w l widget } {
+    variable remoteserver
+
+    destroy $l
+
+    set comm {
+	set widgets [list .]
+	set curr 0
+	while { $curr < [llength $widgets] } {
+	    set wi [lindex $widgets $curr]
+	    if { [lindex [bindtags $wi] 0] == "givemeyourname" } {
+		bindtags $wi [lrange [bindtags $wi] 1 end]
+	    }
+	    eval lappend widgets [winfo children $wi]
+	    incr curr
+	}
+	bind givemeyourname <1> ""
+    }
+    if { $DialogWinTop::user($w,type) == "ramdebugger" } {
+	eval $comm
+    } else {
+	if { $remoteserver == "" } {
+	    after 100 [list WarnWin "Error: there is no debugged application" \
+		           $DialogWinTop::user($w,canvas)]
+	    $DialogWinTop::user($w,canvas) delete items
+	    return
+	}
+	EvalRemote $comm
+    }
+    
+    if { $widget == "" } { return } 
+
+    raise $w
+    set DisplayWindowsHierarchyFindLastId -1
+    set DialogWinTop::user(find) $widget
+    DisplayWindowsHierarchyFind $w
+} 
+
 proc RamDebugger::DisplayWindowsHierarchyCancel { f } {
     destroy [winfo toplevel $f]
 }
@@ -330,19 +432,39 @@ proc RamDebugger::DisplayWindowsHierarchy {} {
     radiobutton $f.r2 -text "In RamDebugger" -variable DialogWinTop::user($w,type) -value ramdebugger \
        -command "RamDebugger::DisplayWindowsHierarchyDo $w do" -grid "1 w"
 
-    frame $f.f -grid "0 2"
+    if { ![info exists DialogWinTop::user($w,fontsize)] } {
+	set DialogWinTop::user($w,fontsize) [font actual NormalFont -size]
+    }
+
+    set bbox [ButtonBox $f.font -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "2 nw px5 py3" \
+	    -spacing 2]
+    $bbox add -image viewmag-16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Decrease display size" \
+	 -command "[list incr DialogWinTop::user($w,fontsize) -1] ;\
+                    [list RamDebugger::DisplayWindowsHierarchyDo $w do]"
+    $bbox add -image viewmag+16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext "Increase display size" \
+	 -command "[list incr DialogWinTop::user($w,fontsize) 1] ;\
+                    [list RamDebugger::DisplayWindowsHierarchyDo $w do]"
+
+    frame $f.f -grid "0 3"
     label $f.f.l -text "Find:" -grid 0
     entry $f.f.e -textvar DialogWinTop::user(find) -grid 1
 
     tkTabToWindow $f.f.e
 
-    button $f.f.b1 -text Go -width 5 -grid "2 px3 py3" -command \
+    button $f.f.b01 -text Go -width 5 -grid "2 px3 py3" -command \
        "RamDebugger::DisplayWindowsHierarchyFind $w"
-    bind $f.f.e <Return> "$f.f.b1 invoke"
+    bind $f.f.e <Return> "$f.f.b01 invoke"
+
+    button $f.f.b1 -text "Pick the window" -grid "0 2 w px3 py3" -command \
+	[list RamDebugger::DisplayWindowsPickWindow $w $f.f.b1]
 
     set DialogWinTop::user($w,type) debug
 
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 3"]
     set DialogWinTop::user($w,canvas) [canvas $sw.t -width 600 -height 400 -bg white -bd 0 ]
     $sw setwidget $DialogWinTop::user($w,canvas)
 

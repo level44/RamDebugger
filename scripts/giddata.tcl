@@ -1,5 +1,5 @@
 
-proc RamDebugger::UpdateNumbersInGiDFiles {} {
+proc RamDebugger::UpdateNumbersInGiDFiles { { dowarn 1 } } {
     variable text
 
     set inum 0
@@ -19,7 +19,7 @@ proc RamDebugger::UpdateNumbersInGiDFiles {} {
 	}
 	set idx [$text index "$idx lineend"]
     }
-    WarnWin "There were $inum numbers. $inumdiff changed"
+    if { $dowarn } { WarnWin "There were $inum numbers. $inumdiff changed" }
 }
 
 proc RamDebugger::SelectBasLoop {} {
@@ -147,14 +147,16 @@ proc RamDebugger::Wizard::OpenPage { FillCmd hasprevious hasnext } {
     }
 }
 
-proc RamDebugger::Wizard::CondPage1 { f } {
+proc RamDebugger::Wizard::CondMatPage1 { what f } {
     
-    if { ![info exists DialogWin::user(NAME)] } {
-	for { set i 0 } { $i < 100 } { incr i } {
-	    if { [lsearch $DialogWin::user(CONDNAMES) condition$i] == -1 } {
-		set DialogWin::user(NAME) condition$i
-		break
-	    }
+    switch $what {
+	condition { set names $DialogWin::user(CONDNAMES) }
+	material { set names $DialogWin::user(MATNAMES) }
+    }
+    for { set i 0 } { $i < 100 } { incr i } {
+	if { [lsearch $names $what$i] == -1 } {
+	    set DialogWin::user(NAME) $what$i
+	    break
 	}
     }
     if { ![info exists DialogWin::user(CONDTYPE)] } {
@@ -164,23 +166,24 @@ proc RamDebugger::Wizard::CondPage1 { f } {
 	set DialogWin::user(CONDMESHTYPE) "over nodes"
     }
 
-    labelframe $f.f1 -text "condition basics" -grid 0
-    label $f.f1.l0 -text "Condition name:" -grid "0 e"
+    labelframe $f.f1 -text "$what basics" -grid 0
+    label $f.f1.l0 -text "[string totitle $what] name:" -grid "0 e"
     ComboBox $f.f1.cb0 -textvariable DialogWin::user(NAME) \
-	-values $DialogWin::user(CONDNAMES) -grid "1 px2"
-    label $f.f1.l1 -text "Geometry assign:" -grid "0 e py2"
-    ComboBox $f.f1.cb1 -textvariable DialogWin::user(CONDTYPE) \
-	-values [list "over points" "over lines" "over surface" "over volumes" \
-	    "over layers"] -grid "1 px2" -editable 0
-    label $f.f1.l2 -text "Mesh assign:" -grid "0 e py2"
-    ComboBox $f.f1.cb12 -textvariable DialogWin::user(CONDMESHTYPE) \
-	-values [list "over nodes" "over body elements" "over face elements"] \
-	-grid "1 px2" -editable 0
-
+	-values $names -grid "1 px2"
+    if { $what == "condition" } {
+	label $f.f1.l1 -text "Geometry assign:" -grid "0 e py2"
+	ComboBox $f.f1.cb1 -textvariable DialogWin::user(CONDTYPE) \
+	    -values [list "over points" "over lines" "over surface" "over volumes" \
+			 "over layers"] -grid "1 px2" -editable 0
+	label $f.f1.l2 -text "Mesh assign:" -grid "0 e py2"
+	ComboBox $f.f1.cb12 -textvariable DialogWin::user(CONDMESHTYPE) \
+	    -values [list "over nodes" "over body elements" "over face elements"] \
+	    -grid "1 px2" -editable 0
+    }
     ::tk::TabToWindow $f.f1.cb0
 }
 
-proc RamDebugger::Wizard::ModCondPage2 { f } {
+proc RamDebugger::Wizard::ModCondMatPage2 { what f } {
 
     foreach i [winfo children $f] { destroy $i }
     set n $DialogWin::user(FIELDNUM)
@@ -259,7 +262,7 @@ proc RamDebugger::Wizard::ModCondPage2 { f } {
     supergrid::go $f
 }
 
-proc RamDebugger::Wizard::CondPage2 { f } {
+proc RamDebugger::Wizard::CondMatPage2 { what f } {
     
     set n $DialogWin::user(FIELDNUM)
     if { ![info exists DialogWin::user(FIELDNAME,$n)] || $n > [llength $DialogWin::user(FIELDNAMES)] } {
@@ -284,26 +287,39 @@ proc RamDebugger::Wizard::CondPage2 { f } {
     label $f.f1.l1 -text "Field type:" -grid 0
     frame $f.f1.f -grid "0 2 w px20"
     radiobutton $f.f1.f.r1 -text Normal -variable DialogWin::user(FIELDTYPE,$n) \
-	-value normal -grid "0 w" -command "RamDebugger::Wizard::ModCondPage2 $f.f2"
+	-value normal -grid "0 w" -command [list RamDebugger::Wizard::ModCondMatPage2 $what $f.f2]
     radiobutton $f.f1.f.r2 -text Combobox -variable DialogWin::user(FIELDTYPE,$n) \
-	-value combobox -grid "0 w" -command "RamDebugger::Wizard::ModCondPage2 $f.f2"
-    radiobutton $f.f1.f.r3 -text "Local Axes" -variable DialogWin::user(FIELDTYPE,$n) \
-	-value localaxes -grid "0 w" -command "RamDebugger::Wizard::ModCondPage2 $f.f2"
+	-value combobox -grid "0 w" -command [list RamDebugger::Wizard::ModCondMatPage2 $what $f.f2]
+    if { $what == "condition" } {
+	radiobutton $f.f1.f.r3 -text "Local Axes" -variable DialogWin::user(FIELDTYPE,$n) \
+	    -value localaxes -grid "0 w" -command [list RamDebugger::Wizard::ModCondPage2 $what $f.f2]
+    }
     radiobutton $f.f1.f.r4 -text Matrix -variable DialogWin::user(FIELDTYPE,$n) \
-	-value matrix -grid "0 w" -command "RamDebugger::Wizard::ModCondPage2 $f.f2"
+	-value matrix -grid "0 w" -command [list RamDebugger::Wizard::ModCondMatPage2 $what $f.f2]
 
     labelframe $f.f2 -text "default value" -grid 0
-    RamDebugger::Wizard::ModCondPage2 $f.f2
+    RamDebugger::Wizard::ModCondMatPage2 $what $f.f2
 
     checkbutton $f.l0 -text "Enter another field" -variable DialogWin::user(anotherfield) -grid "0 w"
     set DialogWin::user(anotherfield) 0
 
 }
-proc RamDebugger::Wizard::CondPage3 { f } {
+proc RamDebugger::Wizard::CondMatPage3 { what f } {
 
-    set txt "NUMBER: $DialogWin::user(MAXCONDNUM) CONDITION: $DialogWin::user(NAME)\n"
-    append txt "CONDTYPE: $DialogWin::user(CONDTYPE)\n"
-    append txt "CONDMESHTYPE: $DialogWin::user(CONDMESHTYPE)\n"
+    switch $what {
+	condition { set txt "NUMBER: $DialogWin::user(MAXCONDNUM) " }
+	material { set txt "NUMBER: $DialogWin::user(MAXMATNUM) " }
+    }
+    switch $what {
+	condition {
+	    append txt "CONDITION: $DialogWin::user(NAME)\n"
+	    append txt "CONDTYPE: $DialogWin::user(CONDTYPE)\n"
+	    append txt "CONDMESHTYPE: $DialogWin::user(CONDMESHTYPE)\n"
+	}
+	material {
+	    append txt "MATERIAL: $DialogWin::user(NAME)\n"
+	}
+    }
     for { set i 1 } { $i <= $DialogWin::user(FIELDNUM) } { incr i } {
 	switch $DialogWin::user(FIELDTYPE,$i) {
 	    normal {
@@ -335,11 +351,14 @@ proc RamDebugger::Wizard::CondPage3 { f } {
 	    append txt "VALUE: #N# $len_fo [lrepeat 0.0 $len_fo]\n"
 	}
     }
-    append txt "END CONDITION\n"
+    switch $what {
+	condition { append txt "END CONDITION" }
+	material { append txt "END MATERIAL" }
+    }
     set DialogWin::user(CONTTXT) $txt
 
-    labelframe $f.f1 -text "generated condition" -grid 0
-    label $f.f1.l0 -text "The generated condition is the following. Proceed?" -grid 0
+    labelframe $f.f1 -text "generated $what" -grid 0
+    label $f.f1.l0 -text "The generated $what is the following. Proceed?" -grid 0
     set sw [ScrolledWindow $f.f1.lf -relief sunken -borderwidth 0 -grid 0]
     text $sw.t -background white -width 30 -height 6 -wrap none
     $sw setwidget $sw.t
@@ -348,30 +367,64 @@ proc RamDebugger::Wizard::CondPage3 { f } {
     bind $sw.t <1> "focus $sw.t"
 }
 
-proc RamDebugger::Wizard::CondWizard { text } {
+proc RamDebugger::Wizard::CondMatWizard { text filename } {
     variable nice_image
+
+    switch -- [file extension $filename] {
+	.cnd { set what condition }
+	.mat { set what material }
+	default {
+	    WarnWin "File '$filename' must be a GiD CND or a MAT file"
+	    return
+	}
+    }
+
+    set idx [$text index insert]
+    if { [string trim [$text get "$idx linestart" "$idx lineend"]] != "" } {
+	WarnWin "Insertion cursor must be in a blank line"
+	return
+    }
+    if { ![regexp {(END\s+(CONDITION|MATERIAL)\s+|^\s*)$} [$text get 1.0 $idx]] } {
+	WarnWin "Insertion cursor must be at the beginning of the file or after one $what"
+	return
+    }
 
     set txt [$text get 1.0 end-1c]
 
-    set DialogWin::user(CONDNAMES) ""
-    set DialogWin::user(MAXCONDNUM) 0
-    foreach "- num cnd" [regexp -inline -all {(?in)^\s*NUMBER:\s*(\d+)\s+CONDITION:\s*(\S+)} $txt] {
-	lappend DialogWin::user(CONDNAMES) $cnd
-	if { $num > $DialogWin::user(MAXCONDNUM) } { set DialogWin::user(MAXCONDNUM) $num }
+    switch $what {
+	condition {
+	    set DialogWin::user(CONDNAMES) ""
+	    set DialogWin::user(MAXCONDNUM) 0
+	    foreach "- num cnd" [regexp -inline -all {(?in)^\s*NUMBER:\s*(\d+)\s+CONDITION:\s*(\S+)} $txt] {
+		lappend DialogWin::user(CONDNAMES) $cnd
+		if { $num > $DialogWin::user(MAXCONDNUM) } { set DialogWin::user(MAXCONDNUM) $num }
+	    }
+	    incr DialogWin::user(MAXCONDNUM)
+	    set names $DialogWin::user(CONDNAMES)
+	}
+	material {
+	    set DialogWin::user(MATNAMES) ""
+	    set DialogWin::user(MAXMATNUM) 0
+	    foreach "- num mat" [regexp -inline -all {(?in)^\s*NUMBER:\s*(\d+)\s+MATERIAL:\s*(\S+)} $txt] {
+		lappend DialogWin::user(MATNAMES) $mat
+		if { $num > $DialogWin::user(MAXMATNUM) } { set DialogWin::user(MAXMATNUM) $num }
+	    }
+	    incr DialogWin::user(MAXMATNUM)
+	    set names $DialogWin::user(MATNAMES)
+	}
     }
-    incr DialogWin::user(MAXCONDNUM)
     set DialogWin::user(FIELDNAMES) ""
     foreach "- f" [regexp -inline -all {(?in)^\s*QUESTION:\s*([-\w]+)} $txt] {
 	lappend DialogWin::user(FIELDNAMES) $f
     }
-    EnterInitialData $text $nice_image "Create condition" "Enter data to define condition:"
-    set numlevels [llength [info command ::RamDebugger::Wizard::CondPage*]]
+    EnterInitialData $text $nice_image "Create $what" "Enter data to define $what:"
+    set numlevels [llength [info command ::RamDebugger::Wizard::CondMatPage*]]
     set level 1
     while 1 {
 	switch $level 1 { set hasprevious 0 } default { set hasprevious 1 }
 	switch $level $numlevels { set hasnext 0 } default { set hasnext 1 }
    
-	set retval [RamDebugger::Wizard::OpenPage RamDebugger::Wizard::CondPage$level \
+	set retval [RamDebugger::Wizard::OpenPage [list RamDebugger::Wizard::CondMatPage$level $what] \
 		$hasprevious $hasnext]
 	switch $retval {
 	    cancel { return }
@@ -388,11 +441,11 @@ proc RamDebugger::Wizard::CondWizard { text } {
 		        set DialogWin::user(NAME) [string trim $DialogWin::user(NAME)]
 		        regsub -all {\s+} $DialogWin::user(NAME) {_} DialogWin::user(NAME)
 		        if { $DialogWin::user(NAME) == "" } {
-		            WarnWin "Condition name is void. Fill it, please"
+		            WarnWin "[string totitle $what] name is void. Fill it, please"
 		            continue
 		        }
-		        if { [lsearch $DialogWin::user(CONDNAMES) $DialogWin::user(NAME)] != -1 } {
-		            WarnWin "Repeated condition name '$DialogWin::user(NAME)'"
+		        if { [lsearch $names $DialogWin::user(NAME)] != -1 } {
+		            WarnWin "Repeated $what name '$DialogWin::user(NAME)'"
 		            continue
 		        }
 		        set DialogWin::user(FIELDNUM) 1
@@ -404,13 +457,13 @@ proc RamDebugger::Wizard::CondWizard { text } {
 		        set DialogWin::user(FIELDNAME,$n) [string trim $DialogWin::user(FIELDNAME,$n)]
 		        regsub -all {\s+} $DialogWin::user(FIELDNAME,$n) {_} DialogWin::user(FIELDNAME,$n)
 		        if { $DialogWin::user(FIELDNAME,$n) == "" } {
-		            WarnWin "Condition field is void. Fill it, please"
+		            WarnWin "[string totitle $what] field is void. Fill it, please"
 		            continue
 		        }
 		        set DialogWin::user(DEFAULTVALUE,$n) [string trim $DialogWin::user(DEFAULTVALUE,$n)]
 		        regsub -all {\s+} $DialogWin::user(DEFAULTVALUE,$n) {_} DialogWin::user(DEFAULTVALUE,$n)
 		        if { $DialogWin::user(DEFAULTVALUE,$n) == "" && $DialogWin::user(FIELDTYPE,$n) != "matrix" } {
-		            WarnWin "Condition default value is void. Fill it, please"
+		            WarnWin "[string totitle $what] default value is void. Fill it, please"
 		            continue
 		        }
 		        if { [llength $DialogWin::user(FIELDNAMES)] < $n && \
@@ -465,6 +518,7 @@ proc RamDebugger::Wizard::CondWizard { text } {
     catch { DialogWin::DestroyWindow }
 
     $text insert insert $DialogWin::user(CONTTXT)
+    UpdateNumbersInGiDFiles 0
 }
 
 namespace eval RamDebugger::Wizard {

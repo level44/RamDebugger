@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.27 2003/07/23 08:55:17 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.28 2003/09/03 16:12:27 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -148,11 +148,21 @@ proc RamDebugger::Init { readprefs { registerasremote 1 } } {
     lappend ::auto_path [file join $MainDir addons]
     lappend ::auto_path [file join $MainDir scripts]
 
-    if { ![file isdir [file join $MainDir cache]] } {
-	catch { file mkdir [file join $MainDir cache] }
+    set dirs ""
+    if { [info exists ::env(APPDATA)] } {
+	lappend dirs [file join $::env(APPDATA) RamDebugger cache]
     }
-    if { [file isdir [file join $MainDir cache]] } {
-	set CacheDir [file join $MainDir cache]
+    if { [info exists ::env(HOME)] } {
+	lappend dirs [file join $::env(HOME) .RamDebugger cache]
+    }
+    lappend dirs [file join $MainDir cache]
+
+    foreach i $dirs {
+	catch { file mkdir $i }
+	if { [file isdirectory $i] } {
+	    set CacheDir $i
+	    break
+	}
     }
 
     ################################################################################
@@ -1588,6 +1598,12 @@ proc RamDebugger::rbreak { args } {
 		error $errormessage
 	    }
 	}
+    } elseif { $filetype == "C/C++" } {
+	# nothing
+    } else {
+	set errormessage "error: this type of file does not admit debugging"
+	set currentfile $currentfile_save
+	error $errormessage
     }
    
     set NumBreakPoint 1
@@ -2614,6 +2630,8 @@ proc RamDebugger::SaveFile { what } {
 	set w [winfo toplevel $text]
 	set types {
 	    {{TCL Scripts}      {.tcl}        }
+	    {{C,C++ files}      {.cc .c .h}   }
+	    {{GiD files}      {.bas .prb .mat .cnd}   }
 	    {{All Files}        *             }
 	}
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
@@ -2672,6 +2690,8 @@ proc RamDebugger::OpenFileF { file { force 0 } } {
     variable WindowFilesListLineNums
     variable WindowFilesListCurr
     variable options
+
+    set file [filenormalize $file]
 
     if { $force == -1 } {
 	set force 0
@@ -3932,7 +3952,7 @@ proc RamDebugger::TextOutInsert { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    foreach i [split $data \n] {
+    foreach i [split [string trimright $data \n] \n] {
 	TextInsertAndWrap $textOUT "$i\n" 200
 	if { [info command tkcon_puts] != "" } { catch { tkcon_puts "$i" } }
     }
@@ -3948,7 +3968,7 @@ proc RamDebugger::TextOutInsertRed { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    foreach i [split $data \n] {
+    foreach i [split [string trimright $data \n] \n] {
 	TextInsertAndWrap $textOUT "$i\n" 200 red
 	if { [info command tkcon_puts] != "" } { catch { tkcon_puts stderr "$i" } }
     }
@@ -3964,7 +3984,7 @@ proc RamDebugger::TextOutInsertBlue { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    foreach i [split $data \n] {
+    foreach i [split [string trimright $data \n] \n] {
 	TextInsertAndWrap $textOUT "$i\n" 200 blue
     }
     $textOUT tag configure blue -foreground blue
@@ -5131,14 +5151,20 @@ proc RamDebugger::ApplyDropBinding { w command } {
 
     if { [info command dnd] == "" } { return }
 
-    if { $::tcl_platform(platform) == "windows"} {
-	dnd bindtarget $w Files <Drop> $command
-    } else {
-	dnd bindtarget $w text/uri-list <Drop> $command
-	foreach i [winfo children $w] {
-	    ApplyDropBinding $i $command
-	}
+    dnd bindtarget $w text/uri-list <Drop> $command
+    foreach i [winfo children $w] {
+	ApplyDropBinding $i $command
     }
+
+
+#     if { $::tcl_platform(platform) == "windows"} {
+#         dnd bindtarget $w Files <Drop> $command
+#     } else {
+#         dnd bindtarget $w text/uri-list <Drop> $command
+#         foreach i [winfo children $w] {
+#             ApplyDropBinding $i $command
+#         }
+#     }
 }
 
 proc RamDebugger::DropBindingDone { files } {
@@ -5152,6 +5178,7 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
     variable mainframe
     variable descmenu
     variable text
+    variable currentfile
 
     set menu [$mainframe getmenu filetypemenu]
     
@@ -5166,9 +5193,9 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 		      "Change Conditions or Materials numbers and orders them" \
 		      "" -command "RamDebugger::UpdateNumbersInGiDFiles"] \
 		[list separator] \
-		[list command "&Conditions wizard" {} \
+		[list command "&Conditions/Materials wizard" {} \
 		      "Makes it easy to create one new condition" \
-		      "" -command "RamDebugger::Wizard::CondWizard $text"]]
+		     "" -command [list RamDebugger::Wizard::CondMatWizard $text $currentfile]]]
 	    set descmenu_new [linsert $descmenu 30 "&GiD" all filetypemenu 0 $menu]
 	    set changes 1
 	}
@@ -5634,9 +5661,9 @@ proc RamDebugger::InitGUI { { w .gui } } {
     bind $textCOMP <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y compile]
 
 
-    proc TextStackTraceRaise {} "$pane2in2.nb raise stacktrace"
-    proc TextOutRaise {} "$pane2in2.nb raise output"
-    proc TextCompRaise {} "$pane2in2.nb raise compile"
+    proc TextStackTraceRaise {} "catch { $pane2in2.nb raise stacktrace }"
+    proc TextOutRaise {} "catch { $pane2in2.nb raise output }"
+    proc TextCompRaise {} "catch { $pane2in2.nb raise compile }"
 
 
     set pane3 [$pw add -weight $weight3]
@@ -5888,8 +5915,8 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		for { set i 0 } { $i < [llength $options(RecentFiles)] } { incr i } {
 		    set options(currentfile) [lindex $options(RecentFiles) $i]
 		    if { ![AreFilesEqual $options(currentfile) \
-			       [sendmaster set ::RamDebugger::currentfile]] } {
-			break
+		               [sendmaster set ::RamDebugger::currentfile]] } {
+		        break
 		    } else { set options(currentfile) "" }
 		}
 	    }
