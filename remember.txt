@@ -1,0 +1,8 @@
+
+
+
+* actualize version number in .tcl and in .texinfo and in makefile_win
+* check makefile_win.tcl to see if more thing need to be included in the ZIP file
+* There are some help pointers in the code. Check that they still point OK to the
+  correct help file (ViewHelpFile).
+* Check the README

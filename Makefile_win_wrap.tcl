@@ -29,7 +29,18 @@ proc Execute { args } {
     .t ins end "done\n"
 }
 
-set FREEWRAP /tcltk/freewrap44/freewrap.exe
+proc Rename { tofile fromfile_tcl } {
+
+    if { $::tcl_platform(platform) == "windows" } {
+	set from [file root $fromfile_tcl].exe
+    } else {
+	set from [file root $fromfile_tcl]
+    }
+    file rename -force $from $from.back
+    file rename -force $from.back $tofile
+}
+
+set FREEWRAP /tcltk/freewrap53b/freewrap.exe
 set FREEWRAPTCLSH /utils/freewrapTCLSH
 set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html" \
     -split_node -menu}
@@ -38,16 +49,14 @@ set ZIP /utils/zip.exe
 set ZIPFILES [list RamDebugger/RamDebugger.tcl RamDebugger/license.terms RamDebugger/Readme \
     RamDebugger/addons RamDebugger/scripts RamDebugger/Examples RamDebugger/help]
 
+set files [list RamDebugger.tcl]
+
 pack [text .t -width 70 -height 4]
 
-if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
-    set oldcwd [pwd]
-    cd help/01RamDebugger
-    eval [concat Execute $TEXI2HTML ../../RamDebugger.texinfo]
-    cd $oldcwd
+if { [eval MustCompile RamDebugger.exe $files] } {
+    file delete RamDebugger.exe
+    eval [concat Execute $FREEWRAP -e $files]
 }
-
-zipfile RamDebugger1.3.zip .. $ZIPFILES
 
 update
 after 500
