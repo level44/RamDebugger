@@ -82,7 +82,7 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 #                 set NeedsNamespaceClose 1
 	    }
 	} elseif { $DoInstrument == 1 } {
-	    switch -- [lindex $words 0] {
+	    switch -glob -- [lindex $words 0] {
 		"if" {
 		    if { [llength $words] == 2 } {
 		        set NewDoInstrument 1
@@ -112,7 +112,7 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		        set NewDoInstrument 1
 		    }
 		}
-		"foreach" {
+		"*foreach" {
 		    if { [llength $words] >= 3 } {
 		        set NewDoInstrument 1
 		    }

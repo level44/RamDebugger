@@ -603,11 +603,11 @@ proc RamDebugger::PreferencesWindow {} {
 	set DialogWin::user(CheckRemotes) $options(CheckRemotes)
     }
 
-    checkbutton $f1.cb1 -text "Confirm start debugging" -variable \
+    checkbutton $f1.cb1 -text "Confirm restart debugging" -variable \
        DialogWin::user(ConfirmStartDebugging) -grid "0 3 w"
     DynamicHelp::register $f1.cb1 balloon "\
 	If this option is set, a confirmation window will be displayed\n\
-	when starting the execution of the debugger"
+	when restarting the execution of the debugger"
     
     set DialogWin::user(ConfirmStartDebugging) $options(ConfirmStartDebugging)
 
@@ -1850,14 +1850,16 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	set commands [list "RamDebugger::Search $w begin 0" "RamDebugger::SearchReplace $w cancel"]
 	set morebuttons ""
 	set OKname ""
+	set title "Search"
     } else {
 	set commands [list "RamDebugger::SearchReplace $w beginreplace" "RamDebugger::SearchReplace $w replace" \
 		"RamDebugger::SearchReplace $w replaceall"  "RamDebugger::SearchReplace $w cancel"]
 	set morebuttons [list "Replace" "Replace all"]
 	set OKname "Search"
+	set title "Replace"
     }
 	
-    set f [DialogWinTop::Init $text "Search" separator $commands $morebuttons $OKname]
+    set f [DialogWinTop::Init $text $title separator $commands $morebuttons $OKname]
     set w [winfo toplevel $f]
 
     label $f.l1 -text "Search:" -grid 0
@@ -2152,6 +2154,20 @@ proc RamDebugger::OpenProgram { what } {
     $what eval [list source $file]
 }
 
+proc RamDebugger::revalforTkcon { comm } {
+    variable remoteserver
+
+    if { $remoteserver == "" } {
+	catch { tkcon_puts stderr "There is no current debugged program" }
+	::tkcon::Attach {}
+	set ::tkcon::PRIV(appname) ""
+	set ::tkcon::attachdebugged 0
+	::tkcon::Prompt \n [::tkcon::CmdGet $::tkcon::PRIV(console)]
+	return [uplevel #0 $comm]
+    }
+    return [EvalRemoteAndReturn $comm]
+}
+
 proc RamDebugger::OpenConsole {} {
     variable MainDir
 
@@ -2184,6 +2200,25 @@ proc RamDebugger::OpenConsole {} {
 	#set tkcon(cols) 60
 	#set tkcon(rows) 18
 	catch [list namespace import RamDebugger::*]
+
+	set menubar $::tkcon::PRIV(menubar)
+	$menubar insert [$menubar index end] cascade -label "RamDebugger" -underline 0 \
+	    -menu $menubar.ramm
+	set m $menubar.ramm
+	menu $m
+	$m add check -label "Attach to debugged program" -variable ::tkcon::attachdebugged \
+	    -command {
+		if { !$::tkcon::attachdebugged } {
+		    ::tkcon::Attach {}
+		    set ::tkcon::PRIV(appname) ""
+		    ::tkcon::Prompt \n [::tkcon::CmdGet $::tkcon::PRIV(console)]
+		} else {
+		    interp alias {} ::tkcon::EvalAttached {} RamDebugger::revalforTkcon
+		    set ::tkcon::PRIV(appname) "RamDebugger"
+		    ::tkcon::Prompt \n [::tkcon::CmdGet $::tkcon::PRIV(console)]
+		    RamDebugger::revalforTkcon ""
+		}
+	    }
 	puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
     }
     if { [winfo exists .tkcon] } { destroy .tkcon }
