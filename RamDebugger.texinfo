@@ -58,11 +58,11 @@
 
 @set photo
 
-@set Version 4.4
-@set Date August 2004
-@set Copyright 2002-2004 Ramon Ribó
+@set Version 4.98
+@set Date December 2004
+@set Copyright 2002-2005 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.28 $
+@set CVSVersion  $Revision: 1.29 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -190,10 +190,14 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
+Changes From version 3.2 to version 4.9
+
+@itemize @bullet
 @item Fast c++ instrumenter
 @item Profile procedures
 @item Files list obtained with Ctrl-Tab has a new alternative list based on
 current directory
+@end itemize
 
 Changes From version 3.2 to version 4.4
 

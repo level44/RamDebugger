@@ -8,7 +8,14 @@ package require fileutil
 proc CopyPackages { files todir packages packagesout } {
 
     set tclfiles ""
-    foreach i $files { if { [file extension $i] == ".tcl" } { lappend tclfiles $i } }
+    for { set i 0 } { $i < [llength $files] } { incr i } {
+	set file [lindex $files $i]
+	if { [file extension $file] == ".tcl" } {
+	    lappend tclfiles $file
+	} elseif { [file isdirectory $file] } {
+	    eval lappend files [glob -nocomplain -dir $file *.tcl]
+	}
+    }
     foreach i [fileutil::grep package $tclfiles] {
 	foreach "filename number contents" [split $i :] break
 	if { [regexp {package\s+require\s+(\w+)} $contents {} package] && \
@@ -201,9 +208,9 @@ proc Execute { args } {
 set TEXI2HTML [list perl [file normalize "~/Gid Project/info/html-version/texi2html"] \
 		              -split_node -menu]
 set ZIP zip.exe
-set Version 4.4
-set Date "August 2004"
-set Copyright "2002-2004 Ramon Ribó"
+set Version 4.98
+set Date "December 2004"
+set Copyright "2002-2005 Ramon Ribó"
 
 set files [list RamDebugger.tcl license.terms Readme addons scripts Examples help \
 	       pkgIndex.tcl]

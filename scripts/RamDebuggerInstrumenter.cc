@@ -81,10 +81,10 @@ void RamDebuggerInstrumenterInitState(InstrumenterState* is)
   is->NeedsNamespaceClose=0;
   is->braceslevel=0;
   is->level=0;
+  is->snitpackageinserted=0;
 
   Tcl_EvalEx(is->ip,""
-    "foreach i [list return break while eval foreach for if else elseif error switch default \\n"
-	     "continue] {\n"
+    "foreach i [list return break while eval foreach for if else elseif error switch default continue] {\n"
 	     "set ::RamDebugger::Instrumenter::colors($i) magenta\n"
 	     "}\n"
 	     "foreach i [list variable set global] {\n"
@@ -112,7 +112,7 @@ int RamDebuggerInstrumenterEndState(InstrumenterState* is)
     case BRACKET_WT: type='['; break;
     }
     sprintf(buf,"There is a block of type (%c) beginning at line %d "
-	    "that is not closed at the end of the file\n",type,is->line);
+	    "that is not closed at the end of the file\n",type,is->stack[i].wordtypeline);
     if(result==NULL) result=Tcl_NewStringObj("",-1);
     Tcl_AppendToObj(result,buf,-1);
   }
@@ -246,20 +246,22 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
     }
   }
   if(!PushState && !NewDoInstrument) { return 1; }
-
-  is->stack[is->level].words=is->words;
-  Tcl_IncrRefCount(is->stack[is->level].words);
-  is->stack[is->level].currentword=is->currentword;
-  Tcl_IncrRefCount(is->stack[is->level].currentword);
-  is->stack[is->level].wordtype=is->wordtype;
-  is->stack[is->level].wordtypeline=is->wordtypeline;
-  is->stack[is->level].wordtypepos=is->wordtypepos;
-  is->stack[is->level].DoInstrument=is->DoInstrument;
-  is->stack[is->level].OutputType=is->OutputType;
-  is->stack[is->level].NeedsNamespaceClose=is->NeedsNamespaceClose;
-  is->stack[is->level].braceslevel=is->braceslevel;
-  is->stack[is->level].line=line;
-  is->stack[is->level].type=type;
+  
+  if(is->level>=0){
+    is->stack[is->level].words=is->words;
+    Tcl_IncrRefCount(is->stack[is->level].words);
+    is->stack[is->level].currentword=is->currentword;
+    Tcl_IncrRefCount(is->stack[is->level].currentword);
+    is->stack[is->level].wordtype=is->wordtype;
+    is->stack[is->level].wordtypeline=is->wordtypeline;
+    is->stack[is->level].wordtypepos=is->wordtypepos;
+    is->stack[is->level].DoInstrument=is->DoInstrument;
+    is->stack[is->level].OutputType=is->OutputType;
+    is->stack[is->level].NeedsNamespaceClose=is->NeedsNamespaceClose;
+    is->stack[is->level].braceslevel=is->braceslevel;
+    is->stack[is->level].line=line;
+    is->stack[is->level].type=type;
+  }
   is->level++;
     
   is->words=Tcl_ResetList(is->words);
@@ -281,9 +283,10 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
   Word_types last_type;
   int i;
 
-  if(is->level==0) return 1;
-  last_type=is->stack[is->level-1].type;
-  if(type==BRACKET_WT && last_type!=BRACKET_WT) return 1;
+  if(is->level>0){
+    last_type=is->stack[is->level-1].type;
+    if(type==BRACKET_WT && last_type!=BRACKET_WT) return 1;
+  }
 
   if(type==BRACE_WT){
     if(is->wordtype==W_WT){
@@ -313,6 +316,7 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
   }
 
   is->level--;
+  if(is->level<0) return 0;
   Tcl_DecrRefCount(is->words);
   is->words=is->stack[is->level].words;
   Tcl_DecrRefCount(is->currentword);
@@ -357,7 +361,8 @@ int RamDebuggerInstrumenterIsProcUpLevel(InstrumenterState* is)
   int wordslen;
   Tcl_Obj *word0;
   char* pword0;
-  if(is->level==0) return 0;
+  if(is->level<=0)
+    return 0;
   Tcl_ListObjLength(is->ip,is->stack[is->level-1].words,&wordslen);
   if(wordslen==0) return 0;
   Tcl_ListObjIndex(is->ip,is->stack[is->level-1].words,0,&word0);
@@ -394,9 +399,9 @@ void RamDebuggerInstrumenterInsertSnitPackage_ifneeded(InstrumenterState* is)
 int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char* newblocknameP,
 				   char* newblocknameR,char* blockinfoname,int progress) {
 
-  int i,length,snitpackageinserted,braceslevelNoEval,lastinstrumentedline,
+  int i,length,braceslevelNoEval,lastinstrumentedline,
     line,ichar,icharline,consumed,instrument_proc_last_line,wordslen=0,
-    quoteintobraceline=-1,quoteintobracepos,fail,commentpos;
+    quoteintobraceline=-1,quoteintobracepos,fail,commentpos,result;
   Word_types checkExtraCharsAfterCQB;
   Tcl_Obj *blockinfo,*blockinfocurrent,*word0,*wordi,*tmpObj;
   char c,lastc,buf[1024],*pword0=NULL;
@@ -433,7 +438,6 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
   if(Tcl_ExprBoolean(is->ip,"$::RamDebugger::options(instrument_proc_last_line)",
 		     &instrument_proc_last_line)!=TCL_OK) instrument_proc_last_line=0;
 
-  snitpackageinserted=0;
   braceslevelNoEval=0;
   checkExtraCharsAfterCQB=NONE_WT;
   lastc=0;
@@ -842,7 +846,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
   blockinfo=Tcl_CopyIfShared(blockinfo);
   Tcl_ListObjAppendElement(is->ip,blockinfo,blockinfocurrent);
 
-  RamDebuggerInstrumenterEndState(is);
+  result=RamDebuggerInstrumenterEndState(is);
 
   Tcl_UpVar(ip,"1",newblocknameP,"newblockP",0);
   Tcl_SetVar2Ex(is->ip,"newblockP",NULL,is->newblock[P],0);
@@ -851,6 +855,9 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
   Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
   Tcl_SetVar2Ex(is->ip,"blockinfo",NULL,blockinfo,0);
 
+#ifdef _DEBUG
+  char* tmpblockinfo=Tcl_GetString(blockinfo);
+#endif
   if(length>1000 && progress){
     /*     RamDebugger::ProgressVar 100 */
   }
@@ -858,7 +865,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
   Tcl_DecrRefCount(is->newblock[R]);
   Tcl_DecrRefCount(blockinfo);
   Tcl_DecrRefCount(blockinfocurrent);
-  return TCL_OK;
+  return result;
 }
 
 

@@ -321,6 +321,10 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 		                                   "progress 1" } {
     variable FastInstrumenterLoaded
 
+#     set dynlib {C:\Documents and Settings\ramsan\Mis documentos\myTclTk\RamDebugger\RamDebuggerInstrumenterDoWork\Debug\RamDebuggerInstrumenterDoWork.dll} 
+#     load $dynlib Ramdebuggerinstrumenter
+#     set FastInstrumenterLoaded 1
+
     if { ![info exists FastInstrumenterLoaded] } {
 	set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
 	set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
