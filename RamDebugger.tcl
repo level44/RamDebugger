@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.41 2004/08/02 11:48:52 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.42 2004/08/02 13:16:39 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 package require Tcl 8.4
@@ -2661,6 +2661,10 @@ proc RamDebugger::ViewSecondText {} {
 
     set f [$mainframe getframe]
     if { ![winfo exists $f.textpane] } {
+
+	$f.fulltext configure -height 5
+	grid propagate $f.fulltext 0
+
 	panedwindow $f.textpane -orient vertical -bd 0
 	frame $f.textpane.f
 	set text_secondary [text $f.textpane.f.fulltext_secondary -bg grey95 -state disabled \
@@ -2684,7 +2688,7 @@ proc RamDebugger::ViewSecondText {} {
 	set parent [lindex [grid info $f.fulltext] 1]
 	grid remove $f.fulltext
 	$f.textpane add $f.fulltext
-	raise $f.fulltext
+
 	grid $f.textpane -in $parent -sticky nsew
 
 	foreach "weight1 weight2" [list 1 1] break
@@ -2694,12 +2698,14 @@ proc RamDebugger::ViewSecondText {} {
 	if { ![info exists currentfile_secondary] } {
 	    set currentfile_secondary $currentfile
 	}
-	OpenFileSecondary $currentfile_secondary
 	update idletasks
 	if { [winfo exists $f.textpane] } {
-	    set h1 [expr {int($weight1*[winfo height $parent]/double($weight1+$weight2))}]
+	    set wsum [expr {double($weight1+$weight2)}]
+	    set h1 [expr {int($weight1*[winfo height $parent]/$wsum)}]
 	    $f.textpane sash place 0 0 $h1
 	}
+	OpenFileSecondary $currentfile_secondary
+	raise $f.fulltext
     } else {
 	_secondtextsavepos
 	if { [$text cget -synctextwidget] ne "" } {
@@ -2708,6 +2714,7 @@ proc RamDebugger::ViewSecondText {} {
 	set parent [lindex [grid info $f.textpane] 1]
 	destroy $f.textpane
 	grid $f.fulltext -in $parent -sticky nsew
+	grid propagate $f.fulltext 1
 	unset text_secondary
 	unset currentfile_secondary
 	focus $text
