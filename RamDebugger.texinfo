@@ -58,11 +58,11 @@
 
 @set photo
 
-@set Version 3.0
-@set Date May 2003
+@set Version 3.1
+@set Date July 2003
 @set Copyright 2002-2003 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.17 $
+@set CVSVersion  $Revision: 1.18 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
