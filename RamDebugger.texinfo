@@ -62,7 +62,7 @@
 @set Date August 2004
 @set Copyright 2002-2004 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.27 $
+@set CVSVersion  $Revision: 1.28 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -189,6 +189,11 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
+
+@item Fast c++ instrumenter
+@item Profile procedures
+@item Files list obtained with Ctrl-Tab has a new alternative list based on
+current directory
 
 Changes From version 3.2 to version 4.4
 

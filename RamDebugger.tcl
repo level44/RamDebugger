@@ -1,10 +1,12 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.45 2004/10/26 12:59:07 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.46 2004/12/21 10:58:58 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2004
 
 package require Tcl 8.4
+#package require Tk 8.4
+
 
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
@@ -12,7 +14,6 @@ if { [info exists ::starkit::topdir] } {
     interp eval local [list load {} Tk]
     package require Tk 8.4
 }
-
 
 ################################################################################
 #  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
@@ -1569,7 +1570,7 @@ proc RamDebugger::rlist { args } {
 	}
 	if { $filetype == "TCL" } {
 	    if { [catch {
-		Instrumenter::DoWork $files($currentfile) $filenum instrumentedfilesP($currentfile) \
+		Instrumenter::DoWorkForTcl $files($currentfile) $filenum instrumentedfilesP($currentfile) \
 		         instrumentedfilesR($currentfile) instrumentedfilesInfo($currentfile)
 	    } errstring] } {
 		RamDebugger::ProgressVar 100
@@ -2273,20 +2274,22 @@ proc RamDebugger::EvalRemoteAndReturn { comm } {
 	error "Error: a program to debug must be selected using rdebug"
     }
     if { $remoteserverType == "local" } {
-	local eval $comm
+	set ret [local eval $comm]
     } elseif { $remoteserverType == "master" } {
-	master $comm
+	set ret [master $comm]
     } elseif { $remoteserverType == "gdb" } {
 	foreach "fid program state" $remoteserver break
 	regsub -all {(^|\n)(.)} $comm\n {\1-->\2} commlog
 	append gdblog $commlog
 	puts $fid $comm
 	flush $fid
+	set ret ""
     } elseif { $::tcl_platform(platform) == "windows" } {
-	comm::comm send $remoteserverNum $comm
+	set ret [comm::comm send $remoteserverNum $comm]
     } else {
-	send $remoteserver $comm
+	set ret [send $remoteserver $comm]
     }
+    return $ret
 }
 
 proc RamDebugger::GiveInstFile { file onlyifnewer filetype } {
@@ -3130,7 +3133,8 @@ proc RamDebugger::SaveFile { what } {
     }
 
     set NeedsReinstrument 0
-    if { $currentfile == "*Macros*" || [info exists FileSaveHandlers($currentfile)] } {
+    if { $what ne "saveas" && ($currentfile == "*Macros*" || \
+	[info exists FileSaveHandlers($currentfile)]) } {
 	set file $currentfile
     } elseif { $what == "saveas" || $currentfile == "*New file*" || $currentfile == "" || \
 		   [regexp {^\*.*\*$} $currentfile] } {
@@ -3886,11 +3890,15 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     } else {
 	foreach i $services {
 	    if { $remoteserverType == "remote" && $i == $remoteserver } {
-		$menu add check -label $i -command [list RamDebugger::rdebug $i] \
+		$menu add check -label $i -command \
+		    "[list RamDebugger::rdebug $i]
+		    [namespace code [list ActualizeActivePrograms $menu]]" \
 		   -variable ::checked 
 		set ::checked 1
 	    } else {
-		$menu add command -label $i -command [list RamDebugger::rdebug $i]
+		$menu add command -label $i -command \
+		    "[list RamDebugger::rdebug $i]
+		    [namespace code [list ActualizeActivePrograms $menu]]"
 	    }
 	}
     }
@@ -3995,15 +4003,42 @@ proc RamDebugger::ChooseViewFile { what args } {
     set numcols 6
 
     switch $what {
-	start - startrecent {
-	    if { $what eq "startrecent" || ([info exists options(RecentFiles)] && \
-		[llength $WindowFilesList] < 2 && [llength options(RecentFiles)]) } {
-		if { ![info exists options(RecentFiles)] } {
-		    set list ""
-		} else { set list $options(RecentFiles) }
-	    } else {
-		set list $WindowFilesList
+	start - startrecent - startcurrdir {
+	    if { ![info exists options(RecentFiles)] } { set options(RecentFiles) "" }
+	    if { $what eq "start" && [llength $WindowFilesList] < 2 } {
+		set what startrecent
 	    }
+	    if { $what eq "startrecent" && ![llength options(RecentFiles)] } {
+		set what startcurrdir
+	    }
+	    if { $what eq "startcurrdir" } {
+		set patterns ""
+		foreach ext $options(extensions,TCL) {
+		    if { $ext ne "*" } { lappend patterns *[string trim $ext *] }
+		}
+		set dir [file dirname $file]
+		if { $dir ne "." } {
+		    set list [eval [list glob -nocomplain -dir $dir] $patterns]
+		} else { set list "" }
+		if { $list eq "" } {
+		    if { [llength $WindowFilesList] >= 2 || \
+		        ![llength options(RecentFiles)] } {
+		        set what start
+		    } else { set what startrecent }
+		}
+	    }
+	    switch $what {
+		start {
+		    set list $WindowFilesList
+		}
+		startrecent {
+		    set list $options(RecentFiles)
+		}
+		startcurrdir {
+		    # already assigned
+		}
+	    }
+	    set list [lrange [lsort -dictionary $list] 0 39]
 	    set ipos [lsearch -exact $list $file]
 	    if { $ipos == -1 } {
 		set list [linsert $list 0 $file]
@@ -4101,9 +4136,18 @@ proc RamDebugger::ChooseViewFile { what args } {
 	keypress {
 	    foreach "K what_in" $args break
 	    if { [regexp {(?i)^space} $K] } {
-		if { $what_in eq "start" } {
-		    ChooseViewFile startrecent
-		} else { ChooseViewFile start }
+		switch $what_in {
+		    start {
+		        set whatnext startrecent
+		    }
+		    startrecent {
+		        set whatnext startcurrdir
+		    }
+		    startcurrdir {
+		        set whatnext start
+		    }
+		}
+		ChooseViewFile $whatnext
 	    }
 	}
 	next {
@@ -5630,7 +5674,7 @@ proc RamDebugger::CheckText { command args } {
     set blockinfo ""
     switch $filetype {
 	TCL {
-	    set err [catch { Instrumenter::DoWork $block 0 newblockP newblockR blockinfo 0 } errstring]
+	    set err [catch { Instrumenter::DoWorkForTcl $block 0 newblockP newblockR blockinfo 0 } errstring]
 	}
 	C/C++ {
 	    set err [catch { Instrumenter::DoWorkForC++ $block blockinfo 0 $oldlevel } errstring]
@@ -6649,6 +6693,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command "&Timing control..." debugentry \
 		    "Open a window to control execution times" "" \
 		-command "RamDebugger::DisplayTimesWindow"] \
+		[list command "&Profile procedures..." debugentry \
+		    "Open a window to profile execution time of procs" "" \
+		-command "profileprocs::OpenGUI"] \
 		separator \
 		[list command "&Reinstrument" debugentry \
 		    "Reinstrument and recolorize a file" "" \
@@ -7157,42 +7204,46 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	bind $text $i "[bind $w $i] ;break"
     }
     bind $marker <1> {
-	set tkPriv(x) 0
-	set tkPriv(y) %y
-	set tkPriv(mouseMoved) 0
-	set tkPriv(pressX) 0
-	set tk::Priv(mouseMoved) 0
-	set tk::Priv(pressX) 0
-	set tk::Priv(x) 0
-	set tk::Priv(y) %y
-	$RamDebugger::text mark set insert [tkTextClosestGap $RamDebugger::text 0 %y]
-	$RamDebugger::text mark set anchor insert
-
-	set ini [$RamDebugger::text index "@0,%y linestart"]
-	set end [$RamDebugger::text index "@0,%y lineend"]
-	$RamDebugger::text tag remove sel 1.0 end
-	$RamDebugger::text tag add sel $ini $end
-	set tkPriv(selectMode) line
+	tk::TextButton1 $RamDebugger::text 0 %y
+	 set tk::Priv(selectMode) line
+	 tk::TextSelectTo $RamDebugger::text 0 %y
+# 
+#         set tkPriv(x) 0
+#         set tkPriv(y) %y
+#         set tkPriv(mouseMoved) 0
+#         set tkPriv(pressX) 0
+#         set tk::Priv(mouseMoved) 0
+#         set tk::Priv(pressX) 0
+#         set tk::Priv(x) 0
+#         set tk::Priv(y) %y
+#         $RamDebugger::text mark set insert [tkTextClosestGap $RamDebugger::text 0 %y]
+#         $RamDebugger::text mark set anchor insert
+# 
+#         set ini [$RamDebugger::text index "@0,%y linestart"]
+#         set end [$RamDebugger::text index "@0,%y lineend"]
+#         $RamDebugger::text tag remove sel 1.0 end
+#         $RamDebugger::text tag add sel $ini $end
+#         set tkPriv(selectMode) line
     }
     bind $marker <B1-Motion> {
 	set tkPriv(x) 0
 	set tkPriv(y) %y
 	set tk::Priv(x) 0
 	set tk::Priv(y) %y
-	tkTextSelectTo $RamDebugger::text 0 %y
+	tk::TextSelectTo $RamDebugger::text 0 %y
     }
     bind $marker <B1-Leave> {
 	set tkPriv(x) 0
 	set tkPriv(y) %y
 	set tk::Priv(x) %x
 	set tk::Priv(y) %y
-	tkTextAutoScan $RamDebugger::text
+	tk::TextAutoScan $RamDebugger::text
     }
     bind $marker <B1-Enter> {
-	tkCancelRepeat
+	tk::CancelRepeat
     }
     bind $marker <ButtonRelease-1> {
-	tkCancelRepeat
+	tk::CancelRepeat
     }
 
     bind all <Control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"

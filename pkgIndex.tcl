@@ -3,7 +3,13 @@ set Version 4.4
 
 proc LoadRamDebugger { dir version } {
 
-    if { [interp exists ramdebugger] } { interp delete ramdebugger }
+    set argv ""
+    if { [interp exists ramdebugger] } {
+	if { [ramdebugger eval info exists argv] } {
+	    set argv [ramdebugger eval set argv]
+	}
+	interp delete ramdebugger
+    }
 #     interp create ramdebugger
     if { ![interp exists ramdebugger] } {
 	interp create ramdebugger
@@ -12,7 +18,8 @@ proc LoadRamDebugger { dir version } {
     ramdebugger eval [list load {} Tk]
     ramdebugger eval package require Tk
     if { ![ramdebugger eval info exists argv] } {
-	ramdebugger eval { set argc 0 ; set argv "" }
+	ramdebugger eval [list set argc 0]
+	ramdebugger eval [list set argv $argv]
     }
     ramdebugger eval [list set auto_path $::auto_path]
     ramdebugger eval [list set argv0 [file join $dir RamDebugger.tcl]]
