@@ -11,4 +11,4 @@
 TEXI2HTML = /home/ramsan/bin/info/html-version/texi2html -split_node -menu
 
 help/RamDebugger_toc.html : RamDebugger.texinfo
-	(cd help/RamDebugger ; $(TEXI2HTML) ../../RamDebugger.texinfo)
+	(cd help/01RamDebugger ; $(TEXI2HTML) ../../RamDebugger.texinfo)

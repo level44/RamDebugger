@@ -31,7 +31,7 @@ proc Execute { args } {
 
 set FREEWRAP /tcltk/freewrap44/freewrap.exe
 set FREEWRAPTCLSH /utils/freewrapTCLSH
-set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html1.64" \
+set TEXI2HTML {perl "/Gid Project/info/html-version/texi2html" \
     -split_node -menu}
 set ZIP /utils/zip.exe
 
@@ -47,7 +47,7 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     cd $oldcwd
 }
 
-zipfile RamDebugger1.0.zip .. $ZIPFILES
+zipfile RamDebugger1.1.zip .. $ZIPFILES
 
 update
 after 500

@@ -58,7 +58,7 @@
 
 @set photo
 
-@set Version  $Revision: 1.3 $
+@set Version  $Revision: 1.4 $
 @set Date August 2002
 
 @ifinfo
@@ -66,7 +66,7 @@ Copyright 2002 Ramon Ribó
 @end ifinfo
 
 @titlepage
-@title RamDebugger 1.0:
+@title RamDebugger 1.1:
 @subtitleA graphical and interactive debugger for Tcl-TK
 @author Copyright 2002 Ramon Ribó
 @c The following two commands start the copyright page.
@@ -112,6 +112,7 @@ Using RamDebugger
 * Debugging remotely::          
 * Debugging GiD::               
 * Debugging RamDebugger::       
+* Compiling/Debugging c++::     
 * Timing control::              
 * Windows hierarchy::           
 
@@ -132,7 +133,7 @@ CN @value{Version} @value{Date}
 * Starting RamDebugger::        
 @end menu
 
-@node Introduction, , Introduction and Setup, Introduction and Setup
+@node Introduction, Download, Introduction and Setup, Introduction and Setup
 @section Introduction
 
 RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK. It can operate
@@ -171,10 +172,13 @@ people, as a convenience for RamDebugger users.
 </center><p>
 @end ifhtml
 
+@b{Note:} RamDebugger can also be an IDE for compiling and debugging c/c++ code. It
+uses GDB as a backend. See @xref{Compiling/Debugging c++} for details.
+
 @node  Download, Installation and prerequisites, Introduction, Introduction and Setup
 @section Download
 
-RamDebugger can be download from @url{http://gid.cimne.upc.es/RamDebugger/RamDebugger1.0.zip}
+RamDebugger can be download from @url{http://gid.cimne.upc.es/RamDebugger/RamDebugger1.1.zip}
 
 @node Installation and prerequisites, Starting RamDebugger, Download, Introduction and Setup
 @section Installation and prerequisites
@@ -182,15 +186,20 @@ RamDebugger can be download from @url{http://gid.cimne.upc.es/RamDebugger/RamDeb
 The only prerequisite before executing RamDebugger is to have Tcl-Tk installed. The tested
 version is Tcl-Tk 8.3.4
 It can be obtained from @url{http://tcl.activestate.com}.
-
-RamoDebugger has been tested on Windows and on Linux. For other UNIXes and MAC, it is necessary
+@sp
+RamDebugger has been tested on Windows and on Linux. For other UNIXes and MAC, it is necessary
 to obtain, separately, the package Tkhtml compiled for the platform. Without it, the help
 cannot be visualized.
-
+@sp
 All the additional packages that RamDebugger uses, are already contained in the distribution.
-
+@sp
 The distribution comes in a ZIP file. Once it is unpacked in one directory, RamDebugger is
 ready to begin to work.
+@sp
+@strong{Note:} Text files inside ZIP files have Windows line-ends. UNIX and Linux users
+may want to unzip using something like @code{unzip -a ...} in order to change the line-ends
+to Unix ones. After doing this and after changing the program to executable with @code{chmod +x
+RamDebugger.tcl}, it is possible to start the program by just writing @code{RamDebugger.tcl}
 
 @node Starting RamDebugger,  , Installation and prerequisites, Introduction and Setup
 @section Starting RamDebugger
@@ -199,6 +208,9 @@ To start RamDebugger on Windows, double-click over @b{RamDebugger.tcl}.
 
 To start Ramdebugger on UNIX, in the command line use something similar to:
 @b{wish RamDebugger.tcl}
+
+or just: @b{RamDebugger.tcl} if you followed the instructions in 
+@xref{Installation and prerequisites}.
 
 To start RamDebugger in text mode inside Tkcon, one of the following possibilities can
 be done:
@@ -227,6 +239,7 @@ set ::tkcon::OPT(slaveeval) {
 * Debugging remotely::          
 * Debugging GiD::               
 * Debugging RamDebugger::       
+* Compiling/Debugging c++::     
 * Timing control::              
 * Windows hierarchy::           
 @end menu
@@ -244,7 +257,20 @@ having the cursor in the desired line.
 @item Start the debugger with @code{Debug->Go} or press @b{F5}. A grey arrow at the left
 of the text indicates that the program has stopped in that line.
 @item to continue one line, use @code{Debug->Next} or press @b{F10}.
-@item Use @code{Edit->Goto line->21} and press @code{Debug->Continue to}
+@item Use @code{Edit->Goto line->27} and press @code{Debug->Continue to}
+@item Modify source code line @b{21} from:
+@example
+        set cc $bb--qq
+@end example
+to:
+@example
+        set cc $bb--qq2
+@end example
+@item to continue one line, entering in functions, use @code{Debug->Step} or press @b{F11}.
+@item Press @b{F11} several times until arrow is in line @b{22}
+@item Put the mouse cursor over variable @b{cc} and leave it there for aprox. one second.
+The value of the variable appears in a popup window. Note that it holds the new value,
+after the modification of the code.
 @item To see the value of one expression, open the window: @code{Debug->Expressions} and
 write: @code{[string length $i]+3}
 @item To modify the value of variable @b{i}, enter @b{i} in the left column of the @b{User
@@ -271,7 +297,9 @@ than in local debugging (@pxref{Debugging locally})
 @end itemize
 
 To debug remotely, in Windows it is necessary to load the package @t{comm} in the remote
-program. To do so use something similar to:
+program. To do so use add something similar to the code below in you program, in any
+place that gets executed before beginning the debug session (typically at the beginning
+of your program):
 @example
     lappend ::auto_path <RamDebugger path>/addons
     package require commR
@@ -279,9 +307,10 @@ program. To do so use something similar to:
 @end example
 @strong{Note:} The package @t{commR} included in RamDebugger is based on the package @b{comm} 
 in tcllib with some modifications. Use always @b{commR} instead of @b{comm}
-
+@sp
 In Linux/Unix, the communication is made with the command @b{send}, So, it is only necessary
 to have this command enabled in the program, which is true by default.
+@sp
 @strong{Note:} It can be necessary to check the security of the server in Unix before being
 able to use @b{send}. As a fast workaround, write command @b{xhost -} in the UNIX command
 line.
@@ -299,7 +328,7 @@ In UNIX, it should work directly.
 
 Check section @ref{Debugging remotely} for the rest of the steps to follow.
 
-@node  Debugging RamDebugger, Timing control, Debugging GiD, Using RamDebugger
+@node  Debugging RamDebugger, , Debugging GiD, Using RamDebugger
 @section Debugging RamDebugger
 
 As a good debugger must do, RamDebugger permmits to debugger itself. As it is not a simple
@@ -312,8 +341,26 @@ for details.
 To debug itself remotely, open two RamDebuggers. From one of them, connect to the other
 with @code{File->Debug on->RamDebugger}.
 
+@node  Compiling/Debugging c++, Timing control, Debugging RamDebugger, Using RamDebugger
+@section Compiling/Debugging c++
 
-@node Timing control, Windows hierarchy, Debugging RamDebugger, Using RamDebugger
+RamDebugger can also compile and debug c/c++ projects. It uses as a backend the program
+gdb. It is necessary to have @code{gdb} installed in the computer.
+@sp
+@strong{CODE FOR COMPILING AND DEBUGGING C++ IS STILL EXPERIMENTAL AND NEEDS FINE TUNING}
+Use at your own risk.
+@sp
+@strong{Note:} It can also be used in Windows, if the @b{mingw} compiler and debugger
+have been previously installed. In this case, the directories where the executables are,
+must be in the @b{PATH}. Use something similar to:
+@example
+SET PATH=C:\mingw\bin
+@end example
+in file @b{AUTOEXEC.BAT} or search for environment variables in Windows200/XP. Using
+mingw causes some very dirty black windows to appear from time to time.
+
+
+@node Timing control, Windows hierarchy, Compiling/Debugging c++, Using RamDebugger
 @section Timing control
 An additional feature of RamDebugger is the possibility of controlling the computing time
 of several parts of the program.
@@ -375,7 +422,8 @@ work but has a very very slow startup time.
 @item @b{comm}: This package emulates the UNIX send by using sockets. It has some problems
 in speed when trying connections. Also, it has been necessary to make some trick in order
 to identify the interps. This is the package chosen in Windows.
- 
+@end itemize
+
 Due to the high dynamics nature of TCL, it is unpossible to make a direct correlation
 between source code lines and execution lines. Anyway, it works quite well for normal
 TCL code. Try and comment.
@@ -389,7 +437,7 @@ in the distribution as a convenience to the final user.
 
 Some of the packages have been modified, either to fix some errors or to improve
 some capabilities. The packages that have been modified are marked below.
-
+@sp
 @multitable @columnfractions .3 .3 .2 .2
 
 @item @b{Package}
@@ -439,6 +487,10 @@ some capabilities. The packages that have been modified are marked below.
 @tab NO
 @item tcllib 
 @tab Many 
+@tab BSD 
+@tab NO
+@item icons 
+@tab Adrian Davis 
 @tab BSD 
 @tab NO
 @end multitable
