@@ -1,3 +1,9 @@
+#!/bin/sh
+# the next line restarts using wish \
+exec wish "$0" "$@"
+
+# 	$Id: RamDebugger.tcl,v 1.2 2002/07/30 18:09:49 ramsan Exp $	
+#RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jul-2002
 
 
 namespace eval RamDebugger {
