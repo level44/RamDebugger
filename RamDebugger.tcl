@@ -1,10 +1,16 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.43 2004/08/02 13:23:00 ramsan Exp $        
-# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
+#         $Id: RamDebugger.tcl,v 1.44 2004/08/12 13:27:56 ramsan Exp $        
+# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2004
 
 package require Tcl 8.4
+
+if { [info exists ::starkit::topdir] } {
+    # This is for the starkit in UNIX to start graphically
+    # that the following line out if you want to run without GUI
+    package require Tk 8.4
+}
 
 
 ################################################################################
@@ -42,7 +48,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 4.1
+    set Version 4.4
 
     ################################################################################
     #    Non GUI commands
@@ -104,7 +110,6 @@ namespace eval RamDebugger {
     variable status
     variable WindowFilesList ""
     variable WindowFilesListLineNums ""
-    variable WindowFilesListCurr -1
 
     ################################################################################
     # Handlers to save files. Array with names: filename
@@ -255,7 +260,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     }
 
     set options_def(AutoSaveRevisions) 1
-    set options_def(AutoSaveRevisions_time) 300
+    set options_def(AutoSaveRevisions_time) 5
     set options_def(AutoSaveRevisions_idletime) 5
 
     ################################################################################
@@ -542,8 +547,8 @@ proc RamDebugger::rdebug { args } {
 	    interp eval local package provide registry $ver
 	}
 	if { $LocalDebuggingType == "tk" } {
-	    #interp eval local [list load {} Tk]
-	    interp eval local package require Tk
+	    interp eval local [list load {} Tk]
+	    #interp eval local package require Tk
 	    local eval [list bind . <Destroy> { if { "%W" == "." } { exit } }]
 	}
 	set remoteserverType local
@@ -2793,21 +2798,19 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 
 	set width [winfo width $fulltext]
 
-	if { [info exist pane1] && [winfo width $pane1] <= 1 } {
-	    set panedw [winfo parent [winfo parent $pane1]] ;# dirty hack
-	    foreach "weight1 weight2 weight3" [ManagePanes $panedw h "1 6 2"] break
-	    set w1 [expr int($weight1/double($weight2)*$width+0.5)]
+	if { [info exist pane3] && [winfo width $pane3] <= 1 } {
+	    set panedw [winfo parent [winfo parent $pane3]] ;# dirty hack
+	    foreach "weight2 weight3" [ManagePanes $panedw h "6 2"] break
 	    set w3 [expr int($weight3/double($weight2)*$width+0.5)]
-	    incr width $w1
 	    incr width $w3
-	    set x [expr {[winfo x $t]-$w1+0}]
+	    set x [expr {[winfo x $t]+0}]
 	} else {
 	    if { [info exist pane1] } { incr width [winfo width $pane1] }
 	    incr width [winfo width $pane3]
 	    if { [info exist pane1] } { set wpane1 [winfo width $pane1] } else { set wpane1 0 }
 	    set x [expr {[winfo x $t]-$wpane1+0}]
 	}
-	incr width 8
+	incr width 4
 	wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
 	set options(ViewOnlyTextOrAll) All
     }
@@ -2846,6 +2849,7 @@ proc RamDebugger::ExitGUI {} {
     variable TimeMeasureData
     variable debuggerstate
     variable readwriteprefs
+    variable SearchToolbar
 
     if { [SaveFile ask] == -1 } { return }
 
@@ -2859,6 +2863,10 @@ proc RamDebugger::ExitGUI {} {
 
     if { [info exists remoteserver] && [string match master* $remoteserver] } {
 	set options(master_type) $remoteserver
+    }
+
+    if { [info exists SearchToolbar] } {
+	set options(SearchToolbar) $SearchToolbar
     }
 
     set options(debuggerstate) $debuggerstate
@@ -3162,7 +3170,6 @@ proc RamDebugger::OpenFileF { file { force 0 } { UserNumLine -1 } } {
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListLineNums
-    variable WindowFilesListCurr
     variable options
     variable currentfile_secondary
 
@@ -3181,14 +3188,12 @@ proc RamDebugger::OpenFileF { file { force 0 } { UserNumLine -1 } } {
 
     WaitState 1
 
-    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch -exact $WindowFilesList $currentfile]
+    if { [set pos [lsearch -exact $WindowFilesList $currentfile]] != -1 } {
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
     }
     set linenum 1
-    if { [lsearch -exact $WindowFilesList $file] != -1 } {
-	set pos [lsearch -exact $WindowFilesList $file]
+    if { [set pos [lsearch -exact $WindowFilesList $file]] != -1 } {
 	set linenum [lindex $WindowFilesListLineNums $pos]
     }
     if { $file == $currentfile } {
@@ -3246,18 +3251,13 @@ proc RamDebugger::OpenFileF { file { force 0 } { UserNumLine -1 } } {
     wm title [winfo toplevel $text] "RamDebugger     [file tail $currentfile]"
     set currentfileIsModified 0
 
-    if { [lsearch -exact $WindowFilesList $file] != -1 } {
-	set WindowFilesListCurr [lsearch -exact $WindowFilesList $file]
-    } elseif { [string index $file 0] != "*" } {
-	incr WindowFilesListCurr
-	if { $WindowFilesListCurr == [llength $WindowFilesList] } {
-	    lappend WindowFilesList $file
-	    lappend WindowFilesListLineNums $linenum
-	} else {
-	    set WindowFilesList [linsert $WindowFilesList $WindowFilesListCurr $file]
-	    set WindowFilesListLineNums [linsert $WindowFilesListLineNums $WindowFilesListCurr \
-		$linenum]
-	}
+    if { [set pos [lsearch -exact $WindowFilesList $file]] != -1 } {
+	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
+	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
+    }
+    if { [string index $file 0] != "*" } {
+	set WindowFilesList [linsert $WindowFilesList 0 $file]
+	set WindowFilesListLineNums [linsert $WindowFilesListLineNums 0 $linenum]
     }
     $text conf -editable 1
 
@@ -3300,7 +3300,6 @@ proc RamDebugger::OpenFileSecondary { file } {
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListLineNums
-    variable WindowFilesListCurr
     variable options
 
     WaitState 1
@@ -3308,8 +3307,7 @@ proc RamDebugger::OpenFileSecondary { file } {
     set linenum 1
     if { $file eq $currentfile } {
 	set linenum [scan [$text index insert] %d]
-    } elseif { [lsearch -exact $WindowFilesList $file] != -1 } {
-	set pos [lsearch -exact $WindowFilesList $file]
+    } elseif { [set pos [lsearch -exact $WindowFilesList $file]] != -1 } {
 	set linenum [lindex $WindowFilesListLineNums $pos]
     }
     set idx $linenum.0
@@ -3339,7 +3337,6 @@ proc RamDebugger::OpenFileSecondary { file } {
     $text_secondary mark set insert $idx
     $text_secondary see $idx
     
-
     if { [lsearch -exact $WindowFilesList $file] == -1 } {
 	lappend WindowFilesList $file
 	lappend WindowFilesListLineNums $linenum
@@ -3364,7 +3361,6 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListLineNums
-    variable WindowFilesListCurr
     variable options
     variable FileSaveHandlers
     variable currentfile_secondary
@@ -3462,17 +3458,14 @@ proc RamDebugger::ReinstrumentCurrentFile {} {
 proc RamDebugger::CloseFile {} {
     variable currentfile
     variable WindowFilesList
-    variable WindowFilesListCurr
     variable WindowFilesListLineNums
 
-    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch -exact $WindowFilesList $currentfile]
+    if { [set pos [lsearch -exact $WindowFilesList $currentfile]] != -1 } {
 	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
-	if { $WindowFilesListCurr >= $pos } { incr WindowFilesListCurr -1 }
     }
     if { [llength $WindowFilesList] > 0 } {
-	GotoPreviusNextInWinList prev 1
+	OpenFileF [lindex $WindowFilesList 0]
     } else { NewFile }
 }
 
@@ -3485,7 +3478,6 @@ proc RamDebugger::NewFile {} {
     variable currentfile
     variable currentfileIsModified
     variable WindowFilesList
-    variable WindowFilesListCurr
     variable WindowFilesListLineNums
     variable currentfile_secondary
     variable text_secondary
@@ -3494,8 +3486,7 @@ proc RamDebugger::NewFile {} {
 
     WaitState 1
 
-    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch -exact $WindowFilesList $currentfile]
+    if { [set pos [lsearch -exact $WindowFilesList $currentfile]] != -1 } {
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
     }
@@ -3549,6 +3540,13 @@ proc RamDebugger::_savefile_only { file data } {
 	set err [catch {eval $FileSaveHandlers($file) [list $file $data]} errstring]
 	if { $err } { error "Error saving file '$file' ($errstring)" }
     } else {
+	if { [file exists $file] } {
+	    set ic 0
+	    while { [file exists $file.~$ic~] } { incr ic }     
+	    set renfile $file.~$ic~
+	    set err [catch { file rename -force $file $renfile } errstring]
+	    if { $err } { error "Error saving file '$file' ($errstring)" }
+	}
 	set err [catch { open $file w } fout]
 	if { $err } { error "Error saving file '$file'" }
 
@@ -3558,6 +3556,9 @@ proc RamDebugger::_savefile_only { file data } {
 	}
 	puts -nonewline $fout $data
 	close $fout
+	if { [info exists renfile] } {
+	    file delete -force $renfile
+	}
     }
 }
 
@@ -3573,7 +3574,6 @@ proc RamDebugger::SaveFileF { file } {
     variable filesmtime
     variable FileSaveHandlers
     variable WindowFilesList
-    variable WindowFilesListCurr
     variable WindowFilesListLineNums
     variable options
     variable currentfile_secondary
@@ -3631,20 +3631,14 @@ proc RamDebugger::SaveFileF { file } {
 	set filesmtime($currentfile) [file mtime $file]
     }
     set linenum [scan [$text index insert] %d]
-    if { [lsearch -exact $WindowFilesList $file] != -1 } {
-	set WindowFilesListCurr [lsearch -exact $WindowFilesList $file]
-    } elseif { [string index $file 0] != "*" } {
-	incr WindowFilesListCurr
-	if { $WindowFilesListCurr == [llength $WindowFilesList] } {
-	    lappend WindowFilesList $file
-	    lappend WindowFilesListLineNums $linenum
-	} else {
-	    set WindowFilesList [linsert $WindowFilesList $WindowFilesListCurr $file]
-	    set WindowFilesListLineNums [linsert $WindowFilesListLineNums $WindowFilesListCurr \
-		$linenum]
-	}
+    if { [set pos [lsearch -exact $WindowFilesList $file]] != -1 } {
+	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
+	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
     }
-
+    if { [string index $file 0] != "*" } {
+	set WindowFilesList [linsert $WindowFilesList 0 $file]
+	set WindowFilesListLineNums [linsert $WindowFilesListLineNums 0 $linenum]
+    }
     if { [string index $file 0] != "*" } {
 	if { ![info exists options(RecentFiles)] } {
 	    set options(RecentFiles) ""
@@ -3721,12 +3715,10 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     }
     WaitState 1
 
-    if { [lsearch -exact $WindowFilesList $currentfile] != -1 } {
-	set pos [lsearch -exact $WindowFilesList $currentfile]
+    if { [set pos [lsearch -exact $WindowFilesList $currentfile]] != -1 } {
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
     }
-
     set ed [$text cget -editable]
     $text conf -editable 1
     $text clearundo
@@ -3765,6 +3757,9 @@ proc RamDebugger::ViewInstrumentedFile { what } {
 
 proc RamDebugger::ViewHelpFile { { file "" } } {
     variable MainDir
+    variable AppDataDir
+
+    HelpViewer::EnterDirForIndex $AppDataDir
 
     if { $file == "" } {
 	set w [HelpViewer::HelpWindow [file join $MainDir help]]
@@ -3777,6 +3772,9 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 
 proc RamDebugger::ViewHelpForWord { { word "" } } {
     variable text
+    variable AppDataDir
+
+    HelpViewer::EnterDirForIndex $AppDataDir
 
     set w [ViewHelpFile]
 
@@ -3917,36 +3915,33 @@ proc RamDebugger::DisconnectStop {} {
     }
 }
 
-proc RamDebugger::GotoPreviusNextInWinList { what { force 0 } } {
+proc RamDebugger::GotoPreviusNextInWinList { what } {
     variable WindowFilesList
     variable WindowFilesListLineNums
-    variable WindowFilesListCurr
+    variable text
+    variable text_secondary
     variable currentfile
+    variable currentfile_secondary
 
     if { [llength $WindowFilesList] < 1 } { return }
-    switch $what {
-	prev {
-	    if { $force || $currentfile eq [lindex $WindowFilesList $WindowFilesListCurr] } {
-		incr WindowFilesListCurr -1
-	    }
-	    if { $WindowFilesListCurr < 0 } {
-		set WindowFilesListCurr [expr [llength $WindowFilesList]-1]
-	    }
-	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr]
-	}
-	next {
-	    incr WindowFilesListCurr 1
-	    if { $WindowFilesListCurr >= [llength $WindowFilesList] } {
-		set WindowFilesListCurr 0
-	    }
-	    OpenFileF [lindex $WindowFilesList $WindowFilesListCurr]
-	}
+
+    if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
+	set file $currentfile_secondary
+    } else {
+	set file $currentfile
     }
+    set pos [lsearch -exact $WindowFilesList $file]
+    if { [llength $WindowFilesList] == 1 && $pos == 0 } { return }
+
+    switch $what prev { incr pos } next { incr pos -1 }
+
+    if { $pos < 0 } { set pos [expr {[llength $WindowFilesList]-1}] }
+    if { $pos >= [llength $WindowFilesList] } { set pos 0 }
+    OpenFileF [lindex $WindowFilesList $pos]
 }
 
-proc RamDebugger::ChooseViewFile { w what args } {
+proc RamDebugger::ChooseViewFile { what args } {
     variable WindowFilesList
-    variable WindowFilesListCurr
     variable text
     variable text_secondary
     variable currentfile
@@ -3959,7 +3954,7 @@ proc RamDebugger::ChooseViewFile { w what args } {
     } else {
 	set file $currentfile
     }
-    if { $w eq "." } { set w "" }
+    set w $text
 
     if { [winfo exists $w._choosevf] } {
 	wm geometry $w._choosevf [wm geometry $w._choosevf]
@@ -3976,9 +3971,7 @@ proc RamDebugger::ChooseViewFile { w what args } {
 		    set list ""
 		} else { set list $options(RecentFiles) }
 	    } else {
-		set list [lrange $WindowFilesList $WindowFilesListCurr end]
-		eval lappend list [lrange $WindowFilesList 0 \
-		        [expr {$WindowFilesListCurr-1}]]
+		set list $WindowFilesList
 	    }
 	    set ipos [lsearch -exact $list $file]
 	    if { $ipos == -1 } {
@@ -4015,15 +4008,15 @@ proc RamDebugger::ChooseViewFile { w what args } {
 		$w._choosevf.l$i xview end
 		$w._choosevf.l$i configure -state disabled
 		grid $w._choosevf.l$i -row $row -column $col -sticky nw
-		bind $w._choosevf.l$i <Tab> "[list RamDebugger::ChooseViewFile $w next $i] ; break"
-		bind $w._choosevf.l$i <Shift-Tab> "[list RamDebugger::ChooseViewFile $w prev $i] ; break"
-		bind $w._choosevf.l$i <Right> "[list RamDebugger::ChooseViewFile $w next $i] ; break"
-		bind $w._choosevf.l$i <Left> "[list RamDebugger::ChooseViewFile $w prev $i] ; break"
-		bind $w._choosevf.l$i <Up> "[list RamDebugger::ChooseViewFile $w up $row $col] ; break"
-		bind $w._choosevf.l$i <Down> "[list RamDebugger::ChooseViewFile $w down $row $col] ; break"
+		bind $w._choosevf.l$i <Tab> "[list RamDebugger::ChooseViewFile next $i] ; break"
+		bind $w._choosevf.l$i <Shift-Tab> "[list RamDebugger::ChooseViewFile prev $i] ; break"
+		bind $w._choosevf.l$i <Right> "[list RamDebugger::ChooseViewFile next $i] ; break"
+		bind $w._choosevf.l$i <Left> "[list RamDebugger::ChooseViewFile prev $i] ; break"
+		bind $w._choosevf.l$i <Up> "[list RamDebugger::ChooseViewFile up $row $col] ; break"
+		bind $w._choosevf.l$i <Down> "[list RamDebugger::ChooseViewFile down $row $col] ; break"
 		bind $w._choosevf.l$i <FocusIn> [list $w._choosevf.ld configure -text $path]
-		bind $w._choosevf.l$i <1> "[list RamDebugger::ChooseViewFile \
-		        $w keyrelease button1 $list] ; break"
+		bind $w._choosevf.l$i <1> "[list focus $w._choosevf.l$i] ;
+		    [list RamDebugger::ChooseViewFile keyrelease button1 $list] ; break"
 		incr col
 	    }
 	    grid $w._choosevf.ld -row [incr row] -column 0 -columnspan $numcols -sticky ew \
@@ -4053,9 +4046,9 @@ proc RamDebugger::ChooseViewFile { w what args } {
 	    wm deiconify $w._choosevf
 	    
 	    bind $w._choosevf <KeyRelease> [list RamDebugger::ChooseViewFile \
-		    $w keyrelease %K $list]
+		    keyrelease %K $list]
 	    bind $w._choosevf <KeyPress> [list RamDebugger::ChooseViewFile \
-		    $w keypress %K $what]
+		    keypress %K $what]
 	    raise $w._choosevf
 	    if { [llength $list] > 1 } {
 		after idle focus -force $w._choosevf.l1
@@ -4078,8 +4071,8 @@ proc RamDebugger::ChooseViewFile { w what args } {
 	    foreach "K what_in" $args break
 	    if { [regexp {(?i)^space} $K] } {
 		if { $what_in eq "start" } {
-		    ChooseViewFile $w startrecent
-		} else { ChooseViewFile $w start }
+		    ChooseViewFile startrecent
+		} else { ChooseViewFile start }
 	    }
 	}
 	next {
@@ -4129,11 +4122,11 @@ proc RamDebugger::ChooseViewFile { w what args } {
 proc RamDebugger::ActualizeViewMenu { menu } {
     variable WindowFilesList
     variable WindowFilesListLineNums
-    variable WindowFilesListCurr
     variable text
+    variable currentfile
 
-    if { [$menu index end] > 2 } {
-	$menu del 3 end
+    if { [$menu index end] > 4 } {
+	$menu del 5 end
     }
 
     $menu add command -label "Previus" -acc "Alt-Left" -command \
@@ -4141,27 +4134,24 @@ proc RamDebugger::ActualizeViewMenu { menu } {
     $menu add command -label "Next" -acc "Alt-Right" -command \
        "RamDebugger::GotoPreviusNextInWinList next"
     $menu add command -label "Select..." -acc "Ctrl Tab" -command \
-	[list RamDebugger::ChooseViewFile $text start]
+	[list RamDebugger::ChooseViewFile start]
 
     set needssep 1
-    set ipos 0
     foreach i $WindowFilesList {
 	if { $needssep } {
 	    $menu add separator
 	    set needssep 0
 	}
-	if { $ipos == $WindowFilesListCurr } {
-	    set label $i
-	    if { [string length $label] > 45 } { set label ...[string range $label end-42 end] }
+	set label $i
+	if { [string length $label] > 45 } { set label ...[string range $label end-42 end] }
+	
+	if { $i eq $currentfile } {
 	    $menu add checkbutton -label $label -variable ::pp -command \
-	       [list RamDebugger::OpenFileF $i]
+		[list RamDebugger::OpenFileF $i]
 	    set ::pp 1
 	} else {
-	    set label $i
-	    if { [string length $label] > 45 } { set label ...[string range $label end-42 end] }
 	    $menu add command -label $label -command [list RamDebugger::OpenFileF $i]
 	}
-	incr ipos
     }
 }
 
@@ -4863,7 +4853,6 @@ proc RamDebugger::TextOutClear {} {
 
 proc RamDebugger::TextOutInsert { data } {
     variable textOUT
-    variable textOUT2
 
     if { ![info exists textOUT] || ![winfo exists $textOUT] } { return }
 
@@ -4879,7 +4868,6 @@ proc RamDebugger::TextOutInsert { data } {
 
 proc RamDebugger::TextOutInsertRed { data } {
     variable textOUT
-    variable textOUT2
 
     if { ![info exists textOUT] || ![winfo exists $textOUT] } { return }
 
@@ -5485,6 +5473,11 @@ proc RamDebugger::CheckTextBefore { command args } {
     variable text
     variable CheckTextSave
 
+    if { $command eq "tag" && [regexp {^(add|delete|remove)$} [lindex $args 0]] && \
+	[lindex $args 1] eq "sel" } {
+	$text tag remove search 1.0 end
+    }
+
     if { ![regexp {^(ins|del)} $command] } { return }
 
     # for the search braces stuff
@@ -5574,6 +5567,8 @@ proc RamDebugger::CheckText { command args } {
 	[expr $Numlines*[font metrics $font -linespace]]]
 
     set diff [expr $l2-$l1]
+
+    if { ![info exists instrumentedfilesInfo($currentfile)] } { return }
 
     while { $l1_old > 1 && [lindex [lindex $instrumentedfilesInfo($currentfile) \
 	[expr $l1_old-1]] 1] != "n" } {
@@ -5778,14 +5773,19 @@ proc RamDebugger::SearchBraces { x y } {
 
 proc RamDebugger::CenterDisplay {} {
     variable text
+    variable text_secondary
 
-    scan [$text index insert] "%d" line
-    set NumLines [scan [$text index end-1c] %d]
+    if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
+	set mytext $text_secondary
+    } else { set mytext $text }
 
-    foreach "f1 f2" [$text yview] break
+    scan [$mytext index insert] "%d" line
+    set NumLines [scan [$mytext index end-1c] %d]
+
+    foreach "f1 f2" [$mytext yview] break
     set ys [expr $line/double($NumLines)-($f2-$f1)/2.0]
     if { $ys < 0 } { set ys 0 }
-    $text yview moveto $ys
+    $mytext yview moveto $ys
 }
 
 proc RamDebugger::CommentSelection { what } {
@@ -6426,7 +6426,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require supergrid
     package require supertext
     package require dialogwin
-    package require helpviewer
+    package require helpviewer 1.1
     catch { package require tkdnd } ;# only if it is compiled
 
     CreateImages
@@ -6500,7 +6500,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		    "ShiftCtrl f" \
 		        -command "RamDebugger::SearchInFiles"] \
 		    separator \
-		    [list command "&Save position" {} \
+		    [list command "&Save/clear position" {} \
 		        "Save position to stack or clear position" "Shift F2" \
 		        -command "RamDebugger::PositionsStack save"] \
 		    [list command "&Go to position" {} "Recover position from stack" "F2" \
@@ -6523,7 +6523,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::Search $w iforward"] \
 		[list command "Isearch backward" {} "Incrementally search backward" "Ctrl r" \
 		-command "RamDebugger::Search $w ibackward"] \
-		[list command "Replace..." {} "Replace text in source file" "" \
+		[list command "&Replace..." {} "Replace text in source file" "" \
 		-command "RamDebugger::SearchWindow 1"] \
 		[list command "&Goto line" {} "Go to the given line" "Ctrl g" \
 		-command "RamDebugger::GotoLine"] \
@@ -7042,7 +7042,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind all <F10> ""
 
     bind $text <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev ; break"
-    bind $text <Control-Tab> "[list RamDebugger::ChooseViewFile $text start] ; break"
+    bind $text <Control-Tab> "[list RamDebugger::ChooseViewFile start] ; break"
 #     bind $text <Control-Tab> "RamDebugger::GotoPreviusNextInWinList prev ; break"
 #     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
@@ -7051,6 +7051,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Control-c> "RamDebugger::CutCopyPasteText copy  ; break"
     bind $text <Control-v> "RamDebugger::CutCopyPasteText paste ; break"
     bind [winfo toplevel $text] <Tab> ""
+    bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
 
     bind $w <Shift-Key-F5> "RamDebugger::DisconnectStop ;break"
 
@@ -7174,6 +7175,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set debuggerstate $options(debuggerstate)
 	#RamDebugger::DisplayTimesWindow
     }
+    if { [info exists options(SearchToolbar)] && [lindex $options(SearchToolbar) 0] } {
+	SearchWindow [lindex $options(SearchToolbar) 1]
+    }
     
 #     if { [info exists options(remoteserverType)] && $options(remoteserverType) == "remote" && \
 #          [info exists options(remoteserver)] } {
@@ -7184,7 +7188,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     NewFile
     
-    focus $text
+    focus -force $text
     cproject::Init $w
 
     # for tkcon

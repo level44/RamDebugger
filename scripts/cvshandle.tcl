@@ -1,5 +1,7 @@
 
+package require textutil
 package require base64
+package require sha1
 
 namespace eval RamDebugger::CVS {
     variable cvsrootdir
@@ -126,11 +128,11 @@ proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
     RamDebugger::WaitState 1
 
     if { [regexp {^\*.*\*$} $RamDebugger::currentfile] } {
-	set file [string trim $RamDebugger::currentfile *].UNNAMED
-	set lfile $file.[base64::encode -wrapchar "" $RamDebugger::currentfile]
+	set file [string trim $RamDebugger::currentfile *]
+	set lfile $file.[sha1::sha1 $file]
     } else {
 	set file [file normalize $RamDebugger::currentfile]
-	set lfile [file tail $file].[base64::encode -wrapchar "" $file]
+	set lfile [file tail $file].[sha1::sha1 $file]
     }
     RamDebugger::SetMessage "Saving revision for file '$file'..."
 
@@ -151,7 +153,14 @@ proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
     cd $cvsworkdir
     set err [catch { exec cvs log -R $lfile }]
     if { $err } {
-	exec cvs add -ko $lfile 2> $null
+	set err [catch { exec cvs add -ko -m $file $lfile 2> $null } errstring]
+	if { $err } {
+	    RamDebugger::WaitState 0
+	    RamDebugger::SetMessage ""
+	    if { $raiseerror } { error $errstring }
+	    WarnWin $errstring
+	    return
+	}
     }
     exec cvs commit -m "" $lfile
     file delete $lfile
@@ -172,10 +181,10 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	}
     }
     if { [regexp {^\*.*\*$} $file] } {
-	set file [string trim $RamDebugger::currentfile *]
-	set lfile $file.UNNAMED.[base64::encode -wrapchar "" $RamDebugger::currentfile]
+	set file [string trim $file *]
+	set lfile $file.[sha1::sha1 $file]
     } else {
-	set lfile [file tail $file].[base64::encode -wrapchar "" $file]
+	set lfile [file tail $file].[sha1::sha1 $file]
     }
 
     set err [catch { Init } errstring]
@@ -201,7 +210,6 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	"Choose a revision for file '$file'" -morebuttons [list Diff]
     set f [$w giveframe]
 
-    package require textutil
     set list ""
     foreach i [lrange [textutil::splitx $retval {--------+}] 1 end] {
 	regexp -line {^revision\s+(\S+)} $i {} revision
@@ -311,6 +319,45 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     }
 }
 
+proc RamDebugger::CVS::_showallfiles_update {} {
+    variable cvsrootdir
+    variable cvsworkdir
+    variable null
+
+    package require fileutil
+
+    set pwd [pwd]
+    cd $cvsworkdir
+    set err [catch { exec cvs -Q log -t } retcvslog]
+    cd $pwd
+
+    set list ""
+    set totalsize 0
+    foreach i [textutil::splitx $retcvslog {=======+}] {
+	if { [string trim $i] eq "" } { continue }
+	regexp -line {^RCS file:\s+(.*)} $i {} rcsfile
+	regexp -line {^description:\s+(.*)} $i {} file
+	set file [string trim $file]
+	if { $file eq "" } { continue }
+	set size [file size $rcsfile]
+	incr totalsize $size
+	set size_show [format "%.3g KB" [expr {$size/1024.0}]]
+	if { [file exists $file] } {
+	    set current_size [file size $file]
+	    set current_size_show [format "%.3g KB" [expr {$current_size/1024.0}]]
+	} else { set current_size_show "" }
+	set dirname [file dirname $file]
+	if { $dirname eq "." } { set dirname "" }
+	lappend list [list [file tail $file] $dirname $size_show $current_size_show]
+    }
+
+    set totalsize_show [format "%.3g MB" [expr {$totalsize/1024.0/1024.0}]]
+    if { $totalsize_show < 1 } {
+	set totalsize_show [format "%.3g KB" [expr {$totalsize/1024.0}]]
+    }
+    return [list $list $totalsize_show $retcvslog]
+}
+
 proc RamDebugger::CVS::ShowAllFiles {} {
     variable cvsrootdir
     variable cvsworkdir
@@ -324,41 +371,14 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 	return
     }
 
-    package require fileutil
-
-
-    set pwd [pwd]
-    cd $cvsworkdir
-    set err [catch { exec cvs -Q log -R } retcvslog]
-    cd $pwd
-#     if { $err && [string match -nocase *abort* $retcvslog] } {
-#         WarnWin "File '$file' has no revisions"
-#         return
-#     }
-    RamDebugger::WaitState 0
     set w $RamDebugger::text._openrev
     destroy $w
     dialogwin_snit $w -title "Choose revision file" -entrytext \
 	"Choose a revision file to check its revisions or to remove revisions history" \
-	-morebuttons [list "Remove..." "Purge..."]
+	-morebuttons [list "Remove..." "Purge..."] -okname "Revisions"
     set f [$w giveframe]
 
-    package require base64
-    set list ""
-    set totalsize 0
-    foreach i [split $retcvslog \n] {
-	set size [file size $i]
-	incr totalsize $size
-	set size_show [format "%.3g KB" [expr {$size/1024.0}]]
-	set file [base64::decode [string range [file extension $i] 1 end-2]]
-	set dirname [file dirname $file]
-	if { $dirname eq "." } { set dirname "" }
-	lappend list [list [file tail $file] $dirname $size_show]
-    }
-    set totalsize_show [format "%.3g MB" [expr {$totalsize/1024.0/1024.0}]]
-    if { $totalsize_show < 1 } {
-	set totalsize_show [format "%.3g KB" [expr {$totalsize/1024.0}]]
-    }
+    foreach "list totalsize_show retcvslog" [_showallfiles_update] break
 
     label $f.lsize -text "Total size of revision storage: $totalsize_show"
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
@@ -367,7 +387,8 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 		  -columns [list \
 		                15  file      left \
 		                50  path     left \
-		                10  size     left \
+		                15  "storage size"     left \
+		                10  "file size" left \
 		               ] \
 		  -labelcommand tablelist::sortByColumn \
 		  -background white \
@@ -375,7 +396,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 		  -stretch all -selectmode extended \
 		  -highlightthickness 0]
   
-    foreach i "0 1 2" { $sw.lb columnconfigure $i -sortmode dictionary }
+    foreach i "0 1 2 3" { $sw.lb columnconfigure $i -sortmode dictionary }
     $sw setwidget $sw.lb
     $sw.lb insertlist end $list
     $sw.lb selection set 0
@@ -389,6 +410,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
     grid rowconfigure $f 2 -weight 1
     grid columnconfigure $f 0 -weight 1
 
+    RamDebugger::WaitState 0
     set action [$w createwindow]
     while 1 {
 	if { $action <= 0 } {
@@ -402,14 +424,21 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 	if { $action == 1 } {
 	    if { [llength $selecteditems] != 1  } {
 		WarnWin "Select one file in order to visualize its revisions"
-	    } else { break }
+	    } else {
+		destroy $w
+		OpenRevisions [file join [lindex $selecteditems 0 1] \
+		        [lindex $selecteditems 0 0]]
+		return
+	    }
 	} else {
+	    set isgood 1
 	    if { [llength $selecteditems] == 0  } {
 		if { $action == 2 } {
 		    WarnWin "Select one or more files in order to remove the revisions"
 		} else {
 		    WarnWin "Select one or more files in order to purge the revisions"
 		}
+		set isgood 0
 	    } else {
 		set len [llength $selecteditems]
 		if { $action == 2 } {
@@ -420,42 +449,61 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 		    set txt "Are you user to purge revision history for the $len selected files?"
 		}
 		set ret [snit_messageBox -icon question -title $title -type okcancel \
-		             -default ok -parent $w -message $txt]
-		if { $ret eq "ok" } { break }
+		        -default ok -parent $w -message $txt]
+		if { $ret ne "ok" } { set isgood 0 }
+	    }
+	    if { $isgood } {
+		RamDebugger::WaitState 1
+		set pwd [pwd]
+		cd $cvsworkdir
+		
+		foreach i [textutil::splitx $retcvslog {=======+}] {
+		    if { [string trim $i] eq "" } { continue }
+		    regexp -line {^RCS file:\s+(.*)} $i {} rcsfile
+		    regexp -line {^description:\s+(.*)} $i {} file
+		    set file [string trim $file]
+		    if { $file eq "" } {
+		        set lfile [string range [file tail $rcsfile] 0 end-2]
+		        exec cvs remove $lfile 2> $null
+		        exec cvs commit -m "" $lfile
+		        file delete [file join $cvsrootdir cvswork Attic [file tail $rcsfile]]
+		        continue
+		    }
+		    set size [file size $rcsfile]
+		    set size_show [format "%.3g KB" [expr {$size/1024.0}]]
+		    if { [file exists $file] } {
+		        set current_size [file size $file]
+		        set current_size_show [format "%.3g KB" [expr {$current_size/1024.0}]]
+		    } else { set current_size_show "" }
+		    set dirname [file dirname $file]
+		    if { $dirname eq "." } { set dirname "" }
+		    set key [list [file tail $file] $dirname $size_show $current_size_show]
+		    if { [lsearch -exact $selecteditems $key] != -1 } {
+		        set lfile [string range [file tail $rcsfile] 0 end-2]
+		        if { $action == 3 } {
+		            set data [exec cvs -Q update -p $lfile]
+		        }
+		        exec cvs remove $lfile 2> $null
+		        exec cvs commit -m "" $lfile
+		        file delete [file join $cvsrootdir cvswork Attic [file tail $rcsfile]]
+		        
+		        if { $action == 3 } {
+		            RamDebugger::_savefile_only [file join $cvsworkdir $lfile] $data
+		            exec cvs add -ko -m $file $lfile 2> $null
+		            exec cvs commit -m "" $lfile
+		            file delete $lfile
+		        }
+		    }
+		}
+		cd $pwd
+		foreach "list totalsize_show retcvslog" [_showallfiles_update] break
+		$f.lsize configure -text "Total size of revision storage: $totalsize_show"
+		$sw.lb delete 0 end
+		$sw.lb insertlist end $list
+		RamDebugger::WaitState 0
 	    }
 	}
 	set action [$w waitforwindow]
     }
-    destroy $w
-
-    if { $action == 1 } {
-	OpenRevisions [file join [lindex $selecteditems 0 1] [lindex $selecteditems 0 0]]
-    } else {
-	cd $cvsworkdir
-	foreach i [split $retcvslog \n] {
-	    set size [file size $i]
-	    set size_show [format "%.3g KB" [expr {$size/1024.0}]]
-	    set file [base64::decode [string range [file extension $i] 0 end-2]]
-	    set dirname [file dirname $file]
-	    if { $dirname eq "." } { set dirname "" }
-	    set key [list [file tail $file] $dirname $size_show]
-	    if { [lsearch -exact $selecteditems $key] != -1 } {
-		set lfile [string range [file tail $i] 0 end-2]
-		if { $action == 3 } {
-		    set data [exec cvs -Q update -p $lfile]
-		}
-		exec cvs remove $lfile 2> $null
-		exec cvs commit -m "" $lfile
-		file delete [file join $cvsrootdir cvswork Attic [file tail $i]]
-
-		if { $action == 3 } {
-		    RamDebugger::_savefile_only [file join $cvsworkdir $lfile] $data
-		    exec cvs add -ko $lfile 2> $null
-		    exec cvs commit -m "" $lfile
-		    file delete $lfile
-		}
-	    }
-	}
-	cd $pwd
-    }
 }
+

@@ -2050,12 +2050,53 @@ proc RamDebugger::SearchInFiles {} {
 # Search
 ################################################################################
 
+proc RamDebugger::SearchWindow_autoclose {} {
+    variable options
+    variable SearchToolbar
+    variable mainframe
+
+    if { ![info exists options(SearchToolbar_autoclose)] ||
+	!$options(SearchToolbar_autoclose) } { return }
+
+    if { [info exists SearchToolbar] && [lindex $SearchToolbar 0] } {
+	$mainframe showtoolbar 1 0
+	lset SearchToolbar 0 0
+    }
+}
+
 proc RamDebugger::SearchWindow { { replace 0 } }  {
     variable text
     variable options
     variable text_secondary
+    variable mainframe
+    variable SearchToolbar
+    variable searchFromBegin
 
-    if { !$replace && [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
+    set istoplevel 0
+
+    if { [info exists SearchToolbar] } {
+	set f [$mainframe gettoolbar 1]
+	set ::RamDebugger::searchstring [GetSelOrWordInIndex insert]
+	if { $replace != [lindex $SearchToolbar 1] } {
+	    #nothing
+	} elseif { [lindex $SearchToolbar 0] } {
+	    $mainframe showtoolbar 1 0
+	    focus $text
+	    set SearchToolbar [list 0 $replace]
+	    return
+	} else {
+	    $mainframe showtoolbar 1 1
+	    tkTabToWindow $f.e1
+	    set SearchToolbar [list 1 $replace]
+	    return
+	}
+    }
+    if { ![info exists options(SearchToolbar_autoclose)] } {
+	set options(SearchToolbar_autoclose) 1
+    }
+
+    if { !$replace && [info exists text_secondary] && [focus -lastfor $text] eq \
+	$text_secondary } {
 	set active_text $text_secondary
     } else { set active_text $text }
 
@@ -2067,10 +2108,14 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	set options(old_replaces) ""
     }
 
-    if { ![info exists ::RamDebugger::searchFromBegin] } {
-	set ::RamDebugger::searchFromBegin 1
+#     if { ![info exists searchFromBegin] } {
+#         set searchFromBegin 1
+#     }
+    set searchFromBegin 1
+
+    if { $replace && $searchFromBegin } {
+	set searchFromBegin 0
     }
-    if { $replace } { set ::RamDebugger::searchFromBegin 0 }
 
     set ::RamDebugger::replacestring ""
 
@@ -2085,63 +2130,151 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	set commands [list "RamDebugger::SearchReplace $w beginreplace" \
 		          "RamDebugger::SearchReplace $w replace" \
 		          "RamDebugger::SearchReplace $w replaceall"  \
-		          "RamDebugger::SearchReplace $w cancel"]
+		          "RamDebugger::SearchReplace $w cancel $istoplevel"]
 	set morebuttons [list "Replace" "Replace all"]
 	set OKname "Search"
 	set title "Replace"
     }
-	
-    set f [DialogWinTop::Init $active_text $title separator $commands $morebuttons $OKname]
-    set w [winfo toplevel $f]
+    
+    if { $istoplevel } {
+	set f [DialogWinTop::Init $active_text $title separator $commands $morebuttons $OKname]
+    } else {
+	if { [info exists ::RamDebugger::SearchToolbar] } {
+	    $mainframe showtoolbar 1 1
+	    set f [$mainframe gettoolbar 1]
+	    eval destroy [winfo children $f]
+	} else {
+	    set f [$mainframe addtoolbar]
+	}
+    }
+    set ::RamDebugger::SearchToolbar [list 1 $replace]
 
-    label $f.l1 -text "Search:" -grid 0
-    ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs) \
-	-grid "1 2 px3 py3"
+    label $f.l1 -text "Search:"
+    ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs)
 
-    if { $replace } {
-	label $f.l11 -text "Replace:" -grid 0
-	ComboBox $f.e11 -textvariable ::RamDebugger::replacestring \
-	    -values $options(old_replaces) \
-	    -grid "1 2 px3 py3"
+    set f2 [frame $f.f2 -bd 1 -relief ridge]
+    radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
+	-value -exact
+    radiobutton $f2.r2 -text Regexp -variable ::RamDebugger::searchmode \
+	-value -regexp
+
+    grid $f2.r1 -sticky w
+    grid $f2.r2 -sticky w
+
+    set f25 [frame $f.f25 -bd 1 -relief ridge]
+    radiobutton $f25.r1 -text Forward -variable ::RamDebugger::SearchType \
+	-value -forwards
+    radiobutton $f25.r2 -text Backward -variable ::RamDebugger::SearchType \
+	-value -backwards
+
+    grid $f25.r1 -sticky w
+    grid $f25.r2 -sticky w
+
+    set f3 [frame $f.f3]
+    checkbutton $f3.cb1 -text "Consider case" -variable ::RamDebugger::searchcase
+    checkbutton $f3.cb2 -text "From beginning" -variable ::RamDebugger::searchFromBegin
+
+    grid $f3.cb1 $f3.cb2 -sticky w
+
+    radiobutton $f.r1 -image navup16 -variable ::RamDebugger::SearchType \
+	-value -backwards -indicatoron 0 -bd 1
+    radiobutton $f.r2 -image navdown16 -variable ::RamDebugger::SearchType \
+	-value -forwards -indicatoron 0 -bd 1
+    Separator $f.sp1 -orient vertical
+    checkbutton $f.cb1 -image navhome16 -variable ::RamDebugger::searchFromBegin \
+	-indicatoron 0 -bd 1
+    checkbutton $f.cb2 -image uppercase_lowercase -variable ::RamDebugger::searchcase\
+	 -indicatoron 0 -bd 1
+    checkbutton $f.cb3 -text Regexp -variable ::RamDebugger::searchmode \
+	-onvalue -regexp -offvalue -exact
+
+    set helps [list \
+	    $f.r1 "Search backwards (PgUp)" \
+	    $f.r2 "Search forwards (PgDn)" \
+	    $f.cb1 "From beginning (Home)" \
+	    $f.cb2 "Consider case" \
+	    $f.cb3 "Rexexp mode"]
+    foreach "widget help" $helps {
+	DynamicHelp::register $widget balloon $help
     }
 
-    set f2 [frame $f.f2 -bd 1 -relief ridge -grid "0 2 w px3"]
-    radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
-	-value -exact -grid "0 w"
-    radiobutton $f2.r2 -text Regexp -variable ::RamDebugger::searchmode \
-	-value -regexp -grid "0 w"
+    if { $replace } {
+	label $f.l11 -text "Replace:"
+	ComboBox $f.e11 -textvariable ::RamDebugger::replacestring \
+	    -values $options(old_replaces)
+	frame $f.buts
+	
+	set ic 0
+	foreach "txt cmd help" [list "Skip" beginreplace "Search next (Shift-Return)" \
+		"Replace" replace "Replace (Return)" \
+		"Replace all" replaceall "Replace all"] {
+	    button $f.buts.b[incr ic] -text $txt -padx 0 -pady 0 -width 9 \
+		-relief flat -overrelief raised -bd 1 -command \
+		[list RamDebugger::SearchReplace $w $cmd]
+	    DynamicHelp::register $f.buts.b$ic balloon $help
+	}
+	grid $f.buts.b1 $f.buts.b2 $f.buts.b3 -sticky nw -padx 2
+    }
 
-    set f25 [frame $f.f25 -bd 1 -relief ridge -grid "2 w px3"]
-    radiobutton $f25.r1 -text Forward -variable ::RamDebugger::SearchType \
-	-value -forwards -grid "0 w"
-    radiobutton $f25.r2 -text Backward -variable ::RamDebugger::SearchType \
-	-value -backwards -grid "0 w"
-
-    set f3 [frame $f.f3 -grid "0 3 w"]
-    checkbutton $f3.cb1 -text "Consider case" -variable ::RamDebugger::searchcase \
-	-grid 0
-    checkbutton $f3.cb2 -text "From beginning" -variable ::RamDebugger::searchFromBegin \
-	-grid 1
-   
-    supergrid::go $f
-
+    if { !$istoplevel } {
+	grid $f.l1 $f.e1 $f.r1 $f.r2 $f.sp1 $f.cb1 $f.cb2 $f.cb3 -sticky nw -padx 2
+	if { [winfo exists $f.l11] } {
+	    grid $f.l11 $f.e11 $f.buts - - - - - -sticky nw -padx 2 -pady 1
+	    grid configure $f.e11 -sticky new
+	}
+	grid $f.e1 -sticky new
+	grid $f.sp1 -sticky nsw
+	grid columnconfigure $f 1 -weight 1
+    } else {
+	grid $f.l1 $f.e1    - -sticky nw -padx 3 -pady 3
+	if { [winfo exists $f.l11] } {
+	    grid $f.l11 $f.e11    - -sticky nw -padx 3 -pady 3
+	    grid configure $f.e11 -sticky new
+	}
+	grid $f2     -   $f25 -sticky nw -padx 3
+	grid $f3     -     -   -sticky nw
+	grid configure $f.e1 -sticky new
+	grid columnconfigure $f 2 -weight 1
+    }
     set ::RamDebugger::searchstring [GetSelOrWordInIndex insert]
 
     set ::RamDebugger::searchmode -exact
     set ::RamDebugger::searchcase 0
     set ::RamDebugger::SearchType -forwards
 
+    bind $f.l1 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+    $f.e1 bind <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+
+    $f.e1 bind <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
+    $f.e1 bind <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
+    $f.e1 bind <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
+    $f.e1 bind <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
+
     tkTabToWindow $f.e1
     if { !$replace } {
-	bind $w <Return> "DialogWinTop::InvokeOK $f"
+	$f.e1 bind <Return> "RamDebugger::Search $w begin 0 $f"
     } else {
-	bind $w <Return> "DialogWinTop::InvokeButton $f 2"
+	$f.e1 bind <Return> "RamDebugger::SearchReplace $w replace"
+	$f.e11 bind <Return> "RamDebugger::SearchReplace $w replace ; break"
+	$f.e11 bind <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
+	bind $f.l11 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+	$f.e11 bind <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+	$f.e11 bind <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
+	$f.e11 bind <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
+	$f.e11 bind <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
+	$f.e11 bind <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
     }
-    bind $w <Destroy> "$active_text tag remove search 1.0 end"
-    DialogWinTop::CreateWindow $f
+
+    if { $istoplevel } {
+	bind [winfo toplevel $f] <Destroy> "$active_text tag remove search 1.0 end"
+	DialogWinTop::CreateWindow $f
+    } else {
+	bind $f <Destroy> "[list $active_text tag remove search 1.0 end]
+	    [list unset ::RamDebugger::SearchToolbar]"
+    }
 }
 
-proc RamDebugger::SearchReplace { w what {f "" } } {
+proc RamDebugger::SearchReplace { w what args } {
     variable text
 
     switch $what {
@@ -2194,8 +2327,50 @@ proc RamDebugger::SearchReplace { w what {f "" } } {
 	    SetMessage "Replaced $inum words"
 	}
 	cancel {
-	    destroy [winfo toplevel $f]
+	    foreach "istoplevel f" $args break
+	    if { $istoplevel } {
+		destroy [winfo toplevel $f]
+	    } else {
+		destroy $f
+	    }
 	    return
+	}
+	contextual {
+	    foreach "replace x y" $args break
+	    set menu $w._menu
+	    catch { destroy $menu }
+	    menu $menu -tearoff 0
+	    if { !$replace } {
+		$menu add command -label Replace -command \
+		    [list RamDebugger::SearchWindow 1]
+	    } else {
+		$menu add command -label Search -command \
+		    [list RamDebugger::SearchWindow]
+	    }
+	    $menu add separator
+	    $menu add radio -label Backward -variable ::RamDebugger::SearchType \
+		-value -backwards
+	    $menu add radio -label Forward -variable ::RamDebugger::SearchType \
+		-value -forwards
+	    $menu add separator
+	    $menu add check -label "From beginning" -variable \
+		::RamDebugger::searchFromBegin
+	    $menu add check -label "Consider case" -variable \
+		::RamDebugger::searchcase
+	    $menu add check -label "Regexp mode" -variable \
+		::RamDebugger::searchmode -onvalue -regexp -offvalue -exact
+	    $menu add separator
+	    $menu add check -label "Auto close toolbar" -variable \
+		::RamDebugger::options(SearchToolbar_autoclose)
+	    $menu add separator
+	    if { !$replace } {
+		$menu add command -label Close -command \
+		    [list RamDebugger::SearchWindow]
+	    } else {
+		$menu add command -label Close -command \
+		    [list RamDebugger::SearchWindow 1]
+	    }
+	    tk_popup $menu $x $y
 	}
     }
 }
@@ -2210,7 +2385,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     } else { set active_text $text }
 
     if { [string match begin* $what] } {
-	if { $what == "begin" } {
+	if { $what == "begin" && ![info exists ::RamDebugger::SearchToolbar] } {
 	    destroy [winfo toplevel $f]
 	}
 	if { $::RamDebugger::searchstring == "" } {
@@ -2236,6 +2411,9 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    } else { set idx [$active_text index end] }
 	} else {
 	    set idx [$active_text index insert]
+	}
+	if { [info exists ::RamDebugger::SearchToolbar] } {
+	    set ::RamDebugger::searchFromBegin 0
 	}
 	if { $what == "beginreplace" } {
 	    set ::RamDebugger::searchFromBegin 0
@@ -2387,11 +2565,11 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		set idxA $idx2
 	    }
 	    $active_text tag add sel $idxA $idxB
-	    if { $what == "beginreplace" } {
+	    #if { $what == "beginreplace" } 
 		$active_text tag add search $idxA $idxB
 		$active_text tag conf search -background [$active_text tag cget sel -background] \
 		    -foreground [$active_text tag cget sel -foreground]
-	    }
+	    #
 	    if { $active_text eq $text } {
 		$active_text conf -editable $ed
 	    } else {
@@ -2443,6 +2621,7 @@ proc RamDebugger::revalforTkcon { comm } {
 
 proc RamDebugger::OpenConsole {} {
     variable MainDir
+    variable textOUT
 
     set tkcon [file join $MainDir addons tkcon tkcon.tcl]
 
@@ -2494,6 +2673,21 @@ proc RamDebugger::OpenConsole {} {
 	    }
 	puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
     }
+
+    if { [info exists textOUT] && [winfo exists $textOUT] } {
+	set channel stdout
+	foreach "k v i" [$textOUT dump -tag -text 1.0 end-1c] {
+	    switch $k {
+		tagon { if { $v eq "red" } { set channel stderr } }
+		tagoff { if { $v eq "red" } { set channel stdout } }
+		text {
+		    append tkconprefs [list puts -nonewline $channel $v]\n
+		}
+	    }
+	}
+    }
+    append tkconprefs [list puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"]\n
+
     if { [winfo exists .tkcon] } { destroy .tkcon }
 
     set argv [list -rcfile "" -exec "" -root .tkcon -eval $tkconprefs]
@@ -2655,7 +2849,7 @@ proc RamDebugger::DisplayPositionsStack { args } {
 		  -labelcommand tablelist::sortByColumn \
 		  -background white \
 		  -selectbackground navy -selectforeground white \
-		  -stretch 1 -selectmode extended \
+		  -stretch "2 3" -selectmode extended \
 		  -highlightthickness 0]
 
     $sw setwidget $DialogWinTop::user(list)
