@@ -112,7 +112,7 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		        set NewDoInstrument 1
 		    }
 		}
-		"*foreach" {
+		"*foreach" - mk::loop {
 		    if { [llength $words] >= 3 } {
 		        set NewDoInstrument 1
 		    }
