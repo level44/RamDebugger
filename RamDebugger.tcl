@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.29 2003/11/10 15:42:30 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.30 2003/11/11 09:15:12 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -6228,8 +6228,9 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	    foreach i $options(breakpoints) {
 		lappend breakpoints [concat [list [lindex $i 0]] 1 [lrange $i 1 3]]
 	    }
+	} else {
+	    set breakpoints $options(breakpoints)
 	}
-	set breakpoints $options(breakpoints)
     }
     if { [info exists options(TimeMeasureData)] } {
 	set TimeMeasureData $options(TimeMeasureData)
