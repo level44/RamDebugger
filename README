@@ -46,6 +46,15 @@ for details.
 Changes
 =======
 
+Changes From version 4.4 to version 5.3
+
+   * Colors customization
+   * Fast instrumenter for TCL code, developed in C++
+   * Profile procedures
+   * Files list obtained with Ctrl-Tab has a new alternative list
+     based on current directory
+
+
 Changes From version 3.2 to version 4.1
 
    * Implemented secondary view in the Editor
@@ -139,8 +148,10 @@ Download
 ========
 
 RamDebugger can be download from
-`http://gid.cimne.com/RamDebugger/RamDebugger4.1.zip'
-`http://gid.cimne.com/RamDebugger/RamDebugger4.1.kit'
+
+   * `http://gid.cimne.com/RamDebugger/RamDebugger5.3.zip'
+   * `http://gid.cimne.com/RamDebugger/RamDebugger5.3.kit'
+
 
 
 Installation and prerequisites

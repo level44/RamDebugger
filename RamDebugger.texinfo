@@ -58,11 +58,11 @@
 
 @set photo
 
-@set Version 5.2
-@set Date January 2005
+@set Version 5.3
+@set Date February 2005
 @set Copyright 2002-2005 Ramon Ribó
 
-@set CVSVersion  $Revision: 1.31 $
+@set CVSVersion  $Revision: 1.32 $
 @ifinfo
 Copyright @value{Copyright}
 @end ifinfo
@@ -190,7 +190,7 @@ uses GDB as a backend. See @ref{Compiling/Debugging c++} for details.
 @node Changes, web page, Introduction, Introduction and Setup
 @section Changes
 
-Changes From version 4.4 to version 5.0
+Changes From version 4.4 to version 5.3
 
 @itemize @bullet
 @item Colors customization
