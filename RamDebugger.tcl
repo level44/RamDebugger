@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.12 2002/09/10 11:10:45 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.13 2002/09/10 14:31:54 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -245,7 +245,7 @@ proc RamDebugger::UpdateExecDirs {} {
 		if { [file exists [file join $j bin]] } {
 		    set file [filenormalize [file join $j bin]]
 		    if { [lsearch $options(executable_dirs) $file] == -1 } {
-			lappend options(executable_dirs) $file
+		        lappend options(executable_dirs) $file
 		    }
 		}
 	    }
@@ -645,20 +645,19 @@ proc RamDebugger::rdebug { args } {
 	set debuggerstate debug
 	UpdateRemoteBreaks
     }
-    if { $debuggerstate == "debug" } {
-	switch $remoteserverType {
-	    remote {
-		if { $currentfile != "" } {
-		    rlist -quiet $currentfile
-		}
+
+    switch $remoteserverType {
+	remote {
+	    if { $currentfile != "" } {
+		rlist -quiet $currentfile
 	    }
-	    local {
-		EvalRemote [list set ::RDC::currentfile $currentfile]
-		after idle [list RamDebugger::rlist -quiet -asmainfile $currentfile]
-	    }
-	    gdb {
-		EvalRemote "run"
-	    }
+	}
+	local {
+	    EvalRemote [list set ::RDC::currentfile $currentfile]
+	    after idle [list RamDebugger::rlist -quiet -asmainfile $currentfile]
+	}
+	gdb {
+	    EvalRemote "run"
 	}
     }
     return "Begin debugging of program '$remoteserver'"
@@ -1028,6 +1027,7 @@ proc RamDebugger::rtime { args } {
 	    if { [lindex $data($i) 2] != "" && [lindex $data($i) 2] != 0 } {
 		append retval " ([format %.3g [lindex $data($i) 2]]%)"
 	    }
+	    if {$time == "" } { append retval " (this block not executed since start)" }
 	    append retval \n
 	}
 	return $retval
@@ -1056,7 +1056,7 @@ proc RamDebugger::rtime { args } {
 		error "block name '$opts(name)' already exists"
 	    }
 	    set fail 0
-	    if { $opts(lineini) < $lineini && $opts(lineend) >= $lineend } { set fail 1 }
+	    if { $opts(lineini) < $lineini && $opts(lineend) > $lineend } { set fail 1 }
 	    if { $opts(lineini) > $lineini && $opts(lineini) <= $lineend && 
 		$opts(lineend) > $lineend } { set fail 1 }
 	    if { $fail } {
@@ -1904,10 +1904,10 @@ proc RamDebugger::RecieveFromGdb {} {
 		if { ![file exists $file] } {
 		    set fullfile [cproject::TryToFindPath $file]
 		    if { $fullfile != "" } {
-			set file $fullfile
-			if { [file exists $file] } {
-			    set file [filenormalize $file]
-			}
+		        set file $fullfile
+		        if { [file exists $file] } {
+		            set file [filenormalize $file]
+		        }
 		    }
 		}
 	    }
@@ -2018,33 +2018,33 @@ proc RamDebugger::RecieveFromGdb {} {
 	    RecieveFromProgram "" $filenum $line $procname "" ""
 	    return
 
-# 	set found 0
-# 	foreach i $breakpoints {
-# 	    set breaknum [lindex $i 0]
-# 	    set line_in [lindex $i 2]
-# 	    set file_in [lindex $i 1]
-# 	    if { $line == $line_in && [AreFilesEqual $file $file_in] } {
-# 		set found 1
-# 		break
-# 	    }
-# 	    # CONDITION is forgotten by now
-# 	}
-# 	if { $found } {
-# 	    set filenum [lsearch $fileslist $file]
-# 	    if { $filenum == -1 } {
-# 		set err [catch {OpenFileF $file} errstring]
-# 		if { $err } {
-# 		    WarnWin "Could not open file '$file' for stopping program"
-# 		    return
-# 		}
-# 		set filenum [lsearch $fileslist $file]
-# 	    }
-# 	    RecieveFromProgram $breaknum $filenum $line $procname "" ""
-# 	    return
-# 	} else {
-# 	    WarnWin "Problems finding breakpoint in file $file ($aa)"
-# 	}
-# 	return
+#         set found 0
+#         foreach i $breakpoints {
+#             set breaknum [lindex $i 0]
+#             set line_in [lindex $i 2]
+#             set file_in [lindex $i 1]
+#             if { $line == $line_in && [AreFilesEqual $file $file_in] } {
+#                 set found 1
+#                 break
+#             }
+#             # CONDITION is forgotten by now
+#         }
+#         if { $found } {
+#             set filenum [lsearch $fileslist $file]
+#             if { $filenum == -1 } {
+#                 set err [catch {OpenFileF $file} errstring]
+#                 if { $err } {
+#                     WarnWin "Could not open file '$file' for stopping program"
+#                     return
+#                 }
+#                 set filenum [lsearch $fileslist $file]
+#             }
+#             RecieveFromProgram $breaknum $filenum $line $procname "" ""
+#             return
+#         } else {
+#             WarnWin "Problems finding breakpoint in file $file ($aa)"
+#         }
+#         return
     }
 
     if { [regexp {Program exited[^\n]*} $aa mess] } {
@@ -2139,6 +2139,7 @@ proc RamDebugger::ExitGUI {} {
     variable currentfile
     variable currentline
     variable breakpoints
+    variable TimeMeasureData
 
     if { [SaveFile ask] == -1 } { return }
 
@@ -2176,7 +2177,9 @@ proc RamDebugger::ExitGUI {} {
 	    lappend options(breakpoints) $i
 	}
     }
-
+    if { $TimeMeasureData != "" } {
+	set options(TimeMeasureData) $TimeMeasureData
+    }
     set options(remoteserverType) $remoteserverType
     set options(remoteserver) $remoteserver
     if { [wm state [winfo toplevel $text]] == "zoomed" } {
@@ -2569,6 +2572,7 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     variable instrumentedfilesP
     variable instrumentedfilesR
     variable instrumentedfilesInfo
+    variable instrumentedfilesTime
     variable gdblog
 
     if { [SaveFile ask] == -1 } { return }
@@ -2590,6 +2594,11 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     } elseif { $what == "gdb" } {
 	if { $gdblog == "" } {
 	    WarnWin "There is no GDB log file. Use Files->Debug on->Debug c++ to obtain it"
+	    return
+	}
+    } elseif { $what == "time" } {
+	if { ![info exists instrumentedfilesTime($currentfile)] } {
+	    WarnWin "There is no instrumented file time for file '$currentfile'"
 	    return
 	}
     } else {
@@ -2620,6 +2629,9 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     } elseif { $what == "gdb" } {
 	wm title [winfo toplevel $text] "RamDebugger      GDB log info"
 	$textO ins end $gdblog
+    } elseif { $what == "time" } {
+	wm title [winfo toplevel $text] "RamDebugger      [file tail $currentfile] instrumented time"
+	$textO ins end [string map [list "\t" "        "] $instrumentedfilesTime($currentfile)]
     } else {
 	wm title [winfo toplevel $text] "RamDebugger      [file tail $currentfile] instrumented info"
 	foreach i $instrumentedfilesInfo($currentfile) {
@@ -4378,6 +4390,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
     variable textCOMP
     variable breakpoints
     variable MainDir
+    variable TimeMeasureData
 
     proc ::bgerror { errstring } {
 	if { [info command RamDebugger::TextOutRaise] != "" } {
@@ -4525,6 +4538,8 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::ViewInstrumentedFile instrumentedR"] \
 		[list command "&View instrumented info file" {} "View instrumented info file" "" \
 		-command "RamDebugger::ViewInstrumentedFile info"] \
+		[list command "&View instrumented time file" {} "View instrumented time file" "" \
+		-command "RamDebugger::ViewInstrumentedFile time"] \
 		[list command "&View gdb log" {} \
 		  "View all commands transferred from/to gdb, if debugging c++" "" \
 		-command "RamDebugger::ViewInstrumentedFile gdb"] \
@@ -4988,6 +5003,9 @@ proc RamDebugger::InitGUI { { w .gui } } {
 
     if { [info exists options(breakpoints)] } {
 	set breakpoints $options(breakpoints)
+    }
+    if { [info exists options(TimeMeasureData)] } {
+	set TimeMeasureData $options(TimeMeasureData)
     }
 
 #     if { [info exists options(remoteserverType)] && $options(remoteserverType) == "remote" && \

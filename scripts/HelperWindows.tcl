@@ -713,6 +713,7 @@ proc RamDebugger::PreferencesWindow {} {
 
 proc RamDebugger::DisplayTimesWindowStart { f } {
     rtime -start
+    #WarnWin "Starting to measure times. Use 'File->Debug on->currentfile' to proceed" $f
 }
 
 proc RamDebugger::DisplayTimesWindowReport { f } {
@@ -759,7 +760,9 @@ proc RamDebugger::DisplayTimesPickSelection { w } {
 	set DialogWinTop::user($w,lineini) [scan [$text index sel.first] %d]
 	set DialogWinTop::user($w,lineend) [scan [$text index sel.last] %d]
     }]} {
-	WarnWin "It is necessary to select some text in main window" $w
+	set DialogWinTop::user($w,lineini) [scan [$text index insert] %d]
+	set DialogWinTop::user($w,lineend) [scan [$text index insert] %d]
+	#WarnWin "It is necessary to select some text in main window" $w
     }
 }
 
@@ -775,7 +778,7 @@ proc RamDebugger::DisplayTimesDrawSelection { w } {
     }
 }
 
-proc RamDebugger::ModifyTimingBlock { w what } {
+proc RamDebugger::ModifyTimingBlock { w entry what } {
     variable TimeMeasureData
 
     set idx [$DialogWinTop::user($w,list) curselection]
@@ -788,28 +791,52 @@ proc RamDebugger::ModifyTimingBlock { w what } {
 		WarnWin [lindex [split $errstring \n] 0]
 		return $err
 	    } else {
-		ModifyTimingBlock $w update
+		set i 1
+		while 1 {
+		    set found 0
+		    foreach j $TimeMeasureData {
+			if { [lindex $j 0] == "Block $i" } {
+			    set found 1
+			    break
+			}
+		    }
+		    if { !$found } { break }
+		    incr i
+		}
+		set DialogWinTop::user($w,name) "Block $i"
+		set DialogWinTop::user($w,lineini) ""
+		set DialogWinTop::user($w,lineend) ""
+		tkTabToWindow $entry
+		ModifyTimingBlock $w $entry update
 		return 0
 	    }
 	}
 	edit {
-	    set err [ModifyTimingBlock $w delete]
-	    if { !$err } { ModifyTimingBlock $w create }
-	}
-	delete {
 	    if { [llength $idx] != 1 } {
-		WarnWin "Error: it is necessary to select one block in list"
+		WarnWin "Error: it is necessary to select just one block in list"
 		return 1
 	    }
-	    set selname [lindex [$DialogWinTop::user($w,list) get $idx] 0]
-	    set err [catch [list rtime -delete $selname] errstring]
-	    if { $err } {
-		WarnWin [lindex [split $errstring \n] 0]
-		return $err
-	    } else {
-		ModifyTimingBlock $w update
-		return 0
+	    set err [ModifyTimingBlock $w $entry delete]
+	    if { !$err } { ModifyTimingBlock $w $entry create }
+	}
+	delete {
+	    if { [llength $idx] == 0 } {
+		WarnWin "Error: it is necessary to select at least one block in list"
+		return 1
 	    }
+	    set selnames ""
+	    foreach i $idx {
+		lappend selnames [lindex [$DialogWinTop::user($w,list) get $i] 0]
+	    }
+	    foreach selname $selnames {
+		set err [catch [list rtime -delete $selname] errstring]
+		if { $err } {
+		    WarnWin [lindex [split $errstring \n] 0]
+		    return $err
+		}
+	    }
+	    ModifyTimingBlock $w $entry update
+	    return 0
 	}
 	updatecurrent {
 	    if { [llength $idx] != 1 } {
@@ -831,6 +858,7 @@ proc RamDebugger::ModifyTimingBlock { w what } {
 
 proc RamDebugger::DisplayTimesWindow {} {
     variable text
+    variable TimeMeasureData
 
     set commands [list RamDebugger::DisplayTimesWindowStart RamDebugger::DisplayTimesWindowReport \
 	RamDebugger::DisplayTimesWindowCancel]
@@ -874,35 +902,55 @@ proc RamDebugger::DisplayTimesWindow {} {
 	-labelcommand tablelist::sortByColumn \
 	-background white \
 	-selectbackground navy -selectforeground white \
-	-stretch "0 1" -selectmode browse \
+	-stretch "0 1" -selectmode extended \
 	-highlightthickness 0]
 
     $sw setwidget $DialogWinTop::user($w,list)
 
     bind [$DialogWinTop::user($w,list) bodypath] <Double-1> \
-       "RamDebugger::ModifyTimingBlock $w updatecurrent"
+       "RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent"
 
     set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w"]
     $bbox add -image acttick16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Create new block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w create"
+	 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 create"
     $bbox add -image edit16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Update selected block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w edit"
+	 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 edit"
     $bbox add -image actcross16 \
 	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	 -helptext [_ "Delete selected block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w delete"
+	 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
 
     supergrid::go $f1
     supergrid::go $f2
     supergrid::go $f
 
-    tkTabToWindow $f1.e1
     bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
-    ModifyTimingBlock $w update
+
+    foreach i "$f1.e1 $f1.e2 $f1.e3" {
+	bind $i <Return> "$bbox invoke 0; break"
+    }
+
+    ModifyTimingBlock $w $f1.e1 update
+
+    set i 1
+    while 1 {
+	set found 0
+	foreach j $TimeMeasureData {
+	    if { [lindex $j 0] == "Block $i" } {
+		set found 1
+		break
+	    }
+	}
+	if { !$found } { break }
+	incr i
+    }
+    set DialogWinTop::user($w,name) "Block $i"
+
+    tkTabToWindow $f1.e1
 
     DialogWinTop::CreateWindow $f
     DialogWinTop::InvokeOK $f
@@ -1815,6 +1863,7 @@ proc RamDebugger::Search { w { what {} } } {
 	set idx [eval $text search $options [list $RamDebugger::searchstring] \
 		     $idx $stopindex]
 	if { $idx == "" } {
+	    SetMessage "Search not found"
 	    bell
 	    if { $RamDebugger::SearchType == "-forwards" } {
 		set RamDebugger::SearchPos 1.0
