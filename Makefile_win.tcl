@@ -26,7 +26,7 @@ pack [text .t -width 70 -height 4]
 
 if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
     set oldcwd [pwd]
-    cd help/RamDebugger
+    cd help/01RamDebugger
     eval [concat Execute $TEXI2HTML ../../RamDebugger.texinfo]
     cd $oldcwd
 }

@@ -2,14 +2,14 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.5 2002/08/07 12:19:25 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.6 2002/08/07 18:07:37 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jul-2002
 
 
 ################################################################################
 #  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
-#  The following terms apply to all files associated
-#  with the software unless explicitly disclaimed in individual files.
+#  (http://gid.cimne.upc.es/ramsan) The following terms apply to all files 
+#  associated with the software unless explicitly disclaimed in individual files.
 
 #  The authors hereby grant permission to use, copy, modify, distribute,
 #  and license this software and its documentation for any purpose, provided
@@ -121,6 +121,9 @@ proc RamDebugger::Init {} {
 
     lappend ::auto_path [file join $MainDir addons]
 
+    if { ![file isdir [file join $MainDir cache]] } {
+	catch { file mkdir [file join $MainDir cache] }
+    }
     if { [file isdir [file join $MainDir cache]] } {
 	set CacheDir [file join $MainDir cache]
     }
@@ -150,12 +153,20 @@ proc RamDebugger::Init {} {
 
     switch $::tcl_platform(platform) {
 	windows {
-	    set options_def(NormalFont) {-family "MS Sans Serif" -size 8}
-	    set options_def(FixedFont)  {-family "Courier" -size 8}
+	    set options_def(NormalFont) { -family "MS Sans Serif" -size 8 -weight normal \
+		-slant roman -underline 0 -overstrike 0 }
+	    set options_def(FixedFont)  { -family "Courier" -size 8 -weight normal \
+		-slant roman -underline 0 -overstrike 0 }
+	    set options_def(HelpFont)  { -family "Helvetica" -size 11 -weight normal \
+		-slant roman -underline 0 -overstrike 0 }
 	}
 	default {
-	    set options_def(NormalFont) {-family "new century schoolbook" -size 12}
-	    set options_def(FixedFont)  {-family "Courier" -size 12}
+	    set options_def(NormalFont) { -family "new century schoolbook" -size 12 -weight normal \
+		-slant roman -underline 0 -overstrike 0 }
+	    set options_def(FixedFont)  { -family "Courier" -size 12 -weight normal \
+		-slant roman -underline 0 -overstrike 0 }
+	    set options_def(HelpFont)  { -family "Helvetica" -size 15 -weight normal \
+		-slant roman -underline 0 -overstrike 0 }
 	}
     }
 }
@@ -208,6 +219,7 @@ proc RamDebugger::rdebug { args } {
 	-h:            displays usage
 	-actives:      return active programs
 	-forceupdate:  force update of remote program search
+	-forceupdate2: force update of remote program search, try harder
 	-disconnect:   disconnect from remoteserver
 	-currentfile:  execute and debug currentfile
 	--:            end of options
@@ -218,7 +230,9 @@ proc RamDebugger::rdebug { args } {
     }
     ParseArgs $args $usagestring opts
 
-    if { $opts(-forceupdate) } {
+    if { $opts(-forceupdate2) } {
+	FindActivePrograms 2
+    } elseif { $opts(-forceupdate) } {
 	FindActivePrograms 1
     } else { FindActivePrograms 0 }
     
@@ -1215,7 +1229,7 @@ proc RamDebugger::FindActivePrograms { force } {
 	    if { $i == $debuggerserverNum } { continue }
 	    set comm [list comm::comm send -async $i \
 		          [list catch [list comm::givename $debuggerserverNum]]]
-	    if { [catch $comm] } { break }
+	    if { [catch $comm] && $force != 2 } { break }
 	}
 	# dirty trick to make array exist
 	set services(11) ""
@@ -1382,6 +1396,7 @@ namespace eval RamDebugger::Instrumenter {
     variable wordtypepos
     variable DoInstrument
     variable DoOutput
+    variable NeedsNamespaceClose
 
     variable level
     variable colors
@@ -1396,6 +1411,7 @@ proc RamDebugger::Instrumenter::InitState {} {
     variable wordtypepos ""
     variable DoInstrument 0
     variable DoOutput 0
+    variable NeedsNamespaceClose 0
     variable level 0
     variable colors
 
@@ -1408,7 +1424,7 @@ proc RamDebugger::Instrumenter::InitState {} {
     }
 }
 
-proc RamDebugger::Instrumenter::PushState { type line } {
+proc RamDebugger::Instrumenter::PushState { type line newblockname } {
     variable stack
     variable words
     variable currentword
@@ -1417,6 +1433,7 @@ proc RamDebugger::Instrumenter::PushState { type line } {
     variable wordtypepos
     variable DoInstrument
     variable DoOutput
+    variable NeedsNamespaceClose
     variable level
 
     set NewDoInstrument 0
@@ -1439,6 +1456,9 @@ proc RamDebugger::Instrumenter::PushState { type line } {
 	    if { [lindex $words 0] == "namespace" && [lindex $words 1] == "eval" && \
 		     [llength $words] >= 3 } {
 		set PushState 1
+		upvar 2 $newblockname newblock
+		append newblock "namespace eval [lindex $words 2] \{\n"
+		set NeedsNamespaceClose 1
 	    }
 	} elseif { $DoInstrument == 1 } {
 	    switch -- [lindex $words 0] {
@@ -1511,7 +1531,7 @@ proc RamDebugger::Instrumenter::PushState { type line } {
 
     incr level
     lappend stack [list $words $currentword $wordtype $wordtypeline \
-	$wordtypepos $DoInstrument $DoOutput $line $type]
+	$wordtypepos $DoInstrument $DoOutput $NeedsNamespaceClose $line $type]
 
     set words ""
     set currentword ""
@@ -1520,10 +1540,11 @@ proc RamDebugger::Instrumenter::PushState { type line } {
     set wordtypepos ""
     set DoInstrument $NewDoInstrument
     set DoOutput $NewDoOutput
+    set NeedsNamespaceClose 0
     return 0
 }
 
-proc RamDebugger::Instrumenter::PopState { type line } {
+proc RamDebugger::Instrumenter::PopState { type line newblockname } {
     variable stack
     variable wordtype
     variable words
@@ -1533,6 +1554,7 @@ proc RamDebugger::Instrumenter::PopState { type line } {
     variable wordtypepos
     variable DoInstrument
     variable DoOutput
+    variable NeedsNamespaceClose
     variable level
 
     set lasttype [lindex [lindex $stack end] end]
@@ -1562,10 +1584,16 @@ proc RamDebugger::Instrumenter::PopState { type line } {
 	    }
 	} 
     }
-    foreach "words currentword wordtype wordtypeline wordtypepos DoInstrument DoOutput" \
-	[lindex $stack end] break
+    foreach [list words currentword wordtype wordtypeline wordtypepos DoInstrument DoOutput \
+	NeedsNamespaceClose] [lindex $stack end] break
     set stack [lreplace $stack end end]
     incr level -1
+
+    if { $NeedsNamespaceClose } {
+	upvar 2 $newblockname newblock
+	append newblock "\}\n"
+	set NeedsNamespaceClose 0
+    }
 
     return 0
 }
@@ -1693,7 +1721,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		        incr braceslevel
 		    } elseif { $wordtype != "\"" && $wordtype != "w" } {
 		        set consumed 1
-		        set fail [PushState \{ $line]
+		        set fail [PushState \{ $line $newblockname]
 		        if { $fail } {
 		            set wordtype \{
 		            set wordtypeline $line
@@ -1722,7 +1750,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		            }
 		        }
 		    } elseif { $wordtype != "\"" } {
-		        set fail [PopState \} $line]
+		        set fail [PopState \} $line $newblockname]
 		        if { !$fail } {
 		            set consumed 1
 		            lappend words ""
@@ -1766,13 +1794,13 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		if { $lastc != "\\" && $wordtype != "\{" } {
 		    if { $wordtype == "" } { set wordtype "w" }
 		    set consumed 1
-		    PushState \[ $line
+		    PushState \[ $line $newblockname
 		    set lastinstrumentedline $line
 		}
 	    }
 	    \] {
 		if { $lastc != "\\" && $wordtype != "\"" && $wordtype != "\{" } {
-		    set fail [PopState \] $line]
+		    set fail [PopState \] $line $newblockname]
 		    if { !$fail } {
 		        set consumed 1
 		    }
@@ -1784,6 +1812,10 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblockname blockinfonam
 		    lappend blockinfocurrent red 0 $icharline
 		} elseif { $wordtype == "\"" } {
 		    lappend blockinfocurrent grey $wordtypepos $icharline
+		} elseif { $wordtype == "w" && [info exists colors($currentword)] } {
+		    set icharlineold [expr $icharline-[string length $currentword]]
+		    lappend blockinfocurrent $colors($currentword) $icharlineold \
+		       $icharline
 		}
 		lappend blockinfo $blockinfocurrent
 		incr line
@@ -2425,7 +2457,9 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     WaitState 1
     SetMessage "Searching for active programs..."
 
-    if { $force } {
+    if { $force == 2 } {
+	set services [rdebug -forceupdate2 -actives]
+    } elseif { $force } {
 	set services [rdebug -forceupdate -actives]
     } else {
 	set services [rdebug -actives]
@@ -2445,6 +2479,7 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     }
     if { $::tcl_platform(platform) == "windows" } {
 	$menu add command -label Update -command "RamDebugger::ActualizeActivePrograms $menu 1"
+ 	$menu add command -label "Update slow" -command "RamDebugger::ActualizeActivePrograms $menu 2"
     }
     $menu add command -label Disconnect -command {
 	if { [catch [list RamDebugger::rdebug -disconnect] errstring] } {
@@ -2997,12 +3032,14 @@ proc RamDebugger::CreateModifyFonts {} {
 
     if { [lsearch [font names] NormalFont] == -1 } { font create NormalFont }
     if { [lsearch [font names] FixedFont] == -1 } { font create FixedFont }
+    if { [lsearch [font names] HelpFont] == -1 } { font create HelpFont }
 
     eval font configure NormalFont $options(NormalFont)
     eval font configure FixedFont $options(FixedFont)
+    eval font configure HelpFont $options(HelpFont)
 }
 
-proc RamDebugger::UpdateFont { w fontname } {
+proc RamDebugger::UpdateFont { w but fontname } {
 
     set newfont [SelectFont $w.fonts -type dialog -parent $w -sampletext \
 	"RamDebugger is nice" -title "Select font"]
@@ -3024,6 +3061,11 @@ proc RamDebugger::UpdateFont { w fontname } {
     } else { lappend comm -overstrike 0 }
 
     eval $comm
+
+    regexp {^[^:]+} [$but cget -text] type
+    set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
+    append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
+    $but configure -text $btext
 }
 
 proc RamDebugger::PreferencesWindow {} {
@@ -3055,10 +3097,13 @@ proc RamDebugger::PreferencesWindow {} {
     TitleFrame $f.f2 -text [_ fonts] -grid 0
     set f2 [$f.f2 getframe]
     
-    Button $f2.b1 -text "GUI font" -font NormalFont -relief link -command \
-       "RamDebugger::UpdateFont $w NormalFont" -grid "0 w"
-    Button $f2.b2 -text "Text font" -font FixedFont -relief link -command \
-       "RamDebugger::UpdateFont $w FixedFont" -grid "0 w"
+    foreach "but type fontname" [list $f2.b1 {GUI font} NormalFont $f2.b2 {Text font} FixedFont \
+	$f2.b3 {Help font} HelpFont] {
+	set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
+	append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
+	Button $but -text $btext -font $fontname -relief link -command \
+	    "RamDebugger::UpdateFont $w $but $fontname" -grid "0 w"
+    }
 
     supergrid::go $f1
     supergrid::go $f2
@@ -3090,6 +3135,13 @@ proc RamDebugger::PreferencesWindow {} {
 		    set DialogWin::user($i) $options_def($i)
 		}
 		CreateModifyFonts
+
+		foreach "but fontname" [list $f2.b1 NormalFont $f2.b2 FixedFont $f2.b3 HelpFont] {
+		    regexp {^[^:]+} [$but cget -text] type
+		    set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
+		    append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
+		    $but configure -text $btext
+		}
 	    }
 	}
 	set action [DialogWin::WaitForWindow]
@@ -3343,7 +3395,7 @@ proc RamDebugger::AboutWindow {} {
     wm transient $w $par
 
     bind $w.close <Enter> "RamDebugger::MotionInAbout $w.close ; break"
-    bind $w.close <ButtonPress-1> "WarnWin [list {Congratulations!!!}] ; destroy $w; break"
+    bind $w.close <ButtonPress-1> "WarnWin [list {Congratulations, you got it!!!}] ; destroy $w; break"
 
 
     $w.c create text 0 0 -anchor n -font "-family {new century schoolbook} -size 16 -weight bold"\
@@ -3361,6 +3413,8 @@ proc RamDebugger::AboutWindow {} {
 	supertext  "Bryan Oakley" "FREE SOFT" YES
 	tablelist  "Csaba Nemethi" "FREE SOFT" NO
 	"visual regexp" "Laurent Riesterer" GPL NO
+	Tkhtml  "D. Richard Hipp" LGPL NO
+	tcllib Many BSD NO
     }
     foreach "pack author lic mod" $data {
 	$w.lf.lb insert end [list $pack $author $lic $mod]
@@ -4260,9 +4314,34 @@ proc RamDebugger::OpenVisualRegexp {} {
     exec [info nameofexecutable] [file join [info script] addons visual_regexp-2.2 visual_regexp.tcl] &
 }
 
-proc RamDebugger::OpenConsole {} {
 
-    set tkcon [lindex [glob -nocomplain -dir [file dirname [info nameofexecutable]] tkcon*] 0]
+proc RamDebugger::OpenProgram { what } {
+    variable MainDir
+
+    switch $what {
+	tkcvs {
+	    if { [interp exists tkcvs] } { interp delete tkcvs }
+	    interp create tkcvs
+	    interp alias tkcvs exit "" interp delete tkcvs
+	    tkcvs eval [list load {} Tk]
+	    tkcvs eval { set argc 0 ; set argv "" }
+	    tkcvs eval [list source [file join $MainDir addons tkcvs bin tkcvs.tcl]]
+	}
+	tkdiff {
+	    if { [interp exists tkdiff] } { interp delete tkdiff }
+	    interp create tkdiff
+	    interp alias tkdiff exit "" interp delete tkdiff
+	    tkdiff eval [list load {} Tk]
+	    tkdiff eval { set argc 0 ; set argv "" }
+	    tkdiff eval [list source [file join $MainDir addons tkcvs bin tkdiff.tcl]]
+	}
+    }
+}
+
+proc RamDebugger::OpenConsole {} {
+    variable MainDir
+
+    set tkcon [file join $MainDir addons tkcon tkcon.tcl]
 
     if { $tkcon == "" } {
 	WarnWin "Could not find tkcon"
@@ -4471,7 +4550,7 @@ proc RamDebugger::CheckText { command args } {
   
     set block [$text get $l1_new.0 "$l2_new.0 lineend"]
     set blockinfo ""
-    set err [catch { Instrumenter::DoWork $block 0 newblock blockinfo 0 }]
+    set err [catch { Instrumenter::DoWork $block 0 newblock blockinfo 0 } errstring]
 
     set oldlevel [lindex [lindex $instrumentedfilesInfo($currentfile) [expr $l1_old-1]] 0]
 
@@ -4535,7 +4614,7 @@ proc RamDebugger::SearchBraces { x y } {
 	set level_alt 0
 	set idx_alt ""
 	while { [set idx2 [$text search $dir -regexp -- {\{|\}|\[|\]} $idx $stopindex]] != "" } {
-	    if { [$text get "$idx2-1c"] == "\\" } {
+	    if { [$text get "$idx2-1c"] == "\\" && [$text get "$idx2-2c"] != "\\" } {
 		if { $dir == "-forwards" } {
 		    set idx [$text index $idx2+1c]
 		} else { set idx $idx2 }
@@ -4627,7 +4706,10 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
 	c { set indent [expr $level*$indent_val+$indent_val] }
 	"" { set indent 0 }
     }
-    for { set i 0 } { $i < [$text index "$line.0 lineend"] } { incr i } {
+    foreach "- col" [scan [$text index "$line.0 lineend"] %d.%d] break
+    set FirstPos 0
+    set FirstChar ""
+    for { set i 0 } { $i < $col } { incr i } {
 	if { [$text get $line.$i] != " " } {
 	    set FirstPos $i
 	    set FirstChar [$text get $line.$i]
@@ -4975,7 +5057,6 @@ proc RamDebugger::InitGUI { { w .gui } } {
     variable pane2in1
     variable images
     variable textST
-    variable CacheDir
     variable breakpoints
     variable MainDir
 
@@ -5096,6 +5177,10 @@ proc RamDebugger::InitGUI { { w .gui } } {
 		-command "RamDebugger::OpenConsole"] \
 		[list command "O&pen VisualRegexp" {} "Open VisualRegexp" "" \
 		-command "RamDebugger::OpenVisualRegexp"] \
+		[list command "Open tkcvs" {} "Open tkcvs a CVS browser" "" \
+		-command "RamDebugger::OpenProgram tkcvs"] \
+		[list command "Open tkdiff" {} "Open tkdiff" "" \
+		-command "RamDebugger::OpenProgram tkdiff"] \
 		separator \
 		[list command "&View instrumented file" {} "View instrumented file" "" \
 		-command "RamDebugger::ViewInstrumentedFile instrumented"] \
@@ -5223,6 +5308,8 @@ proc RamDebugger::InitGUI { { w .gui } } {
     set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0 -grid 0]
     set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
     $sw setwidget $listbox
+
+    $sw.lb configure -deltay [expr [font metrics [$sw.lb cget -font] -linespace]]
 
     set pane2 [$pw add -weight $weight2]
 
