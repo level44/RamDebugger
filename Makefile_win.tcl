@@ -239,18 +239,18 @@ if { [MustCompile help/RamDebugger/RamDebugger_toc.html RamDebugger.texinfo] } {
 }
 
 
-file delete -force install/RamDebugger
-file mkdir install/RamDebugger
+file delete -force install_temp/RamDebugger
+file mkdir install_temp/RamDebugger
 file delete RamDebugger$Version.zip
 foreach i $files {
-    file copy $i install/RamDebugger/.
+    file copy $i install_temp/RamDebugger/.
 }
-CleanCVSdirs install/RamDebugger
-CopyPackages $files install/RamDebugger/addons $packages $packagesout
+CleanCVSdirs install_temp/RamDebugger
+CopyPackages $files install_temp/RamDebugger/addons $packages $packagesout
 
 set tclfiles ""
 foreach i $files { lappend tclfiles RamDebugger/$i }
-zipfile RamDebugger$Version.zip install $tclfiles
+zipfile RamDebugger$Version.zip install_temp $tclfiles
 
 puts -nonewline DONE\n
 #.t see end

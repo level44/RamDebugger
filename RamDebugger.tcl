@@ -2,7 +2,7 @@
 # the next line restarts using wish \
 exec wish "$0" "$@"
 
-#         $Id: RamDebugger.tcl,v 1.24 2003/06/06 18:44:31 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.25 2003/06/11 08:47:12 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Aug-2002
 
 
@@ -448,7 +448,7 @@ proc RamDebugger::rdebug { args } {
 	}
 	if { ![info exists options(LocalDebuggingType)] || $options(LocalDebuggingType) == "tk" } {
 	    interp eval local [list load {} Tk]
-	    local eval bind . <Destroy> exit
+	    local eval [list bind . <Destroy> { if { "%W" == "." } { exit } }]
 	}
 	#local eval { catch { bind . <Destroy> exit } }
 	set remoteserverType local
@@ -3154,9 +3154,11 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow } {
 	    arrowbreak {
 		if { $hasbreak == "" } { set hasbreak 1 }
 		if { $hasarrow == "" } { set hasarrow 1 }
+		set hadarrow 1
 	    }
 	    arrow {
 		if { $hasarrow == "" } { set hasarrow 1 }
+		set hadarrow 1
 	    }
 	    break {
 		if { $hasbreak == "" } { set hasbreak 1 }
@@ -3198,8 +3200,10 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow } {
 	if { $doit } {
 	    after 100 "raise [winfo toplevel $text] ; focus -force $text"
 	}
-	$text see $line.0
-	$text mark set insert $line.0
+	if { !$hadarrow } {
+	    $text see $line.0
+	    $text mark set insert $line.0
+	}
     }
     MoveCanvas $text $marker
 
@@ -4153,6 +4157,9 @@ proc RamDebugger::ListboxMenu { listb x y item } {
     } else {
 	set name [lindex $data 1]
 	$menu add command -label Open -command [list RamDebugger::OpenFileF $name]
+	$menu add command -label "Open & Debug" -command \
+	    "[list RamDebugger::OpenFileF $name] ; RamDebugger::ContNextGUI rcont"
+	$menu add separator
 	$menu add command -label Reinstrument -command [list RamDebugger::OpenFileF \
 		$name 2]
 
@@ -5614,7 +5621,7 @@ proc RamDebugger::InitGUI { { w .gui } } {
 	OpenFileF $options(currentfile)
 	FillListBox
 
-	if { [winfo exists options(currentidx)] } {
+	if { [info exists options(currentidx)] } {
 	    $text see $options(currentidx)
 	    $text mark set insert $options(currentidx)
 	}
