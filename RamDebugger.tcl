@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.54 2005/02/18 09:24:56 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.55 2005/05/26 19:19:59 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -230,6 +230,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(instrument_source) auto
     set options_def(instrument_proc_last_line) 0
     set options_def(ConfirmModifyVariable) 1
+    set options_def(openfile_browser) 1
     set options_def(LocalDebuggingType) tk
     set options_def(executable_dirs) ""
     set options_def(debugrelease) debug
@@ -2267,6 +2268,7 @@ proc RamDebugger::EvalRemote { comm } {
 	error "Error: a program to debug must be selected using rdebug"
     }
 
+    set err 0
     if { $remoteserverType == "local" } {
 	interp eval local after idle [list $comm]
     } elseif { $remoteserverType == "master" } {
@@ -2277,10 +2279,14 @@ proc RamDebugger::EvalRemote { comm } {
 	append gdblog $commlog
 	puts $fid $comm
 	flush $fid
-    } elseif { $::tcl_platform(platform) == "windows" } {
-	comm::comm send $remoteserverNum $comm
+    } elseif { $::tcl_platform(platform) eq "windows" } {
+	set err [catch { comm::comm send $remoteserverNum $comm }]
     } else {
-	send $remoteserver $comm
+	set err [catch { send $remoteserver $comm }]
+    }
+    if { $err } {
+	WarnWin "Debugged program is not available anymore. Disconnecting"
+	DisconnectStop
     }
 }
 
@@ -3274,8 +3280,12 @@ proc RamDebugger::SaveFile { what } {
 	set w [winfo toplevel $text]
 	set types [GiveFileTypeForFileBrowser]
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
-	set file [tk_getSaveFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
-		      -title "Save file"]
+	if { $options(openfile_browser) } {
+	    set file [tk_getSaveFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
+		    -title "Save file"]
+	} else {
+	    set file [GetFile save]
+	}
 	if { $file == "" } { return }
 	set options(defaultdir) [file dirname $file]
     } elseif { $currentfile == "*Macros*" || [info exists FileSaveHandlers($currentfile)] } {
@@ -3316,8 +3326,13 @@ proc RamDebugger::OpenFile {} {
     #         {{All Files}        *             }
     #     }
     if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
-    set file [tk_getOpenFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
-		  -title "Open source file"]
+    if { $options(openfile_browser) } {
+	set file [tk_getOpenFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
+		-title "Open source file"]
+    } else {
+	set file [GetFile open]
+    }
+
     if { $file == "" } { return }
     OpenFileF $file -1
     FillListBox
@@ -3970,6 +3985,13 @@ proc RamDebugger::ViewHelpForWord { { word "" } } {
 	if { $word == "" } { return }
     }
     HelpViewer::HelpSearchWord $word
+}
+
+proc RamDebugger::ActualizeActiveProgramsIfVoid { menu } {
+
+    if { [$menu index end] eq "none" } {
+	ActualizeActivePrograms $menu
+    }
 }
 
 proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
@@ -5072,10 +5094,11 @@ proc RamDebugger::TextOutInsert { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    foreach i [split [string trimright $data \n] \n] {
-	TextInsertAndWrap $textOUT "$i\n" 200
+    foreach i [::textutil::splitx  $data {(\n)(?!$)}] {
+	TextInsertAndWrap $textOUT "$i" 200
 	if { [info command tkcon_puts] != "" } { catch { tkcon_puts "$i" } }
     }
+
     $textOUT conf -state disabled
     if { $yend == 1 } { $textOUT yview moveto 1 }
 }
@@ -5087,8 +5110,8 @@ proc RamDebugger::TextOutInsertRed { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    foreach i [split [string trimright $data \n] \n] {
-	TextInsertAndWrap $textOUT "$i\n" 200 red
+    foreach i [::textutil::splitx  $data {(\n)(?!$)}] {
+	TextInsertAndWrap $textOUT "$i" 200 red
 	if { [info command tkcon_puts] != "" } { catch { tkcon_puts stderr "$i" } }
     }
     $textOUT tag configure red -foreground red
@@ -5103,8 +5126,8 @@ proc RamDebugger::TextOutInsertBlue { data } {
 
     foreach "- yend" [$textOUT yview] break
     $textOUT conf -state normal
-    foreach i [split [string trimright $data \n] \n] {
-	TextInsertAndWrap $textOUT "$i\n" 200 blue
+    foreach i [::textutil::splitx  $data {(\n)(?!$)}] {
+	TextInsertAndWrap $textOUT "$i" 200 blue
     }
     $textOUT tag configure blue -foreground blue
     $textOUT conf -state disabled
@@ -5789,6 +5812,16 @@ proc RamDebugger::CheckText { command args } {
 	incr l1_new -1
 	incr l1_old -1
     }
+
+#     set level0 [lindex [lindex $instrumentedfilesInfo($currentfile) \
+#                 [expr $l1_old-1]] 0]
+#     set level $level0
+#     while { $level0 > 0 && $level == $level0 } {
+#         incr l1_new -1
+#         incr l1_old -1
+#         set level [lindex [lindex $instrumentedfilesInfo($currentfile) \
+#                     [expr $l1_old-1]] 0]
+#     }
     if { [regexp {(?n)^[^\[]*\]\s*$} [$text get $l1_new.0 "$l2_new.0 lineend"]] && $l1_old > 1 &&
 	 [lindex [lindex $instrumentedfilesInfo($currentfile) [expr $l1_old-1]] 0] > 0 } {
 	set newlevel [expr {[lindex [lindex $instrumentedfilesInfo($currentfile) [expr $l1_old-1]] 0]-1}]
@@ -6137,20 +6170,28 @@ proc RamDebugger::UpdateLineNum { command args } {
     if { $line == "" } { return }
     set LineNum "L: $line"
 
-    if { $currentfile != "" && [string index $currentfile 0] != "*" &&  [file exists $currentfile] && \
-	     [file mtime $currentfile] > $filesmtime($currentfile) } {
-	set filesmtime($currentfile) [file mtime $currentfile]
-
-	if { $currentfileIsModified } {
-	    set quest "File '$currentfile' has been modified outside RamDebugger. Reload it "
-	    append quest "and loose the changes made inside RamDebugger?"
+    if { $currentfile ne "" && [string index $currentfile 0] != "*" } {
+	if { [lindex [file system $currentfile] 0] eq "native" } {
+	    set exists [file exists $currentfile]
+	    set mtime [file mtime $currentfile]
 	} else {
-	    set quest "File '$currentfile' has been modified outside RamDebugger. Reload it?"
+	    set exists 1
+	    set mtime $filesmtime($currentfile)
 	}
-	set ret [DialogWin::messageBox -default ok -icon warning -message $quest \
-		     -parent $text -title "reload file" -type okcancel]
-	if { $ret == "ok" } {
-	    OpenFileF $currentfile 1
+	if { $exists && $mtime > $filesmtime($currentfile) } {
+	    set filesmtime($currentfile) $mtime
+
+	    if { $currentfileIsModified } {
+		set quest "File '$currentfile' has been modified outside RamDebugger. Reload it "
+		append quest "and loose the changes made inside RamDebugger?"
+	    } else {
+		set quest "File '$currentfile' has been modified outside RamDebugger. Reload it?"
+	    }
+	    set ret [DialogWin::messageBox -default ok -icon warning -message $quest \
+			 -parent $text -title "reload file" -type okcancel]
+	    if { $ret == "ok" } {
+		OpenFileF $currentfile 1
+	    }
 	}
     }
 }
@@ -6391,7 +6432,8 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 	MainFrame::_create_menubar $mainframe $descmenu_new
 	
 	set menu [$mainframe getmenu activeprograms]
-	#$menu configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu]
+	$menu configure -postcommand [list RamDebugger::ActualizeActiveProgramsIfVoid \
+		$menu]
 
 	set menu [$mainframe getmenu view]
 	$menu configure -postcommand [list RamDebugger::ActualizeViewMenu $menu]
@@ -6675,6 +6717,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require supergrid
     package require supertext
     package require dialogwin
+    package require textutil
     #needed a catch for wince
     package require helpviewer 1.1
     catch { package require tkdnd } ;# only if it is compiled
@@ -6958,7 +7001,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     ################################################################################
 
     set toolbar [$mainframe addtoolbar]
-
+    $mainframe addtoolbar ;# search
+    $mainframe showtoolbar 1 0
+    $mainframe addtoolbar ;# getfile
+    $mainframe showtoolbar 2 0
     if { $iswince } {
 	#wince
 	set bbox [ButtonBox $toolbar.bbox1 -spacing 0 -padx 0 -pady 0 -homogeneous 1 -grid "0 w" \

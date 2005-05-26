@@ -698,6 +698,15 @@ proc RamDebugger::PreferencesWindow {} {
     
     set DialogWin::user(ConfirmModifyVariable) $options(ConfirmModifyVariable)
 
+    checkbutton $f1.cb25 -text "Use browser to open files" -variable \
+       DialogWin::user(openfile_browser) -grid "0 3 w"
+    DynamicHelp::register $f1.cb2 balloon "\
+	If this option is set, files names are chosen with the default\n\
+	browser. If not, file names are chosen inline. This last option\n\
+	permmits to use remote protocols like ssh,..."
+    
+    set DialogWin::user(openfile_browser) $options(openfile_browser)
+
     label $f1.isf -text "Instrument sourced files" -grid "0 e"
     tk_optionMenu $f1.cb3 DialogWin::user(instrument_source) auto autoprint always never ask
     $f1.cb3 conf -width 10
@@ -737,13 +746,13 @@ proc RamDebugger::PreferencesWindow {} {
 
     Label $f1.l2 -text "Indent size TCL:" -helptext "Size used when indenting TCL with key: <Tab>" \
        -grid "0 e"
-    SpinBox $f1.sb -range "0 10 1" -textvariable DialogWin::user(indentsizeTCL) \
+    spinbox $f1.sb -from 0 -to 10 -increment 1 -textvariable DialogWin::user(indentsizeTCL) \
        -width 4 -grid "1 2 px3"
     set DialogWin::user(indentsizeTCL) $options(indentsizeTCL)
 
     Label $f1.l3 -text "Indent size c++:" -helptext "Size used when indenting c++ with key: <Tab>" \
        -grid "0 e"
-    SpinBox $f1.sb2 -range "0 10 1" -textvariable DialogWin::user(indentsizeC++) \
+    spinbox $f1.sb2 -from 0 -to 10 -increment 1 -textvariable DialogWin::user(indentsizeC++) \
        -width 4 -grid "1 2 px3"
     set DialogWin::user(indentsizeC++) $options(indentsizeC++)
 
@@ -943,7 +952,7 @@ proc RamDebugger::PreferencesWindow {} {
 		}
 		if { $good } {
 		    foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging \
-		                   ConfirmModifyVariable instrument_source instrument_proc_last_line \
+		                   ConfirmModifyVariable openfile_browser instrument_source instrument_proc_last_line \
 		                   LocalDebuggingType AutoSaveRevisions AutoSaveRevisions_time \
 		                   AutoSaveRevisions_idletime CompileFastInstrumenter] {
 		        set options($i) $DialogWin::user($i)
@@ -984,7 +993,7 @@ proc RamDebugger::PreferencesWindow {} {
 	    }
 	    3 {
 		foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging \
-		               ConfirmModifyVariable instrument_source instrument_proc_last_line \
+		               ConfirmModifyVariable openfile_browser instrument_source instrument_proc_last_line \
 		               LocalDebuggingType CheckRemotes NormalFont FixedFont HelpFont \
 		               executable_dirs AutoSaveRevisions AutoSaveRevisions_time \
 		              AutoSaveRevisions_idletime] {
@@ -1513,7 +1522,7 @@ proc RamDebugger::GotoLine {} {
     set w [winfo toplevel $f]
 
     label $f.l -text "Go to line:" -grid "0 px3 py5"
-    SpinBox $f.sb -range "1 1000 1" -textvariable DialogWin::user(line) \
+    spinbox $f.sb -from 1 -to 1000 -increment 1 -textvariable DialogWin::user(line) \
 	    -width 8 -grid "1 px3"
 
     checkbutton $f.cb1 -text "Relative to current line" -variable DialogWin::user(relative) \
@@ -2245,7 +2254,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	    set f [$mainframe gettoolbar 1]
 	    eval destroy [winfo children $f]
 	} else {
-	    set f [$mainframe addtoolbar]
+	    set f [$mainframe gettoolbar 1]
+	    #set f [$mainframe addtoolbar]
 	}
     }
     set ::RamDebugger::SearchToolbar [list 1 $replace]
@@ -3377,6 +3387,12 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
 	    lappend commands $comm
 	}
     }
+    foreach i [array names Macros::macrodata *,accelerator] {
+	if { $Macros::macrodata($i) != "" } {
+	    regexp {(.*),accelerator} $i {} name
+	    bind all $Macros::macrodata($i) [list RamDebugger::Macros::$name $text]
+	}
+    }
     if { [llength $commands] } {
 	$menu add separator
 	DynamicHelp::register $menu menu [$mainframe cget -textvariable]
@@ -3389,7 +3405,7 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
 		regsub -all { } $acclabel + acclabel
 		regsub {><} $acclabel { } acclabel
 		$menu entryconfigure end -acc $acclabel
-		bind all $Macros::macrodata($i,accelerator) [list $menu invoke [$menu index end]]
+		#bind all $Macros::macrodata($i,accelerator) [list $menu invoke [$menu index end]]
 	    }
 	    if { [info exists Macros::macrodata($i,help)] && $Macros::macrodata($i,help) != "" } {
 		DynamicHelp::register $menu menuentry [$menu index end] $Macros::macrodata($i,help)

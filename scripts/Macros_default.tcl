@@ -190,10 +190,13 @@ proc "Go to proc" { w } {
 	incr numline
     }
     
-    set f [DialogWin::Init $w "Go to proc" separator]
+    set wg $w.g
+    destroy $wg
+    dialogwin_snit $wg -title "Go to proc"
+    set f [$wg giveframe]
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     
-    set DialogWin::user(list) [tablelist::tablelist $sw.lb -width 55\
+    tablelist::tablelist $sw.lb -width 60\
 	    -height 35 -exportselection 0 \
 	-columns [list \
 		20  "Proc name"        left \
@@ -205,30 +208,28 @@ proc "Go to proc" { w } {
 	    -background white \
 	    -selectbackground navy -selectforeground white \
 	    -stretch "" -selectmode browse \
-	    -highlightthickness 0]
+	-highlightthickness 0
     
-    $sw setwidget $DialogWin::user(list)
-    $DialogWin::user(list) columnconfigure 0 -sortmode dictionary
-    $DialogWin::user(list) columnconfigure 1 -sortmode dictionary
-    $DialogWin::user(list) columnconfigure 2 -sortmode dictionary
-    $DialogWin::user(list) columnconfigure 3 -sortmode integer
+    $sw setwidget $sw.lb
+    $sw.lb columnconfigure 0 -sortmode dictionary
+    $sw.lb columnconfigure 1 -sortmode dictionary
+    $sw.lb columnconfigure 2 -sortmode dictionary
+    $sw.lb columnconfigure 3 -sortmode integer
 
     foreach i $procs {
-	$DialogWin::user(list) insert end $i
+	$sw.lb insert end $i
 	if { [string match *snit* [lindex $i 2]] } {
-	    $DialogWin::user(list) rowconfigure end -background orange
+	    $sw.lb rowconfigure end -background orange
 	}
     }
-    $DialogWin::user(list) selection set 0
-    $DialogWin::user(list) activate 0
+    $sw.lb sortbycolumn 0
+    $sw.lb selection set 0
+    $sw.lb activate 0
 
-    bind [$DialogWin::user(list) bodypath] <Double-1> {
-	DialogWin::InvokeOK
-    }
-    bind [$DialogWin::user(list) bodypath] <Return> {
-	DialogWin::InvokeOK
-    }
-    bind [$DialogWin::user(list) bodypath] <KeyPress> {
+    bind [$sw.lb bodypath] <Double-1> [list $wg invokeok]
+    bind [$sw.lb bodypath] <Return> [list $wg invokeok]
+
+    bind [$sw.lb bodypath] <KeyPress> {
 	set w [winfo parent %W]
 	set idx [$w index active]
 	if { [string is wordchar -strict %A] } {
@@ -263,19 +264,31 @@ proc "Go to proc" { w } {
     supergrid::go $f
     focus $sw.lb
 
-    set action [DialogWin::CreateWindow]
+    set action [$wg createwindow]
 
-    if { $action == 1 } {
-	set curr [$DialogWin::user(list) curselection]
-	if { [llength $curr] != 1 } { return }
-	set line [lindex [$DialogWin::user(list) get $curr] 2]
+    while 1 {
+	switch -- $action {
+	    -1 - 0 {
+		destroy $wg
+		return
+	    }
+	    1 {
+		set curr [$sw.lb curselection]
+		if { [llength $curr] == 1 } {
+		    set line [lindex [$sw.lb get $curr] 3]
 	$w mark set insert $line.0
 	$w see $line.0
 	focus $w
+		    destroy $wg
+		    return
+		} else {
+		    tk_messageBox -message "Select one function in order to go to it"
+		}
+	    }
+	}
+	set action [$wg waitforwindow]
     }
-    DialogWin::DestroyWindow
 }
-
 
 ################################################################################
 #    proc Mark translation strings
@@ -309,7 +322,8 @@ proc "Mark translation strings" { w } {
     $w tag configure marktransstrings -background orange1 -foreground black
 
     while 1 {
-	set type trans
+	set type_idx1 trans
+	set type_idx2 trans
 	set idx1 insert
 	while 1 {
 	    set idx1 [$w search -regexp -count ::len1 $rex $idx1 end]
@@ -338,7 +352,7 @@ proc "Mark translation strings" { w } {
 		if { [regexp $rex_before $txt_before] } {
 		    if { ![regexp -- $rex_cmd $txt_before] && \
 		        [regexp {[^\\]\$} $txt] } {
-		        set type err
+		        set type_idx2 err
 		        break
 		    }
 		} else { break }
@@ -350,9 +364,9 @@ proc "Mark translation strings" { w } {
 	    break
 	}
 	if { $idx1 ne "" && ($idx2 eq "" || [$w compare $idx1 < $idx2]) } {
-	    foreach "ini end" [list $idx1 $idx1_end] break
+	    foreach "ini end type" [list $idx1 $idx1_end $type_idx1] break
 	} else {
-	    foreach "ini end" [list $idx2 $idx2_end] break
+	    foreach "ini end type" [list $idx2 $idx2_end $type_idx2] break
 	}
 	if { $type eq "trans" } {
 	    $w tag add marktransstrings $ini $end
@@ -391,8 +405,8 @@ proc "Mark translation strings" { w } {
 		set data [$w get $ini $end]
 		regsub -all {([^\\])\$(\w+|{[^\}]+})} $data {\1%s} data_new
 		set data_new "\[$trans_cmd $data_new"
-		set rex {[^\\]\$(\w+|{[^\}]+})}
-		foreach "- v" [regexp -inline -all $rex $data] {
+		set rex_var {[^\\]\$(\w+|{[^\}]+})}
+		foreach "- v" [regexp -inline -all $rex_var $data] {
 		    append data_new " \$$v"
 		}
 		append data_new "\]"
@@ -417,6 +431,32 @@ proc "Mark translation strings" { w } {
     $w tag remove marktransstrings 1.0 end
     $w tag remove markerrstrings 1.0 end
     focus $w
+}
+
+################################################################################
+#    proc Convert GiD help Strings
+################################################################################
+
+set "macrodata(Convert GiD help Strings,inmenu)" 0
+# recommended: <Control-F8>
+set "macrodata(Convert GiD help Strings,accelerator)" ""
+set "macrodata(Convert GiD help Strings,help)" "Convert GiD help Strings"
+
+proc "Convert GiD help Strings" { w } {
+
+    set trans_cmd "="
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range == "" } { 
+	WarnWin "Select a region to modify"
+	return
+    }
+    set data [eval $w get $range]
+
+    regsub -line -all {^(\s*.)\"} $data {\1} data
+    regsub -line -all {\s*\"\s*\\$} $data {\\} data
+
+    eval $w delete $range
+    $w insert [lindex $range 0] "\[$trans_cmd $data\]"
 }
 
 

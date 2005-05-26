@@ -3,6 +3,7 @@
 #   Windows Hierarchy
 ################################################################################
 
+namespace eval RamDebugger {}
 
 proc RamDebugger::DisplayWindowsHierarchyInfo { w canvas widget x y } {
     variable TextMotionAfterId
