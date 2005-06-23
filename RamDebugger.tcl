@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.55 2005/05/26 19:19:59 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.56 2005/06/23 11:36:57 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -49,7 +49,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 5.3
+    set Version 5.4
 
     ################################################################################
     #    Non GUI commands
@@ -285,6 +285,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set options_def(extensions,TCL) ".tcl *"
     set options_def(extensions,C/C++) ".c .cpp .cc .h"
+    set options_def(extensions,XML) ".xml .html .htm"
     set "options_def(extensions,GiD BAS file)" .bas
     set "options_def(extensions,GiD data files)" ".prb .mat .cnd"
 
@@ -1564,7 +1565,19 @@ proc RamDebugger::rlist { args } {
 		WarnWin $errstring
 	    }
 	}
-
+	if { $filetype == "XML" } {
+	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
+	    if { $err } {
+		set einfo $::errorInfo
+		RamDebugger::ProgressVar 100
+		if { ![string match  "*user demand*" $errstring] } {
+		    RamDebugger::TextOutRaise
+		    RamDebugger::TextOutInsertRed $einfo
+		}
+		#WarnWin $errstring--$einfo
+		WarnWin $errstring
+	    }
+	}
 	if { $filetype == "GiD BAS file" } {
 	    if { [catch {
 		Instrumenter::DoWorkForBas $files($currentfile) instrumentedfilesInfo($currentfile)
@@ -3280,11 +3293,12 @@ proc RamDebugger::SaveFile { what } {
 	set w [winfo toplevel $text]
 	set types [GiveFileTypeForFileBrowser]
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
+	set title "Save file"
 	if { $options(openfile_browser) } {
 	    set file [tk_getSaveFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
-		    -title "Save file"]
+		    -title $title]
 	} else {
-	    set file [GetFile save]
+	    set file [GetFile save $types $title]
 	}
 	if { $file == "" } { return }
 	set options(defaultdir) [file dirname $file]
@@ -3325,12 +3339,13 @@ proc RamDebugger::OpenFile {} {
     #         {{GiD files}      {.bas .prb .mat .cnd}   }
     #         {{All Files}        *             }
     #     }
+    set title "Open source file"
     if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
     if { $options(openfile_browser) } {
 	set file [tk_getOpenFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
-		-title "Open source file"]
+		-title $title]
     } else {
-	set file [GetFile open]
+	set file [GetFile open $types $title]
     }
 
     if { $file == "" } { return }
@@ -5458,7 +5473,10 @@ proc RamDebugger::PrevNextCompileError { what } {
 		    }
 		}
 	    }
-	    $textCOMP tag add sel2 "$idx linestart" "$idx lineend"
+	    set rex {(((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+))|(((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+))}
+	    if { [regexp $rex [$textCOMP get "$idx linestart" "$idx lineend"]] } {
+		$textCOMP tag add sel2 "$idx linestart" "$idx lineend"
+	    }
 	    if { $idx == $idxini } { break }
 	}
     }
@@ -5484,17 +5502,17 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 		     [file exists $letter:$sfile] } {
 		set file $letter:$sfile
 	    }
-	    
-	    if { ![file exists $file] && [file exists [file join $options(defaultdir) \
-		                                           $file]] } {
-		set file [file join $options(defaultdir) $file]
-	    }
 	    if { ![file exists $file] } {
 		set fullfile [cproject::TryToFindPath $file]
 		if { $fullfile != "" } {
 		    set file $fullfile
 		}
 	    }
+	    if { ![file exists $file] && [file exists [file join $options(defaultdir) \
+		                                           $file]] } {
+		set file [file join $options(defaultdir) $file]
+	    }
+
 	    if { [file exists $file] } {
 		set file [filenormalize $file]
 		if { $file != $currentfile } {
@@ -5852,6 +5870,10 @@ proc RamDebugger::CheckText { command args } {
 	    set err [catch { Instrumenter::DoWorkForC++ $block blockinfo 0 $oldlevel } errstring]
 	    set oldlevel 0
 	}
+	XML {
+	    set err [catch { Instrumenter::DoWorkForXML $block blockinfo 0 $oldlevel 0 } errstring]
+	    set oldlevel 0
+	}
 	"GiD BAS file" {
 	    set err [catch { Instrumenter::DoWorkForBas $block blockinfo 0 $oldlevel } errstring]
 	    set oldlevel 0
@@ -6106,6 +6128,8 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
     set filetype [GiveFileType $currentfile]
     if { $filetype == "C/C++" } {
 	set indent_val $options(indentsizeC++)
+    } elseif { $filetype == "XML" } {
+	set indent_val $options(indentsizeC++)
     } elseif { $filetype == "TCL" } {
 	set indent_val $options(indentsizeTCL)
     } elseif { $filetype == "GiD BAS file" } {
@@ -6133,7 +6157,7 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
     }
     if { $filetype == "C/C++" && $FirstChar == "\{" && $type == "c" } {
 	set indent [expr $indent-$indent_val]
-    } elseif { $FirstChar == "\}" && $indent >= $indent_val } {
+    } elseif { [regexp {TCL|C/C\+\+} $filetype] && $FirstChar == "\}" && $indent >= $indent_val } {
 	set indent [expr $indent-$indent_val]
     }
     if { $FirstPos == -1 } { set FirstPos $col }
@@ -6188,7 +6212,7 @@ proc RamDebugger::UpdateLineNum { command args } {
 		set quest "File '$currentfile' has been modified outside RamDebugger. Reload it?"
 	    }
 	    set ret [DialogWin::messageBox -default ok -icon warning -message $quest \
-			 -parent $text -title "reload file" -type okcancel]
+		         -parent $text -title "reload file" -type okcancel]
 	    if { $ret == "ok" } {
 		OpenFileF $currentfile 1
 	    }
