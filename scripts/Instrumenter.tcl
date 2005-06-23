@@ -1187,7 +1187,7 @@ proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress
     upvar $blockinfoname blockinfo
     set blockinfo ""
 
-    foreach i [list book title dependencies help tkwidget] {
+    foreach i [list book title dependencies help tkwidget state] {
 	set colors($i) blue
     }
     foreach i [list question value condtype condmeshtype] {
@@ -1203,6 +1203,7 @@ proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress
     set braceslevel $braceslevelIni
     set bracesstack [string repeat ANY $braceslevelIni]
     set blockinfocurrent [list 0 n]
+    set dep_continuation 0
 
     set iline 1
     set nlines [regexp {\n} $block]
@@ -1210,7 +1211,11 @@ proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress
 	if { $iline%50 == 0  && $progress } {
 	    RamDebugger::ProgressVar [expr $iline*100/$nlines]
 	}
-	if { [regexp {(?i)^\s*end\M} $line] } {
+	if { $dep_continuation } {
+	    if { [regexp {\\\s*$} $line] } {
+		set dep_continuation 1
+	    } else { set dep_continuation 0 }
+	} elseif { [regexp {(?i)^\s*end\M} $line] } {
 	    if { $braceslevel > 1 } {
 		incr braceslevel -1
 		set bracesstack [lreplace $bracesstack end end]
@@ -1236,6 +1241,20 @@ proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress
 	    lappend blockinfocurrent $colors(condition) $idx1 $idx2
 	    incr braceslevel
 	    lappend bracesstack [list condmat $iline]
+	} elseif { [regexp -indices {(?i)^\s*(DEPENDENCIES:)} $line {} idxs] } {
+	    foreach "idx1 idx2" $idxs break
+	    incr idx2
+	    lappend blockinfocurrent $colors(dependencies) $idx1 $idx2
+	    if { [regexp {\\\s*$} $line] } {
+		set dep_continuation 1
+	    }
+	} elseif { [regexp -indices {(?i)^\s*(HELP:)} $line {} idxs] } {
+	    foreach "idx1 idx2" $idxs break
+	    incr idx2
+	    lappend blockinfocurrent $colors(help) $idx1 $idx2
+	    if { [regexp {\\\s*$} $line] } {
+		set dep_continuation 1
+	    }
 	} elseif { [regexp -indices {\s*([^\s:]+:)} $line {} idxs] } {
 	    foreach "idx1 idx2" $idxs break
 	    set word [string tolower [string range $line $idx1 [expr {$idx2-1}]]]
@@ -1267,6 +1286,325 @@ proc RamDebugger::Instrumenter::DoWorkForGiDData { block blockinfoname "progress
 	append text "that is not closed at the end of the file (N of open levels: $braceslevel)"
 	error $text
      }
+    if { $length >= 1000  && $progress } {
+	RamDebugger::ProgressVar 100
+    }
+}
+
+proc RamDebugger::Instrumenter::raise_error { txt } {
+    upvar 1 iline iline
+    upvar 1 icharline icharline
+    upvar 1 raiseerror raiseerror
+
+    if { !$raiseerror } { return }
+
+    set str "error in line=$iline position=[expr {$icharline+1}]. "
+    append str $txt
+    error $str
+}
+
+proc RamDebugger::Instrumenter::push_state { state } {
+    upvar 1 statestack statestack
+    lappend statestack $state
+}
+
+proc RamDebugger::Instrumenter::pop_state {} {
+    upvar 1 statestack statestack
+    set statestack [lrange $statestack 0 end-1]
+}
+
+proc RamDebugger::Instrumenter::state_is { state { idx end } } {
+    upvar 1 statestack statestack
+    return [string equal $state [lindex $statestack $idx]]
+}
+
+proc RamDebugger::Instrumenter::push_tag { tag } {
+    upvar 1 tagsstack tagsstack
+    upvar 1 indentlevel indentlevel
+    lappend tagsstack $tag
+    incr indentlevel
+}
+
+proc RamDebugger::Instrumenter::pop_tag { tag } {
+    upvar 1 tagsstack tagsstack
+    upvar 1 indentlevel indentlevel
+
+    if { $tag ne "-" && $tag ne [lindex $tagsstack end] } {
+	uplevel 1 [list raise_error "closing tag '$tag' is not correct. tags stack='$tagsstack'"]
+    }
+    set tagsstack [lrange $tagsstack 0 end-1]
+    incr indentlevel -1
+}
+
+proc RamDebugger::Instrumenter::range { i1 i2 } {
+    upvar 1 block block
+    return [string range $block [expr $i1] [expr $i2]]
+}
+
+proc RamDebugger::Instrumenter::lappend_info { color i1 i2 } {
+    upvar 1 blockinfocurrent blockinfocurrent
+    lappend blockinfocurrent $color [expr $i1] [expr $i2]
+}
+
+proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" { indentlevel_ini 0 } \
+    { raiseerror 1 } } {
+
+    set length [string length $block]
+    if { $length >= 5000 && $progress } {
+	RamDebugger::ProgressVar 0 1
+    }
+
+    set indentlevel $indentlevel_ini
+    upvar $blockinfoname blockinfo
+    set blockinfo ""
+    set blockinfocurrent [list $indentlevel n]
+
+    # colors: magenta magenta2 green red
+
+    set tagsstack ""
+    set statestack ""
+    set icharline 0
+    set iline 1
+
+    for { set i 0 } { $i < $length } { incr i } {
+	set c [string index $block $i]
+
+	if { $i%5000 == 0  && $progress } {
+	    RamDebugger::ProgressVar [expr $i*100/$length]
+	}
+	if { [state_is "cdata"] } {
+	    if { [range $i-2 $i] eq "\]\]>" } {
+		pop_state
+		lappend_info green $icharline-2 $icharline+1
+	    }
+	} elseif { [state_is "comment"] } {
+	    if { [range $i-2 $i] eq "-->" } {
+		pop_state
+		lappend_info red $state_start $icharline+1
+	    }
+	} elseif { [state_is "doctype"]} {
+	    if { $c eq "\[" } {
+		pop_state
+		push_state doctype+
+	    } elseif { $c eq ">" } {
+		pop_state
+	    }
+	    # nothing
+	} elseif { [state_is "doctype+"]} {
+	    if { [range $i-1 $i] eq "\]>" } {
+		pop_state
+	    }
+	    # nothing
+	} else {
+	    switch -- $c {
+		< {
+		    if { ![state_is ""] && ![state_is text] } {
+		        raise_error "Not valid <"
+		    } elseif { [range $i $i+1] eq "<?" } {
+		        push_state pi
+		    } elseif { [range $i $i+8] eq "<!DOCTYPE" } {
+		        push_state doctype
+		    } elseif { [range $i $i+3] eq "<!--" } {
+		        push_state comment
+		        set state_start $icharline
+		        set state_start_global $i
+		    } elseif { [range $i $i+8] eq "<!\[CDATA\[" } {
+		        push_state cdata
+		        lappend_info green $icharline $icharline+9
+		    } else {
+		        if { [state_is text] } { pop_state }
+		        push_state tag
+		        lappend_info magenta $icharline $icharline
+		    }
+		}
+		> {
+		    if { [state_is enter_tagtext] } {
+		        pop_state
+		        if { [state_is tag_end] } {
+		            set isend 1
+		            pop_state
+		        } else { set isend 0 }
+		        if { [state_is "tag"] } {
+		            if { $isend } {
+		                pop_tag [range $state_start_global $i-1]
+		            } else {
+		                push_tag [range $state_start_global $i-1]
+		            }
+		            lappend_info magenta $state_start $icharline
+		        } else {
+		            lappend_info green $state_start $icharline
+		        }
+		        push_state entered_tagtext
+		        
+		    }
+		    if { ![state_is entered_tagtext] } {
+		        raise_error "Not valid >"
+		    }
+		    pop_state
+		    if {[state_is "pi"] && [range $i-1 $i] eq "?>" } {
+		        pop_state
+		    } elseif {[state_is "tag"] } {
+		        pop_state
+		        push_state text
+		    } else {
+		        raise_error "Not 2 valid >"
+		    }
+		}
+		/ {
+		    if { [state_is tag] || [state_is pi] } {
+		        push_state tag_end
+		        lappend_info red $icharline $icharline+1
+		    } elseif { [state_is enter_tagtext] } {
+		        pop_state
+		        if { [state_is "tag"] } {
+		            push_tag [range $state_start_global $i-1]
+		            pop_tag [range $state_start_global $i-1]
+		        }
+		        lappend_info magenta $state_start $icharline
+		        push_state entered_tagtext
+		    } elseif { [state_is entered_tagtext] } {
+		        pop_tag -
+		    } elseif { ![state_is text] && ![state_is att_text] && ![state_is att_quote] \
+		        && ![state_is att_dquote] } {
+		        raise_error "Not valid /"
+		    }
+		}
+		= {
+		    if { [state_is att_entername] || [state_is att_after_name] } {
+		        pop_state
+		        push_state att_after_equal
+		    } elseif { ![state_is text] && ![state_is att_dquote] \
+		        && ![state_is att_quote]} {
+		        raise_error "Not valid '"
+		    }
+		}
+		' {
+		    if { [state_is att_after_equal] } {
+		        pop_state
+		        push_state att_quote
+		        set state_start $icharline
+		        set state_start_global $i
+		    } elseif { [state_is att_quote] } {
+		        if { ![regexp {[\s?/>]} [range $i+1 $i+1]] } {
+		            raise_error "Not valid close '"
+		        }
+		        pop_state
+		        lappend_info grey $state_start $icharline+1
+		    } elseif { ![state_is text] && ![state_is att_dquote] } {
+		        raise_error "Not valid '"
+		    }
+		}
+		\" {
+		    if { [state_is att_after_equal] } {
+		        pop_state
+		        push_state att_dquote
+		        set state_start $icharline
+		        set state_start_global $i
+		    } elseif { [state_is att_dquote] } {
+		        if { ![regexp {[\s?/>]} [range $i+1 $i+1]] } {
+		            raise_error "Not valid close \""
+		        }
+		        pop_state
+		        lappend_info grey $state_start $icharline+1
+		    } elseif { ![state_is text] && ![state_is att_quote] } {
+		        raise_error "Not valid \""
+		    }
+		}
+		\n {
+		    if { [state_is enter_tagtext] } {
+		        pop_state
+		        if { [state_is "tag" end-1] } {
+		            if { [state_is tag_end] } {
+		                pop_tag [range $state_start_global $i-1]
+		                pop_state
+		            } else {
+		                push_tag [range $state_start_global $i-1]
+		            }
+		        }
+		        push_state entered_tagtext
+		        lappend_info magenta $state_start $icharline-1
+		    } elseif { [state_is att_entername] } {
+		        pop_state
+		        push_state att_after_name
+		    }
+		}
+		{ } - \t {
+		    if { [state_is enter_tagtext] } {
+		        pop_state
+		        if { [state_is tag_end] } {
+		            set isend 1
+		            pop_state
+		        } else { set isend 0 }
+		        if { [state_is "tag"] } {
+		            if { $isend } {
+		                pop_tag [range $state_start_global $i-1]
+		            } else {
+		                push_tag [range $state_start_global $i-1]
+		            }
+		            lappend_info magenta $state_start $icharline
+		        } else {
+		            lappend_info green $state_start $icharline
+		        }
+		        push_state entered_tagtext
+		        
+		    } elseif { [state_is att_entername] } {
+		        pop_state
+		        push_state att_after_name
+		    }
+		}
+		default {
+		    if { $c ne "" } {
+		        if { [state_is tag] || [state_is pi] || [state_is tag_end] } {
+		            push_state enter_tagtext
+		            set state_start $icharline
+		            set state_start_global $i
+		        } elseif { [state_is entered_tagtext] } {
+		            if { $c ne "?" } {
+		                push_state att_entername
+		                set state_start $icharline
+		                set state_start_global $i
+		            }
+		        } elseif { ![state_is text] && ![state_is att_quote] \
+		            && ![state_is att_dquote] && ![state_is enter_tagtext] && \
+		                ![state_is att_entername] } {
+		            raise_error "Not valid character '$c'"
+		        }
+		    }
+		}
+	    }
+	}
+	if { $c == "\t" } {
+	    incr icharline 8
+	} elseif { $c eq "\n" } {
+	    incr iline
+	    set icharline 0
+	    if { $indentlevel < [lindex $blockinfocurrent 0] } {
+		if { $iline == 2 } {
+		    incr indentlevel
+		} else {
+		    lset blockinfocurrent 0 $indentlevel
+		}
+	    }
+	    lappend blockinfo $blockinfocurrent
+	    set blockinfocurrent $indentlevel
+	    lappend blockinfocurrent "n"
+	} else {
+	    incr icharline
+	}
+    }
+    if { $indentlevel < [lindex $blockinfocurrent 0] } {
+	if { $iline == 2 } {
+	    incr indentlevel
+	} else {
+	    lset blockinfocurrent 0 $indentlevel
+	}
+    }
+    lappend blockinfo $blockinfocurrent
+
+    if { [llength $tagsstack] } {
+	raise_error "not closed tags: $tagsstack"
+    }
+
     if { $length >= 1000  && $progress } {
 	RamDebugger::ProgressVar 100
     }

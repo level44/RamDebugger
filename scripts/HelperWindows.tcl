@@ -810,9 +810,10 @@ proc RamDebugger::PreferencesWindow {} {
     label $fde1.ll -text "Choose extensions for every file type:" -grid "0 2 w"
     set ic 0
     foreach "type extsdefaultlist" [list TCL [list ".tcl" ".tcl .tk *"] \
-		                            C/C++ [list ".c .cpp .cc .h"] \
-		                            "GiD BAS file" .bas \
-		                            "GiD data files" [list ".prb .mat .cnd"]] {
+	    C/C++ [list ".c .cpp .cc .h"] \
+	    XML [list ".xml .html .htm"] \
+	    "GiD BAS file" .bas \
+	    "GiD data files" [list ".prb .mat .cnd"]] {
 	label $fde1.l$ic -text $type: -grid "0 e"
 	if { ![info exists options(extensions,$type)] } {
 	    set DialogWin::user(extensions,$type) $options_def(extensions,$type)
@@ -2203,6 +2204,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	    set SearchToolbar [list 1 $replace]
 	    return
 	}
+    } else {
+	$mainframe showtoolbar 1 1
     }
 
     if { !$replace && [info exists text_secondary] && [focus -lastfor $text] eq \
