@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.56 2005/06/23 11:36:57 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.57 2005/07/20 12:25:24 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -16,7 +16,7 @@ if { [info exists ::starkit::topdir] } {
 
 ################################################################################
 #  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
-#  (http://gid.cimne.com/ramsan) The following terms apply to all files 
+#  (http://www.gidhome.com/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
 #  The authors hereby grant permission to use, copy, modify, distribute,
@@ -271,6 +271,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 		                                  -slant roman -underline 0 -overstrike 0 }
 		set options_def(HelpFont)  { -family "Helvetica" -size 11 -weight normal \
 		                                 -slant roman -underline 0 -overstrike 0 }
+		set options_def(ViewOnlyTextOrAll) All
 	    }
 	}
 	default {
@@ -280,6 +281,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 		                              -slant roman -underline 0 -overstrike 0 }
 	    set options_def(HelpFont)  { -family "Helvetica" -size 15 -weight normal \
 		                             -slant roman -underline 0 -overstrike 0 }
+	    set options_def(ViewOnlyTextOrAll) All
 	}
     }
 
@@ -303,6 +305,8 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(AutoSaveRevisions) 1
     set options_def(AutoSaveRevisions_time) 5
     set options_def(AutoSaveRevisions_idletime) 5
+
+    set options_def(nonInstrumentingProcs) ""
 
     ################################################################################
     # Reading preferences (they are only saved in GUI mode)
@@ -2836,6 +2840,7 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 
     set f [$mainframe getframe]
     set t [winfo toplevel $mainframe]
+    set w [winfo toplevel $text]
 
     if { [winfo exists $f.textpane] } {
 	set fulltext $f.textpane
@@ -2845,6 +2850,13 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 
     set delta [expr {[$f.pw cget -sashwidth]+2*[$f.pw cget -sashpad]}]
     set delta_ext [expr {2*[$f.pw cget -borderwidth]+4}]
+
+    set geomkey maingeometry_$options(ViewOnlyTextOrAll)
+    if { [wm state $w] == "zoomed" } {
+	set options($geomkey) zoomed
+    } elseif { [winfo width $w] > 1 } {
+	set options($geomkey) [wm geometry $w]
+    }
 
     if { [lindex [grid info $fulltext] 1] != $f } {
 	foreach i [array names options paneweights,*] {
@@ -2879,7 +2891,6 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	    set x [winfo x $t]
 	}
 	wm geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
-	
 	set options(ViewOnlyTextOrAll) OnlyText
     } else {
 	set width [winfo width $fulltext]
@@ -2909,11 +2920,24 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
 	set options(ViewOnlyTextOrAll) All
     }
-    if { [[winfo toplevel $t] cget -use] == "" } {
-	wm withdraw $t
-	update
-	after 0 wm deiconify $t
+    set geomkey maingeometry_$options(ViewOnlyTextOrAll)
+    if { [info exists options($geomkey)] } {
+	if { $options($geomkey) == "zoomed" } {
+	    wm geom $w 800x600+0+0
+	    wm state $w zoomed
+	} else {
+	    wm geom $w $options($geomkey)
+	    wm state $w normal
+	}
     }
+#     if { [[winfo toplevel $t] cget -use] == "" } {
+#         wm withdraw $t
+#         update
+#         after 0 wm deiconify $t
+#         if { [info exists options($geomkey)] && $options($geomkey) == "zoomed" } {
+#             wm state $w zoomed
+#         }
+#     }
 }
 
 #option add *Panedwindow.Stretch always
@@ -3062,10 +3086,11 @@ proc RamDebugger::ExitGUI {} {
     set options(TimeMeasureData) $TimeMeasureData
     set options(remoteserverType) $remoteserverType
     set options(remoteserver) $remoteserver
+    set geomkey maingeometry_$options(ViewOnlyTextOrAll)
     if { [wm state [winfo toplevel $text]] == "zoomed" } {
-	set options(maingeometry) zoomed
+	set options($geomkey) zoomed
     } else {
-	set options(maingeometry) [wm geometry [winfo toplevel $text]]
+	set options($geomkey) [wm geometry [winfo toplevel $text]]
     }
 
     _secondtextsavepos
@@ -5431,6 +5456,7 @@ proc RamDebugger::FillListBox {} {
 		switch $instrumentedfilesSent($fullpath) {
 		    debug { set img $images(file_blue) }
 		    time { set img $images(file_magenta) }
+		    default { set img $images(file_blue) }
 		}
 	    } elseif { [GiveInstFile $fullpath 1 P] != "" } {
 		set img $images(file_yellow)
@@ -6760,7 +6786,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     if { !$iswince && $topleveluse == "" } {
 	wm withdraw $w
-	wm geom $w 800x600
+	wm geom $w 800x600+0+0
     } else { update }
 
     wm title $w RamDebugger
@@ -7523,22 +7549,24 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # start up options
     ################################################################################
 
-    if { $geometry != "" } {
-	set options(maingeometry) $geometry
-    } elseif { ![info exists options(maingeometry)] } {
-	set options(maingeometry) 800x600
-    }
-
     if { $ViewOnlyTextOrAll == "OnlyText" } {
 	set options(ViewOnlyTextOrAll) "OnlyText"
     }
+    set geomkey maingeometry_$options(ViewOnlyTextOrAll)
+
+    if { $geometry != "" } {
+	set options($geomkey) $geometry
+    } elseif { ![info exists options($geomkey)] } {
+	set options($geomkey) 800x600+0+0
+    }
+
     if { [info exists options(ViewOnlyTextOrAll)] && $options(ViewOnlyTextOrAll) == "OnlyText" } {
 	RamDebugger::ViewOnlyTextOrAll
     }
 
     # trick to know if we are debugging RamDebugger
     if { [info command sendmaster] != "" } {
-	if { [regexp {(\d+)x(\d+)[+]([-\d]+)[+]([-\d]+)} $options(maingeometry) {} wi he xpos ypos] } {
+	if { [regexp {(\d+)x(\d+)[+]([-\d]+)[+]([-\d]+)} $options($geomkey) {} wi he xpos ypos] } {
 	    incr xpos 20
 	    incr ypos 20
 	    wm geometry $w ${wi}x$he+$xpos+$ypos
@@ -7557,11 +7585,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    }
 	}
     } else {
-	if { $options(maingeometry) == "zoomed" } {
-	    wm geom $w 800x600
+	if { $options($geomkey) == "zoomed" } {
+	    wm geom $w 800x600+0+0
 	    wm state $w zoomed
 	} else {
-	    wm geom $w $options(maingeometry)
+	    wm geom $w $options($geomkey)
 	}
     }
 

@@ -590,6 +590,31 @@ proc RamDebugger::CreateModifyFonts {} {
 # Preferences
 ################################################################################
 
+proc RamDebugger::PreferencesAddDelProcs { listbox what } {
+    variable options
+    
+    switch $what {
+	add {
+	    set proc [string trim $DialogWin::user(nonInstrumentingProc)]
+	    if { $proc eq "" } {
+		WarnWin "Write a proc in order to add it to list"
+		return
+	    }
+	    if { [lsearch -exact $DialogWin::user(nonInstrumentingProcs) $proc] == -1 } {
+		lappend DialogWin::user(nonInstrumentingProcs) $proc
+	    }
+	}
+	delete {
+	    set num 0
+	    foreach i [$listbox curselection] {
+		set ipos [expr $i-$num]
+		$listbox delete $ipos
+		incr num
+	    }
+	    $listbox selection clear 0 end
+	}
+    }
+}
 
 proc RamDebugger::PreferencesAddDelDirectories { listbox what } {
     variable options
@@ -866,7 +891,6 @@ proc RamDebugger::PreferencesWindow {} {
     supergrid::go $f
     supergrid::go $fd
 
-
     set fas [$fb.nb insert end autosave -text "Auto save"]
 
     set lb [labelframe $fas.l1 -text "auto save revisions"]
@@ -913,6 +937,46 @@ proc RamDebugger::PreferencesWindow {} {
     grid columnconfigure $fas 0 -weight 1
     grid rowconfigure $fas 0 -weight 1
 
+    set fd [$fb.nb insert end noninstrument -text "Non instrument"]
+
+    TitleFrame $fd.f1 -text "non instrument procs" -grid "0 nsew"
+    set fd1 [$fd.f1 getframe]
+
+    set sw [ScrolledWindow $fd1.lf -relief sunken -borderwidth 0]
+    listbox $sw.lb -listvariable DialogWin::user(nonInstrumentingProcs) \
+	-selectmode extended
+    $sw setwidget $sw.lb
+
+    set bbox [ButtonBox $fd1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
+    $bbox add -image folderopen16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Add proc"] \
+	 -command "RamDebugger::PreferencesAddDelProcs $sw.lb add"
+    $bbox add -image actcross16 \
+	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	 -helptext [_ "Delete proc"] \
+	 -command "RamDebugger::PreferencesAddDelProcs $sw.lb delete"
+    label $fd1.l1 -text "Proc:"
+    entry $fd1.e1 -textvariable DialogWin::user(nonInstrumentingProc)
+
+    bind $fd1.e1 <Return> "RamDebugger::PreferencesAddDelProcs $sw.lb add"
+
+    grid $fd1.lf - -sticky nsew
+    grid $fd1.bbox1 - -sticky nw
+    grid $fd1.l1 $fd1.e1 -sticky nw -pady 3 -padx 3
+    grid configure $fd1.e1 -sticky new
+    grid columnconfigure $fd1 1 -weight 1
+    grid rowconfigure $fd1 0 -weight 1
+
+    grid $fd.f1 -sticky nsew
+    grid columnconfigure $fd 0 -weight 1
+    grid rowconfigure $fd 0 -weight 1
+
+    set DialogWin::user(nonInstrumentingProcs) $options(nonInstrumentingProcs)
+
+    set tt "The procs with this name will not be instrumented"
+    DynamicHelp::register $sw.lb balloon $tt
+    DynamicHelp::register $fd1.l1 balloon $tt
 
     $fb.nb compute_size
     $fb.nb raise basic
@@ -1377,8 +1441,8 @@ proc RamDebugger::AboutWindow {} {
 	    -fg \#d3513d -grid 0
 
     set tt "Author: Ramon Ribó (RAMSAN)\n"
-    append tt "ramsan@compassis.com\nhttp://gid.cimne.com/ramsan\n"
-    append tt "http://gid.cimne.com/RamDebugger"
+    append tt "ramsan@compassis.com\nhttp://www.gidhome.com/ramsan\n"
+    append tt "http://www2.compassis.com/ramdebugger"
 
     text $w.l2 -grid "0 px20 py10" -bd 0 -bg [$w cget -bg] -width 10 -height 4 \
 	    -highlightthickness 0 
@@ -3394,6 +3458,8 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
 	if { $Macros::macrodata($i) != "" } {
 	    regexp {(.*),accelerator} $i {} name
 	    bind all $Macros::macrodata($i) [list RamDebugger::Macros::$name $text]
+	    bind $text $Macros::macrodata($i) "[list RamDebugger::Macros::$name $text];break"
+
 	}
     }
     if { [llength $commands] } {

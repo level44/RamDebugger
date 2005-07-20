@@ -79,7 +79,11 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 	    set NewDoInstrument 1
 	} elseif { [regexp {^(proc|method|typemethod|onconfigure|oncget)$} [lindex $words 0]] && \
 		       [llength $words] == 3 } {
-	    set NewDoInstrument 1
+	    if { ![info exists ::RamDebugger::options(nonInstrumentingProcs)] || \
+		[lsearch -exact $::RamDebugger::options(nonInstrumentingProcs) \
+		        [lindex $words 1]] == -1 } {
+		set NewDoInstrument 1
+	    }
 	} elseif { $DoInstrument == 0 } {
 	    if { [regexp {^(::)?snit::(type|widget|widgetadaptor)$} [lindex $words 0]] && \
 		     [llength $words] == 2 } {

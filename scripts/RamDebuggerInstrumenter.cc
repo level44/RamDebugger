@@ -22,6 +22,7 @@ struct InstrumenterState
   int snitpackageinserted;
   int level;
   Tcl_Obj *newblock[3];
+  char **nonInstrumentingProcs;
 
   int line;
   Word_types type;
@@ -67,6 +68,7 @@ inline Tcl_Obj *Tcl_ResetList(Tcl_Obj *obj)
 
 void RamDebuggerInstrumenterInitState(InstrumenterState* is)
 {
+  int i,result,len;
   is->stack=(InstrumenterState*) malloc(1000*sizeof(InstrumenterState));
   is->words=Tcl_NewListObj(0,NULL);
   Tcl_IncrRefCount(is->words);
@@ -90,6 +92,26 @@ void RamDebuggerInstrumenterInitState(InstrumenterState* is)
 	     "foreach i [list variable set global incr] {\n"
 	     "set ::RamDebugger::Instrumenter::colors($i) green\n"
 	     "}",-1,0);
+
+  result=Tcl_EvalEx(is->ip,"set RamDebugger::options(nonInstrumentingProcs)",-1,TCL_EVAL_GLOBAL);
+  if(result==TCL_OK){
+    int objc;
+    Tcl_Obj** objv;
+    result=Tcl_ListObjGetElements(is->ip,Tcl_GetObjResult(is->ip),&objc,&objv);
+    if(result==TCL_OK){
+      is->nonInstrumentingProcs=new char*[objc+1];
+      for(i=0;i<objc;i++){
+	char* str=Tcl_GetStringFromObj(objv[i],&len);
+	is->nonInstrumentingProcs[i]=new char[len+1];
+	strcpy(is->nonInstrumentingProcs[i],str);
+      }
+      is->nonInstrumentingProcs[i]=NULL;
+    }
+  }
+  if(result!=TCL_OK){
+    is->nonInstrumentingProcs=new char*[1];
+    is->nonInstrumentingProcs[0]=NULL;
+  }
 }
 
 int RamDebuggerInstrumenterEndState(InstrumenterState* is)
@@ -124,12 +146,17 @@ int RamDebuggerInstrumenterEndState(InstrumenterState* is)
     Tcl_SetObjResult(is->ip,result);
     return TCL_ERROR;
   }
+  i=0;
+  while(is->nonInstrumentingProcs[i]){
+    delete [] is->nonInstrumentingProcs[i++];
+  }
+  delete [] is->nonInstrumentingProcs;
   return TCL_OK;
 }
 
 int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int line)
 {
-  int i,NewDoInstrument=0,PushState=0,wordslen,intbuf;
+  int i,NewDoInstrument=0,PushState=0,wordslen,intbuf,index;
   P_or_R NewOutputType;
   Tcl_Obj *word0,*word1,*wordi,*tmpObj;
   char* pword0,*pword1,*pchar,buf[1024];
@@ -163,11 +190,15 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
       NewDoInstrument=1;
     else if(wordslen==3 && (strcmp(pword0,"proc")==0 || strcmp(pword0,"method")==0 || 
 	     strcmp(pword0,"typemethod")==0 || strcmp(pword0,"onconfigure")==0 || 
-	     strcmp(pword0,"oncget")==0))
-      NewDoInstrument=1;
+	     strcmp(pword0,"oncget")==0)){
+      int result=Tcl_GetIndexFromObj(NULL,word1,(const char**) is->nonInstrumentingProcs,"",TCL_EXACT,&index);
+      if(result!=TCL_OK){
+	NewDoInstrument=1;
+      }
+    }
     else if(is->DoInstrument==0){
       if(wordslen==2 && (strcmp(pword0,"snit::type")==0 || strcmp(pword0,"snit::widget")==0 || 
-			 strcmp(pword0,"snit::widgetadaptor")==0))
+		         strcmp(pword0,"snit::widgetadaptor")==0))
 	PushState=1;
       else if(wordslen>=3 && strcmp(pword0,"namespace")==0 && strcmp(pword1,"eval")==0){
 	PushState=1;
@@ -405,7 +436,7 @@ void RamDebuggerInstrumenterInsertSnitPackage_ifneeded(InstrumenterState* is)
 /*  newblocknameP is for procs */
 /*  newblocknameR is for the rest */
 int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char* newblocknameP,
-				   char* newblocknameR,char* blockinfoname,int progress) {
+		                   char* newblocknameR,char* blockinfoname,int progress) {
 
   int i,length,braceslevelNoEval,lastinstrumentedline,
     line,ichar,icharline,consumed,instrument_proc_last_line,wordslen=0,
@@ -738,7 +769,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	      if(*pword0==':' && *(pword0+1)==':') pword0+=2;
 	    }
 	  }
-	  /* 	note: the word inside words is not correct when using [] */
+	  /*         note: the word inside words is not correct when using [] */
 	}
 	break;
       case '\n':
@@ -757,7 +788,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline));
 	} else if(is->wordtype==W_WT){
 	  tmpObj=Tcl_GetVar2Ex(is->ip,"::RamDebugger::Instrumenter::colors",
-			       Tcl_GetStringFromObj(is->currentword,NULL),TCL_GLOBAL_ONLY);
+		               Tcl_GetStringFromObj(is->currentword,NULL),TCL_GLOBAL_ONLY);
 	  if(tmpObj){
 	    int icharlineold=icharline-Tcl_GetCharLength(is->currentword);
 	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
@@ -892,7 +923,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 
 
 int RamDebuggerInstrumenterDoWork(ClientData clientData, Tcl_Interp *ip, int objc,
-				  Tcl_Obj *CONST objv[])
+		                  Tcl_Obj *CONST objv[])
 {
   int result,filenum,progress=1;
   if (objc<6) {
@@ -907,7 +938,7 @@ int RamDebuggerInstrumenterDoWork(ClientData clientData, Tcl_Interp *ip, int obj
     if(result) return TCL_ERROR;
   }
   result=RamDebuggerInstrumenterDoWork_do(ip,Tcl_GetString(objv[1]),filenum,Tcl_GetString(objv[3]),
-					Tcl_GetString(objv[4]),Tcl_GetString(objv[5]),progress);
+		                        Tcl_GetString(objv[4]),Tcl_GetString(objv[5]),progress);
   return result;
 }
 
@@ -919,7 +950,7 @@ extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
 #endif
 
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWork",RamDebuggerInstrumenterDoWork,
-			( ClientData)0, NULL);
+		        ( ClientData)0, NULL);
   return TCL_OK;
 }
 
