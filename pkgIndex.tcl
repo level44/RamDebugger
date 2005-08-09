@@ -15,6 +15,13 @@ proc LoadRamDebugger { dir version } {
 	interp create ramdebugger
     }
     interp alias ramdebugger master "" eval
+    if { [info exists ::GIDDEFAULT] } {
+	#loaded inside GiD
+	foreach i { _  } {
+	    interp alias ramdebugger $i "" $i
+	}
+    }
+
     ramdebugger eval [list load {} Tk]
     ramdebugger eval package require Tk
     if { ![ramdebugger eval info exists argv] } {
