@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.57 2005/07/20 12:25:24 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.58 2005/08/09 20:49:36 escolano Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -163,9 +163,10 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     if { [info command winfo] ne "" && [winfo screenwidth .] < 300 } {
 	set iswince 1
     } else { set iswince 0 }
-
-    lappend ::auto_path [file join $MainDir addons]
+   
+    lappend ::auto_path [file dirname $MainDir]
     lappend ::auto_path [file join $MainDir scripts]
+    lappend ::auto_path [file join $MainDir addons]
 
     if { $::tcl_platform(platform) eq "windows" } {
 	if { [info exists ::env(APPDATA)] } {
@@ -351,7 +352,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     if { $::tcl_platform(platform) == "windows" } {
 	if { $options(CheckRemotes) == 1 } {
-	    uplevel \#0 package require commR
+	    uplevel \#0 package require commR  ;#modification (commR) of tcllib comm package
 	    set debuggerserverNum [comm::register RamDebugger 1]
 	}
     } else {
@@ -2110,7 +2111,7 @@ proc RamDebugger::FindActivePrograms { force } {
 	WaitState 1
 
 	if { $debuggerserverNum == "" } {
-	    uplevel \#0 package require commR
+	    uplevel \#0 package require commR ;#modification (commR) of tcllib comm package
 	    set debuggerserverNum [comm::register RamDebugger 1]
 	}
 	RamDebugger::ProgressVar 20
@@ -6761,7 +6762,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # only necessary when working inside a master
     #auto_load ComboBox
     package require Tablelist
-    package require BWidgetR
+    #require BWidgetR, a BWidget with some modifications, marked with RAMSAN
+    #inside the GiD scripts BWidget is really BWidgetR, to avoid duplicate it
+    if { [catch {package require BWidgetR}] } { 
+	package require BWidget
+    }
+   
     # dirty trick to avoid conflicts with other bwidget packages
     auto_load ComboBox
     package require supergrid
