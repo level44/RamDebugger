@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.58 2005/08/09 20:49:36 escolano Exp $        
+#         $Id: RamDebugger.tcl,v 1.59 2005/08/12 18:37:51 escolano Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -13,6 +13,18 @@ if { [info exists ::starkit::topdir] } {
     # that the following line out if you want to run without GUI
     package require Tk 8.4
 }
+
+package require msgcat
+
+if { [info command _] eq "" } {
+    proc ::_ { args } {
+	if { [regexp {(.*)#C#(.*)} [lindex $args 0] {} str comm] } {
+	    set args [lreplace $args 0 0 $str]
+	}
+	return [uplevel 1 ::msgcat::mc $args]
+    }
+}
+
 
 ################################################################################
 #  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
@@ -155,7 +167,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set MainDir $dir
 
     if { ![file isdir [file join $MainDir addons]] } {
-	set text "error: bad installation. Directory 'addons' could not be found in '$MainDir'"
+	set text [_ "Error: bad installation. Directory 'addons' could not be found in '%s'" $MainDir]
 	puts $text
 	catch { tk_messageBox -message $text }
     }
@@ -427,13 +439,13 @@ proc RamDebugger::rhelp { args } {
 
     if { $opts(command) != "" } {
 	if { [info command $opts(command)] == "" } {
-	    error "command '$opts(command)' does not exists\n$usagestring"
+	    error [_ "command '%s' does not exists" $opts(command)]\n$usagestring
 	}
 	catch { $opts(command) -h } string
 	return $string
     }
     set list [namespace export]
-    set retval "Use 'rhelp -h' or 'rhelp command' for more information\n\n"
+    set retval [_ "Use 'rhelp -h' or 'rhelp command' for more information"]\n\n
     foreach i [namespace export] {
 	catch { $i -h } string
 	regexp {^.*:(.*)} [lindex [split $string \n] 0] {} string
@@ -486,10 +498,10 @@ proc RamDebugger::rdebug { args } {
 
     if { $opts(-disconnect) } {
 	if { $remoteserver == "" } {
-	    error "error. There is no debugging session active to stop"
+	    error [_ "Error. There is no debugging session active to stop"]
 	}
 	if { $remoteserverType == "master" } {
-	    error "It is not possible to stop this type of debugging. Use 'Quit' instead"
+	    error [_ "It is not possible to stop this type of debugging. Use 'Quit' instead"]
 	}
 	if { $remoteserverType == "local" } {
 	    catch { local eval destroy . }
@@ -550,7 +562,7 @@ proc RamDebugger::rdebug { args } {
 		set code 0
 		if { [llength $args] == 1 } { set code [lindex $args 0] }
 		TextOutRaise
-		TextOutInsertRed "Program exited with code $code"
+		TextOutInsertRed [_ "Program exited with code %s" $code]
 	    }
 	}
 	interp alias local exit "" RamDebugger::exit_slave
@@ -577,18 +589,18 @@ proc RamDebugger::rdebug { args } {
 		    }
 		    if { [file isdirectory $dir_in] } {
 		        local eval [list cd $dir_in]
-		        set txt "Executing '$filetodebug'\nin directory: $dir_in"
-		    } else { set txt "Executing '$filetodebug'" }
+		        set txt [_ "Executing '%s'\nin directory: %s" $filetodebug $dir_in]
+		    } else { set txt [_ "Executing '%s'" $filetodebug] }
 		    TextOutInsertBlue $txt
-		    SetMessage "Executing '$filetodebug'"
+		    SetMessage [_ "Executing '%s'" $filetodebug]
 		    local eval [list set argc [llength $arg_in]]
 		    local eval [list set argv $arg_in]
-		    TextOutInsertBlue "Using arguments: '$arg_in'"
+		    TextOutInsertBlue [_ "Using arguments: '%s'" $arg_in]
 		    if { $tcl_or_tk != "auto" } {
 		        set LocalDebuggingType $tcl_or_tk
-		        TextOutInsertBlue "Considering file as type: $tcl_or_tk"
+		        TextOutInsertBlue [_ "Considering file as type: %s" $tcl_or_tk]
 		    }
-		    TextOutInsertBlue "Defined in: File->Debug on->Current file arguments"
+		    TextOutInsertBlue [_ "Defined in: File->Debug on->Current file arguments"]
 		    break
 		}
 	    }
@@ -607,7 +619,7 @@ proc RamDebugger::rdebug { args } {
 	}
 	set remoteserverType local
 	if { $filetodebug == "" } {
-	    error "Error. there is no current file"
+	    error [_ "Error. there is no current file"]
 	}
 	local eval [cd [file dirname $filetodebug]]
 
@@ -617,22 +629,22 @@ proc RamDebugger::rdebug { args } {
 	if { $opts(program) == "" } {
 	    if { $remoteserver != "" } {
 		return [lindex $remoteserver 1]
-	    } else { error "error. $usagestring\nActive programs: [array names services]" }
+	    } else { error [_ "Error. %s\nActive programs: %s" $usagestring [array names services]] }
 	}
 
 	if { [auto_execok gdb] == "" } {
 	    variable text
 	    if { [info exists text] && [winfo exists $text] } {
 		set ret [DialogWin::messageBox -default yes -icon question -message \
-		             "Could not find command 'gdb'. Do you want to see the help?" -parent $textST \
-		             -title "Command not found" -type yesno]
+		             [_ "Could not find command 'gdb'. Do you want to see the help?"] -parent $textST \
+		             -title [_ "Command not found"] -type yesno]
 		if { $ret == "yes" } {
 		    ViewHelpForWord "Debugging c++"
 		    #RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 		}
 		return
 	    } else {
-		error "Could not find command 'gdb'"
+		error [_ "Could not find command 'gdb'"]
 	    }
 	}
 	
@@ -663,7 +675,7 @@ proc RamDebugger::rdebug { args } {
 	if { $opts(program) == "" } {
 	    if { $remoteserver != "" } {
 		return $remoteserver
-	    } else { error "error. $usagestring\nActive programs: [array names services]" }
+	    } else { error [_ "Error. %s\nActive programs: %s" $usagestring [array names services]] }
 	}
 	if { [lsearch -exact [array names services] $opts(program)] == -1 } {
 	    FindActivePrograms 1
@@ -671,7 +683,7 @@ proc RamDebugger::rdebug { args } {
 	if { [lsearch -exact [array names services] $opts(program)] != -1 } {
 	    set remoteserver $opts(program)
 	    set remoteserverNum $services($remoteserver)
-	} else { error "error. $usagestring\nActive programs: [array names services]" }
+	} else { error [_ "Error. %s\nActive programs: %s" $usagestring [array names services]] }
 	if { $remoteserverType == "local" } {
 	    catch { local eval destroy . }
 	    catch { interp delete local }
@@ -925,7 +937,7 @@ proc RamDebugger::rdebug { args } {
 	    EvalRemote "run"
 	}
     }
-    return "Begin debugging of program '$remoteserver'"
+    return [_ "Begin debugging of program '%s'" $remoteserver]
 }
 
 proc RamDebugger::reval { args } {
@@ -935,7 +947,7 @@ proc RamDebugger::reval { args } {
     variable remoteserver
 
     if { $debuggerstate == "time" } {
-	error "Command reval cannot be used in 'time' mode. Check rtime"
+	error [_ "Command reval cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: reval ?switches? arg ?arg...?
@@ -985,7 +997,7 @@ proc RamDebugger::rstack { args } {
     variable ExpressionResult
 
     if { $debuggerstate == "time" } {
-	error "Command rstack cannot be used in 'time' mode. Check rtime"
+	error [_ "Command rstack cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: rstack ?switches?
@@ -1039,7 +1051,7 @@ proc RamDebugger::rcont { args } {
     variable files
 
     if { $debuggerstate == "time" } {
-	error "Command rcont cannot be used in 'time' mode. Check rtime"
+	error [_ "Command rcont cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: rcont ?switches? ?line?
@@ -1049,11 +1061,11 @@ proc RamDebugger::rcont { args } {
     ParseArgs $args $usagestring opts
 
     if { ![string is integer $opts(line)] } {
-	error "line '$opts(line)' must be a number\n$usagestring"
+	error [_ "line '%s' must be a number\n%s" $opts(line) $usagestring]
     }
 
     if { $currentfile == "" } {
-	error "There is no file selected\n$usagestring"
+	error [_ "There is no file selected\n%s" $usagestring]
     }
     if { $opts(line) != "" } {
 	set currentline $opts(line)
@@ -1065,11 +1077,10 @@ proc RamDebugger::rcont { args } {
 		set ipos [string first "RDC::F $filenum $currentline ;" \
 		              $instrumentedfilesR($currentfile)]
 		if { $ipos == -1 } {
-		    set errormessage "error: line $currentline is not instrumented"
+		    set errormessage [_ "Error: line %s is not instrumented" $currentline]
 		    set linetxt [lindex [split $files($currentfile) \n] [expr {$currentline-1}]]
 		    if { [string trim $linetxt] == "\}" } {
-		        append errormessage ". Consider option 'Instrument proc last line' "
-		        append errormessage "in Preferences"
+		        append errormessage [_ ". Consider option 'Instrument proc last line' in Preferences"]
 		    }
 		    error $errormessage
 		}
@@ -1102,7 +1113,7 @@ proc RamDebugger::rnext { args } {
     variable remoteserver
 
     if { $debuggerstate == "time" } {
-	error "Command rnext cannot be used in 'time' mode. Check rtime"
+	error [_ "Command rnext cannot be used in 'time' mode. Check rtime"]
     }
     
     set usagestring {usage: rnext ?switches?
@@ -1135,7 +1146,7 @@ proc RamDebugger::rstep { args } {
     variable remoteserver
 
     if { $debuggerstate == "time" } {
-	error "Command rstep cannot be used in 'time' mode. Check rtime"
+	error [_ "Command rstep cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: rstep ?switches?
@@ -1160,7 +1171,7 @@ proc RamDebugger::routput { args } {
     variable debuggerstate
 
     if { $debuggerstate == "time" } {
-	error "Command routput cannot be used in 'time' mode. Check rtime"
+	error [_ "Command routput cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: routput ?switches? boolean
@@ -1210,7 +1221,7 @@ proc RamDebugger::rtime { args } {
 	    }
 	}
 	set TimeMeasureData $TimeMeasureDataNew
-	return "cleared times table"
+	return [_ "cleared times table"]
     }
     if { $opts(-start) } {
 	set debuggerstate time
@@ -1244,15 +1255,15 @@ proc RamDebugger::rtime { args } {
 	if { $remoteserverType == "" && [info command master] != "" } {
 	    rdebug -master
 	}
-	return "Using 'measure times' mode"
+	return [_ "Using 'measure times' mode"]
     }
     if { $opts(-stop) } {
 	if { $remoteserver == "" } {
 	    set debuggerstate ""
-	    return "Using no mode"
+	    return [_ "Using no mode"]
 	} else {
 	    set debuggerstate debug
-	    return "Using 'debug' mode"
+	    return [_ "Using 'debug' mode"]
 	}
     }
     if { $opts(-delete) } {
@@ -1264,12 +1275,12 @@ proc RamDebugger::rtime { args } {
 		    if { [info exists instrumentedfilesTime($file)] } {
 		        unset instrumentedfilesTime($file)
 		    }
-		    return "deleted time block '$opts(name)'"
+		    return [_ "deleted time block '%s'" $opts(name)]
 		}
 	    }
 	    incr ipos
 	}
-	error "error: time block '$opts(name)' not found"
+	error [_ "Error: time block '%s' not found" $opts(name)]
     }
     if { $opts(-list) } {
 	set retval ""
@@ -1322,7 +1333,7 @@ proc RamDebugger::rtime { args } {
 		set data($name_in) [list $hilevel $time_in $percent]
 	    }
 	    if { $sum > 0 && $time != "" && $sum < $time } {
-		set remname "Remaining time for '$name'"
+		set remname [_ "Remaining time for '%s'" $name]
 		set time_rem [expr $time-$sum]
 		set data($remname) [list $hilevel $time_rem [expr $time_rem*100/double($time)]]
 		lappend datanames $remname
@@ -1335,7 +1346,7 @@ proc RamDebugger::rtime { args } {
 	    sec { set unitfactor 1e-6  ; set format %.4g }
 	    min { set unitfactor 1e-6/60.0  ; set format %.4g }
 	    default {
-		error "error in display units.\n$usagestring"
+		error [- "Error in display units.\n%s" $usagestring]
 	    }
 	}
 	set retval ""
@@ -1348,33 +1359,33 @@ proc RamDebugger::rtime { args } {
 	    if { [lindex $data($i) 2] != "" && [lindex $data($i) 2] != 0 } {
 		append retval " ([format %.3g [lindex $data($i) 2]]%)"
 	    }
-	    if {$time == "" } { append retval " (this block not executed since start)" }
+	    if {$time == "" } { append retval [_ " (this block not executed since start)"] }
 	    append retval \n
 	}
 	return $retval
     }
     if { !$opts(-add) } {
-	error "error: it is necessary to select one switch\n$usagestring"
+	error [_ "Error: it is necessary to select one switch\n%s" $usagestring]
     }
     if { $opts(name) == "" } {
-	error "error: it is necessary to enter a name for the block\n$usagestring"
+	error [_ "Error: it is necessary to enter a name for the block\n%s" $usagestring]
     }
     if { ![string is integer -strict $opts(lineini)] || $opts(lineini) < 1 } {
-	error "error: lineini must be a positive number\n$usagestring"
+	error [_ "Error: lineini must be a positive number\n%s" $usagestring]
     }
     if { ![string is integer -strict $opts(lineend)] || $opts(lineend) < 1 } {
-	error "error: lineend must be a positive number\n$usagestring"
+	error [_ "Error: lineend must be a positive number\n%s" $usagestring]
     }
     if { $opts(lineend) < $opts(lineini) } {
-	error "error: lineend cannot be smaller than lineini\n$usagestring"
+	error [_ "Error: lineend cannot be smaller than lineini\n%s" $usagestring]
     }
     if { $currentfile == "" } {
-	error "error: there is no current file"
+	error[_  "Error: there is no current file"]
     }
     foreach i $TimeMeasureData {
 	foreach "name file lineini lineend lasttime" $i {
 	    if { $name == $opts(name) } {
-		error "block name '$opts(name)' already exists"
+		error [_ "block name '%s' already exists" $opts(name)]
 	    }
 	    set fail 0
 	    if { $opts(lineini) < $lineini && $opts(lineend) >= $lineini && \
@@ -1382,7 +1393,7 @@ proc RamDebugger::rtime { args } {
 	    if { $opts(lineini) > $lineini && $opts(lineini) <= $lineend && 
 		 $opts(lineend) > $lineend } { set fail 1 }
 	    if { $fail } {
-		error "error: block is crossing with block '$name'"
+		error [_ "Error: block is crossing with block '%s'" $name]
 	    }
 	}
     }
@@ -1404,7 +1415,7 @@ proc RamDebugger::rtime { args } {
     if { [info exists instrumentedfilesTime($currentfile)] } {
 	unset instrumentedfilesTime($currentfile)
     }
-    return "Added time block '$opts(name)'"
+    return [_ "Added time block '%s'" $opts(name)]
 }
 
 proc RamDebugger::rlist { args } {
@@ -1441,7 +1452,7 @@ proc RamDebugger::rlist { args } {
     set reinstrument $opts(-reinstrument)
 
     if { ![string is integer $opts(line)] } {
-	error "line '$opts(line)' must be a number\n$usagestring"
+	error [_ "line '%s' must be a number\n%s" $opts(line) $usagestring]
     }
 
     set currentfile_save $currentfile
@@ -1449,7 +1460,7 @@ proc RamDebugger::rlist { args } {
 
     if { $currentfile == "" } {
 	set currentfile $currentfile_save
-	error "it is necessary to enter a file name\n$usagestring"
+	error [_ "it is necessary to enter a file name\n%s" $usagestring]
     }
 
     set filetype [GiveFileType $currentfile]
@@ -1493,7 +1504,7 @@ proc RamDebugger::rlist { args } {
 	if { $err } {
 	    set filetry $currentfile
 	    set currentfile $currentfile_save
-	    error "file '$filetry' does not exist\n$usagestring"
+	    error [_ "file '%s' does not exist\n%s" $filetry $usagestring]
 	}
 	if { $opts(-encoding) != 0 && $opts(-encoding) != "" } {
 	    fconfigure $fin -encoding $opts(-encoding)
@@ -1554,7 +1565,7 @@ proc RamDebugger::rlist { args } {
     }
     if { ($filetype == "TCL"  && ![info exists instrumentedfilesP($currentfile)]) || \
 	     ![info exists instrumentedfilesInfo($currentfile)] || $force || $reinstrument } {
-	SetMessage "Instrumenting file '$currentfile'..."
+	SetMessage [_ "Instrumenting file '%s'" $currentfile]...
 
 	set filenum [lsearchfile $fileslist $currentfile]
 
@@ -1658,7 +1669,7 @@ proc RamDebugger::rlist { args } {
     }
     if { $debuggerstate == "time" && [info exists files($currentfile)] && \
 	     (![info exists instrumentedfilesTime($currentfile)] || $force || $reinstrument) } {
-	SetMessage "Instrumenting file '$currentfile' for time measure..."
+	SetMessage [_ "Instrumenting file '%s' for time measure" $currentfile]...
 	Instrumenter::DoWorkForTime $files($currentfile) $currentfile \
 	    instrumentedfilesTime($currentfile) $TimeMeasureData
 	if { [info exists instrumentedfilesSent($currentfile)] } {
@@ -1734,7 +1745,7 @@ proc RamDebugger::rcond { args } {
     variable debuggerstate
 
     if { $debuggerstate == "time" } {
-	error "Command rcond cannot be used in 'time' mode. Check rtime"
+	error [_ "Command rcond cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: rcond ?switches? breakpointnum cond
@@ -1754,14 +1765,14 @@ proc RamDebugger::rcond { args } {
 	incr ipos
     }
     if { !$found } {
-	error "Breakpoints $opts(breakpointnum) does not exist\n$usagestring"
+	error [_ "Breakpoints %s does not exist\n%s" $opts(breakpointnum) $usagestring]
     }
     set breakpoints [lreplace $breakpoints $ipos $ipos [lreplace $i 4 4 $opts(cond)]]
 
     UpdateRemoteBreaks
 
     if { !$opts(-quiet) } {
-	return "condition for breakpoint $opts(breakpointnum): $opts(cond)"
+	return [_ "condition for breakpoint %s: %s" $opts(breakpointnum) $opts(cond)]
     }
 }
 
@@ -1770,7 +1781,7 @@ proc RamDebugger::renabledisable { args } {
     variable debuggerstate
 
     if { $debuggerstate == "time" } {
-	error "Command renabledisable cannot be used in 'time' mode. Check rtime"
+	error [_ "Command renabledisable cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: renabledisable ?switches? breakpointnum
@@ -1790,7 +1801,7 @@ proc RamDebugger::renabledisable { args } {
 	incr ipos
     }
     if { !$found } {
-	error "Breakpoints $opts(breakpointnum) does not exist\n$usagestring"
+	error [_ "Breakpoints %s does not exist\n%s" $opts(breakpointnum) $usagestring]
     }
     set br [lindex $breakpoints $ipos]
     if { [lindex $br 1] } {
@@ -1805,7 +1816,7 @@ proc RamDebugger::renabledisable { args } {
     UpdateRemoteBreaks
 
     if { !$opts(-quiet) } {
-	return "breakpoint $opts(breakpointnum) enable/disable: $enabledisable"
+	return [_ "breakpoint %s enable/disable: %s" $opts(breakpointnum) $enabledisable]
     }
 }
 
@@ -1822,7 +1833,7 @@ proc RamDebugger::rbreak { args } {
     variable debuggerstate
 
     if { $debuggerstate == "time" } {
-	error "Command rbreak cannot be used in 'time' mode. Check rtime"
+	error [_ "Command rbreak cannot be used in 'time' mode. Check rtime"]
     }
 
     set usagestring {usage: rbreak ?switches? ?file? line
@@ -1836,7 +1847,7 @@ proc RamDebugger::rbreak { args } {
     ParseArgs $args $usagestring opts
 
     if { $opts(line) == "" } {
-	error "It is necessary to enter a line number\n$usagestring"
+	error [_ "It is necessary to enter a line number\n%s" $usagestring]
     }
     set currentfile_save $currentfile
     if { [catch {
@@ -1854,11 +1865,10 @@ proc RamDebugger::rbreak { args } {
 	if { $ipos == -1 } {
 	    set ipos [string first "RDC::F $filenum $currentline ;" $instrumentedfilesR($currentfile)]
 	    if { $ipos == -1 } {
-		set errormessage "error: line $currentline is not instrumented"
+		set errormessage [_ "Error: line %s is not instrumented" $currentline]
 		set linetxt [lindex [split $files($currentfile) \n] [expr {$currentline-1}]]
 		if { [string trim $linetxt] == "\}" } {
-		    append errormessage ". Consider option 'Instrument proc last line' "
-		    append errormessage "in Preferences"
+		    append errormessage [_ ". Consider option 'Instrument proc last line' in Preferences"]
 		}
 		set currentfile $currentfile_save
 		error $errormessage
@@ -1867,7 +1877,7 @@ proc RamDebugger::rbreak { args } {
     } elseif { $filetype == "C/C++" } {
 	# nothing
     } else {
-	set errormessage "error: this type of file does not permmit debugging"
+	set errormessage [_ "Error: this type of file does not permmit debugging"]
 	set currentfile $currentfile_save
 	error $errormessage
     }
@@ -1883,7 +1893,7 @@ proc RamDebugger::rbreak { args } {
 
     set currentfile $currentfile_save
     if { !$opts(-quiet) } {
-	return "set breakpoint $NumBreakPoint at $opts(file) $currentline"
+	return [_ "set breakpoint %s at %s %s" $NumBreakPoint $opts(file) $currentline]
     }
 }
 
@@ -1903,7 +1913,7 @@ proc RamDebugger::rinfo { args } {
 
     if { $opts(line) != "" } {
 	if { ![string is integer $opts(line)] } {
-	    error "line '$line' must be a number\n$usagestring"
+	    error [_ "line '%s' must be a number\n%s" $line $usagestring]
 	}
 	set retval ""
 	foreach i $breakpoints {
@@ -1940,25 +1950,25 @@ proc RamDebugger::rdel { args } {
 
     if { $opts(-all) } {
 	if { $opts(breakpointnum) != "" } {
-	    error "when using -all, no breakpointnum must be written\n$usagestring"
+	    error [_ "when using -all, no breakpointnum must be written\n%s" $usagestring]
 	}
 	set breakpoints ""
 	UpdateRemoteBreaks
-	return "deleted all breakpoints"
+	return [_ "deleted all breakpoints"]
     }
     if { ![string is integer -strict $opts(breakpointnum)] } {
-	error "breakpointnum '$opts(breakpointnum)' must be a number\n$usagestring"
+	error [_ "breakpointnum '%s' must be a number\n%s" $opts(breakpointnum) $usagestring]
     }
     set ipos 0
     foreach i $breakpoints {
 	if { [lindex $i 0] == $opts(breakpointnum) } {
 	    set breakpoints [lreplace $breakpoints $ipos $ipos]
 	    UpdateRemoteBreaks
-	    return "deleted breakpoint $opts(breakpointnum)"
+	    return [_ "deleted breakpoint %s" $opts(breakpointnum)]
 	}
 	incr ipos
     }
-    error "breakpoint $opts(breakpointnum) not found"
+    error [_ "breakpoint %s not found" opts(breakpointnum)]
 }
 
 ################################################################################
@@ -1997,7 +2007,7 @@ proc RamDebugger::GiveFileTypeForFileBrowser {} {
 	regexp {,(.*)} $i {} type
 	lappend types [list $type $options($i)]
     }
-    lappend types [list "All Files" "*"]
+    lappend types [list [_ "All Files"] "*"]
     return $types
 }
 
@@ -2068,25 +2078,25 @@ proc RamDebugger::ParseArgs { args usagestring OptsName } {
 	    while { [regexp {^[?].*[?]$} [lindex $normalargs $i]] && \
 		        [llength $args]-$i < [llength $normalargs]-$iargs && \
 		        ![regexp {^[?].*[?]$} [lindex $normalargs end]] } {
-		if { $iargs >= [llength $normalargs] } { error "error. $usagestring" }
+		if { $iargs >= [llength $normalargs] } { error [_ "Error. %s" $usagestring] }
 		set opts([string trim [lindex $normalargs $iargs] ?]) ""
 		incr iargs
 	    }
-	    if { $iargs >= [llength $normalargs] } { error "error. $usagestring" }
+	    if { $iargs >= [llength $normalargs] } { error [_ "Error. %s" $usagestring] }
 	    set opts([string trim [lindex $normalargs $iargs] ?]) $arg
 	    incr iargs
 	}
     }
     for { set i $iargs } { $i < [llength $normalargs] } { incr i } {
 	if { ![regexp {^[?].*[?]$} [lindex $normalargs $i]] } {
-	    error "error. $usagestring"
+	    error [_ "Error. %s" $usagestring]
 	} else { set opts([string trim [lindex $normalargs $i] ?]) "" }
     }
 }
 
 proc RamDebugger::MyNameIs { name id } {
     variable services
-    SetMessage "Remote program: $name"
+    SetMessage [_ "Remote program: %s" $name]
     set services($name) $id
 }
 
@@ -2106,7 +2116,7 @@ proc RamDebugger::FindActivePrograms { force } {
 	if { [info exists services] && !$force } { return }
 	catch { unset services }
 
-	SetMessage "Searching external programs..."
+	SetMessage [_ "Searching external programs"]...
 	ProgressVar 0
 	WaitState 1
 
@@ -2131,7 +2141,7 @@ proc RamDebugger::FindActivePrograms { force } {
 	unset services(11)
 	WaitState 0
 	RamDebugger::ProgressVar 100
-	RamDebugger::SetMessage "Searching external programs...done"
+	RamDebugger::SetMessage [_ "Searching external programs...done"]
     } else {
 	catch { unset services }
 	foreach i [winfo interps] {
@@ -2166,7 +2176,7 @@ proc RamDebugger::RecieveTimeFromProgram { name level time } {
 	}
 	incr ipos
     }
-    error "error recieving from program. Time measure block '$name' does not exists"
+    error [_ "Error recieving from program. Time measure block '%s' does not exists" $name] 
 }
 
 proc RamDebugger::RecieveFromProgramExpr { err val } {
@@ -2202,19 +2212,19 @@ proc RamDebugger::RecieveFromProgram { breaknum filenum line procname textline c
     if { ![winfo exists $text] } {
 	# non GUI mode
 	if { $breaknum == "output" } {
-	    puts "output line $breaknum $file $line"
+	    puts [_ "output line %s %s %s" $breaknum $file $line]
 	} elseif { $breaknum } {
-	    puts "break $breaknum at $procname $file $line"        
+	    puts [_ "break %s at %s %s %s" $breaknum $procname $file $line] 
 	    if { $textline != "" } { puts "---> $textline" }
 	} elseif { $filenum >= 0 } {
-	    puts "break at $procname $file $line"
+	    puts [_ "break at %s %s %s " $procname $file $line]
 	    if { $textline != "" } { puts "---> $textline" }
 	} else {
-	    puts "break at $procname local func line: $line"
+	    puts [_ "break at %s local func line: %s" $procname $line]
 	    if { $textline != "" } { puts "---> $textline" }
 	}
 	if { $condinfo != "" } {
-	    puts "Condition results: $condinfo"
+	    puts [_ "Condition results: %s" $condinfo]
 	}
     } elseif { $file != "" && $line != ""  } {
 	# GUI mode
@@ -2258,7 +2268,7 @@ proc RamDebugger::RecieveFromProgramSource { args } {
     set retval [RamDebugger::DoinstrumentThisfile $file]
     if { $retval == 1 } {
 	TextOutRaise
-	TextOutInsertBlue "Sending Instrumented file '$file'\n"
+	TextOutInsertBlue [_ "Sending Instrumented file '%s'" $file]\n
 
 	set currentfile_save $currentfile
 	set err [catch {
@@ -2271,7 +2281,7 @@ proc RamDebugger::RecieveFromProgramSource { args } {
 	return $retval
     } elseif { $retval == 2 } {
 	TextOutRaise
-	TextOutInsertBlue "Sourcing file '$file'\n"
+	TextOutInsertBlue [_ "Sourcing file '%s'" $file]\n
     }
     return "::RDC::sourceproc $args"
 }
@@ -2283,7 +2293,7 @@ proc RamDebugger::EvalRemote { comm } {
     variable gdblog
 
     if { $remoteserver == "" } {
-	error "Error: a program to debug must be selected using rdebug"
+	error [_ "Error: a program to debug must be selected using rdebug"]
     }
 
     set err 0
@@ -2303,7 +2313,7 @@ proc RamDebugger::EvalRemote { comm } {
 	set err [catch { send $remoteserver $comm }]
     }
     if { $err } {
-	WarnWin "Debugged program is not available anymore. Disconnecting"
+	WarnWin [_ "Debugged program is not available anymore. Disconnecting"]
 	DisconnectStop
     }
 }
@@ -2315,7 +2325,7 @@ proc RamDebugger::EvalRemoteAndReturn { comm } {
     variable gdblog
 
     if { $remoteserver == "" } {
-	error "Error: a program to debug must be selected using rdebug"
+	error [_ "Error: a program to debug must be selected using rdebug"]
     }
     if { $remoteserverType == "local" } {
 	set ret [local eval $comm]
@@ -2417,7 +2427,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	set remoteserverType ""
 	set remoteserver ""
 	set debuggerstate ""
-	WarnWin "Program exited ($errstring)"
+	WarnWin [_ "Program exited (%s)" $errstring]
 	return
     }
     set aa [read $fid]
@@ -2438,7 +2448,7 @@ proc RamDebugger::RecieveFromGdb {} {
 		set remoteserverType ""
 		set remoteserver ""
 		set debuggerstate ""
-		WarnWin "Program exited ($aa)"
+		WarnWin [_ "Program exited (%s)" $aa]
 		return
 	    } 
 	    set remoteserver [lreplace $remoteserver 2 2 ""]
@@ -2508,7 +2518,7 @@ proc RamDebugger::RecieveFromGdb {} {
 		if { $filenum == -1 } {
 		    set err [catch {OpenFileF $file} errstring]
 		    if { $err } {
-		        WarnWin "Could not open file '$file' for stopping program"
+		        WarnWin [_ "Could not open file '%s' for stopping program" $file]
 		        return
 		    }
 		    set filenum [lsearch -exact $fileslist $file]
@@ -2601,7 +2611,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	if { $filenum == -1 } {
 	    set err [catch {OpenFileF $file} errstring]
 	    if { $err } {
-		WarnWin "Could not open file '$file' for stopping program"
+		WarnWin [_ "Could not open file '%s' for stopping program" $file]
 		return
 	    }
 	    set filenum [lsearch -exact $fileslist $file]
@@ -2655,7 +2665,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	return
     }
     if { [string match "*No executable specified, use `target exec'.*" $aa] } {
-	WarnWin "Error defining the debugged executable. Use 'Utilities->gdb log' for details"
+	WarnWin [_ "Error defining the debugged executable. Use 'Utilities->gdb log' for details"]
     }
     TextOutInsert $aa
     TextOutRaise
@@ -3107,7 +3117,7 @@ proc RamDebugger::ExitGUI {} {
 	    }
 	} errstring]
 	if { $err } {
-	    WarnWin "Could not save preferences: $errstring"
+	    WarnWin [_ "Could not save preferences: %s" $errstring]
 	}
     }
     if { $remoteserverType == "master" } {
@@ -3294,14 +3304,14 @@ proc RamDebugger::SaveFile { what } {
 	if { !$currentfileIsModified } { return 0 }
 
 	if { [string index $currentfile 0] != "*" } {
-	    set message "Do you want to save file '$currentfile'?"
+	    set message [_ "Do you want to save file '%s'?" $currentfile]
 	} else {
-	    set message "Do you want to save '$currentfile'?"
+	    set message [_ "Do you want to save '%s'?" $currentfile]
 	}
 
 	set ret [DialogWin::messageBox -default yes -icon question -message \
 		     $message -parent $text \
-		     -title "Save" -type yesnocancel]
+		     -title [_ "Save"] -type yesnocancel]
 	if { $ret == "cancel" } { return -1 }
 	if { $ret == "no" } {
 	    set currentfileIsModified 0
@@ -3319,7 +3329,7 @@ proc RamDebugger::SaveFile { what } {
 	set w [winfo toplevel $text]
 	set types [GiveFileTypeForFileBrowser]
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
-	set title "Save file"
+	set title [_ "Save file"]
 	if { $options(openfile_browser) } {
 	    set file [tk_getSaveFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
 		    -title $title]
@@ -3335,8 +3345,8 @@ proc RamDebugger::SaveFile { what } {
 
 	if { [file mtime $file] > $filesmtime($file) } {
 	    set ret [DialogWin::messageBox -default ok -icon question -message \
-		         "File '$currentfile' has been modified outside RamDebugger. Loose external changes?" \
-		         -parent $text -title "Warning" -type okcancel]
+		         [_ "File '%s' has been modified outside RamDebugger. Loose external changes?" $currentfile]\
+		         -parent $text -title [_ "Warning"] -type okcancel]
 	    if { $ret == "cancel" } { return -1 }
 	}
     }
@@ -3365,7 +3375,7 @@ proc RamDebugger::OpenFile {} {
     #         {{GiD files}      {.bas .prb .mat .cnd}   }
     #         {{All Files}        *             }
     #     }
-    set title "Open source file"
+    set title [_ "Open source file"]
     if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
     if { $options(openfile_browser) } {
 	set file [tk_getOpenFile -filetypes $types -initialdir $options(defaultdir) -parent $w \
@@ -3590,7 +3600,7 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     variable text_secondary
 
     if { [string index $file 0] != "*" } {
-	WarnWin "File name must begin with: '*'"
+	WarnWin [_ "File name must begin with: '*'"]
 	return 1
     }
     
@@ -3761,17 +3771,17 @@ proc RamDebugger::_savefile_only { file data } {
 	SaveMacrosDocument $data
     } elseif { [info exists FileSaveHandlers($file)] } {
 	set err [catch {eval $FileSaveHandlers($file) [list $file $data]} errstring]
-	if { $err } { error "Error saving file '$file' ($errstring)" }
+	if { $err } { error [_ "Error saving file '%s' (%s)" $file $errstring] }
     } else {
 	if { [file exists $file] } {
 	    set ic 0
 	    while { [file exists $file.~$ic~] } { incr ic }     
 	    set renfile $file.~$ic~
 	    set err [catch { file rename -force $file $renfile } errstring]
-	    if { $err } { error "Error saving file '$file' ($errstring)" }
+	    if { $err } { error [_ "Error saving file '%s' (%s)" $file $errstring] }
 	}
 	set err [catch { open $file w } fout]
-	if { $err } { error "Error saving file '$file'" }
+	if { $err } { error [_ "Error saving file '%s'" $file] }
 
 	set header [string range $data 0 255]
 	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
@@ -3803,7 +3813,7 @@ proc RamDebugger::SaveFileF { file } {
     variable text_secondary
 
     WaitState 1
-    SetMessage "Saving file '$file'..."
+    SetMessage [_ "Saving file '%s'" $file]...
 
     set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
     set files($file) [string map $map [$text get 1.0 end-1c]]
@@ -3889,7 +3899,7 @@ proc RamDebugger::SaveFileF { file } {
     }
     ManagePositionsImages
     WaitState 0
-    SetMessage "Saved file '$file'"
+    SetMessage [_ "Saved file '%s'" $file]
 }
 
 proc RamDebugger::ViewInstrumentedFile { what } {
@@ -3907,32 +3917,32 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     if { [SaveFile ask] == -1 } { return }
 
     if { $currentfile == "" && $what != "gdb" } {
-	WarnWin "There is no file to see its instrumented file"
+	WarnWin [_ "There is no file to see its instrumented file"]
 	return
     }
     if { $what == "instrumentedP" } {
 	if { ![info exists instrumentedfilesP($currentfile)] } {
-	    WarnWin "There is no instrumented file P for file '$currentfile'"
+	    WarnWin [_ "There is no instrumented file P for file '%s'" $currentfile]
 	    return
 	}
     } elseif { $what == "instrumentedR" } {
 	if { ![info exists instrumentedfilesR($currentfile)] } {
-	    WarnWin "There is no instrumented file R for file '$currentfile'"
+	    WarnWin [_ "There is no instrumented file R for file '%s'" $currentfile]
 	    return
 	}
     } elseif { $what == "gdb" } {
 	if { $gdblog == "" } {
-	    WarnWin "There is no GDB log file. Use Files->Debug on->Debug c++ to obtain it"
+	    WarnWin [_ "There is no GDB log file. Use Files->Debug on->Debug c++ to obtain it"]
 	    return
 	}
     } elseif { $what == "time" } {
 	if { ![info exists instrumentedfilesTime($currentfile)] } {
-	    WarnWin "There is no instrumented file time for file '$currentfile'"
+	    WarnWin [_ "There is no instrumented file time for file '%s'" $currentfile]
 	    return
 	}
     } else {
 	if { ![info exists instrumentedfilesInfo($currentfile)] } {
-	    WarnWin "There is no instrumented info file for file '$currentfile'"
+	    WarnWin [_ "There is no instrumented info file for file '%s'" $currentfile]
 	    return
 	}
     }
@@ -4045,19 +4055,19 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     # set at program start up
     if { [info command master] != "" } {
 	$menu del 0 end
-	$menu add radio -label "No autosend" -variable RamDebugger::remoteserver -value master
-	$menu add radio -label "Send procs" -variable RamDebugger::remoteserver -value "master proc"
-	$menu add radio -label "Send all" -variable RamDebugger::remoteserver -value "master all"
+	$menu add radio -label [_ "No autosend"] -variable RamDebugger::remoteserver -value master
+	$menu add radio -label [_ "Send procs"] -variable RamDebugger::remoteserver -value "master proc"
+	$menu add radio -label [_ "Send all"] -variable RamDebugger::remoteserver -value "master all"
 
 	DynamicHelp::register $menu menu RamDebugger::status
-	DynamicHelp::register $menu menuentry 0 "Only instrument sourced files"
-	DynamicHelp::register $menu menuentry 1 "Instrument all procs in active files"
-	DynamicHelp::register $menu menuentry 2 "Instrument/execute all active files"
+	DynamicHelp::register $menu menuentry 0 [_ "Only instrument sourced files"]
+	DynamicHelp::register $menu menuentry 1 [_ "Instrument all procs in active files"]
+	DynamicHelp::register $menu menuentry 2 [_ "Instrument/execute all active files"]
 	return
     }
 
     WaitState 1
-    SetMessage "Searching for active programs..."
+    SetMessage [_ "Searching for active programs"]...
 
     if { $force == 2 } {
 	set services [rdebug -forceupdate2 -actives]
@@ -4074,13 +4084,13 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     incr ipos
     set fontbold [lreplace $fontbold $ipos $ipos bold]
 
-    $menu add command -label "Remote TCL debugging" -font $fontbold -state disabled \
+    $menu add command -label [_ "Remote TCL debugging"] -font $fontbold -state disabled \
 	-background grey85
 
     if { [llength $services] == 0 } {
-	$menu add command -label "There are no active programs" -state disabled
+	$menu add command -label [_ "There are no active programs"] -state disabled
 	if { $::tcl_platform(platform) == "windows" } {
-	    $menu add command -label "Use 'Remote TCL update' to actualize" -state disabled
+	    $menu add command -label [_ "Use 'Remote TCL update' to actualize"] -state disabled
 	}
     } else {
 	foreach i $services {
@@ -4100,39 +4110,39 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     $menu add separator
 
     if { $::tcl_platform(platform) == "windows" } {
-	$menu add command -label "Remote TCL update" -font $fontbold -state disabled \
+	$menu add command -label [_ "Remote TCL update"] -font $fontbold -state disabled \
 	    -background grey85
-	$menu add command -label "Update remotes" -command \
+	$menu add command -label [_ "Update remotes"] -command \
 	    "RamDebugger::ActualizeActivePrograms $menu 1"
 	$menu add separator
     }
 
-    $menu add command -label "Local TCL debugging" -font $fontbold -state disabled \
+    $menu add command -label [_ "Local TCL debugging"] -font $fontbold -state disabled \
 	-background grey85
     if { $remoteserverType == "local" } {
-	$menu add check -label "Current file" -command {
+	$menu add check -label [_ "Current file"] -command {
 	    RamDebugger::rdebug -currentfile
 	} -variable ::checked 
 	set ::checked 1
     } else {
-	$menu add command -label "Current file" -command {
+	$menu add command -label [_ "Current file"] -command {
 	    RamDebugger::rdebug -currentfile
 	}
     }
-    $menu add command -label "Current file arguments" -command {
+    $menu add command -label [_ "Current file arguments"] -command {
 	RamDebugger::DebugCurrentFileArgsWindow
     }
     $menu add separator
-    $menu add command -label "Local c/c++ debugging" -font $fontbold -state disabled \
+    $menu add command -label [_ "Local c/c++ debugging"] -font $fontbold -state disabled \
 	-background grey85
     if { $remoteserverType == "gdb" } {
-	$menu add check -label "Debug c++" -command "RamDebugger::DebugCplusPlusWindow" \
+	$menu add check -label [_ "Debug c++"] -command "RamDebugger::DebugCplusPlusWindow" \
 	    -variable ::checked 
 	set ::checked 1
     } else {
-	$menu add command -label "Debug c++" -command "RamDebugger::DebugCplusPlusWindow"
+	$menu add command -label [_ "Debug c++"] -command "RamDebugger::DebugCplusPlusWindow"
     }
-    $menu add command -label "Debug c++ (no ask)" -command "RamDebugger::DebugCplusPlusWindow 1"
+    $menu add command -label [_ "Debug c++ (no ask)"] -command "RamDebugger::DebugCplusPlusWindow 1"
     $menu add separator
     $menu add command -label Disconnect/Stop -command RamDebugger::DisconnectStop -acc "Shift+F5"
 
@@ -4458,13 +4468,13 @@ proc RamDebugger::SetGUIBreakpoint {} {
     variable currentfile
 
     if { $currentfile == "" } {
-	WarnWin "This file does not admit breakpoints"
+	WarnWin [_ "This file does not admit breakpoints"]
 	return
     }
     set idx [$text index insert]
 
     if { $idx == "" } {
-	WarnWin "Before setting breakpoint, select something or pick in the text"
+	WarnWin [_ "Before setting breakpoint, select something or pick in the text"]
 	return
     }
     WaitState 1
@@ -4670,7 +4680,7 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
 
     RamDebugger::SetMessage "" ;# to take out old SetMessageFlash
     if { $condinfo != "" } {
-	RamDebugger::SetMessageFlash "Conditional breakpoint result: $condinfo"
+	RamDebugger::SetMessageFlash [_ "Conditional breakpoint result: %s" $condinfo]
 	#WarnWin "Conditional breakpoint result: $condinfo" [winfo toplevel $text]
     }
 }
@@ -4693,15 +4703,15 @@ proc RamDebugger::ContNextGUI { what } {
 
     if { $remoteserver == "" } {
 	if { $currentfile == "" } {
-	    WarnWin "Cannot start debugging. There is no currentfile" $text
+	    WarnWin [_ "Cannot start debugging. There is no currentfile"] $text
 	    return
 	}
 	set filetype [GiveFileType $currentfile]
 	if { $filetype == "C/C++" } {
 	    if { $options(ConfirmStartDebugging) && $remoteserver != "" } {
 		set ret [DialogWin::messageBox -default yes -icon question -message \
-		             "Do you want to start to debug c++ program?" -parent $text \
-		             -title "start debugging" -type yesnocancel]
+		             [_ "Do you want to start to debug c++ program?"] -parent $text \
+		             -title [_ "start debugging"] -type yesnocancel]
 	    } else { set ret yes }
 	    if { $ret == "cancel" } { return }
 	    if { $ret == "yes" } {
@@ -4711,13 +4721,13 @@ proc RamDebugger::ContNextGUI { what } {
 	} else {
 	    if { $options(ConfirmStartDebugging) && $remoteserver != "" } {
 		if { $remoteserverType == "local" || $remoteserverType == "" } {
-		    set tt "Do you want to start to debug locally '$currentfile'?"
+		    set tt [_ "Do you want to start to debug locally '%s'?" $currentfile]
 		} else {
-		    set tt "Do you want to execute file '$currentfile'?"
+		    set tt [_ "Do you want to execute file '%s'?" $currentfile]
 		}
 		set ret [DialogWin::messageBox -default yes -icon question -message \
 		             $tt -parent $text \
-		             -title "start debugging" -type yesnocancel]
+		             -title [_ "start debugging"] -type yesnocancel]
 	    } else { set ret yes }
 	    if { $ret == "cancel" } { return }
 	    if { $ret == "yes" } {
@@ -4743,7 +4753,7 @@ proc RamDebugger::ContNextGUI { what } {
 	    set idx [$text index insert] 
 	    
 	    if { $idx == "" } {
-		WarnWin "Before using 'Continue to', pick in the text"
+		WarnWin [_ "Before using 'Continue to', pick in the text"]
 		return
 	    }
 	    $text see $idx
@@ -4818,7 +4828,7 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		        if { !$::RDC::err } {
 		            lappend ::RDC::retval expr $::RDC::val
 		        } else {
-		            lappend ::RDC::retval error "variable or expr $::RDC::i does not exist"
+		            lappend ::RDC::retval error [_ "variable or expr %s does not exist" $::RDC::i]
 		            set ::errorInfo $::RDC::errorInfo
 		        }
 		    }
@@ -4838,7 +4848,7 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		    incr i
 		}
 		set RamDebugger::EvalEntries($i,right) $val
-		if { $type == "error" } {
+		if { $type == "Error" } {
 		    $RamDebugger::EvalEntries($i,rightentry) conf -fg red
 		} else {
 		    $RamDebugger::EvalEntries($i,rightentry) conf -fg black
@@ -4892,7 +4902,7 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		set val [string range $val 0 96]...
 	    }
 	    set RamDebugger::EvalEntries($i,right) $val
-	    if { $type == "error" } {
+	    if { $type == "Error" } {
 		$RamDebugger::EvalEntries($i,rightentry) conf -fg red
 	    } else {
 		$RamDebugger::EvalEntries($i,rightentry) conf -fg black
@@ -4907,8 +4917,8 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 
 	    if { $options(ConfirmModifyVariable) } {
 		set ret [DialogWin::messageBox -default ok -icon question -message \
-		             "Are you sure to change variable '$var' to value '$value'?" \
-		             -title "Warning" -type okcancel]
+		             [_ "Are you sure to change variable '%s' to value '%s'?" $var $value] \
+		             -title [_ "Warning"] -type okcancel]
 		if { $ret == "cancel" } { return }
 	    }
 
@@ -4976,7 +4986,7 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		        }
 		        lappend ::RDC::retval $::RDC::i variable $::RDC::val
 		    } else {
-		        lappend ::RDC::retval $::RDC::i error "error"
+		        lappend ::RDC::retval $::RDC::i error [_ "Error"]
 		    }
 		}
 		set ::RDC::retval
@@ -4985,7 +4995,7 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 	} else {
 	    set i 0
 	    foreach "name type val" [lindex $res 1] {
-		if { $type == "error" } { continue }
+		if { $type == "Error" } { continue }
 		if { ![info exists EvalEntries($i,leftL)] } {
 		    set pane1 [winfo parent $EvalEntries(0,leftentryL)]
 		    set pane2 [winfo parent $EvalEntries(0,rightentryL)]
@@ -5031,7 +5041,7 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		    if { !$::RDC::err } {
 		        set ::RDC::retval [list expr $::RDC::val]
 		    } else {
-		        set ::RDC::retval [list error "variable or expr 'VAR' does not exist"]
+		        set ::RDC::retval [list error [_ "variable or expr 'VAR' does not exist"]]
 		        set ::errorInfo $::RDC::errorInfo
 		    }
 		}
@@ -5049,7 +5059,7 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		set val [string range $val 0 96]...
 	    }
 	    set RamDebugger::EvalEntries($i,rightL) $val
-	    if { $type == "error" } {
+	    if { $type == "Error" } {
 		$RamDebugger::EvalEntries($i,rightentryL) conf -fg red
 	    } else {
 		$RamDebugger::EvalEntries($i,rightentryL) conf -fg black
@@ -5069,8 +5079,8 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		bind $RamDebugger::EvalEntries($i,rightentryL) <FocusOut> ""
 
 		set ret [DialogWin::messageBox -default ok -icon question -message \
-		             "Are you sure to change variable '$var' to value '$value'?" \
-		             -title "Warning" -type okcancel]
+		             [_ "Are you sure to change variable '%s' to value '%s'?" $var $value] \
+		             -title [_ "Warning"] -type okcancel]
 
 		bind $RamDebugger::EvalEntries($i,rightentryL) <FocusOut> $comm
 
@@ -5261,7 +5271,7 @@ proc RamDebugger::ProgressVar { value { canstop 0 } } {
     if { [info exists progressvar] && $progressvar == -2 } {
 	set RamDebugger::progressvar -1
 	if { [winfo exists $label_for_ProgressVar] } { destroy $label_for_ProgressVar }
-	error "Stop at user demand"
+	error [_ "Stop at user demand"]
     }
 
     set progressvar $value
@@ -5269,7 +5279,7 @@ proc RamDebugger::ProgressVar { value { canstop 0 } } {
     if { $canstop == 1 && $value == 0 } {
 	if { [winfo exists $label_for_ProgressVar] } { destroy $label_for_ProgressVar }
 
-	set label_for_ProgressVar [$mainframe addindicator -text "Wait please..."]
+	set label_for_ProgressVar [$mainframe addindicator -text [_ "Wait please"]...]
 	bindtags $label_for_ProgressVar [list $label_for_ProgressVar]
 	focus $label_for_ProgressVar
 	# catch is necessary because it fails in Linux (it says window needs to be viewable)
@@ -6051,7 +6061,7 @@ proc RamDebugger::SearchBraces { x y } {
 	    set idxB insert
 	}
 	
-	if { $error } { SetMessage "error: braces not OK" }
+	if { $error } { SetMessage [_ "Error: braces not OK"] }
 	
 	# when not doing it by mouse, use x=-1
 	if { $x >= 0 } {
@@ -6233,13 +6243,13 @@ proc RamDebugger::UpdateLineNum { command args } {
 	    set filesmtime($currentfile) $mtime
 
 	    if { $currentfileIsModified } {
-		set quest "File '$currentfile' has been modified outside RamDebugger. Reload it "
-		append quest "and loose the changes made inside RamDebugger?"
+		set quest [_ "File '%s' has been modified outside RamDebugger. Reload it " $currentfile]
+		append quest [_ "and loose the changes made inside RamDebugger?"]
 	    } else {
-		set quest "File '$currentfile' has been modified outside RamDebugger. Reload it?"
+		set quest [_ "File '%s' has been modified outside RamDebugger. Reload it?" $currentfile]
 	    }
 	    set ret [DialogWin::messageBox -default ok -icon warning -message $quest \
-		         -parent $text -title "reload file" -type okcancel]
+		         -parent $text -title [_ "Reload file"] -type okcancel]
 	    if { $ret == "ok" } {
 		OpenFileF $currentfile 1
 	    }
@@ -6314,7 +6324,7 @@ proc RamDebugger::CreatePanedEntries { num pane1 pane2 suffix } {
 	    set menu %W.menu
 	    destroy $menu
 	    menu $menu -tearoff 0
-	    $menu add command -label "Expressions..." -command \
+	    $menu add command -label [_ "Expressions"]... -command \
 		[list RamDebugger::DisplayVarWindow [winfo toplevel %W] \
 		     [%W get]]
 	    focus %W
@@ -6462,15 +6472,15 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
     switch $filetype {
 	"GiD BAS file" - "GiD data files" {
 	    set menu [list \
-		          [list command "&Select loop" {} "Search and select the loop that begins or ends here" \
+		          [list command &[_ "Select loop"] {} [_ "Search and select the loop that begins or ends here"] \
 		               "Ctrl Space" -command "RamDebugger::SelectBasLoop"] \
 		          [list separator] \
-		          [list command "&Update numbers" {} \
-		               "Change Conditions or Materials numbers and orders them" \
+		          [list command &[_ "Update numbers"] {} \
+		               [_ "Change Conditions or Materials numbers and orders them"] \
 		               "" -command "RamDebugger::UpdateNumbersInGiDFiles"] \
 		          [list separator] \
-		          [list command "&Conditions/Materials wizard" {} \
-		               "Makes it easy to create one new condition" \
+		          [list command &[_ "Conditions/Materials wizard"] {} \
+		               [_ "Makes it easy to create one new condition"] \
 		               "" -command [list RamDebugger::Wizard::CondMatWizard $text $currentfile]]]
 	    set descmenu_new [linsert $descmenu 30 "&GiD" all filetypemenu 0 $menu]
 	    set changes 1
@@ -6557,20 +6567,20 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
     menu $menu -tearoff 0
 
     if { $num == -1 } {
-	$menu add command -label "Set breakpoint" -command \
+	$menu add command -label [_ "Set breakpoint"] -command \
 	    [list RamDebugger::MarkerContextualSubmenuDo $line set]
     } else {
-	$menu add command -label "Clear breakpoint" -command \
+	$menu add command -label [_ "Clear breakpoint"] -command \
 	    [list RamDebugger::MarkerContextualSubmenuDo $line clear]
 	if { $endis } {
-	    $menu add command -label "Disable breakpoint" -command \
+	    $menu add command -label [_ "Disable breakpoint"] -command \
 		[list RamDebugger::MarkerContextualSubmenuDo $line enabledisable]
 	} else {
-	    $menu add command -label "Enable breakpoint" -command \
+	    $menu add command -label [_ "Enable breakpoint"] -command \
 		[list RamDebugger::MarkerContextualSubmenuDo $line enabledisable]
 	}
 	if { $cond != "" } {
-	    $menu add command -label "Clear condition: $cond" -command \
+	    $menu add command -label [_ "Clear condition: %s" $cond] -command \
 		[list RamDebugger::MarkerContextualSubmenuDo $line clearcond]
 	}
     }
@@ -6579,14 +6589,14 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
     set item [$marker find withtag "bookmark&&l$line"]
 
     if { $item eq "" } {
-	$menu add command -label "Save position" -command \
+	$menu add command -label [_ "Save position"] -command \
 	    [list RamDebugger::PositionsStack save $text $line]
     } else {
-	$menu add command -label "Clear position" -command \
+	$menu add command -label [_ "Clear position"] -command \
 	    [list RamDebugger::PositionsStack clean $text $line]
     }
     $menu add separator
-    $menu add cascade -menu $menu.m -label "Go to position"
+    $menu add cascade -menu $menu.m -label [_ "Go to position"]
     menu $menu.m -tearoff 0
 
     foreach i $options(saved_positions_stack) {
@@ -6599,9 +6609,9 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
 	$menu.m add command -label $txt -command \
 	    [list RamDebugger::PositionsStack goto $text $line $file]
     }
-    $menu add command -label "Positions window" -command \
+    $menu add command -label [_ "Positions window"] -command \
 	[list RamDebugger::DisplayPositionsStack $text $line]
-    $menu add command -label "Breakpoints window" -command \
+    $menu add command -label [_ "Breakpoints window"] -command \
 	[list RamDebugger::MarkerContextualSubmenuDo $line window]
 
     tk_popup $menu $X $Y
@@ -6639,12 +6649,12 @@ proc RamDebugger::RegisterExtension {} {
     }
 
     if { $val(1) eq $rval(1) && $val(2) eq $rval(2) && $val(3) eq $rval(3) } {
-	dialogwin_snit $text._ask -title "Unassociate extension"
+	dialogwin_snit $text._ask -title [_ "Unassociate extension"]
 	set f [$text._ask giveframe]
-	label $f.l1 -text "Do you want to unassociate command 'RamDebugger from extension .tcl?"
+	label $f.l1 -text [_ "Do you want to unassociate command 'RamDebugger from extension .tcl?"]
 	set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
-	label $f.l2 -font "-size $smallfontsize" -text "Note: this command can be used in the Windows\
-	      explorer by using the contextual menu over one .tcl file" -wraplength 170 -justify left
+	label $f.l2 -font "-size $smallfontsize" -text [_ "Note: this command can be used in the Windows\
+	      explorer by using the contextual menu over one .tcl file" ] -wraplength 170 -justify left
 
 	grid $f.l1 -sticky nw -padx 5 -pady 5
 	grid $f.l2 -sticky nw -padx 5 -pady 5
@@ -6657,16 +6667,16 @@ proc RamDebugger::RegisterExtension {} {
 	    registry delete "$key(2)\\shell\\RamDebugger"
 	}] } {
 	    tk_messageBox -message \
-		"Error in the operation. Check your permissions and/or enter as administrator"
+		[_ "Error in the operation. Check your permissions and/or enter as administrator"]
 	}
 	return
     }
-    dialogwin_snit $text._ask -title "Associate extension"
+    dialogwin_snit $text._ask -title [_ "Associate extension"]
     set f [$text._ask giveframe]
-    label $f.l1 -text "Do you want to associate command 'RamDebugger to extension .tcl?"
+    label $f.l1 -text [_ "Do you want to associate command 'RamDebugger to extension .tcl?"]
     set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
-    label $f.l2 -font "-size $smallfontsize" -text "Note: this command can be used in the Windows\
-	   explorer by using the contextual menu over one .tcl file" -wraplength 170 -justify left
+    label $f.l2 -font "-size $smallfontsize" -text [_ "Note: this command can be used in the Windows\
+	   explorer by using the contextual menu over one .tcl file"] -wraplength 170 -justify left
 
     grid $f.l1 -sticky nw -padx 5 -pady 5
     grid $f.l2 -sticky nw -padx 5 -pady 5
@@ -6680,7 +6690,7 @@ proc RamDebugger::RegisterExtension {} {
 	    registry set $key($i) "" $val($i)
 	}
     }] } {
-	tk_messageBox -message "Error in the operation. Check your permissions and/or enter as administrator"
+	tk_messageBox -message [_ "Error in the operation. Check your permissions and/or enter as administrator"]
     }
 }
 
@@ -6689,10 +6699,10 @@ proc RamDebugger::ExtractExamplesDir {} {
     variable text 
 
     set dir [tk_chooseDirectory -initialdir $MainDir -parent $text \
-		 -title "Select directory where to extract the Examples directory"]
+		 -title [_ "Select directory where to extract the Examples directory"]]
     if { $dir eq "" } { return }
     file copy -force [file join $MainDir Examples] $dir
-    SetMessage "Copied examples directory into directory '$dir'"
+    SetMessage [_ "Copied examples directory into directory '%s'" $dir]
 }
 
 proc RamDebugger::ShowStatusBar {} {
@@ -6797,216 +6807,215 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
-
     ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
     set descmenu [list \
-		"&File" all file 0 [list \
-		[list command "&New" {} "Begin new file" "" \
+		&[_ "File"] all file 0 [list \
+		[list command &[_ "New"] {} [_ "Begin new file"] "" \
 		-command "RamDebugger::NewFile"] \
-		[list command "&Open" {} "Select source file" "Ctrl o" \
+		[list command &[_ "Open"] {} [_ "Select source file"] "Ctrl o" \
 		-command "RamDebugger::OpenFile"] \
-		[list command "&Save" {} "Save file" "Ctrl s" \
+		[list command &[_ "Save"] {} [_ "Save file"] "Ctrl s" \
 		-command "RamDebugger::SaveFile save"] \
-		[list command "Save &as" {} "Save file as" "" \
+		[list command [_ "Save &as"] {} [_ "Save file as"] "" \
 		-command "RamDebugger::SaveFile saveas"] \
-		[list command "&Close" {} "Close current file" "Ctrl F4" \
+		[list command &[_ "Close"] {} [_ "Close current file"] "Ctrl F4" \
 		-command "RamDebugger::CloseFile"] \
 		separator \
-		[list cascad "&Debug on" {} activeprograms 0 {}] \
+		[list cascad &[_ "Debug on"] {} activeprograms 0 {}] \
 		separator \
-		[list cascad "&Revisions" {} revisions 0 [list \
-		[list command "&Save revision" {} "Saves a revision of the file" "ShiftCtrl s" \
+		[list cascad &[_ "Revisions"] {} revisions 0 [list \
+		[list command &[_ "Save revision"] {} [_ "Saves a revision of the file"] "ShiftCtrl s" \
 		        -command "RamDebugger::CVS::SaveRevision"] \
-		[list command "&Open revisions list" {} "Open revisions list for current file" "" \
+		[list command &[_ "Open revisions list"] {} [_ "Open revisions list for current file"] "" \
 		        -command "RamDebugger::CVS::OpenRevisions"] \
 		separator \
-		[list command "&View revised files" {} \
-		     "View all files under revision control" "" \
+		[list command &[_ "View revised files"] {} \
+		     [_ "View all files under revision control"] "" \
 		     -command "RamDebugger::CVS::ShowAllFiles"] \
 		                                             ]] \
-		[list cascad "&Recent files" {} recentfiles 0 {}] \
+		[list cascad &[_ "Recent files"] {} recentfiles 0 {}] \
 		separator \
-		[list command "&Quit" {} "Exit program" "Ctrl q" \
+		[list command &[_ "Quit"] {} [_ "Exit program"] "Ctrl q" \
 		-command RamDebugger::ExitGUI] \
 		] \
-		"&Edit" all edit 0 [list \
-		[list command "&Undo" {} "Undo previus insert/delete operation" "Ctrl z" \
+		&[_ "Edit"] all edit 0 [list \
+		[list command &[_ "Undo"] {} [_ "Undo previus insert/delete operation"] "Ctrl z" \
 		-command "RamDebugger::CutCopyPasteText undo"] \
 		separator \
-		[list command "&Cut" {} "Cut selected text to clipboard" "Ctrl x" \
+		[list command &[_ "Cut"] {} [_ "Cut selected text to clipboard"] "Ctrl x" \
 		-command "RamDebugger::CutCopyPasteText cut"] \
-		[list command "C&opy" {} "Copy selected text to clipboard" "Ctrl c" \
+		[list command [_ "C&opy"] {} [_ "Copy selected text to clipboard"] "Ctrl c" \
 		-command "RamDebugger::CutCopyPasteText copy"] \
-		[list command "&Paste" {} "Past text from clipboard" "Ctrl v" \
+		[list command &[_ "Paste"] {} [_ "Past text from clipboard"] "Ctrl v" \
 		-command "RamDebugger::CutCopyPasteText paste"] \
 		separator \
-		[list cascad "&Advanced" {} editadvanced 0 [list \
-		    [list command "&Indent region" {} "Indent selected region or line" "Print Tab" \
+		[list cascad &[_ "Advanced"] {} editadvanced 0 [list \
+		    [list command &[_ "Indent region"] {} [_ "Indent selected region or line"] "Print Tab" \
 		        -command "RamDebugger::Indent"] \
-		    [list command "&Comment region" {} "Comment selected region" "F6" \
+		    [list command &[_ "Comment region"] {} [_ "Comment selected region"] "F6" \
 		        -command "RamDebugger::CommentSelection on"] \
-		    [list command "&Uncomment region" {} "Un-comment selected region" "Shift F6" \
+		    [list command &[_ "Uncomment region"] {} [_ "Un-comment selected region"] "Shift F6" \
 		        -command "RamDebugger::CommentSelection off"] \
 		    separator \
-		    [list command "Center display" {} "Center text display" "Ctrl l" \
+		    [list command [_ "Center display"] {} [_ "Center text display"] "Ctrl l" \
 		        -command "RamDebugger::CenterDisplay"] \
-		    [list command "Search in files" {} "Search for pattern in given files" \
+		    [list command [_ "Search in files"] {} [_ "Search for pattern in given files"] \
 		    "ShiftCtrl f" \
 		        -command "RamDebugger::SearchInFiles"] \
 		    separator \
-		    [list command "&Save/clear position" {} \
-		        "Save position to stack or clear position" "Shift F2" \
+		    [list command &[_ "Save/clear position"] {} \
+		        [_ "Save position to stack or clear position"] "Shift F2" \
 		        -command "RamDebugger::PositionsStack save"] \
-		    [list command "&Go to position" {} "Recover position from stack" "F2" \
+		    [list command &[_ "Go to position"] {} [_ "Recover position from stack"] "F2" \
 		        -command "RamDebugger::PositionsStack go"] \
-		    [list command "&Display positions stack" {} "Display positions stack" "Ctrl F2" \
+		    [list command &[_ "Display positions stack"] {} [_ "Display positions stack"] "Ctrl F2" \
 		        -command "RamDebugger::DisplayPositionsStack"] \
 		   ] \
 		] \
-		[list cascad "&Macros" {} macros 0 [list \
-		    [list command "Macros..." {} "Modify or execute macros" "" \
+		[list cascad &[_ "Macros"] {} macros 0 [list \
+		    [list command [_ "Macros"]... {} [_ "Modify or execute macros"] "" \
 		        -command "RamDebugger::Macros $w"] \
 		   ] \
 		] \
 		separator \
-		[list command "Search..." {} "Search text in source file" "Ctrl f" \
+		[list command [_ "Search"]... {} [_ "Search text in source file"] "Ctrl f" \
 		-command "RamDebugger::SearchWindow"] \
-		[list command "Continue search" {} "Continue searching text" "F3" \
+		[list command [_ "Continue search"] {} [_ "Continue searching text"] "F3" \
 		-command "RamDebugger::Search $w any"] \
-		[list command "Isearch forward" {} "Incrementally search forward" "Ctrl i" \
+		[list command [_ "Isearch forward"] {} [_ "Incrementally search forward"] "Ctrl i" \
 		-command "RamDebugger::Search $w iforward"] \
-		[list command "Isearch backward" {} "Incrementally search backward" "Ctrl r" \
+		[list command [_ "Isearch backward"] {} [_ "Incrementally search backward"] "Ctrl r" \
 		-command "RamDebugger::Search $w ibackward"] \
-		[list command "&Replace..." {} "Replace text in source file" "" \
+		[list command &[_ "Replace"]... {} [_ "Replace text in source file"] "" \
 		-command "RamDebugger::SearchWindow 1"] \
-		[list command "&Goto line" {} "Go to the given line" "Ctrl g" \
+		[list command &[_ "Goto line"] {} [_ "Go to the given line"] "Ctrl g" \
 		-command "RamDebugger::GotoLine"] \
 		separator \
-		[list command "&Preferences" {} "Choose preferences for RamDebugger" "Ctrl p" \
+		[list command &[_ "Preferences"] {} [_ "Choose preferences for RamDebugger"] "Ctrl p" \
 		-command "RamDebugger::PreferencesWindow"] \
 		] \
-		"&View" all view 0 [list \
-		[list command "&View text/all" {} \
-		"Toggle between viewing all windows or only text window" "Ctrl t" \
+		&[_ "View"] all view 0 [list \
+		[list command &[_ "View text/all"] {} \
+		[_ "Toggle between viewing all windows or only text window"] "Ctrl t" \
 		-command "RamDebugger::ViewOnlyTextOrAll"] \
-		[list checkbutton "&View files pane" {} \
-		"Toggle between viewing the file list pane" "" \
+		[list checkbutton &[_ "View files pane"] {} \
+		[_ "Toggle between viewing the file list pane"] "" \
 		-command "RamDebugger::CheckListFilesPane" \
 		-variable RamDebugger::options(listfilespane)] \
-		[list command "&Secondary view" {} \
-		"Toggle between activating a secondary view for files" "Ctrl 2" \
+		[list command &[_ "Secondary view"] {} \
+		[_ "Toggle between activating a secondary view for files"] "Ctrl 2" \
 		-command "RamDebugger::ViewSecondText"] \
-		[list command "&Toggle focus" {} \
-		"Toggle between activating the main or the secondary view" "Ctrl 3" \
+		[list command &[_ "Toggle focus"] {} \
+		[_ "Toggle between activating the main or the secondary view"] "Ctrl 3" \
 		-command "RamDebugger::FocusSecondTextToggle"] \
-		[list command "&Toggle views" {} \
-		"Toggle files between the main and the secondary view" "Ctrl 4" \
+		[list command &[_ "Toggle views"] {} \
+		[_ "Toggle files between the main and the secondary view"] "Ctrl 4" \
 		-command "RamDebugger::ToggleViews"] \
 		separator \
-		[list checkbutton "Status bar" {} \
-		 "View/hide status bar" "" \
+		[list checkbutton [_ "Status bar"] {} \
+		 [_ "View/hide status bar"] "" \
 		-variable RamDebugger::options(showstatusbar) -command RamDebugger::ShowStatusBar] \
-		[list checkbutton "Buttons toolbar" {} \
-		 "View/hide buttons toolbar" "" \
+		[list checkbutton [_ "Buttons toolbar"] {} \
+		 [_ "View/hide buttons toolbar"] "" \
 		-variable RamDebugger::options(showbuttonstoolbar) -command RamDebugger::ShowButtonsToolBar] \
 		separator \
 		] \
-		"&Debug" all debug 0 [list \
-		[list command "&Continue/Go" debugentry "begin/continue execution" "F5" \
+		&[_ "Debug"] all debug 0 [list \
+		[list command &[_ "Continue/Go"] debugentry [_ "begin/continue execution"] "F5" \
 		-command "RamDebugger::ContNextGUI rcont"] \
-		[list command "Set/unset &breakpoint" debugentry "Set/unset breakpoint" "F9" \
+		[list command [_ "Set/unset &breakpoint"] debugentry [_ "Set/unset breakpoint"] "F9" \
 		-command "RamDebugger::SetGUIBreakpoint"] \
-		[list command "&Next" debugentry "continue one command" "F10" \
+		[list command &[_ "Next"] debugentry [_ "continue one command"] "F10" \
 		-command "RamDebugger::ContNextGUI rnext"] \
-		[list command "&Step" debugentry "continue one command, entering in subcommands" "F11" \
+		[list command &[_ "Step"] debugentry [_ "continue one command, entering in subcommands"] "F11" \
 		-command "RamDebugger::ContNextGUI rstep"] \
-		[list command "Break" debugentry "Break execution as fast as possible" "" \
+		[list command [_ "Break"] debugentry [_ "Break execution as fast as possible"] "" \
 		-command "RamDebugger::ContNextGUI rnextfull"] \
-		[list command "Stop debugging" debugentry "Stop current debugging" "Shift F5" \
+		[list command [_ "Stop debugging"] debugentry [_ "Stop current debugging"] "Shift F5" \
 		     -command RamDebugger::DisconnectStop] \
 		separator \
-		[list command "Continue &to" debugentry "continue to selected line" "Ctrl F5" \
+		[list command [_ "Continue &to"] debugentry [_ "continue to selected line"] "Ctrl F5" \
 		-command "RamDebugger::ContNextGUI rcontto"] \
 		separator \
-		[list command "&Expressions..." debugentry \
-		    "Open a window to visualize expresions or variables" "" \
+		[list command &[_ "Expressions"]... debugentry \
+		    [_ "Open a window to visualize expresions or variables"] "" \
 		-command "RamDebugger::DisplayVarWindow $w"] \
-		[list command "Breakpoints..." debugentry \
-		    "Open a window to visualize the breakpoints list" "Alt F9" \
+		[list command [_ "Breakpoints"]... debugentry \
+		    [_ "Open a window to visualize the breakpoints list"] "Alt F9" \
 		-command "RamDebugger::DisplayBreakpointsWindow"] \
-		[list command "&Timing control..." debugentry \
-		    "Open a window to control execution times" "" \
+		[list command &[_ "Timing control"]... debugentry \
+		    [_ "Open a window to control execution times"] "" \
 		-command "RamDebugger::DisplayTimesWindow"] \
-		[list command "&Profile procedures..." debugentry \
-		    "Open a window to profile execution time of procs" "" \
+		[list command &[_ "Profile procedures"] debugentry \
+		    [_ "Open a window to profile execution time of procs"] "" \
 		-command "profileprocs::OpenGUI"] \
 		separator \
-		[list command "&Reinstrument" debugentry \
-		    "Reinstrument and recolorize a file" "" \
+		[list command &[_ "Reinstrument"] debugentry \
+		    [_ "Reinstrument and recolorize a file"] "" \
 		-command "RamDebugger::ReinstrumentCurrentFile"] \
 		] \
-		"&C++ project" all c++ 0 [list \
-		[list command "&Create/Edit" c++entry "Create or edit a c++ compile project" "Alt F7" \
+		&[_ "C++ project"] all c++ 0 [list \
+		[list command &[_ "Create/Edit"] c++entry [_ "Create or edit a c++ compile project"] "Alt F7" \
 		-command "cproject::Create $w"] \
-		[list cascad "C&onfiguration" {} activeconfiguration 0 [list \
-		        [list radiobutton "Debug" activeconfiguration "Compile debug version" "" \
+		[list cascad [_ "C&onfiguration"] {} activeconfiguration 0 [list \
+		        [list radiobutton [_ "Debug"] activeconfiguration [_ "Compile debug version"] "" \
 		        -variable RamDebugger::options(debugrelease) -value debug -selectcolor black] \
-		        [list radiobutton "Release" activeconfiguration "Compile release version" "" \
+		        [list radiobutton [_ "Release"] activeconfiguration [_ "Compile release version"] "" \
 		        -variable RamDebugger::options(debugrelease) -value release \
 		            -selectcolor black] \
 		        ] \
 		] \
-		[list command "Co&mpile" c++entry "Compile project" "F7" \
+		[list command [_ "Co&mpile"] c++entry [_ "Compile project"] "F7" \
 		-command "cproject::Compile $w"] \
-		[list command "Com&pile non stop" c++entry "Compile project, do not stop on errors" \
+		[list command [_ "Com&pile non stop"] c++entry [_ "Compile project, do not stop on errors"] \
 		"Ctrl F7" -command "cproject::CompileNoStop $w"] \
-		[list command "Compile all" c++entry "Compile project, all targets" "" \
+		[list command [_ "Compile all"] c++entry [_ "Compile project, all targets"] "" \
 		-command "cproject::CompileAll $w"] \
 		separator \
-		[list command "&Touch files" c++entry "Actualize date for all compilation files" "" \
+		[list command &[_ "Touch files"] c++entry [_ "Actualize date for all compilation files"] "" \
 		-command "cproject::TouchFiles $w"] \
-		[list command "Cl&ean" c++entry "Clean compiled project files" "" \
+		[list command [_ "Cl&ean"] c++entry [_ "Clean compiled project files"] "" \
 		-command "cproject::CleanCompiledFiles $w"] \
 		] \
-		"&Utilities" all utilities 0 [list \
-		[list command "&Open console" {} "Open console" "" \
+		&[_ "Utilities"] all utilities 0 [list \
+		[list command &[_ "Open console"] {} [_ "Open console"] "" \
 		-command "RamDebugger::OpenConsole"] \
-		[list command "O&pen VisualRegexp" {} "Open VisualRegexp" "" \
+		[list command [_ "O&pen VisualRegexp"] {} [_ "Open VisualRegexp"] "" \
 		-command "RamDebugger::OpenProgram visualregexp"] \
-		[list command "Open Tkdiff" {} "Open Tkdiff" "" \
+		[list command [_ "Open Tkdiff"] {} [_ "Open Tkdiff"] "" \
 		-command "RamDebugger::OpenProgram tkdiff"] \
 		separator \
-		[list command "&View instrumented file P" {} "View instrumented file P" "" \
+		[list command &[_ "View instrumented file P"] {} [_ "View instrumented file P"] "" \
 		-command "RamDebugger::ViewInstrumentedFile instrumentedP"] \
-		[list command "View instrumented file R" {} "View instrumented file R" "" \
+		[list command [_ "View instrumented file R"] {} [_ "View instrumented file R"] "" \
 		-command "RamDebugger::ViewInstrumentedFile instrumentedR"] \
-		[list command "View instrumented info file" {} "View instrumented info file" "" \
+		[list command [_ "View instrumented info file"] {} [_ "View instrumented info file"] "" \
 		-command "RamDebugger::ViewInstrumentedFile info"] \
-		[list command "View instrumented time file" {} "View instrumented time file" "" \
+		[list command [_ "View instrumented time file"] {} [_ "View instrumented time file"] "" \
 		-command "RamDebugger::ViewInstrumentedFile time"] \
-		[list command "View gdb log" {} \
-		  "View all commands transferred from/to gdb, if debugging c++" "" \
+		[list command [_ "View gdb log"] {} \
+		  [_ "View all commands transferred from/to gdb, if debugging c++"] "" \
 		-command "RamDebugger::ViewInstrumentedFile gdb"] \
-		[list command "&Count LOC" {} "Count number of lines of code" "" \
+		[list command &[_ "Count LOC"] {} [_ "Count number of lines of code"] "" \
 		-command "RamDebugger::CountLOCInFiles $w"] \
 		separator \
-		[list command "&Windows hierarchy" {} "View windows hierarchy" "Ctrl 1" \
+		[list command &[_ "Windows hierarchy"] {} [_ "View windows hierarchy"] "Ctrl 1" \
 		-command "RamDebugger::DisplayWindowsHierarchy"] \
 		] \
-		"&Help" all help 0 [list \
-		[list command "&Help" {} "Gives help" "Ctrl h" \
+		&[_ "Help"] all help 0 [list \
+		[list command &[_ "Help"] {} [_ "Gives help"] "Ctrl h" \
 		-command "RamDebugger::ViewHelpFile"] \
-		[list command "&Contextual help" {} "Gives help for commands in editor" "F1" \
+		[list command &[_ "Contextual help"] {} [_ "Gives help for commands in editor"] "F1" \
 		-command "RamDebugger::ViewHelpForWord"] \
 		separator \
-		[list command "&Extract examples" "extractexamples" \
-		     "Extracts examples directory to a user-selectable directory" "" \
+		[list command &[_ "Extract examples"] "extractexamples" \
+		     [_ "Extracts examples directory to a user-selectable directory"] "" \
 		-command "RamDebugger::ExtractExamplesDir"] \
-		[list command "&Register cmd extension..." registerextension \
-		     "Register RamDebugger as command in the .tcl extension" "" \
+		[list command &[_ "Register cmd extension"]... registerextension \
+		     [_ "Register RamDebugger as command in the .tcl extension"] "" \
 		-command "RamDebugger::RegisterExtension"] \
 		separator \
-		[list command "&About" {} "Information about the program" "" \
+		[list command &[_ "About"] {} [_ "Information about the program"] "" \
 		-command "RamDebugger::AboutWindow"] \
 		] \
 		]
@@ -7067,34 +7076,34 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-spacing 0]
 	$bbox add -text . \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
-	    -helptext "Menu" \
+	    -helptext [_ "Menu"] \
 	    -command "tk_popup [$w cget -menu] \[winfo pointerx .] \[winfo pointery .]"
 	$bbox add -image filenew16 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
-	    -helptext "Begin new file" \
+	    -helptext [_ "Begin new file"] \
 	    -command "RamDebugger::NewFile"
 	$bbox add -image fileopen16 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
-	    -helptext "Open source file" \
+	    -helptext [_ "Open source file"] \
 	    -command "RamDebugger::OpenFile"
 	$bbox add -image filesave16 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 0 -pady 0 \
-	    -helptext "Save file" \
+	    -helptext [_ "Save file"] \
 	    -command "RamDebugger::SaveFile save"
     } else {
 	set bbox [ButtonBox $toolbar.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 w" \
 		-spacing 2]
 	$bbox add -image filenew22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Begin new file" \
+	    -helptext [_ "Begin new file"] \
 	    -command "RamDebugger::NewFile"
 	$bbox add -image fileopen22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Open source file" \
+	    -helptext [_ "Open source file"] \
 	    -command "RamDebugger::OpenFile"
 	$bbox add -image filesave22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Save file" \
+	    -helptext [_ "Save file"] \
 	    -command "RamDebugger::SaveFile save"
 	
 	Separator $toolbar.sep -orient vertical -grid "1 ns px3"
@@ -7102,23 +7111,23 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	
 	$bbox add -image actundo22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Undo previus insert/delete operation" \
+	    -helptext [_ "Undo previus insert/delete operation"] \
 	    -command "RamDebugger::CutCopyPasteText undo"
 	$bbox add -image editcut22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Cut selected text to clipboard" \
+	    -helptext [_ "Cut selected text to clipboard"] \
 	    -command "RamDebugger::CutCopyPasteText cut"
 	$bbox add -image editcopy-22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Copy selected text to clipboard" \
+	    -helptext [_ "Copy selected text to clipboard"] \
 	    -command "RamDebugger::CutCopyPasteText copy"
 	$bbox add -image editpaste22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Past text from clipboard" \
+	    -helptext [_ "Past text from clipboard"] \
 	    -command "RamDebugger::CutCopyPasteText paste"
 	$bbox add -image find-22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Search text in source file" \
+	    -helptext [_ "Search text in source file"] \
 	    -command "RamDebugger::SearchWindow"
 	
 	Separator $toolbar.sep2 -orient vertical -grid "3 ns px3"
@@ -7126,23 +7135,23 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	
 	$bbox add -image player_end-22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "begin/continue execution" \
+	    -helptext [_ "begin/continue execution"] \
 	    -command "RamDebugger::ContNextGUI rcont"
 	$bbox add -image player_stop-22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "Set/unset &breakpoint" \
+	    -helptext [_ "Set/unset &breakpoint"] \
 	    -command "RamDebugger::SetGUIBreakpoint"
 	$bbox add -image finish-22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "continue one command" \
+	    -helptext [_ "continue one command"] \
 	    -command "RamDebugger::ContNextGUI rnext"
 	$bbox add -image down-22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "continue one command, entering in subcommands" \
+	    -helptext [_ "continue one command, entering in subcommands"] \
 	    -command "RamDebugger::ContNextGUI rstep"
 	$bbox add -image stop-22 \
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	    -helptext "stop debugging" \
+	    -helptext [_ "stop debugging"] \
 	    -command "RamDebugger::DisconnectStop"
     }
     supergrid::go $toolbar
@@ -7245,7 +7254,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     NoteBook $pane2in2.nb -homogeneous 1 -bd 1 -internalborderwidth 0 \
 	    -grid "0 py2" -side bottom
 
-    set f1 [$pane2in2.nb insert end stacktrace -text "Stack trace"]
+    set f1 [$pane2in2.nb insert end stacktrace -text [_ "Stack trace"]]
  
     set sw2 [ScrolledWindow $f1.lf2 -relief sunken -borderwidth 0 -grid "0" \
 	    -scrollbar both -auto both]
@@ -7255,7 +7264,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     supergrid::go $f1
 
-    set f2 [$pane2in2.nb insert end output -text "Output"]
+    set f2 [$pane2in2.nb insert end output -text [_ "Output"]]
 
     set sw2 [ScrolledWindow $f2.lf2 -relief sunken -borderwidth 0 -grid "0" \
 	    -scrollbar both -auto both]
@@ -7265,7 +7274,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     supergrid::go $f2
 
-    set f3 [$pane2in2.nb insert end compile -text "Compile"]
+    set f3 [$pane2in2.nb insert end compile -text [_ "Compile"]]
 
     set sw2 [ScrolledWindow $f3.lf3 -relief sunken -borderwidth 0 -grid "0" \
 	    -scrollbar both -auto both]
@@ -7316,7 +7325,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set pane3in1 [frame $pw1.pane3in1]
     $pw1 add $pane3in1 -sticky nsew -height $weight3in1
 
-    label $pane3in1.l1 -text "User defined variables" -relief raised -bd 1 -grid "0 ew"
+    label $pane3in1.l1 -text [_ "User defined variables"] -relief raised -bd 1 -grid "0 ew"
 
     set sw [ScrolledWindow $pane3in1.sw -borderwidth 0 -bd 1 -relief raised -grid "0 nswe"]
     set sf [ScrollableFrame $sw.f -constrainedwidth 1]
@@ -7363,7 +7372,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set pane3in2 [frame $pw1.pane3in2]
     $pw1 add $pane3in2 -sticky nsew -height $weight3in2
 
-    checkbutton $pane3in2.l1 -text "Local variables" -relief raised -bd 1 -grid "0 ew" \
+    checkbutton $pane3in2.l1 -text [_ "Local variables"] -relief raised -bd 1 -grid "0 ew" \
 	-variable RamDebugger::options(ViewLocalVariables) \
 	-command "RamDebugger::CheckEvalEntriesL do"
 
@@ -7694,7 +7703,7 @@ proc RamDebugger::OpenDefaultFile {} {
 
     if { [info exists options(currentfile)] && $options(currentfile) != ""  && \
 	     [file exists $options(currentfile)] } {
-	SetMessage "Opening file '$options(currentfile)'..."
+	SetMessage [_ "Opening file '%s'" $options(currentfile)]...
 	OpenFileF $options(currentfile)
 	FillListBox
 	
@@ -7747,7 +7756,11 @@ if { ![info exists SkipRamDebuggerInit] } {
 	} else {
 	    RamDebugger::OpenDefaultFile
 	}
-	bind all <Control-x><Control-l> "[list source [info script]] ; WarnWin reload"
+	proc ReloadScript {} {
+	    source [info script]
+	    WarnWin [_ "Reload"]
+	}
+	bind all <Control-x><Control-l> ReloadScript
 	
 	if { [info command master] != "" } {
 	    #RamDebugger::rdebug -master
