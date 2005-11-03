@@ -2,7 +2,9 @@
 set Version 5.4
 
 proc LoadRamDebugger { dir version } {
-
+    if { [info exists ::GIDDEFAULT] } {
+	GidUtils::WaitState .gid
+    }
     set argv ""
     if { [interp exists ramdebugger] } {
 	if { [ramdebugger eval info exists argv] } {
@@ -35,6 +37,9 @@ proc LoadRamDebugger { dir version } {
     ramdebugger eval [list source [file join $dir RamDebugger.tcl]]
     package provide RamDebugger $version
     update idletasks
+    if { [info exists ::GIDDEFAULT] } {
+	GidUtils::EndWaitState .gid
+    }
 }
 
 proc EndLoadRamDebugger {} {
