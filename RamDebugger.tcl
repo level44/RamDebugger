@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.59 2005/08/12 18:37:51 escolano Exp $        
+#         $Id: RamDebugger.tcl,v 1.60 2005/11/04 20:05:49 escolano Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -4144,7 +4144,7 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     }
     $menu add command -label [_ "Debug c++ (no ask)"] -command "RamDebugger::DebugCplusPlusWindow 1"
     $menu add separator
-    $menu add command -label Disconnect/Stop -command RamDebugger::DisconnectStop -acc "Shift+F5"
+    $menu add command -label [_ "Disconnect/Stop"] -command RamDebugger::DisconnectStop -acc "Shift+F5"
 
     if { $remoteserver == "" } {
 	$menu entryconfigure end -state disabled
@@ -4416,11 +4416,11 @@ proc RamDebugger::ActualizeViewMenu { menu } {
 	$menu del 8 end
     }
 
-    $menu add command -label "Previus" -acc "Alt-Left" -command \
+    $menu add command -label [_ "Previus"] -acc "Alt-Left" -command \
 	"RamDebugger::GotoPreviusNextInWinList prev"
-    $menu add command -label "Next" -acc "Alt-Right" -command \
+    $menu add command -label [_ "Next"] -acc "Alt-Right" -command \
 	"RamDebugger::GotoPreviusNextInWinList next"
-    $menu add command -label "Select..." -acc "Ctrl Tab" -command \
+    $menu add command -label [_ "Select"]... -acc "Ctrl Tab" -command \
 	[list RamDebugger::ChooseViewFile start]
 
     set needssep 1
@@ -5629,27 +5629,27 @@ proc RamDebugger::ListboxMenu { listb x y item } {
     set menu [menu $listb.menu]
 
     if { [lindex $data 0] == "folder" } {
-	$menu add command -label Explore -command [concat [list set \
+	$menu add command -label [_ "Explore"] -command [concat [list set \
 		                                               RamDebugger::options(defaultdir) \
 		                                               [lindex $data 1]] \; RamDebugger::FillListBox]
     } else {
 	set name [lindex $data 1]
-	$menu add command -label Open -command [list RamDebugger::OpenFileF $name]
-	$menu add command -label "Open & Debug" -command \
+	$menu add command -label [_ "Open"] -command [list RamDebugger::OpenFileF $name]
+	$menu add command -label [_ "Open & Debug"] -command \
 	    "[list RamDebugger::OpenFileF $name] ; RamDebugger::ContNextGUI rcont"
 	$menu add separator
-	$menu add command -label Reinstrument -command [list RamDebugger::OpenFileF \
+	$menu add command -label [_ "Reinstrument"] -command [list RamDebugger::OpenFileF \
 		                                            $name 2]
 
 	set filetype [GiveFileType $currentfile]
 	if { $filetype == "C/C++" } {
 	    $menu add separator
 	    set w [winfo toplevel $listb]
-	    $menu add command -label Compile -command [list cproject::Compile $w $name]
+	    $menu add command -label [_ "Compile"] -command [list cproject::Compile $w $name]
 	}
 	if { [regexp {Makefil.*[^~]$} $name] } {
 	    $menu add separator
-	    $menu add command -label Compile -command [list RamDebugger::Compile $name]
+	    $menu add command -label [_ "Compile"] -command [list RamDebugger::Compile $name]
 	}
     }
     tk_popup $menu $x $y
@@ -7293,8 +7293,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	catch { destroy $f.m }
 	menu $f.m
 	switch $page {
-	    output { $f.m add command -label Clear -command RamDebugger::TextOutClear }
-	    compile { $f.m add command -label Clear -command RamDebugger::TextCompClear }
+	    output { $f.m add command -label [_ "Clear"] -command RamDebugger::TextOutClear }
+	    compile { $f.m add command -label [_ "Clear"] -command RamDebugger::TextCompClear }
 	}
 	tk_popup $f.m $x $y
     }
