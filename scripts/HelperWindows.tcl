@@ -215,7 +215,8 @@ proc RamDebugger::GetSelOrWordInIndex { idx } {
 	    set var ""
 	    set idx0 $idx
 	    set char [$text get $idx0]
-	    while { [string is wordchar $char] || $char == "(" || $char == ")" } {
+	    while { [string is wordchar $char] } {
+		#  || $char == "(" || $char == ")"
 		set var $char$var
 		set idx0 [$text index $idx0-1c]
 		if { [$text compare $idx0 <= 1.0] } { break }
@@ -223,7 +224,8 @@ proc RamDebugger::GetSelOrWordInIndex { idx } {
 	    }
 	    set idx1 [$text index $idx+1c]
 	    set char [$text get $idx1]
-	    while { [string is wordchar $char] || $char == "(" || $char == ")" } {
+	    while { [string is wordchar $char] } {
+		#  || $char == "(" || $char == ")"
 		append var $char
 		set idx1 [$text index $idx1+1c]
 		if { [$text compare $idx1 >= end-1c] } { break }
@@ -725,7 +727,7 @@ proc RamDebugger::PreferencesWindow {} {
 
     checkbutton $f1.cb25 -text "Use browser to open files" -variable \
        DialogWin::user(openfile_browser) -grid "0 3 w"
-    DynamicHelp::register $f1.cb2 balloon "\
+    DynamicHelp::register $f1.cb25 balloon "\
 	If this option is set, files names are chosen with the default\n\
 	browser. If not, file names are chosen inline. This last option\n\
 	permmits to use remote protocols like ssh,..."
@@ -937,7 +939,7 @@ proc RamDebugger::PreferencesWindow {} {
     grid columnconfigure $fas 0 -weight 1
     grid rowconfigure $fas 0 -weight 1
 
-    set fd [$fb.nb insert end noninstrument -text "Non instrument"]
+    set fd [$fb.nb insert end noninstrument -text "Instrument"]
 
     TitleFrame $fd.f1 -text "non instrument procs" -grid "0 nsew"
     set fd1 [$fd.f1 getframe]
@@ -1017,9 +1019,10 @@ proc RamDebugger::PreferencesWindow {} {
 		}
 		if { $good } {
 		    foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging \
-		                   ConfirmModifyVariable openfile_browser instrument_source instrument_proc_last_line \
-		                   LocalDebuggingType AutoSaveRevisions AutoSaveRevisions_time \
-		                   AutoSaveRevisions_idletime CompileFastInstrumenter] {
+		            ConfirmModifyVariable openfile_browser instrument_source instrument_proc_last_line \
+		            LocalDebuggingType AutoSaveRevisions AutoSaveRevisions_time \
+		            AutoSaveRevisions_idletime CompileFastInstrumenter \
+		            nonInstrumentingProcs] {
 		        set options($i) $DialogWin::user($i)
 		    }
 		    foreach i [list foreground background commands defines procnames \
@@ -2744,6 +2747,14 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    }
 	    SetMessage "Search not found"
 	    bell
+	    if { [winfo exists $w.search] } {
+		set bg [$w.search cget -background]
+		if { $bg ne "red" } {
+		    $w.search configure -bg red
+		    after 1000 [list catch [list $w.search configure -bg $bg]]
+		}
+	    }
+
 	    if { $RamDebugger::SearchType == "-forwards" } {
 		set RamDebugger::SearchPos 1.0
 	    } else {
@@ -2966,7 +2977,7 @@ proc RamDebugger::DoinstrumentThisfile { file } {
 	-value autoprint
 
     if { $options(instrument_source) == "ask_yes" } {
-	$w set_uservar_value opt
+	$w set_uservar_value opt thisfile
     } else { $w set_uservar_value opt thisfileno }
 
     label $f.l4 -text "Check preferences to change these options" -grid "0 nw"

@@ -35,7 +35,12 @@ proc cproject::Init { w } {
     if { [info exists RamDebugger::options(recentprojects)] && \
 	    [llength $RamDebugger::options(recentprojects)] > 0 } {
 	set project [lindex $RamDebugger::options(recentprojects) 0]
-	catch { OpenProject $w 0 }
+	set err [catch { OpenProject $w 0 1 }]
+	if { $err } {
+	    set project ""
+	    set RamDebugger::options(recentprojects) [lreplace \
+		    $RamDebugger::options(recentprojects) 0 0]
+	}
     }
 }
 
@@ -356,7 +361,7 @@ proc cproject::NewData {} {
     }
 }
 
-proc cproject::OpenProject { w { ask 1 } } {
+proc cproject::OpenProject { w { ask 1 } { raise_error 0 } } {
     variable project
     variable groupbefore
     variable group
@@ -413,7 +418,11 @@ proc cproject::OpenProject { w { ask 1 } } {
     } errstring]
     
     if { $err } {
-	WarnWin "Error opening project '$file' ($errstring)" $w
+	set txt "Error opening project '$file' ($errstring)"
+	if { $raise_error } {
+	    error $txt
+	}
+	WarnWin $txt $w
 	return
     }
     if { [array exists data] } {

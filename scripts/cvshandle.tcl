@@ -335,6 +335,7 @@ proc RamDebugger::CVS::_showallfiles_update {} {
     set list ""
     set totalsize 0
     foreach i [textutil::splitx $retcvslog {=======+}] {
+	set file ""
 	if { [string trim $i] eq "" } { continue }
 	regexp -line {^RCS file:\s+(.*)} $i {} rcsfile
 	regexp -line {^description:\s+(.*)} $i {} file

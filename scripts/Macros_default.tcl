@@ -24,7 +24,7 @@
 ################################################################################
 
 set "macrodata(To upper,inmenu)" 1
-set "macrodata(To upper,accelerator)" "<Control-u>"
+set "macrodata(To upper,accelerator)" "<Control-u><Control-u>"
 set "macrodata(To upper,help)" "This commands converts to uppercase the editor selection"
 
 proc "To upper" { w } {
@@ -43,7 +43,7 @@ proc "To upper" { w } {
 ################################################################################
 
 set "macrodata(To lower,inmenu)" 1
-set "macrodata(To lower,accelerator)" ""
+set "macrodata(To lower,accelerator)" "<Control-u><Control-l>"
 set "macrodata(To lower,help)" "This commands converts to lowercase the editor selection"
 
 proc "To lower" { w } {
@@ -54,6 +54,25 @@ proc "To lower" { w } {
     set txt [eval $w get $range]
     eval $w delete $range
     $w insert [lindex $range 0] [string tolower $txt]
+    eval $w tag add sel $range
+}
+
+################################################################################
+#    proc totitle
+################################################################################
+
+set "macrodata(To title,inmenu)" 1
+set "macrodata(To title,accelerator)" "<Control-u><Control-t>"
+set "macrodata(To title,help)" "This commands converts to lowercase the editor selection (first letter uppercase)"
+
+proc "To title" { w } {
+
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range == "" } { bell; return }
+
+    set txt [eval $w get $range]
+    eval $w delete $range
+    $w insert [lindex $range 0] [string totitle $txt]
     eval $w tag add sel $range
 }
 
@@ -179,31 +198,45 @@ proc "Go to proc" { w } {
 
     set procs ""
     set numline 1
-    foreach line [split [$w get 1.0 end-1c] \n] {
+    set lines [split [$w get 1.0 end-1c] \n]
+    set len [llength $lines]
+    foreach line $lines {
 	set types {proc|method|constructor|onconfigure|snit::type|snit::widget|snit::widgetadaptor}
 
 	if { [regexp "^\\s*(?:::)?($types)\\s+(\[\\w:]+)" $line {} type name] } {
 	    set namespace ""
 	    regexp {(.*)::([^:]+)} $name {} namespace name
-	    lappend procs [list $name $namespace $type $numline]
+	    set comments ""
+	    set iline [expr {$numline-1}]
+	    while { $iline > 0 } {
+		set tline [lindex $lines [expr {$iline-1}]]
+		if { [regexp {^\s*#([-()\s\w.,;:]*)$} $tline {} c] } {
+		   append comments "$c " 
+		} elseif { ![regexp {^\s*$|^\s*#} $tline] } { break }
+		incr iline -1
+	    }
+	    lappend procs [list $name $namespace $comments $type $numline]
 	}
 	incr numline
     }
-    
+    set procs [lsort -dictionary -index 0 $procs]
+    set procs [lsort -dictionary -decreasing -index 2 $procs]
+
     set wg $w.g
     destroy $wg
     dialogwin_snit $wg -title "Go to proc"
     set f [$wg giveframe]
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     
-    tablelist::tablelist $sw.lb -width 60\
-	    -height 35 -exportselection 0 \
+    tablelist::tablelist $sw.lb -width 100 \
+	    -height 25 -exportselection 0 \
 	-columns [list \
-		20  "Proc name"        left \
-		14  "Proc namespace"   left \
-		10  "Proc type"        center \
-		5  "line"     right \
-		] \
+	    26  "Proc name"        left \
+	    6  "Proc namespace"   left \
+	    46  "Comments"   left \
+	    6  "Proc type"        center \
+	    5  "line"     right \
+	    ] \
 	    -labelcommand tablelist::sortByColumn \
 	    -background white \
 	    -selectbackground navy -selectforeground white \
@@ -214,7 +247,8 @@ proc "Go to proc" { w } {
     $sw.lb columnconfigure 0 -sortmode dictionary
     $sw.lb columnconfigure 1 -sortmode dictionary
     $sw.lb columnconfigure 2 -sortmode dictionary
-    $sw.lb columnconfigure 3 -sortmode integer
+    $sw.lb columnconfigure 3 -sortmode dictionary
+    $sw.lb columnconfigure 4 -sortmode integer
 
     foreach i $procs {
 	$sw.lb insert end $i
@@ -222,7 +256,7 @@ proc "Go to proc" { w } {
 	    $sw.lb rowconfigure end -background orange
 	}
     }
-    $sw.lb sortbycolumn 0
+
     $sw.lb selection set 0
     $sw.lb activate 0
 
@@ -275,10 +309,10 @@ proc "Go to proc" { w } {
 	    1 {
 		set curr [$sw.lb curselection]
 		if { [llength $curr] == 1 } {
-		    set line [lindex [$sw.lb get $curr] 3]
-	$w mark set insert $line.0
-	$w see $line.0
-	focus $w
+		    set line [lindex [$sw.lb get $curr] 4]
+		    $w mark set insert $line.0
+		    $w see $line.0
+		    focus $w
 		    destroy $wg
 		    return
 		} else {
@@ -289,6 +323,7 @@ proc "Go to proc" { w } {
 	set action [$wg waitforwindow]
     }
 }
+
 
 ################################################################################
 #    proc Mark translation strings
@@ -457,6 +492,54 @@ proc "Convert GiD help Strings" { w } {
 
     eval $w delete $range
     $w insert [lindex $range 0] "\[$trans_cmd $data\]"
+}
+
+################################################################################
+#    proc Background color region
+################################################################################
+
+set "macrodata(Background color region,inmenu)" 1
+set "macrodata(Background color region,accelerator)" "<Control-u><Control-b>"
+set "macrodata(Background color region,help)" "Apply color to the selected text region background (To unapply, use function without selection)"
+
+proc "Background color region" { w } {
+
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range == "" } {
+	if { [lsearch [$w tag names insert] background_color_*] == -1 } {
+	    WarnWin "Select a region to apply color or put the cursor in a region to unapply"
+	    return
+	}
+	dialogwin_snit $w._ask -title "Unapply background color" \
+	    -entrytext "Do you want to unapply background color to current region?" \
+	    -morebuttons [list "Unapply all"]
+	set action [$w._ask createwindow]
+	destroy $w._ask
+	if { $action <= 0 } {  return }
+	if { $action == 1 } {
+	    foreach tag [$w tag names insert] {
+		if { ![string match background_color_* $tag] } { continue }
+		foreach "idx1 idx2" [$w tag ranges $tag] {
+		    if { [$w compare insert >= $idx1] && \
+		        [$w compare insert < $idx2] } {
+		        $w tag remove $tag $idx1 $idx2
+		    }
+		}
+	    }
+	} elseif { $action == 2 } {
+	    foreach tag [$w tag names] {
+		if { ![string match background_color_* $tag] } { continue }
+		$w tag delete $tag
+	    }
+	}
+	return
+    }
+    set color [tk_chooseColor -initialcolor grey20]
+    if { $color eq "" } { return }
+
+    $w tag add background_color_$color [lindex $range 0] [lindex $range 1]
+    $w tag configure background_color_$color -background $color
+    $w tag lower background_color_$color sel
 }
 
 

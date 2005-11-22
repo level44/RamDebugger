@@ -108,6 +108,13 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		        set NewDoInstrument 1
 		    }
 		}
+		"db" {
+		    if { [lindex $words 1] == "eval" && [llength $words] >= 3 } {
+		        # this is not a very correct one. It assumes that db is a sqlite3 handle
+		        #can fail if db is an interp
+		        set NewDoInstrument 1
+		    }
+		}
 		"namespace" {
 		    if { [lindex $words 1] == "eval" && [llength $words] >= 3 } {
 		        set NewDoInstrument 1
@@ -1322,10 +1329,10 @@ proc RamDebugger::Instrumenter::state_is { state { idx end } } {
     return [string equal $state [lindex $statestack $idx]]
 }
 
-proc RamDebugger::Instrumenter::push_tag { tag } {
+proc RamDebugger::Instrumenter::push_tag { tag line } {
     upvar 1 tagsstack tagsstack
     upvar 1 indentlevel indentlevel
-    lappend tagsstack $tag
+    lappend tagsstack [list $tag $line]
     incr indentlevel
 }
 
@@ -1333,8 +1340,12 @@ proc RamDebugger::Instrumenter::pop_tag { tag } {
     upvar 1 tagsstack tagsstack
     upvar 1 indentlevel indentlevel
 
-    if { $tag ne "-" && $tag ne [lindex $tagsstack end] } {
-	uplevel 1 [list raise_error "closing tag '$tag' is not correct. tags stack='$tagsstack'"]
+    if { $tag ne "-" && $tag ne [lindex $tagsstack end 0] } {
+	set txt "closing tag '$tag' is not correct. tags stack=\n"
+	foreach i $tagsstack {
+	    append txt "\t[lindex $i 0]\tLine: [lindex $i 1]\n"
+	}
+	uplevel 1 [list raise_error $txt]
     }
     set tagsstack [lrange $tagsstack 0 end-1]
     incr indentlevel -1
@@ -1385,6 +1396,9 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 	    if { [range $i-2 $i] eq "-->" } {
 		pop_state
 		lappend_info red $state_start $icharline+1
+	    } elseif { $c eq "\n" } {
+		lappend_info red $state_start $icharline
+		set start_start 0
 	    }
 	} elseif { [state_is "doctype"]} {
 	    if { $c eq "\[" } {
@@ -1432,7 +1446,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		            if { $isend } {
 		                pop_tag [range $state_start_global $i-1]
 		            } else {
-		                push_tag [range $state_start_global $i-1]
+		                push_tag [range $state_start_global $i-1] $iline
 		            }
 		            lappend_info magenta $state_start $icharline
 		        } else {
@@ -1461,7 +1475,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		    } elseif { [state_is enter_tagtext] } {
 		        pop_state
 		        if { [state_is "tag"] } {
-		            push_tag [range $state_start_global $i-1]
+		            push_tag [range $state_start_global $i-1] $iline
 		            pop_tag [range $state_start_global $i-1]
 		        }
 		        lappend_info magenta $state_start $icharline
@@ -1522,7 +1536,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		                pop_tag [range $state_start_global $i-1]
 		                pop_state
 		            } else {
-		                push_tag [range $state_start_global $i-1]
+		                push_tag [range $state_start_global $i-1] $iline
 		            }
 		        }
 		        push_state entered_tagtext
@@ -1543,7 +1557,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		            if { $isend } {
 		                pop_tag [range $state_start_global $i-1]
 		            } else {
-		                push_tag [range $state_start_global $i-1]
+		                push_tag [range $state_start_global $i-1] $iline
 		            }
 		            lappend_info magenta $state_start $icharline
 		        } else {
@@ -1606,10 +1620,32 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
     lappend blockinfo $blockinfocurrent
 
     if { [llength $tagsstack] } {
-	raise_error "not closed tags: $tagsstack"
+	set txt "There are non-closed tags. tags stack=\n"
+	foreach i $tagsstack {
+	    append txt "\t[lindex $i 0]\tLine: [lindex $i 1]\n"
+	}
+	raise_error $txt
     }
 
     if { $length >= 1000  && $progress } {
 	RamDebugger::ProgressVar 100
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

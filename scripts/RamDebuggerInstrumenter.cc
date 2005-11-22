@@ -220,6 +220,13 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 		strcmp(Tcl_GetStringFromObj(wordi,NULL),"elseif")==0)
 	  NewDoInstrument=1;
       }
+      else if(wordslen>0 && strcmp(pword0,"db")==0){
+	if(wordslen>=3 && strcmp(pword1,"eval")==0){
+	  // this is not a very correct one. It assumes that db is a sqlite3 handle
+	  // can fail if db is an interp
+	  NewDoInstrument=1;
+	}
+      }
       else if(wordslen>0 && strcmp(pword0,"namespace")==0){
 	if(wordslen>=3 && strcmp(pword1,"eval")==0){
 	  NewDoInstrument=1;
