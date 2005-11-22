@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.60 2005/11/04 20:05:49 escolano Exp $        
+#         $Id: RamDebugger.tcl,v 1.61 2005/11/22 17:48:48 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -61,7 +61,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 5.4
+    set Version 5.5
 
     ################################################################################
     #    Non GUI commands
@@ -104,6 +104,7 @@ namespace eval RamDebugger {
     variable MainDir
     variable CacheDir
     variable AppDataDir
+    variable info_script
 
     ################################################################################
     # GUI state
@@ -123,6 +124,7 @@ namespace eval RamDebugger {
     variable status
     variable WindowFilesList ""
     variable WindowFilesListLineNums ""
+    variable oldPasteStack ""
 
     ################################################################################
     # Handlers to save files. Array with names: filename
@@ -154,7 +156,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     variable options
     variable readwriteprefs $_readwriteprefs
     variable iswince
+    variable info_script
 
+    set info_script [info script]
     if { [info exists ::freewrap::scriptFile] } {
 	set dir $::argv0
     } else {
@@ -339,7 +343,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     array set options [array get options_def]
 
-    if { $readwriteprefs } {
+    if { $readwriteprefs eq "yes" || $readwriteprefs eq "nowrite" } {
 	catch {
 	    if { $::tcl_platform(platform) == "windows" } {
 		set data [registry get {HKEY_CURRENT_USER\Software\RamDebugger} IniData]
@@ -545,9 +549,6 @@ proc RamDebugger::rdebug { args } {
 	}
 	interp create local
 	interp alias local sendmaster "" eval
-	if { $::tcl_platform(platform) == "windows" } {
-	    interp alias local console "" console
-	}
 	# dirty trick to avoid the slave interp block
 	interp eval local {
 	    proc updatemaster {} {
@@ -615,6 +616,9 @@ proc RamDebugger::rdebug { args } {
 	if { $LocalDebuggingType == "tk" } {
 	    interp eval local [list load {} Tk]
 	    #interp eval local package require Tk
+	    if { $::tcl_platform(platform) == "windows" } {
+		interp alias local console "" console
+	    }
 	    local eval [list bind . <Destroy> { if { "%W" == "." } { exit } }]
 	}
 	set remoteserverType local
@@ -732,7 +736,7 @@ proc RamDebugger::rdebug { args } {
 	proc RDC::F { filenum line } {
 	    variable code
 	    variable evalhandler
-	    # == 1 next ; == 2 step ; == 3 nextfull
+	    # == 1 next ; == 2 step ; == 3 nextfull ; == 4 nextreturn
 	    variable stopnext
 	    variable contto
 	    variable breaks
@@ -820,6 +824,10 @@ proc RamDebugger::rdebug { args } {
 	    while 1 {
 		if { $code == "" } { vwait ::RDC::code }
 		if { $code == "" } {
+		    if { $stopnext == 4 } {
+		        set stopnext 3
+		        return -code return
+		    }
 		    return
 		}
 		set err [catch { uplevel 1 $code } returnvalue]
@@ -832,7 +840,7 @@ proc RamDebugger::rdebug { args } {
 	    }
 	}
 	if { [info commands ::RDC::bgerror_base] == "" } {
-	    auto_import ::bgerror
+	    catch { auto_import ::bgerror }
 	    if { [info commands ::bgerror] != "" } {
 		rename ::bgerror ::RDC::bgerror_base
 	    }
@@ -1119,7 +1127,8 @@ proc RamDebugger::rnext { args } {
     set usagestring {usage: rnext ?switches?
 	-h:       displays usage
 	-full:    Tries to stop program execution in any line
-	--:     end of options
+	-return:  Makes the code return from proc without finishing execution
+	--:       end of options
     }
     ParseArgs $args $usagestring opts
 
@@ -1127,7 +1136,9 @@ proc RamDebugger::rnext { args } {
     StopAtGUI "" ""
 
     if { $remoteserverType != "gdb" } {
-	if { $opts(-full) } {
+	if { $opts(-return) } {
+	    EvalRemote [list set ::RDC::stopnext 4]
+	} elseif { $opts(-full) } {
 	    EvalRemote [list set ::RDC::stopnext 3]
 	} else {
 	    EvalRemote [list set ::RDC::stopnext 1]
@@ -1713,13 +1724,15 @@ proc RamDebugger::rlist { args } {
 	    FillListBox
 	} errstring]
 	
-	if { $err } {
-	    set err $::errorInfo
+	if { $err == 1 } {
+	    set errstring $::errorInfo
 	    if { [catch {
-		WarnWin $err
+		WarnWin $errstring
 	    }] } {
-		puts $err
+		puts $errstring
 	    }
+	} elseif { $err == 2 } {
+	    return
 	}
     }
 
@@ -2022,10 +2035,12 @@ proc RamDebugger::GiveFileType { filename } {
     }
     foreach i [array names options extensions,*] {
 	foreach ext $options($i) {
-	    if { $ext == "*" && ![regexp {^\*.*\*$} $filename] && [file extension $filename] != "" } {
-		continue
-	    }
-	    if { [string match $ext [file extension $filename]] } {
+	    if { $ext == "*" } {
+		if { ![regexp {^\*.*\*$} $filename] && [file extension $filename] != "" } {
+		    continue
+		}
+	    } elseif { [set pos [string last $ext $filename]] != -1 && \
+		$pos+[string length $ext] == [string length $filename] } {
 		regexp {,(.*)} $i {} type
 		return $type
 	    }
@@ -2315,6 +2330,7 @@ proc RamDebugger::EvalRemote { comm } {
     if { $err } {
 	WarnWin [_ "Debugged program is not available anymore. Disconnecting"]
 	DisconnectStop
+	return -code return
     }
 }
 
@@ -2953,12 +2969,6 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 
 #option add *Panedwindow.Stretch always
 
-if { [package vcompare [package present Tcl] 8.5] >= 0 } {
-     option add *Panedwindow.Stretch always
-} else {
-    bind Panedwindow <Configure> [list RamDebugger::ResizePanedWindow %W]
-}
-
 proc RamDebugger::ResizePanedWindow { w } {
     variable resize_panedwindow_id
     if { [info exists resize_panedwindow_id] } {
@@ -3097,6 +3107,7 @@ proc RamDebugger::ExitGUI {} {
     set options(TimeMeasureData) $TimeMeasureData
     set options(remoteserverType) $remoteserverType
     set options(remoteserver) $remoteserver
+
     set geomkey maingeometry_$options(ViewOnlyTextOrAll)
     if { [wm state [winfo toplevel $text]] == "zoomed" } {
 	set options($geomkey) zoomed
@@ -3106,7 +3117,7 @@ proc RamDebugger::ExitGUI {} {
 
     _secondtextsavepos
 
-    if { $readwriteprefs } {
+    if { $readwriteprefs eq "yes" } {
 	set err [catch {
 	    if { $::tcl_platform(platform) == "windows" } {
 		registry set {HKEY_CURRENT_USER\Software\RamDebugger} IniData [array get options]
@@ -3585,6 +3596,14 @@ proc RamDebugger::OpenFileSecondary { file } {
     return 0
 }
 
+proc RamDebugger::UpdateHandlerForFileSave { file handler } {
+    variable FileSaveHandlers
+
+    if { $handler ne "" } {
+	set FileSaveHandlers($file) $handler
+    } else { unset -nocomplain FileSaveHandlers($file) }
+}
+
 proc RamDebugger::OpenFileSaveHandler { file data handler } {
     variable marker
     variable text
@@ -3692,14 +3711,28 @@ proc RamDebugger::CloseFile {} {
     variable currentfile
     variable WindowFilesList
     variable WindowFilesListLineNums
+    variable options
 
+    # first, we take it out to avoid reopening it
     if { [set pos [lsearch -exact $WindowFilesList $currentfile]] != -1 } {
 	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
     }
+
+    set cf $currentfile
+
     if { [llength $WindowFilesList] > 0 } {
 	OpenFileF [lindex $WindowFilesList 0]
     } else { NewFile }
+
+    # second, we take it out to make it dissapear for ever from the list
+    if { [set pos [lsearch -exact $WindowFilesList $cf]] != -1 } {
+	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
+	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
+    }
+    if { [set pos [lsearch -exact $options(RecentFiles) $cf]] != -1 } {
+	set options(RecentFiles) [lreplace $options(RecentFiles) $pos $pos]
+    }
 }
 
 proc RamDebugger::NewFile {} {
@@ -4748,6 +4781,7 @@ proc RamDebugger::ContNextGUI { what } {
 	rcont { rcont }
 	rnext { rnext }
 	rnextfull { rnext -full }
+	rnextreturn { rnext -return }
 	rstep { rstep }
 	rcontto {
 	    set idx [$text index insert] 
@@ -4848,7 +4882,8 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		    incr i
 		}
 		set RamDebugger::EvalEntries($i,right) $val
-		if { $type == "Error" } {
+		if { ![info exists RamDebugger::EvalEntries($i,rightentry)] } { break }
+		if { $type == "error" } {
 		    $RamDebugger::EvalEntries($i,rightentry) conf -fg red
 		} else {
 		    $RamDebugger::EvalEntries($i,rightentry) conf -fg black
@@ -4902,7 +4937,8 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		set val [string range $val 0 96]...
 	    }
 	    set RamDebugger::EvalEntries($i,right) $val
-	    if { $type == "Error" } {
+	    if { ![info exists RamDebugger::EvalEntries($i,rightentry)] } { break }
+	    if { $type == "error" } {
 		$RamDebugger::EvalEntries($i,rightentry) conf -fg red
 	    } else {
 		$RamDebugger::EvalEntries($i,rightentry) conf -fg black
@@ -5415,7 +5451,7 @@ proc RamDebugger::ListBoxLabelMenu { w x y } {
 	    $menu add separator
 	} else {
 	    set label $dir
-	    if { $label > 50 } { set label ...[string range $label end-47 end] }
+	    if { [string length $label] > 50 } { set label ...[string range $label end-47 end] }
 	    $menu add command -label $label -command \
 		"[list set RamDebugger::options(defaultdir) $dir] ;\
 		    RamDebugger::FillListBox"
@@ -5570,6 +5606,7 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 
 proc RamDebugger::CutCopyPasteText { what } {
     variable text
+    variable oldPasteStack
 
     switch $what {
 	undo {
@@ -5600,10 +5637,42 @@ proc RamDebugger::CutCopyPasteText { what } {
 		        $text edit separator
 		        $text configure -autoseparators 1
 		    }
+		    if { [set ipos [lsearch -exact $oldPasteStack $sel]] != -1 } {
+		        set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
+		    }
+		    set oldPasteStack [linsert $oldPasteStack 0 $sel]
+		    set oldPasteStack [lrange $oldPasteStack 0 6]
 		}
 	    } else {
 		tk_textPaste $text
 	    }
+	}
+	paste_stack {
+	    if { ![llength $oldPasteStack] } {
+		WarnWin "There is no old paste stack"
+		return
+	    }
+	    set menu $text.menu
+	    catch { destroy $menu }
+	    
+	    menu $menu
+	    foreach sel $oldPasteStack {
+		set label $sel
+		if { [string length $label] > 50 } {
+		    set label [string range $label 0 47]...
+		}
+		$menu add command -label $label -command \
+		    "[list clipboard clear] ; [list clipboard append $sel] ; RamDebugger::CutCopyPasteText paste"
+	    }
+	    set bbox [$text bbox insert]
+	    if { $bbox eq "" } {
+		set x [winfo pointerx $text]
+		set y [winfo pointery $text]
+	    } else {
+		set x [expr {[winfo rootx $text]+[lindex $bbox 0]}]
+		set y [expr {[winfo rooty $text]+[lindex $bbox 1]}]
+	    }
+	    tk_popup $menu $x $y 0
 	}
     }
 }
@@ -5948,6 +6017,101 @@ proc RamDebugger::CheckText { command args } {
     }
 }
 
+proc RamDebugger::SearchBraces_xml { x y } {
+    variable text
+
+    set rex {<\s*?(/?)(\S+?)(?:\s[^>]*?[^>/])?(/?)\s*?>}
+    set sel [$text get insert-1c]
+    set state normal
+    while { $state eq "normal" && $sel eq ">" } {
+	set idx [$text search -backwards -regexp -count ::count0 $rex insert 1.0]
+	if { $idx eq "" } { break }
+	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_end tag is_start_end
+	set idx_ini $idx
+	set idx_end insert
+	set state found
+    }
+    set sel [$text get insert]
+    while { $state eq "normal" && $sel eq "<" } {
+	set idx [$text search -regexp -count ::count0 $rex insert end]
+	if { $idx eq "" } { break }
+	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_end tag is_start_end
+	set idx_ini insert
+	set idx_end "$idx+$::count0 chars"
+	set state found
+    }
+    if { $state ne "found" } {
+	if { $x >= 0 } {
+	    set ::tkPriv(selectMode) word ;# tcl8.3
+	    catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
+	    tkTextSelectTo $text $x $y
+	    catch { $text mark set insert sel.last}
+	    catch { $text mark set anchor sel.first}
+	}
+	return
+    }
+    if { $is_start_end ne "" } {
+	$text tag remove sel 0.0 end
+	$text tag add sel $idx "$idx+$::count0 chars"
+	$text mark set insert $idx
+	return
+    }
+
+    set counter 0
+    set state normal
+    while { $state eq "normal" && $is_end ne "" } {
+	set idx_new [$text search -backwards -regexp -count ::count $rex $idx 1.0]
+	if { $idx_new eq "" } { break }
+	regexp $rex [$text get $idx_new "$idx_new+$::count chars"] \
+	    {} is_end_new tag_new is_start_end_new
+	if { $is_start_end_new ne "" } {
+	    # nothing
+	} elseif { $is_end_new ne "" } {
+	    incr counter
+	} elseif { $counter == 0 && $tag_new eq $tag } {
+	    set state found
+	    set idx_ini $idx_new
+	    set idx_see $idx_new
+	} else {
+	    incr counter -1
+	}
+	set idx $idx_new
+    }
+    set idx "$idx+$::count0 chars"
+    while { $state eq "normal" && $is_end eq "" } {
+	set idx_new [$text search -regexp -count ::count $rex $idx end]
+	if { $idx_new eq "" } { break }
+	regexp $rex [$text get $idx_new "$idx_new+$::count chars"] \
+	    {} is_end_new tag_new is_start_end_new
+	if { $is_start_end_new ne "" } {
+	    # nothing
+	} elseif { $is_end_new eq "" } {
+	    incr counter
+	} elseif { $counter == 0 && $tag_new eq $tag } {
+	    set state found
+	    set idx_end "$idx_new+$::count chars"
+	    set idx_see "$idx_new+$::count chars"
+	} else {
+	    incr counter -1
+	}
+	set idx "$idx_new+$::count chars"
+    }
+    if { $state eq "normal" } {
+	if { $x >= 0 } {
+	    set ::tkPriv(selectMode) word ;# tcl8.3
+	    catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
+	    tkTextSelectTo $text $x $y
+	    catch { $text mark set insert sel.last}
+	    catch { $text mark set anchor sel.first}
+	}
+	return
+    }
+    $text tag remove sel 0.0 end
+    $text tag add sel $idx_ini $idx_end
+    $text mark set insert $idx_see
+    $text see $idx_see
+}
+
 proc RamDebugger::SearchBraces { x y } {
     variable text
     variable currentfile
@@ -5957,6 +6121,10 @@ proc RamDebugger::SearchBraces { x y } {
 	     [$text compare [$text index insert] <= [$text index "insert linestart +1c"]] && \
 	     [GiveFileType $currentfile] == "GiD BAS file" } {
 	SelectBasLoop
+	return
+    }
+    if { [GiveFileType $currentfile] eq "XML" } {
+	SearchBraces_xml $x $y
 	return
     }
 
@@ -6099,10 +6267,14 @@ proc RamDebugger::CommentSelection { what } {
     variable currentfile
 
     set filetype [GiveFileType $currentfile]
+    set end_commentchar ""
     if { $filetype == "C/C++" } {
 	set commentchar "//"
     } elseif { $filetype == "GiD BAS file" } {
 	set commentchar "*#"
+    } elseif { $filetype == "XML" } {
+	set commentchar "<!--"
+	set end_commentchar "-->"
     } else {
 	set commentchar "#"
     }
@@ -6121,6 +6293,11 @@ proc RamDebugger::CommentSelection { what } {
 	    for { set i $line1 } { $i <= $line2 } { incr i } {
 		$text insert $i.0 "$commentchar "
 	    }
+	    if { $end_commentchar ne "" } {
+		for { set i $line1 } { $i <= $line2 } { incr i } {
+		    $text insert "$i.0 lineend" " $end_commentchar"
+		}
+	    }
 	}
 	off {
 	    for { set i $line1 } { $i <= $line2 } { incr i } {
@@ -6128,6 +6305,14 @@ proc RamDebugger::CommentSelection { what } {
 		regsub "^\\s*$commentchar\\s?" $line {} line
 		$text delete $i.0 "$i.0 lineend"
 		$text insert $i.0 $line
+	    }
+	    if { $end_commentchar ne "" } {
+		for { set i $line1 } { $i <= $line2 } { incr i } {
+		    set line [$text get $i.0 "$i.0 lineend"]
+		    regsub "\\s*$end_commentchar\\s*$" $line {} line
+		    $text delete $i.0 "$i.0 lineend"
+		    $text insert $i.0 $line
+		}
 	    }
 	}
     }
@@ -6485,6 +6670,16 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 	    set descmenu_new [linsert $descmenu 30 "&GiD" all filetypemenu 0 $menu]
 	    set changes 1
 	}
+	XML {
+	    set menu [list \
+		          [list command "&Indent" {} "Indent all the file" \
+		               "" -command "RamDebugger::XMLIndent"] \
+		          [list command "Indent &none" {} \
+		               "Take all the indentation out of the file" \
+		               "" -command "RamDebugger::XMLIndent none"]]
+	    set descmenu_new [linsert $descmenu 30 "&XML" all filetypemenu 0 $menu]
+	    set changes 1
+	}
 	default { set descmenu_new $descmenu }
     }
     if { [$mainframe getmenu filetypemenu] != "" } { set changes 1 }
@@ -6507,6 +6702,28 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 	$menu conf -postcommand "$menu conf -selectcolor black"
 	
     }
+}
+
+    proc RamDebugger::XMLIndent { { none "" } } {
+	variable text
+	
+	set err [catch { package require tdom }]
+	if { $err } {
+	    tk_messageBox -message "It is necessary to install package 'tdom'"
+	    return
+	}
+	set err [catch { dom parse [$text get 1.0 end-1c] doc }]
+	if { $err } {
+	    tk_messageBox -message "XML in file is not correct"
+	    return
+	}
+	$text delete 1.0 end
+	if { $none eq "" } {
+	    $text insert end [$doc asXML]
+	} else {
+	    $text insert end [$doc asXML -indent none]
+	}
+	ReinstrumentCurrentFile
 }
 
 if { [llength [info command lrepeat]] == 0 } {
@@ -6789,6 +7006,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     catch { package require tkdnd } ;# only if it is compiled
     #catch { package require mytile }
 
+    if { [package vcompare [package present Tcl] 8.5] >= 0 } {
+	option add *Panedwindow.Stretch always
+    } else {
+	bind Panedwindow <Configure> [list RamDebugger::ResizePanedWindow %W]
+    }
+
     CreateImages
     TkBackCompatibility
     CreateModifyFonts
@@ -6814,6 +7037,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::NewFile"] \
 		[list command &[_ "Open"] {} [_ "Select source file"] "Ctrl o" \
 		-command "RamDebugger::OpenFile"] \
+		[list command [_ "Open (New win)"] {} [_ "Open new window and select source file"] "ShiftCtrl o" \
+		-command "RamDebugger::OpenFileInNewWindow"] \
 		[list command &[_ "Save"] {} [_ "Save file"] "Ctrl s" \
 		-command "RamDebugger::SaveFile save"] \
 		[list command [_ "Save &as"] {} [_ "Save file as"] "" \
@@ -6848,6 +7073,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::CutCopyPasteText copy"] \
 		[list command &[_ "Paste"] {} [_ "Past text from clipboard"] "Ctrl v" \
 		-command "RamDebugger::CutCopyPasteText paste"] \
+		[list command "&Paste stack" {} "Past text from previus pastes" "ShiftCtrl v" \
+		-command "RamDebugger::CutCopyPasteText paste_stack"] \
 		separator \
 		[list cascad &[_ "Advanced"] {} editadvanced 0 [list \
 		    [list command &[_ "Indent region"] {} [_ "Indent selected region or line"] "Print Tab" \
@@ -6898,6 +7125,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command &[_ "View text/all"] {} \
 		[_ "Toggle between viewing all windows or only text window"] "Ctrl t" \
 		-command "RamDebugger::ViewOnlyTextOrAll"] \
+		separator \
 		[list checkbutton &[_ "View files pane"] {} \
 		[_ "Toggle between viewing the file list pane"] "" \
 		-command "RamDebugger::CheckListFilesPane" \
@@ -6931,6 +7159,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ContNextGUI rstep"] \
 		[list command [_ "Break"] debugentry [_ "Break execution as fast as possible"] "" \
 		-command "RamDebugger::ContNextGUI rnextfull"] \
+		[list command [_ "Return"] debugentry [_ "Makes the code return from proc without finishing execution"] "" \
+		-command "RamDebugger::ContNextGUI rnextreturn"] \
 		[list command [_ "Stop debugging"] debugentry [_ "Stop current debugging"] "Shift F5" \
 		     -command RamDebugger::DisconnectStop] \
 		separator \
@@ -7153,6 +7383,15 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
 	    -helptext [_ "stop debugging"] \
 	    -command "RamDebugger::DisconnectStop"
+
+	Separator $toolbar.sep3 -orient vertical -grid "5 ns px3"
+	set bbox [ButtonBox $toolbar.bbox4 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "6 w"]
+	
+	$bbox add -image colorize-22 \
+	    -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
+	    -helptext "Reinstrument and recolorize code" \
+	    -command "RamDebugger::ReinstrumentCurrentFile"
+
     }
     supergrid::go $toolbar
 
@@ -7697,6 +7936,56 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
 }
 
+proc RamDebugger::OpenFileInNewWindow {} {
+    variable info_script
+    variable text
+    variable options
+
+    set w [winfo toplevel $text]
+    set geomkey maingeometry_newwin_$options(ViewOnlyTextOrAll)
+    if { [info exists options($geomkey)] } {
+	set geometry $options($geomkey)
+    } else {
+	append geometry [expr {[winfo width $w]-40}]x \
+	    [expr {[winfo height $w]-40}]+ \
+	    [expr {[winfo rootx $w]+40}]+ \
+	    [expr {[winfo rooty $w]+40}]
+    }
+    set idx 2
+    while { [interp exists ramdebugger$idx] } { incr idx }
+    set ip ramdebugger$idx
+    interp create $ip
+    catch { $ip eval package require tkdnd } ;# only if it is compiled
+    $ip eval [list set auto_path $::auto_path]
+    $ip eval [list set argv0 $::argv0]
+    $ip eval [list set argc 0]
+    $ip eval [list set argv [list -rgeometry $geometry -noprefswrite \
+		-noopendefault]]
+    interp alias $ip exit "" RamDebugger::OpenFileInNewWindow_exit $ip
+    # trying both ways of loading Tk because they depend on system configuration
+    set err [catch { $ip eval [list load {} Tk] }]
+    if { $err } {
+	$ip eval [list package require Tk]
+    }
+    $ip eval [list source $info_script]
+    $ip eval [list array set RamDebugger::options [array get options]]
+    $ip eval [list after 1 [list RamDebugger::OpenFile]]
+}
+
+proc RamDebugger::OpenFileInNewWindow_exit { ip } {
+    variable options
+
+    set geomkey maingeometry_newwin_[$ip eval [list set options(ViewOnlyTextOrAll)]]
+    set options($geomkey) [$ip eval {
+	    if { [wm state [winfo toplevel $text]] == "zoomed" } {
+		set ret zoomed
+	    } else {
+		set ret [wm geometry [winfo toplevel $text]]
+	    }
+	}] 
+    interp delete $ip
+}
+
 proc RamDebugger::OpenDefaultFile {} {
     variable options
     variable text
@@ -7720,16 +8009,24 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set registerasremote 0
     } else { set registerasremote 1 }
     
+    set readwriteprefs yes
     if { [set ipos [lsearch $argv "-noprefs"]] != -1 } {
-	set readwriteprefs 0
+	set readwriteprefs noreadwrite
 	set argv [lreplace $argv $ipos $ipos]
-    } else { set readwriteprefs 1 }
-    
+    }
+    if { [set ipos [lsearch $argv "-noprefswrite"]] != -1 } {
+	set readwriteprefs nowrite
+	set argv [lreplace $argv $ipos $ipos]
+    }
     if { [set ipos [lsearch $argv "-onlytext"]] != -1 } {
 	set ViewOnlyTextOrAll OnlyText
 	set argv [lreplace $argv $ipos $ipos]
     } else { set ViewOnlyTextOrAll "" }
-    
+    if { [set ipos [lsearch $argv "-noopendefault"]] != -1 } {
+	set opendefault 0
+	set argv [lreplace $argv $ipos $ipos]
+    } else { set opendefault 1 }
+
     if { [set ipos [lsearch $argv "-rgeom*"]] != -1 } {
 	set iposm1 [expr {$ipos+1}]
 	set geometry [lindex $argv $iposm1]
@@ -7753,7 +8050,7 @@ if { ![info exists SkipRamDebuggerInit] } {
 	RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
 	if { [llength $argv] } {
 	    RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
-	} else {
+	} elseif { $opendefault } {
 	    RamDebugger::OpenDefaultFile
 	}
 	proc ReloadScript {} {

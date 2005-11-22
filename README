@@ -46,6 +46,14 @@ for details.
 Changes
 =======
 
+Changes From version 5.4 to version 5.5
+
+ * Added new option Open in new Window 
+ * Added a new Return option to the debugger for returning from a proc without finishing it 
+ * Edit->Paste stack 
+ * New macro for changing background color to regions of file 
+ * Possibility of non-instrumenting some procs, defined by name 
+
 Changes From version 5.3 to version 5.4
  
  * Colorize XML files 
@@ -156,9 +164,7 @@ Download
 
 RamDebugger can be download from
 
-   * `http://gid.cimne.com/RamDebugger/RamDebugger5.4.zip'
-   * `http://gid.cimne.com/RamDebugger/RamDebugger5.4.kit'
-
+* ftp://ftp.compassis.com/pub/ramdebugger
 
 
 Installation and prerequisites
@@ -198,13 +204,13 @@ Installation and prerequisites::.
 To start RamDebugger in text mode inside Tkcon, one of the following
 possibilities can be done:
    * Open Tkcon and do:
-          source RamDebugger.tcl
-          namespace import RamDebugger::*
-          rhelp
+	  source RamDebugger.tcl
+	  namespace import RamDebugger::*
+	  rhelp
    * Modify the Tkcon initialization file (tkcon.cfg or .tkconrc) and add:
 
-             set ::tkcon::OPT(slaveeval) {
-                 source "<Path to RamDebugger>/RamDebugger.tcl"
-                 namespace import RamDebugger::*
-                 puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
-             }
+	     set ::tkcon::OPT(slaveeval) {
+		 source "<Path to RamDebugger>/RamDebugger.tcl"
+		 namespace import RamDebugger::*
+		 puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
+	     }
