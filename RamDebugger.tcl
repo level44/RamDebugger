@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.61 2005/11/22 17:48:48 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.62 2005/12/07 01:21:43 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -582,6 +582,7 @@ proc RamDebugger::rdebug { args } {
 	if { [info exists options(LocalDebuggingType)] } {
 	    set LocalDebuggingType $options(LocalDebuggingType)
 	}
+	set changed_dir 0
 	if { [info exists options(currentfileargs5)] } {
 	    foreach "curr curr_as dir_in arg_in tcl_or_tk" $options(currentfileargs5) {
 		if { $curr == $currentfile } {
@@ -590,18 +591,19 @@ proc RamDebugger::rdebug { args } {
 		    }
 		    if { [file isdirectory $dir_in] } {
 		        local eval [list cd $dir_in]
-		        set txt [_ "Executing '%s'\nin directory: %s" $filetodebug $dir_in]
-		    } else { set txt [_ "Executing '%s'" $filetodebug] }
+		        set changed_dir 1
+		        set txt [_ "Executing '%s'\nin directory: %s\n" $filetodebug $dir_in]
+		    } else { set txt [_ "Executing '%s'\n" $filetodebug] }
 		    TextOutInsertBlue $txt
 		    SetMessage [_ "Executing '%s'" $filetodebug]
 		    local eval [list set argc [llength $arg_in]]
 		    local eval [list set argv $arg_in]
-		    TextOutInsertBlue [_ "Using arguments: '%s'" $arg_in]
+		    TextOutInsertBlue [_ "Using arguments: '%s'\n" $arg_in]
 		    if { $tcl_or_tk != "auto" } {
 		        set LocalDebuggingType $tcl_or_tk
 		        TextOutInsertBlue [_ "Considering file as type: %s" $tcl_or_tk]
 		    }
-		    TextOutInsertBlue [_ "Defined in: File->Debug on->Current file arguments"]
+		    TextOutInsertBlue [_ "Defined in: File->Debug on->Current file arguments\n"]
 		    break
 		}
 	    }
@@ -625,7 +627,7 @@ proc RamDebugger::rdebug { args } {
 	if { $filetodebug == "" } {
 	    error [_ "Error. there is no current file"]
 	}
-	local eval [cd [file dirname $filetodebug]]
+	if { !$changed_dir } { local eval [cd [file dirname $filetodebug]] }
 
 	set remoteserver $filetodebug
 	TakeArrowOutFromText
@@ -2323,12 +2325,13 @@ proc RamDebugger::EvalRemote { comm } {
 	puts $fid $comm
 	flush $fid
     } elseif { $::tcl_platform(platform) eq "windows" } {
-	set err [catch { comm::comm send $remoteserverNum $comm }]
+	set err [catch { comm::comm send $remoteserverNum $comm } errstring]
     } else {
-	set err [catch { send $remoteserver $comm }]
+	set err [catch { send $remoteserver $comm } errstring]
     }
     if { $err } {
-	WarnWin [_ "Debugged program is not available anymore. Disconnecting"]
+	WarnWin [_ "Debugged program is not available anymore. Disconnecting (%s)" \
+		$errstring]
 	DisconnectStop
 	return -code return
     }
@@ -3691,6 +3694,10 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
 	}
     }
     ManagePositionsImages
+
+    set filetype [GiveFileType $currentfile]
+    RamDebugger::AddFileTypeMenu $filetype
+
     WaitState 0
     return 0
 }
@@ -6709,12 +6716,12 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 	
 	set err [catch { package require tdom }]
 	if { $err } {
-	    tk_messageBox -message "It is necessary to install package 'tdom'"
+	    tk_messageBox -message [_ "It is necessary to install package 'tdom'"]
 	    return
 	}
-	set err [catch { dom parse [$text get 1.0 end-1c] doc }]
+	set err [catch { dom parse [$text get 1.0 end-1c] doc } errstring]
 	if { $err } {
-	    tk_messageBox -message "XML in file is not correct"
+	    tk_messageBox -message [_ "XML in file is not correct (%s)" $errstring]
 	    return
 	}
 	$text delete 1.0 end
@@ -7746,6 +7753,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	bind $text $i "[bind $w $i] ;break"
     }
     bind $marker <1> {
+	catch { destroy [winfo toplevel %W].search }
 	tk::TextButton1 $RamDebugger::text 0 %y
 	 set tk::Priv(selectMode) line
 	 tk::TextSelectTo $RamDebugger::text 0 %y
