@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.62 2005/12/07 01:21:43 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.63 2005/12/20 10:38:26 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -706,6 +706,8 @@ proc RamDebugger::rdebug { args } {
     set remotecomm {
 	namespace eval RDC {
 	    variable breaks
+	    variable traces ""
+	    variable traced_variables
 	    variable evalhandler ""
 	    variable code ""
 	    variable stopnext 0
@@ -742,6 +744,8 @@ proc RamDebugger::rdebug { args } {
 	    variable stopnext
 	    variable contto
 	    variable breaks
+	    variable traces
+	    variable traced_variables
 	    variable outputline
 	    variable lastprocstack
 	    variable linecounter
@@ -795,6 +799,49 @@ proc RamDebugger::rdebug { args } {
 		} else {
 		    set err [catch [list uplevel 1 [list expr $cond]] condinfo]
 		    if { $err || $condinfo != 0 } { set stop 1 }
+		}
+	    }
+	    foreach trace $traces {
+		set cond [lindex $trace 1]
+		if { [regexp {^\s*variable\s+(.*)} $cond {} varname] } {
+		    set breaknum [lindex $trace 0]
+		    set exists [uplevel 1 [list info exists $varname]]
+		    set existed [info exists traced_variables($varname)]
+		    if { $exists } {
+		        set v [uplevel 1 [list set $varname]]
+		        if { !$existed } {
+		            set traced_variables($varname) $v
+		            set condinfo "variable '$varname' has been created"
+		            set stop 1
+		            break
+		        } else {
+		            set old_v $traced_variables($varname)
+		            set traced_variables($varname) $v
+		            if { $v != $old_v } {
+		                set condinfo "variable '$varname' has changed value to '$v'"
+		                set stop 1
+		                break
+		            }
+		        }
+		    } elseif { $existed } {
+		        unset traced_variables($varname)
+		        set condinfo "variable '$varname' has been deleted"
+		        set stop 1
+		        break
+		    }
+		} elseif { $cond ne "" } {
+		    set err [catch [list uplevel 1 [list expr $cond]] condinfo]
+		    if { $err || $condinfo != 0 } {
+		        if { !$err } {
+		            set condinfo "$cond = $condinfo"
+		        }
+		        set breaknum [lindex $trace 0]
+		        set stop 1
+		        break
+		    }
+		} else {
+		    set stop 1
+		    break
 		}
 	    }
 	    incr linecounter
@@ -902,6 +949,7 @@ proc RamDebugger::rdebug { args } {
 		    }
 		}
 	    }
+	    array unset traced_variables
 	}
     }
     if { $remoteserverType == "local" } {
@@ -1835,6 +1883,46 @@ proc RamDebugger::renabledisable { args } {
     }
 }
 
+proc RamDebugger::rbreaktotrace { args } {
+    variable breakpoints
+    variable debuggerstate
+
+    if { $debuggerstate == "time" } {
+	error [_ "Command rbreaktotrace cannot be used in 'time' mode. Check rtime"]
+    }
+
+    set usagestring {usage: rbreaktotrace ?switches? breakpointnum
+	-h:       displays usage
+	-quiet: do not print anything
+	--:     end of options
+    }
+    ParseArgs $args $usagestring opts
+
+    set found 0
+    set ipos 0
+    foreach i $breakpoints {
+	if { [lindex $i 0] == $opts(breakpointnum) } {
+	    set found 1
+	    break
+	}
+	incr ipos
+    }
+    if { !$found } {
+	error [_ "Breakpoint %s does not exist\n%s" $opts(breakpointnum) $usagestring]
+    }
+    set br [lindex $breakpoints $ipos]
+    lset br 2 ""
+    lset br 3 ""
+    set breakpoints [lreplace $breakpoints $ipos $ipos $br]
+
+    UpdateRemoteBreaks
+
+    if { !$opts(-quiet) } {
+	return [_ "breakpoint %s converted to trace" $opts(breakpointnum)]
+    }
+}
+
+
 proc RamDebugger::rbreak { args } {
     variable remoteserver
     variable currentfile
@@ -2414,16 +2502,22 @@ proc RamDebugger::UpdateRemoteBreaks {} {
 		EvalRemote "break $file:$line"
 	    }
 	    # CONDITION is forgotten by now
+	    # TRACES are forgotten by now
 	}
 	EvalRemote "printf \"FINISHED SET BREAKPOINTS\\n\""
     } else {
 	EvalRemote { if { [info exists RDC::breaks] } { unset RDC::breaks } }
+	EvalRemote { set RDC::traces "" }
 	foreach i $breakpoints {
 	    if { ![lindex $i 1] } { continue }
 	    set line [lindex $i 3]
-	    set filenum [lsearch $fileslist [lindex $i 2]]
-	    if { $filenum == -1 } { continue }
-	    EvalRemote [list set RDC::breaks($filenum,$line) [list [lindex $i 0] [lindex $i 4]]]
+	    if { $line eq "" } {
+		EvalRemote [list lappend RDC::traces [list [lindex $i 0] [lindex $i 4]]]
+	    } else {
+		set filenum [lsearch $fileslist [lindex $i 2]]
+		if { $filenum == -1 } { continue }
+		EvalRemote [list set RDC::breaks($filenum,$line) [list [lindex $i 0] [lindex $i 4]]]
+	    }
 	}
     }
 }
@@ -4803,6 +4897,49 @@ proc RamDebugger::ContNextGUI { what } {
 		WarnWin $errorstring
 	    }
 	}
+	rcontoutloop {
+	    set idx [$text index insert] 
+	    
+	    if { $idx == "" } {
+		WarnWin [_ "Before using 'Continue out loop', pick in the text"]
+		return
+	    }
+	    set i [$text index "insert linestart"]
+	    set braces_count 0
+	    set found 0
+	    while { [$text compare $i < end] } {
+		set i [$text search -regexp {[{}]} $i]
+		if { $i eq "" } { break }
+		if { [$text get $i] eq "\{" } {
+		    incr braces_count
+		} elseif { [$text get $i] eq "\}" } {
+		    incr braces_count -1
+		    if { $braces_count < 0 } {
+		        set idx [expr {$i+1}]
+		        set found 1
+		        break
+		    }
+		}
+		set i [$text index "$i+1c"]
+	    }
+	    if { !$found } { bell ; return }
+	    set found 0
+	    set idx [$text index "$idx linestart"]
+	    while { [$text compare $idx < end] } {
+		if { [$text search -regexp {(^\s*$|^\s*#)} $idx \
+		    "$idx lineend"] eq "" } {
+		    set found 1
+		    break
+		}
+		set idx [$text index "$idx + 1l"]
+	    }
+	    if { !$found } { bell ; return }
+	    $text see $idx
+	    set line [scan $idx "%d"]
+	    if { [catch [list rcont $line] errorstring] } {
+		WarnWin $errorstring
+	    }
+	}
 	rbreak { rbreak }
     }
 }
@@ -7173,6 +7310,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		separator \
 		[list command [_ "Continue &to"] debugentry [_ "continue to selected line"] "Ctrl F5" \
 		-command "RamDebugger::ContNextGUI rcontto"] \
+		[list command [_ "Continue out loop"] debugentry [_ "continue to just after current loop"] "Ctrl F10" \
+		-command "RamDebugger::ContNextGUI rcontoutloop"] \
 		separator \
 		[list command &[_ "Expressions"]... debugentry \
 		    [_ "Open a window to visualize expresions or variables"] "" \

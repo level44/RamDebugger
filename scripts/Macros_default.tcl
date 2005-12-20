@@ -210,6 +210,7 @@ proc "Go to proc" { w } {
 	    set iline [expr {$numline-1}]
 	    while { $iline > 0 } {
 		set tline [lindex $lines [expr {$iline-1}]]
+		if { [regexp {^\s*#\s*\}} $tline] } { break }
 		if { [regexp {^\s*#([-()\s\w.,;:]*)$} $tline {} c] } {
 		   append comments "$c " 
 		} elseif { ![regexp {^\s*$|^\s*#} $tline] } { break }

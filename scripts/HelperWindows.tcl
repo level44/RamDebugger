@@ -372,16 +372,17 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     
     CopyNamespace ::DialogWin ::DialogWinBreak
 
-    set f [DialogWinBreak::Init $text "Breakpoints window" separator [list Delete \
-	    "Delete all" View En/Dis] "Apply Cond" Close]
+    set f [DialogWinBreak::Init $text [_ "Breakpoints window"] separator [list \
+		[_ Delete] [_ "Delete all"] [_ View] [_ En/Dis] [_ Trace]] [_ "Apply Cond"] \
+	    [_ Close]]
     set w [winfo toplevel $f]
 
-    set help {Examples of conditions:
+    set help [_ {Examples of conditions:
 	$i > $j+1
 	[string match *.tcl $file]
-    }
+    }]
 
-    Label $f.l1 -text "Condition:" -helptext $help -grid 0
+    Label $f.l1 -text [_ "Condition:"] -helptext $help -grid 0
     entry $f.e1 -textvariable DialogWinBreak::user(cond) -width 80 -grid "1 px3 py3"
 
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
@@ -389,12 +390,12 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     set DialogWinBreak::user(list) [tablelist::tablelist $sw.lb -width 55\
 		  -exportselection 0 \
 		  -columns [list \
-		                4  Num        left \
-		                6  En/dis     center \
-		                20 File        right \
-		                5  Line left \
-		                20 Condition left \
-		                40 Path left
+		                4  [_ Num]        left \
+		                6  [_ En/dis]     center \
+		                20 [_ File]        right \
+		                5  [_ Line] left \
+		                20 [_ Condition] left \
+		                40 [_ Path] left
 		               ] \
 		  -labelcommand tablelist::sortByColumn \
 		  -background white \
@@ -417,19 +418,24 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     bind [$DialogWinBreak::user(list) bodypath] <ButtonRelease-3> {
 	catch { destroy %W.menu }
 	set menu [menu %W.menu]
-	$menu add command -label "Apply condition" -command "DialogWinBreak::InvokeOK"
-	$menu add command -label "View" -command "DialogWinBreak::InvokeButton 4"
-	$menu add command -label "Enable/disable" -command "DialogWinBreak::InvokeButton 5"
+	$menu add command -label [_ "Apply condition"] -command "DialogWinBreak::InvokeOK"
+	$menu add command -label [_ "View"] -command "DialogWinBreak::InvokeButton 4"
+	$menu add command -label [_ "Enable/disable"] -command "DialogWinBreak::InvokeButton 5"
+	$menu add command -label [_ "Trace"] -command "DialogWinBreak::InvokeButton 6"
 	$menu add separator
-	$menu add command -label "Delete" -command "DialogWinBreak::InvokeButton 2"
+	$menu add command -label [_ "Delete"] -command "DialogWinBreak::InvokeButton 2"
 	tk_popup $menu %X %Y
     }
 
     set nowline [scan [$text index insert] %d]
     foreach i $breakpoints {
 	foreach "num endis file line cond" $i break
-	$DialogWinBreak::user(list) insert end [list $num $endis [file tail $file] $line $cond \
-		[file dirname $file]]
+	if { $file ne "" } {
+	    set tail [file tail $file]
+	    set dir [file dirname $file]
+	} else { foreach "tail dir" [list "" ""] break }
+	$DialogWinBreak::user(list) insert end [list $num $endis $tail $line $cond \
+		$dir]
 	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
 	    $DialogWinBreak::user(list) selection set end
 	    $DialogWinBreak::user(list) see end
@@ -447,7 +453,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	    1 {
 		set curr [$DialogWinBreak::user(list) curselection]
 		if { [llength $curr] != 1 } {
-		    WarnWin "Select just one breakpoint before applying condition" $w
+		    WarnWin [_ "Select just one breakpoint before applying condition"] $w
 		} else {
 		    set val [$DialogWinBreak::user(list) get $curr]
 		    rcond [lindex $val 0] $DialogWinBreak::user(cond)
@@ -482,8 +488,8 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	    }
 	    3 {
 		set ret [DialogWinBreak::messageBox -default ok -icon warning -message \
-		             "Are you sure to delete all breakpoints?" -parent $f \
-		             -title "delete all breakpoints" -type okcancel]
+		             [_ "Are you sure to delete all breakpoints?"] -parent $f \
+		             -title [_ "delete all breakpoints"] -type okcancel]
 		if { $ret == "ok" } {
 		    $DialogWinBreak::user(list) delete 0 end
 		    foreach i $breakpoints {
@@ -500,7 +506,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	    4 {
 		set curr [$DialogWinBreak::user(list) curselection]
 		if { [llength $curr] != 1 } {
-		    WarnWin "Select just one breakpoint in order to see the file" $w
+		    WarnWin [_ "Select just one breakpoint in order to see the file"] $w
 		    return
 		}
 		set val [$DialogWinBreak::user(list) get $curr]
@@ -528,6 +534,27 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		        UpdateArrowAndBreak $line "" "" 0
 		        $text mark set insert $line.0
 		        $text see $line.0
+		    }
+		}
+	    }
+	    6 {
+		set txt [_ "A trace is a breakpoint that is applied to every line. "]
+		append txt [_ "It should be used with a condition. "]
+		append txt [_ "to trace changes in a variable, write as cond '%s' " "variable varname"]
+		append txt [_ "Proceed?"]
+		set ret [snit_messageBox -type okcancel -message $txt -parent $w]
+		if { $ret eq "ok" } {
+		    foreach i [$DialogWinBreak::user(list) curselection] {
+		        set val [$DialogWinBreak::user(list) get $i]
+		        set file [file join [lindex $val 5 ] [lindex $val 2]]
+		        set line [lindex $val 3]
+		        rbreaktotrace [lindex $val 0]
+		        set val [lreplace $val 2 3 "" ""]
+		        set val [lreplace $val 5 5 ""]
+		        $DialogWinBreak::user(list) insert $i $val
+		        if { $file == $currentfile } {
+		            UpdateArrowAndBreak $line "" "" 0
+		        }
 		    }
 		}
 	    }
@@ -2266,8 +2293,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	    set SearchToolbar [list 0 $replace]
 	    return
 	} else {
-	    $mainframe showtoolbar 1 1
 	    tkTabToWindow $f.e1
+	    $mainframe showtoolbar 1 1
 	    set SearchToolbar [list 1 $replace]
 	    return
 	}
