@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.63 2005/12/20 10:38:26 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.64 2006/02/01 15:30:40 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -2123,20 +2123,24 @@ proc RamDebugger::GiveFileType { filename } {
 	    set options($i) $options_def($i)
 	}
     }
+    set types ""
     foreach i [array names options extensions,*] {
 	foreach ext $options($i) {
 	    if { $ext == "*" } {
 		if { ![regexp {^\*.*\*$} $filename] && [file extension $filename] != "" } {
 		    continue
 		}
+		regexp {,(.*)} $i {} type
+		lappend types [list 2 $type]
 	    } elseif { [set pos [string last $ext $filename]] != -1 && \
 		$pos+[string length $ext] == [string length $filename] } {
 		regexp {,(.*)} $i {} type
-		return $type
+		lappend types [list 1 $type]
 	    }
 	}
     }
-    return ""
+    set types [lsort -integer -index 0 $types]
+    return [lindex $types 0 1]
 }
 
 proc RamDebugger::ParseArgs { args usagestring OptsName } {
@@ -5758,9 +5762,19 @@ proc RamDebugger::CutCopyPasteText { what } {
 	}
 	cut {
 	    tk_textCut $text
+	    if { [set ipos [lsearch -exact $oldPasteStack $text]] != -1 } {
+		set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
+	    }
+	    set oldPasteStack [linsert $oldPasteStack 0 $text]
+	    set oldPasteStack [lrange $oldPasteStack 0 12]
 	}
 	copy {
 	    tk_textCopy $text
+	    if { [set ipos [lsearch -exact $oldPasteStack $text]] != -1 } {
+		set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
+	    }
+	    set oldPasteStack [linsert $oldPasteStack 0 $text]
+	    set oldPasteStack [lrange $oldPasteStack 0 12]
 	}
 	paste {
 	    if { [package vcompare $::tcl_version 8.4] >= 0 } {
@@ -5785,7 +5799,7 @@ proc RamDebugger::CutCopyPasteText { what } {
 		        set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
 		    }
 		    set oldPasteStack [linsert $oldPasteStack 0 $sel]
-		    set oldPasteStack [lrange $oldPasteStack 0 6]
+		    set oldPasteStack [lrange $oldPasteStack 0 12]
 		}
 	    } else {
 		tk_textPaste $text
@@ -6763,9 +6777,7 @@ proc RamDebugger::InitOptions {} {
 }
 
 proc RamDebugger::ApplyDropBinding { w command } {
-
     if { [info command dnd] == "" } { return }
-
     dnd bindtarget $w text/uri-list <Drop> $command
     foreach i [winfo children $w] {
 	ApplyDropBinding $i $command

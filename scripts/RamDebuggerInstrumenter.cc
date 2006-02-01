@@ -227,6 +227,11 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	  NewDoInstrument=1;
 	}
       }
+      else if(wordslen>0 && strcmp(pword0,"dict")==0){
+	if(wordslen==4 && strcmp(pword1,"for")==0){
+	  NewDoInstrument=1;
+	}
+      }
       else if(wordslen>0 && strcmp(pword0,"namespace")==0){
 	if(wordslen>=3 && strcmp(pword1,"eval")==0){
 	  NewDoInstrument=1;

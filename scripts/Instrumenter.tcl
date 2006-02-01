@@ -115,6 +115,11 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		        set NewDoInstrument 1
 		    }
 		}
+		"dict" {
+		    if { [lindex $words 1] == "for" && [llength $words] == 4 } {
+		        set NewDoInstrument 1
+		    }
+		}
 		"namespace" {
 		    if { [lindex $words 1] == "eval" && [llength $words] >= 3 } {
 		        set NewDoInstrument 1
