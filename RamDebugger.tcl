@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.64 2006/02/01 15:30:40 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.65 2006/03/09 09:32:43 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -1571,7 +1571,8 @@ proc RamDebugger::rlist { args } {
 	    fconfigure $fin -encoding $opts(-encoding)
 	} else {
 	    set header [read $fin 256]
-	    if { [regexp -line -- {-\*-.*coding:\s*utf-8\s*;.*-\*-} $header] } {
+	    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+	    if { [regexp -nocase -line -- $rex $header] } {
 		fconfigure $fin -encoding utf-8
 	    }
 	    seek $fin 0
@@ -1606,7 +1607,8 @@ proc RamDebugger::rlist { args } {
 		    fconfigure $fin -encoding $opts(-encoding)
 		} else {
 		    set header [read $fin 256]
-		    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+		    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+		    if { [regexp -nocase -line -- $rex $header] } {
 		        fconfigure $fin -encoding utf-8
 		    }
 		    seek $fin 0
@@ -1708,7 +1710,8 @@ proc RamDebugger::rlist { args } {
 		    fconfigure $fout -encoding $opts(-encoding)
 		} else {
 		    set header [string range [set instrumentedfiles${i}($currentfile)] 0 255]
-		    if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+		    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+		    if { [regexp -nocase -line -- $rex $header] } {
 		        fconfigure $fout -encoding utf-8
 		    }
 		}
@@ -3922,7 +3925,8 @@ proc RamDebugger::_savefile_only { file data } {
 	if { $err } { error [_ "Error saving file '%s'" $file] }
 
 	set header [string range $data 0 255]
-	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
+	set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+	if { [regexp -nocase -line -- $rex $header] } {
 	    fconfigure $fout -encoding utf-8
 	}
 	puts -nonewline $fout $data
@@ -4467,8 +4471,8 @@ proc RamDebugger::ChooseViewFile { what args } {
 		                              keypress %K $what]
 	    raise $w._choosevf
 	    if { [llength $list] > 1 } {
-		after idle focus -force $w._choosevf.l1
-	    } else { after idle focus -force $w._choosevf.l0 }
+		after idle [list catch [list focus -force $w._choosevf.l1]]
+	    } else { after idle [list catch [list focus -force $w._choosevf.l0]] }
 	}
 	keyrelease {
 	    foreach "K list" $args break
@@ -6178,11 +6182,11 @@ proc RamDebugger::CheckText { command args } {
 proc RamDebugger::SearchBraces_xml { x y } {
     variable text
 
-    set rex {<\s*?(/?)(\S+?)(?:\s[^>]*?[^>/])?(/?)\s*?>}
+    set rex {<\s*?(/?)\s*?([^>/\s]+?)(?:\s[^>]*?[^>/])?(/?)\s*?>}
     set sel [$text get insert-1c]
     set state normal
     while { $state eq "normal" && $sel eq ">" } {
-	set idx [$text search -backwards -regexp -count ::count0 $rex insert 1.0]
+	set idx [$text search -backwards -regexp -nolinestop -count ::count0 $rex insert 1.0]
 	if { $idx eq "" } { break }
 	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_end tag is_start_end
 	set idx_ini $idx
@@ -6191,7 +6195,7 @@ proc RamDebugger::SearchBraces_xml { x y } {
     }
     set sel [$text get insert]
     while { $state eq "normal" && $sel eq "<" } {
-	set idx [$text search -regexp -count ::count0 $rex insert end]
+	set idx [$text search -regexp -nolinestop -count ::count0 $rex insert end]
 	if { $idx eq "" } { break }
 	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_end tag is_start_end
 	set idx_ini insert
@@ -6218,7 +6222,7 @@ proc RamDebugger::SearchBraces_xml { x y } {
     set counter 0
     set state normal
     while { $state eq "normal" && $is_end ne "" } {
-	set idx_new [$text search -backwards -regexp -count ::count $rex $idx 1.0]
+	set idx_new [$text search -backwards -regexp -nolinestop -count ::count $rex $idx 1.0]
 	if { $idx_new eq "" } { break }
 	regexp $rex [$text get $idx_new "$idx_new+$::count chars"] \
 	    {} is_end_new tag_new is_start_end_new
@@ -6237,7 +6241,7 @@ proc RamDebugger::SearchBraces_xml { x y } {
     }
     set idx "$idx+$::count0 chars"
     while { $state eq "normal" && $is_end eq "" } {
-	set idx_new [$text search -regexp -count ::count $rex $idx end]
+	set idx_new [$text search -regexp -nolinestop -count ::count $rex $idx end]
 	if { $idx_new eq "" } { break }
 	regexp $rex [$text get $idx_new "$idx_new+$::count chars"] \
 	    {} is_end_new tag_new is_start_end_new
@@ -6828,11 +6832,17 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 	}
 	XML {
 	    set menu [list \
-		          [list command "&Indent" {} "Indent all the file" \
-		               "" -command "RamDebugger::XMLIndent"] \
-		          [list command "Indent &none" {} \
-		               "Take all the indentation out of the file" \
-		               "" -command "RamDebugger::XMLIndent none"]]
+		    [list command "&Indent" {} "Indent all the file" \
+		        "" -command "RamDebugger::XMLIndent"] \
+		    [list command "Indent 2" {} \
+		        "Indent all the file 2 spaces" \
+		        "" -command "RamDebugger::XMLIndent 2"] \
+		    [list command "Indent &none" {} \
+		        "Take all the indentation out of the file" \
+		        "" -command "RamDebugger::XMLIndent none"] \
+		    [list command "Indent html" {} \
+		        "Indent the file as HTML" \
+		         "" -command "RamDebugger::XMLIndent {} 1"]]
 	    set descmenu_new [linsert $descmenu 30 "&XML" all filetypemenu 0 $menu]
 	    set changes 1
 	}
@@ -6847,6 +6857,9 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 	$menu configure -postcommand [list RamDebugger::ActualizeActiveProgramsIfVoid \
 		$menu]
 
+	set menu [$mainframe getmenu macros]
+	AddActiveMacrosToMenu $mainframe $menu
+
 	set menu [$mainframe getmenu view]
 	$menu configure -postcommand [list RamDebugger::ActualizeViewMenu $menu]
 	
@@ -6860,26 +6873,34 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
     }
 }
 
-    proc RamDebugger::XMLIndent { { none "" } } {
-	variable text
-	
-	set err [catch { package require tdom }]
-	if { $err } {
-	    tk_messageBox -message [_ "It is necessary to install package 'tdom'"]
-	    return
-	}
-	set err [catch { dom parse [$text get 1.0 end-1c] doc } errstring]
-	if { $err } {
-	    tk_messageBox -message [_ "XML in file is not correct (%s)" $errstring]
-	    return
-	}
-	$text delete 1.0 end
-	if { $none eq "" } {
-	    $text insert end [$doc asXML]
-	} else {
-	    $text insert end [$doc asXML -indent none]
-	}
-	ReinstrumentCurrentFile
+proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
+    variable text
+    
+    set err [catch { package require tdom }]
+    if { $err } {
+	tk_messageBox -message [_ "It is necessary to install package 'tdom'"]
+	return
+    }
+    set data [$text get 1.0 end-1c]
+    set header ""
+    regexp {^(.*?)<\s*\w} $data {} header
+    if { !$html } {
+	set err [catch { dom parse $data doc } errstring]
+    } else {
+	set err [catch { dom parse -html $data doc } errstring]
+    }
+    if { $err } {
+	tk_messageBox -message [_ "XML in file is not correct (%s)" $errstring]
+	return
+    }
+    $text delete 1.0 end
+    $text insert end $header
+    if { $none eq "" } {
+	$text insert end [$doc asXML]
+    } else {
+	$text insert end [$doc asXML -indent $none]
+    }
+    ReinstrumentCurrentFile
 }
 
 if { [llength [info command lrepeat]] == 0 } {
