@@ -170,10 +170,11 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 		$DialogWinTop::user($w,textv) conf -fg black
 		set DialogWinTop::user($w,type) [lindex [lindex $res 1] 0]
 		if { $DialogWinTop::user($w,type) == "array" } {
+		    set DialogWinTop::user($w,type) array
 		    foreach "name val" [lindex [lindex $res 1] 1] {
 		        $DialogWinTop::user($w,textv) insert end "${var}($name) = $val\n"
 		    }
-		} elseif { $DialogWinTop::user($w,aslist) } {
+		} elseif { $DialogWinTop::user($w,aslist) eq "list" } {
 		    set DialogWinTop::user($w,type) list
 		    if { [catch { set list [lrange [lindex [lindex $res 1] 1] 0 end] }] } {
 		        $DialogWinTop::user($w,textv) insert end "Error: variable is not a list"
@@ -184,7 +185,18 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 		            incr ipos
 		        }
 		    }
+		}  elseif { $DialogWinTop::user($w,aslist) eq "dict" } {
+		    set DialogWinTop::user($w,type) dict
+		    set dict [lindex [lindex $res 1] 1]
+		    if { [catch { dict info $dict }] } {
+		        $DialogWinTop::user($w,textv) insert end "Error: variable is not a dict"
+		    } else {
+		        foreach key [lsort -dictionary [dict keys $dict]] {
+		            $DialogWinTop::user($w,textv) insert end "$key = [dict get $dict $key]\n"
+		        }
+		    }
 		} else {
+		    set DialogWinTop::user($w,type) ""
 		    $DialogWinTop::user($w,textv) insert end [lindex [lindex $res 1] 1]
 		}
 	    }
@@ -324,11 +336,11 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     }
 
     set DialogWinTop::user($w,combo) [ComboBox $f.e1 -textvariable DialogWinTop::user($w,expression) \
-	-values $options(old_expressions) -grid "1 ew px3"]
+	-values $options(old_expressions) -grid "1 3 ew px3"]
 
     set DialogWinTop::user($w,expression) $var
     
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 4"]
     set DialogWinTop::user($w,textv) [text $sw.text -background white -wrap word -width 40 -height 10 \
 		                       -exportselection 0 -font FixedFont -highlightthickness 0]
     $sw setwidget $DialogWinTop::user($w,textv)
@@ -338,9 +350,14 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     }
 
     label $f.l2 -textvar DialogWinTop::user($w,type) -grid "0 w" -bg [CCColorActivo [$w  cget -bg]]
-    checkbutton $f.cb1 -text "As list" -variable DialogWinTop::user($w,aslist) -grid "1 wwe" \
-       -command "DialogWinTop::InvokeOK $f"
-    set DialogWinTop::user($w,aslist) 0
+    radiobutton $f.cb1 -text "As var" -variable DialogWinTop::user($w,aslist) -grid "1 wwe" \
+       -command "DialogWinTop::InvokeOK $f" -value "var"
+    radiobutton $f.cb2 -text "As list" -variable DialogWinTop::user($w,aslist) -grid "2 wwe" \
+       -command "DialogWinTop::InvokeOK $f" -value "list"
+    radiobutton $f.cb3 -text "As dict" -variable DialogWinTop::user($w,aslist) -grid "3 wwe" \
+       -command "DialogWinTop::InvokeOK $f" -value "dict"
+
+    set DialogWinTop::user($w,aslist) var
     supergrid::go $f
 
     tkTabToWindow $f.e1

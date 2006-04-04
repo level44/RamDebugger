@@ -196,7 +196,7 @@ set "macrodata(Go to proc,help)" "This commands permmits to select a proc to go"
 
 proc "Go to proc" { w } {
 
-    set procs ""
+    foreach "procs_n procs_c" [list "" ""] break
     set numline 1
     set lines [split [$w get 1.0 end-1c] \n]
     set len [llength $lines]
@@ -216,12 +216,17 @@ proc "Go to proc" { w } {
 		} elseif { ![regexp {^\s*$|^\s*#} $tline] } { break }
 		incr iline -1
 	    }
-	    lappend procs [list $name $namespace $comments $type $numline]
+	    set comments [string trim $comments]
+	    if { $comments eq "" } {
+		lappend procs_n [list $name $namespace "" $type $numline]
+	    } else {
+		lappend procs_c [list $name $namespace $comments $type $numline]
+	    }
 	}
 	incr numline
     }
-    set procs [lsort -dictionary -index 0 $procs]
-    set procs [lsort -dictionary -decreasing -index 2 $procs]
+    set procs [lsort -dictionary -index 0 $procs_c]
+    eval lappend procs [lsort -dictionary -index 0 $procs_n]
 
     set wg $w.g
     destroy $wg
@@ -324,7 +329,6 @@ proc "Go to proc" { w } {
 	set action [$wg waitforwindow]
     }
 }
-
 
 ################################################################################
 #    proc Mark translation strings
