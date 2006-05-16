@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.65 2006/03/09 09:32:43 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.66 2006/05/16 13:53:41 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -5766,19 +5766,25 @@ proc RamDebugger::CutCopyPasteText { what } {
 	}
 	cut {
 	    tk_textCut $text
-	    if { [set ipos [lsearch -exact $oldPasteStack $text]] != -1 } {
-		set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
+	    if {![catch {::tk::GetSelection $text CLIPBOARD} sel]} {
+		set sel [string map [list "\t" "        "] $sel]
+		if { [set ipos [lsearch -exact $oldPasteStack $sel]] != -1 } {
+		    set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
+		}
+		set oldPasteStack [linsert $oldPasteStack 0 $sel]
+		set oldPasteStack [lrange $oldPasteStack 0 12]
 	    }
-	    set oldPasteStack [linsert $oldPasteStack 0 $text]
-	    set oldPasteStack [lrange $oldPasteStack 0 12]
 	}
 	copy {
 	    tk_textCopy $text
-	    if { [set ipos [lsearch -exact $oldPasteStack $text]] != -1 } {
-		set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
+	    if {![catch {::tk::GetSelection $text CLIPBOARD} sel]} {
+		set sel [string map [list "\t" "        "] $sel]
+		if { [set ipos [lsearch -exact $oldPasteStack $sel]] != -1 } {
+		    set oldPasteStack [lreplace $oldPasteStack $ipos $ipos]
+		}
+		set oldPasteStack [linsert $oldPasteStack 0 $sel]
+		set oldPasteStack [lrange $oldPasteStack 0 12]
 	    }
-	    set oldPasteStack [linsert $oldPasteStack 0 $text]
-	    set oldPasteStack [lrange $oldPasteStack 0 12]
 	}
 	paste {
 	    if { [package vcompare $::tcl_version 8.4] >= 0 } {
@@ -5811,7 +5817,7 @@ proc RamDebugger::CutCopyPasteText { what } {
 	}
 	paste_stack {
 	    if { ![llength $oldPasteStack] } {
-		WarnWin "There is no old paste stack"
+		WarnWin [_ "There is no old paste stack. It can be filled with copy and paste"]
 		return
 	    }
 	    set menu $text.menu
