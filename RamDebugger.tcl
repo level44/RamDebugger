@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.66 2006/05/16 13:53:41 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.67 2006/06/09 15:44:31 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -61,7 +61,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 5.5
+    set Version 5.6
 
     ################################################################################
     #    Non GUI commands
@@ -100,6 +100,7 @@ namespace eval RamDebugger {
     variable breakpoints ""
     variable TimeMeasureData ""
     variable gdblog ""
+    variable CheckExternalFileModification 1
 
     variable MainDir
     variable CacheDir
@@ -304,7 +305,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set options_def(extensions,TCL) ".tcl *"
     set options_def(extensions,C/C++) ".c .cpp .cc .h"
-    set options_def(extensions,XML) ".xml .html .htm"
+    set options_def(extensions,XML) ".xml .spd"
     set "options_def(extensions,GiD BAS file)" .bas
     set "options_def(extensions,GiD data files)" ".prb .mat .cnd"
 
@@ -4134,6 +4135,8 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
     variable MainDir
     variable AppDataDir
 
+    package require helpviewer
+
     HelpViewer::EnterDirForIndex $AppDataDir
 
     if { $file == "" } {
@@ -4148,6 +4151,8 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 proc RamDebugger::ViewHelpForWord { { word "" } } {
     variable text
     variable AppDataDir
+
+    package require helpviewer
 
     HelpViewer::EnterDirForIndex $AppDataDir
 
@@ -6567,6 +6572,7 @@ proc RamDebugger::UpdateLineNum { command args } {
     variable filesmtime
     variable currentfile
     variable currentfileIsModified
+    variable CheckExternalFileModification
 
     RamDebugger::CVS::SetUserActivity
 
@@ -6592,7 +6598,7 @@ proc RamDebugger::UpdateLineNum { command args } {
 	    set exists 1
 	    set mtime $filesmtime($currentfile)
 	}
-	if { $exists && $mtime > $filesmtime($currentfile) } {
+	if { $CheckExternalFileModification && $exists && $mtime > $filesmtime($currentfile) } {
 	    set filesmtime($currentfile) $mtime
 
 	    if { $currentfileIsModified } {
@@ -6605,6 +6611,13 @@ proc RamDebugger::UpdateLineNum { command args } {
 		         -parent $text -title [_ "Reload file"] -type okcancel]
 	    if { $ret == "ok" } {
 		OpenFileF $currentfile 1
+	    } else {
+		set quest [_ "Disable this warning for this session?"]
+		set ret [DialogWin::messageBox -default ok -icon warning -message $quest \
+		        -parent $text -title [_ "Warning reload file"] -type okcancel]
+		if { $ret == "ok" } {
+		    set CheckExternalFileModification 0
+		}
 	    }
 	}
     }
@@ -6889,7 +6902,7 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
     }
     set data [$text get 1.0 end-1c]
     set header ""
-    regexp {^(.*?)<\s*\w} $data {} header
+    regexp {^(.*?)<\s*?(?!\?|!)} $data {} header
     if { !$html } {
 	set err [catch { dom parse $data doc } errstring]
     } else {
@@ -6901,10 +6914,11 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
     }
     $text delete 1.0 end
     $text insert end $header
+    set root [$doc documentElement]
     if { $none eq "" } {
-	$text insert end [$doc asXML]
+	$text insert end [$root asXML]
     } else {
-	$text insert end [$doc asXML -indent $none]
+	$text insert end [$root asXML -indent $none]
     }
     ReinstrumentCurrentFile
 }
@@ -7185,7 +7199,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require dialogwin
     package require textutil
     #needed a catch for wince
-    package require helpviewer 1.1
     catch { package require tkdnd } ;# only if it is compiled
     #catch { package require mytile }
 

@@ -46,6 +46,11 @@ for details.
 Changes
 =======
 
+Changes From version 5.5 to version 5.6
+
+ * Added trace command in the Breakpoints window (checking in every line if a variable changes)
+ * New debug option: Continue out of loop
+
 Changes From version 5.4 to version 5.5
 
  * Added new option Open in new Window 
