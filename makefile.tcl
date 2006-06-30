@@ -9,7 +9,7 @@ IconifiedConsole
 
 set createdistribution::doencrypt 0
 set createdistribution::add_packages [list treectrl BWidgetR tkhtml]
-set createdistribution::remove_packages [list resizer trf bwidget tcllibc \
+set createdistribution::remove_packages [list trf bwidget tcllibc \
 	vfs::ftp]
 
 createdistribution::regsubfiles [list \

@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.67 2006/06/09 15:44:31 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.68 2006/06/30 17:13:08 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -268,7 +268,8 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(colors,comments) red
     set options_def(colors,varnames) \#b8860b
 
-    set optiods_def(listfilespane) 0
+    set options_def(listfilespane) 0
+    set options_def(auto_raise_stack_trace) 1
     
     switch $::tcl_platform(platform) {
 	windows {
@@ -4742,6 +4743,7 @@ proc RamDebugger::UpdateArrowAndBreak { line hasbreak hasarrow { forceraise 1 } 
 
 proc RamDebugger::UpdateGUIStack { res } {
     variable textST
+    variable options
 
     $textST conf -state normal
     $textST mark set insert 1.0
@@ -4752,7 +4754,10 @@ proc RamDebugger::UpdateGUIStack { res } {
     }
     $textST del insert end
     $textST conf -state disabled
-    TextStackTraceRaise
+
+    if { $options(auto_raise_stack_trace) } {
+	TextStackTraceRaise
+    }
 }
 
 proc RamDebugger::TakeArrowOutFromText {} {
@@ -7726,16 +7731,24 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     proc NoteBookPopupMenu { f x y page } {
 
-	if { $page == "stacktrace" } { return }
 	catch { destroy $f.m }
 	menu $f.m
 	switch $page {
-	    output { $f.m add command -label [_ "Clear"] -command RamDebugger::TextOutClear }
+	    stacktrace {
+		$f.m add checkbutton -label [_ "Auto raise stack trace"] -variable \
+		    RamDebugger::options(auto_raise_stack_trace)
+	    }
+	    output {
+		$f.m add command -label [_ "Clear"] -command RamDebugger::TextOutClear
+		$f.m add checkbutton -label [_ "Auto raise stack trace"] -variable \
+		    RamDebugger::options(auto_raise_stack_trace)
+	    }
 	    compile { $f.m add command -label [_ "Clear"] -command RamDebugger::TextCompClear }
 	}
 	tk_popup $f.m $x $y
     }
     $pane2in2.nb bindtabs <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y]
+    bind $textST <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y stacktrace]
     bind $textOUT <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y output]
     bind $textCOMP <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y compile]
 
