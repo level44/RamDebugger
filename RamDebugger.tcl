@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.68 2006/06/30 17:13:08 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.69 2006/07/18 18:32:37 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -61,7 +61,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 5.6
+    set Version 5.7
 
     ################################################################################
     #    Non GUI commands
@@ -371,7 +371,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     if { $::tcl_platform(platform) == "windows" } {
 	if { $options(CheckRemotes) == 1 } {
 	    uplevel \#0 package require commR  ;#modification (commR) of tcllib comm package
-	    set debuggerserverNum [comm::register RamDebugger 1]
+	    set debuggerserverNum [commR::register RamDebugger 1]
 	}
     } else {
 	if { [info command wm] != "" } {
@@ -967,7 +967,7 @@ proc RamDebugger::rdebug { args } {
 	    append remotecomm "set args [lindex $opts(program) 2]"
 	}
     } elseif { $::tcl_platform(platform) == "windows" } {
-	set remotecomm [string map [list SENDDEVBODY "comm::comm send $debuggerserverNum \$comm"] \
+	set remotecomm [string map [list SENDDEVBODY "commR::comm send $debuggerserverNum \$comm"] \
 		            $remotecomm]
     } else {
 	set remotecomm [string map [list SENDDEVBODY "send \"$debuggerserver\" \$comm"] \
@@ -2236,7 +2236,7 @@ proc RamDebugger::FindActivePrograms { force } {
 
 	if { $debuggerserverNum == "" } {
 	    uplevel \#0 package require commR ;#modification (commR) of tcllib comm package
-	    set debuggerserverNum [comm::register RamDebugger 1]
+	    set debuggerserverNum [commR::register RamDebugger 1]
 	}
 	RamDebugger::ProgressVar 20
 	set iprogress 20
@@ -2246,8 +2246,8 @@ proc RamDebugger::FindActivePrograms { force } {
 	    incr iprogress 40
 	    if { $iprogress > 90 } { set iprogress 90 }
 	    RamDebugger::ProgressVar $iprogress
-	    set comm [list comm::comm send -async $i \
-		          [list catch [list comm::givename $debuggerserverNum]]]
+	    set comm [list commR::comm send -async $i \
+		          [list catch [list commR::givename $debuggerserverNum]]]
 	    set err [catch $comm errstring]
 	}
 	# dirty trick to make array exist
@@ -2422,7 +2422,7 @@ proc RamDebugger::EvalRemote { comm } {
 	puts $fid $comm
 	flush $fid
     } elseif { $::tcl_platform(platform) eq "windows" } {
-	set err [catch { comm::comm send $remoteserverNum $comm } errstring]
+	set err [catch { commR::comm send $remoteserverNum $comm } errstring]
     } else {
 	set err [catch { send $remoteserver $comm } errstring]
     }
@@ -2455,7 +2455,7 @@ proc RamDebugger::EvalRemoteAndReturn { comm } {
 	flush $fid
 	set ret ""
     } elseif { $::tcl_platform(platform) == "windows" } {
-	set ret [comm::comm send $remoteserverNum $comm]
+	set ret [commR::comm send $remoteserverNum $comm]
     } else {
 	set ret [send $remoteserver $comm]
     }
@@ -7360,7 +7360,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ContNextGUI rstep"] \
 		[list command [_ "Break"] debugentry [_ "Break execution as fast as possible"] "" \
 		-command "RamDebugger::ContNextGUI rnextfull"] \
-		[list command [_ "Return"] debugentry [_ "Makes the code return from proc without finishing execution"] "" \
+		[list command [_ "Return"] debugentry [_ "Makes the code return from proc without finishing execution"] "F12" \
 		-command "RamDebugger::ContNextGUI rnextreturn"] \
 		[list command [_ "Stop debugging"] debugentry [_ "Stop current debugging"] "Shift F5" \
 		     -command RamDebugger::DisconnectStop] \
