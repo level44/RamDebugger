@@ -21,21 +21,21 @@ proc RamDebugger::DisplayVar { X Y x y } {
 	set comm "$var"
     } else {
 	set comm {
-	    if { [array exists {VAR}] } {
-		set ::RDC::retval [list array [array get {VAR}]]
-	    } elseif { [info exists {VAR}] } {
-		set ::RDC::retval [list variable [set {VAR}]]
+	    if { [::array exists {VAR}] } {
+		::set ::RDC::retval [::list array [array get {VAR}]]
+	    } elseif { [::info exists {VAR}] } {
+		::set ::RDC::retval [::list variable [set {VAR}]]
 	    } else {
-		set ::RDC::errorInfo $::errorInfo
-		set ::RDC::err [catch {expr {VAR}} ::RDC::val]
+		::set ::RDC::errorInfo $::errorInfo
+		::set ::RDC::err [::catch {::expr {VAR}} ::RDC::val]
 		if { !$::RDC::err } {
-		    set ::RDC::retval [list expr $::RDC::val]
+		    ::set ::RDC::retval [::list expr $::RDC::val]
 		} else {
-		    set ::RDC::retval [list error {variable or expr 'VAR' does not exist}]
-		    set ::errorInfo $::RDC::errorInfo
+		    ::set ::RDC::retval [::list error {variable or expr 'VAR' does not exist}]
+		    ::set ::errorInfo $::RDC::errorInfo
 		}
 	    }
-	    set ::RDC::retval
+	    ::set ::RDC::retval
 	}
 	set comm [string map [list VAR [string trim $var]] $comm]
     }
@@ -137,12 +137,12 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 	    return
 	} else {
 	    set comm {
-		if { [array exists {VAR}] } {
-		    list array [array get {VAR}]
-		} elseif { [info exists {VAR}] } {
-		    list variable [set {VAR}]
+		if { [::array exists {VAR}] } {
+		    ::list array [::array get {VAR}]
+		} elseif { [::info exists {VAR}] } {
+		    ::list variable [::set {VAR}]
 		} else {
-		    list expression [expr {VAR}]
+		    ::list expression [::expr {VAR}]
 		}
 	    }
 	    set comm [string map [list VAR [string trim $var]] $comm]
@@ -292,6 +292,30 @@ proc RamDebugger::InvokeAllDisplayVarWindows {} {
     }
 }
 
+proc RamDebugger::DisplayVarWindow_contextual { text x y } {
+    destroy $text.menu
+    set menu [menu $text.menu]
+    $menu add command -label [_ "Copy"] -command \
+	[list RamDebugger::DisplayVarWindow_contextual_do $text copy]
+    $menu add separator
+    $menu add command -label [_ "Select all"] -command \
+	[list RamDebugger::DisplayVarWindow_contextual_do $text selectall]
+    tk_popup $menu $x $y
+}
+
+proc RamDebugger::DisplayVarWindow_contextual_do { text what } {
+
+    switch $what {
+	copy {
+	    event generate $text <<Copy>>
+	}
+	selectall {
+	    $text tag add sel 1.0 end-1c
+	    focus $text
+	}
+    }
+}
+
 proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     variable text
     variable options
@@ -343,6 +367,10 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 4"]
     set DialogWinTop::user($w,textv) [text $sw.text -background white -wrap word -width 40 -height 10 \
 		                       -exportselection 0 -font FixedFont -highlightthickness 0]
+
+    bind $sw.text <3> [list RamDebugger::DisplayVarWindow_contextual %W %X %Y]
+
+
     $sw setwidget $DialogWinTop::user($w,textv)
 
     if { $::tcl_platform(platform) != "windows" } {
@@ -1049,7 +1077,7 @@ proc RamDebugger::PreferencesWindow {} {
 		    WarnWin "Error: indent size must be between 0 and 10" $w
 		    set good 0
 		}
-		if { $good && $DialogWin::user(AutoSaveRevisions) } {
+		if { $good && $DialogWin::user(AutoSaveRevisions) != 0 } {
 		    if { ![string is double -strict $DialogWin::user(AutoSaveRevisions_time)] || \
 		             $DialogWin::user(AutoSaveRevisions_time) < 0 } {
 		        WarnWin "Error: Auto save revisions time must be a number" $w

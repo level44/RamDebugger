@@ -111,6 +111,8 @@ set auto_index(::RamDebugger::ToggleTransientWinAll) [list source [file join $di
 set auto_index(::RamDebugger::ToggleTransientWin) [list source [file join $dir HelperWindows.tcl]]
 set auto_index(::RamDebugger::AddAlwaysOnTopFlag) [list source [file join $dir HelperWindows.tcl]]
 set auto_index(::RamDebugger::InvokeAllDisplayVarWindows) [list source [file join $dir HelperWindows.tcl]]
+set auto_index(::RamDebugger::DisplayVarWindow_contextual) [list source [file join $dir HelperWindows.tcl]]
+set auto_index(::RamDebugger::DisplayVarWindow_contextual_do) [list source [file join $dir HelperWindows.tcl]]
 set auto_index(::RamDebugger::DisplayVarWindow) [list source [file join $dir HelperWindows.tcl]]
 set auto_index(::RamDebugger::DisplayBreakpointsWindowSetCond) [list source [file join $dir HelperWindows.tcl]]
 set auto_index(::RamDebugger::DisplayBreakpointsWindow) [list source [file join $dir HelperWindows.tcl]]

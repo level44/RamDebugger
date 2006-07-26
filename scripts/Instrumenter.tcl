@@ -77,11 +77,17 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 	    set NewDoInstrument 1
 	} elseif { [lindex $words 0] == "destructor" && [llength $words] == 1 } {
 	    set NewDoInstrument 1
-	} elseif { [regexp {^(proc|method|typemethod|onconfigure|oncget)$} [lindex $words 0]] && \
-		       [llength $words] == 3 } {
+	} elseif { [lindex $words 0] == "oncget" && [llength $words] == 2 } {
 	    if { ![info exists ::RamDebugger::options(nonInstrumentingProcs)] || \
 		[lsearch -exact $::RamDebugger::options(nonInstrumentingProcs) \
-		        [lindex $words 1]] == -1 } {
+		[lindex $words 1]] == -1 } {
+		set NewDoInstrument 1
+	    }
+	} elseif { [regexp {^(proc|method|typemethod|onconfigure)$} [lindex $words 0]] && \
+	    [llength $words] == 3 } {
+	    if { ![info exists ::RamDebugger::options(nonInstrumentingProcs)] || \
+	    [lsearch -exact $::RamDebugger::options(nonInstrumentingProcs) \
+		[lindex $words 1]] == -1 } {
 		set NewDoInstrument 1
 	    }
 	} elseif { $DoInstrument == 0 } {
@@ -186,6 +192,12 @@ proc RamDebugger::Instrumenter::PushState { type line newblocknameP newblockname
 		}
 		"bind" {
 		    if { [llength $words] == 3 } {
+		        set NewDoInstrument 1
+		    }
+		}
+		default {
+		    if { [llength $words] == 4 && [lindex $words 1] eq "sql" && \
+		        [lindex $words 2] eq "maplist" } {
 		        set NewDoInstrument 1
 		    }
 		}
@@ -311,25 +323,39 @@ proc RamDebugger::Instrumenter::NeedsToInsertSnitPackage { name } {
 }
 
 proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } {
+    variable MainDir
+
+    set MainDir $RamDebugger::MainDir
+    set AppDataDir $RamDebugger::AppDataDir
 
     set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
-    set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+    set dynlib [file join $AppDataDir $dynlib_base]
 
     catch { load $dynlib }
     if {[info command RamDebuggerInstrumenterDoWork] ne "" } { return }
 
-    set sourcefile [file join $RamDebugger::MainDir scripts RamDebuggerInstrumenter.cc]
+    file copy -force [file join $MainDir scripts RamDebuggerInstrumenter.cc] \
+	[file join $MainDir scripts compile] \
+	$AppDataDir
+
+    set sourcefile [file join $AppDataDir RamDebuggerInstrumenter.cc]
 
     set OPTS [list -shared -DUSE_TCL_STUBS -O2]
-    if {$::tcl_platform(platform) != "windows"} { lappend OPTS "-fPIC" }
+    if {$::tcl_platform(platform) ne "windows"} { lappend OPTS "-fPIC" }
     set basedir [file dirname [file dirname [info nameofexecutable]]]
     lappend OPTS -I[file join $basedir include] \
-	-I[file join $RamDebugger::MainDir scripts compile]
+	-I[file join $AppDataDir compile]
     set libs [glob -nocomplain -dir [file join $basedir lib] *tclstub*]
     switch [llength $libs] {
-	0 { set lib [file join $RamDebugger::MainDir scripts compile libtclstub.a] }
+	0 { set lib [file join $AppDataDir compile libtclstub.a] }
 	1 { set lib [lindex $libs 0] }
-	default { set lib [file join $basedir lib libtclstub.a] }
+	default {
+	    foreach i [glob -dir [file join $basedir lib] libtclstub*.a] {
+		regexp {[\d.]+} [file tail $i] version
+		if { $version >= 8.4 } { break }
+	    }
+	    set lib $i
+	}
     }
     set LOPTS [list $lib]
 
@@ -357,6 +383,10 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 	    if { ![info exists FastInstrumenterLoaded] } {
 		set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
 		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+		set err [catch { load $dynlib }]
+		if { $err } {
+		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
+		}
 		catch { load $dynlib }
 		if { [info command RamDebuggerInstrumenterDoWork] eq "" && \
 		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
@@ -1421,7 +1451,9 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 	} else {
 	    switch -- $c {
 		< {
-		    if { ![state_is ""] && ![state_is text] } {
+		    if { [state_is att_dquote] || [state_is att_quote] } {
+		        #nothing
+		    } elseif { ![state_is ""] && ![state_is text] } {
 		        raise_error "Not valid <"
 		    } elseif { [range $i $i+1] eq "<?" } {
 		        push_state pi
@@ -1460,17 +1492,21 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		        push_state entered_tagtext
 		        
 		    }
-		    if { ![state_is entered_tagtext] } {
-		        raise_error "Not valid >"
-		    }
-		    pop_state
-		    if {[state_is "pi"] && [range $i-1 $i] eq "?>" } {
-		        pop_state
-		    } elseif {[state_is "tag"] } {
-		        pop_state
-		        push_state text
+		    if { [state_is att_dquote] || [state_is att_quote] } {
+		        #nothing
 		    } else {
-		        raise_error "Not 2 valid >"
+		        if { ![state_is entered_tagtext] } {
+		            raise_error "Not valid >"
+		        }
+		        pop_state
+		        if {[state_is "pi"] && [range $i-1 $i] eq "?>" } {
+		            pop_state
+		        } elseif {[state_is "tag"] } {
+		            pop_state
+		            push_state text
+		        } else {
+		            raise_error "Not 2 valid >"
+		        }
 		    }
 		}
 		/ {

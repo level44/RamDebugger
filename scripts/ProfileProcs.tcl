@@ -132,10 +132,17 @@ snit::widget tablestree {
 	    -font $SystemFont -itemheight $height -selectmode browse -showroot no \
 	    -showrootbutton no -showbuttons yes -showlines yes \
 	    -scrollmargin 16 -xscrolldelay "500 50" -yscrolldelay "500 50" \
-	    -openbuttonimage mac-collapse -closedbuttonimage mac-expand \
 	    -showlines yes
 	install vscrollbar as scrollbar $win.sv -orient vertical -command [list $win.t yview]
 	install hscrollbar as scrollbar $win.sh -orient horizontal -command [list $win.t xview]
+
+	set err [catch {
+		$tree configure -openbuttonimage mac-collapse \
+		    -closedbuttonimage mac-expand
+	    }]
+	if { $err } {
+	    $tree configure -buttonimage [list mac-collapse open mac-expand !open ]
+	}
 
 	grid $win.t $win.sv -sticky ns
 	grid $win.sh -sticky ew
@@ -147,6 +154,7 @@ snit::widget tablestree {
 	$tree column create
 	$tree column create
 	$tree column create
+	catch { $tree configure -treecolumn 0 }
 	$tree column configure 0 -width 285 -text Proc -itembackground {\#e0e8f0 {}}
 	$tree column configure 1 -text Time -width 70 -justify left \
 	    -itembackground {linen {}}
@@ -438,10 +446,17 @@ snit::widget procstree {
 	    -font $SystemFont -itemheight $height -selectmode browse -showroot no \
 	    -showrootbutton no -showbuttons yes -showlines yes \
 	    -scrollmargin 16 -xscrolldelay "500 50" -yscrolldelay "500 50" \
-	    -openbuttonimage mac-collapse -closedbuttonimage mac-expand \
 	    -showlines yes
 	install vscrollbar as scrollbar $win.sv -orient vertical -command [list $win.t yview]
 	install hscrollbar as scrollbar $win.sh -orient horizontal -command [list $win.t xview]
+
+	set err [catch {
+		$tree configure -openbuttonimage mac-collapse \
+		    -closedbuttonimage mac-expand
+	    }]
+	if { $err } {
+	    $tree configure -buttonimage [list mac-collapse open mac-expand !open ]
+	}
 
 	grid $win.t $win.sv -sticky ns
 	grid $win.sh -sticky ew
@@ -831,10 +846,10 @@ snit::widget procstree {
 
 proc profileprocs::OpenGUI { { w .profileprocs } } {
 
-    set err [catch { package require treectrl 1.1 }]
+    set err [catch { package require treectrl }]
 
     if { $err } {
-	WarnWin [_ "It is necessary to install package 'treectrl 1.1' in order to use this function"]
+	WarnWin [_ "It is necessary to install package 'treectrl' in order to use this function"]
 	return
     }
 

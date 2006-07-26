@@ -76,7 +76,7 @@ proc RamDebugger::CVS::ManageAutoSave {} {
     set autosaveidle_after ""
 
     if { ![info exists RamDebugger::options(AutoSaveRevisions)] || \
-	     !$RamDebugger::options(AutoSaveRevisions) } {
+	     $RamDebugger::options(AutoSaveRevisions) == 0 } {
 	return
     }
     set now [clock seconds]
@@ -113,7 +113,7 @@ proc RamDebugger::CVS::_ManageAutoSaveDo {} {
 	set err [catch {SaveRevision 1} errstring]
 	if { $err } {
 	    WarnWin "Failed auto saving revisions. Feature disconnected. Reason: $errstring"
-	    set RamDebugger::options(AutoSaveRevisions) 0
+	    set RamDebugger::options(AutoSaveRevisions) ""
 	} else {
 	    set lasttimeautosave [clock seconds]
 	    ManageAutoSave

@@ -188,9 +188,14 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
       NewDoInstrument=1;
     else if(wordslen==1 && strcmp(pword0,"destructor")==0)
       NewDoInstrument=1;
+    else if(wordslen==2 && strcmp(pword0,"oncget")==0) {
+      int result=Tcl_GetIndexFromObj(NULL,word1,(const char**) is->nonInstrumentingProcs,"",TCL_EXACT,&index);
+      if(result!=TCL_OK){
+	NewDoInstrument=1;
+      }
+    }
     else if(wordslen==3 && (strcmp(pword0,"proc")==0 || strcmp(pword0,"method")==0 || 
-	     strcmp(pword0,"typemethod")==0 || strcmp(pword0,"onconfigure")==0 || 
-	     strcmp(pword0,"oncget")==0)){
+	     strcmp(pword0,"typemethod")==0 || strcmp(pword0,"onconfigure")==0)){
       int result=Tcl_GetIndexFromObj(NULL,word1,(const char**) is->nonInstrumentingProcs,"",TCL_EXACT,&index);
       if(result!=TCL_OK){
 	NewDoInstrument=1;
@@ -260,13 +265,16 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	}
       }
       else if((wordslen==1 && strcmp(pword0,"catch")==0) ||
-	      (wordslen==2 && strcmp(pword0,"while")==0) ||
-	      (wordslen>=3 && strcmp(pword0,"foreach")==0) ||
-	      (wordslen>=3 && strcmp(pword0,"mk::loop")==0) ||
-	      (wordslen>=1 && wordslen<=4 && strcmp(pword0,"for")==0) ||
-	      (wordslen>1 && strcmp(pword0,"eval")==0) ||
-	      (wordslen>1 && strcmp(pword0,"html::eval")==0) ||
-	      (wordslen==3 && strcmp(pword0,"bind")==0)) 
+	(wordslen==2 && strcmp(pword0,"while")==0) ||
+	(wordslen>=3 && strcmp(pword0,"foreach")==0) ||
+	(wordslen>=3 && strcmp(pword0,"mk::loop")==0) ||
+	(wordslen>=1 && wordslen<=4 && strcmp(pword0,"for")==0) ||
+	(wordslen>1 && strcmp(pword0,"eval")==0) ||
+	(wordslen>1 && strcmp(pword0,"html::eval")==0) ||
+	(wordslen==3 && strcmp(pword0,"bind")==0) ||
+	(wordslen==4 && strcmp(pword1,"sql")==0) &&
+	Tcl_ListObjIndex(is->ip,is->words,2,&wordi)==TCL_OK &&
+	strcmp(Tcl_GetStringFromObj(wordi,NULL),"maplist")==0) 
 	NewDoInstrument=1;
       else if(wordslen>1 && strcmp(pword0,"uplevel")==0){
 	int len=wordslen;

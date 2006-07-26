@@ -112,6 +112,13 @@ proc RamDebugger::GetFile { what types title }  {
 	    save {
 		if { ![file isdirectory $getfilestring] && \
 		    [file isdirectory [file dirname $getfilestring]] } {
+
+		    if { [file exists $getfilestring] } {
+		        set ret [DialogWin::messageBox -default ok -icon question -message \
+		                [_ "Are you sure to overwrite file '%s'?" $getfilestring] \
+		                -title [_ "Warning"] -type okcancel]
+		        if { $ret == "cancel" } { continue }
+		    }
 		    break
 		}
 	    }
