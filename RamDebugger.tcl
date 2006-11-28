@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.69 2006/07/18 18:32:37 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.70 2006/11/28 20:05:26 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -177,7 +177,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	catch { tk_messageBox -message $text }
     }
 
-    if { [info command winfo] ne "" && [winfo screenwidth .] < 300 } {
+    if { [info command winfo] ne "" && [winfo screenwidth .] < 350 } {
 	set iswince 1
     } else { set iswince 0 }
    
@@ -368,7 +368,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set debuggerserver ramdebugger
 
-    if { $::tcl_platform(platform) == "windows" } {
+    if { $::tcl_platform(platform) == "windows" && !$iswince } {
 	if { $options(CheckRemotes) == 1 } {
 	    uplevel \#0 package require commR  ;#modification (commR) of tcllib comm package
 	    set debuggerserverNum [commR::register RamDebugger 1]
@@ -2219,6 +2219,7 @@ proc RamDebugger::FindActivePrograms { force } {
     variable debuggerserver
     variable debuggerserverNum
     variable options
+    variable iswince
 
     if { $::tcl_platform(platform) == "windows" } {
 	if { !$options(CheckRemotes) && !$force } {
@@ -2234,7 +2235,7 @@ proc RamDebugger::FindActivePrograms { force } {
 	ProgressVar 0
 	WaitState 1
 
-	if { $debuggerserverNum == "" } {
+	if { $debuggerserverNum == "" && !$iswince } {
 	    uplevel \#0 package require commR ;#modification (commR) of tcllib comm package
 	    set debuggerserverNum [commR::register RamDebugger 1]
 	}
@@ -8062,6 +8063,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     if { $iswince } {
 	# wince
 	wm geometry $w 244x268+-6+0
+	::etcl::autofit $w
+	bind $w <ConfigureRequest> {::etcl::autofit %W}
     }
 
     set menu [$mainframe getmenu activeprograms]
