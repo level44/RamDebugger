@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.71 2007/02/20 14:24:33 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.72 2007/02/20 15:58:58 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -6890,27 +6890,25 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 
 proc RamDebugger::AddFileTypeMenu_do { descmenu_new } {
     variable mainframe
-
-	MainFrame::_create_menubar $mainframe $descmenu_new
-	
-	set menu [$mainframe getmenu activeprograms]
-	$menu configure -postcommand [list RamDebugger::ActualizeActiveProgramsIfVoid \
-		$menu]
-
-	set menu [$mainframe getmenu macros]
-	AddActiveMacrosToMenu $mainframe $menu
-
-	set menu [$mainframe getmenu view]
-	$menu configure -postcommand [list RamDebugger::ActualizeViewMenu $menu]
-	
-	set menu [$mainframe getmenu recentfiles]
-	$menu configure -postcommand [list RamDebugger::AddRecentfilesToMenu $menu]
-	
-	# very dirty. Without it, the radiobutton indicator is not drawn. Why???
-	set menu [$mainframe getmenu activeconfiguration]
-	$menu conf -postcommand "$menu conf -selectcolor black"
-	
-    }
+    
+    MainFrame::_create_menubar $mainframe $descmenu_new
+    
+    set menu [$mainframe getmenu activeprograms]
+    $menu configure -postcommand [list RamDebugger::ActualizeActiveProgramsIfVoid \
+	    $menu]
+    
+    set menu [$mainframe getmenu macros]
+    AddActiveMacrosToMenu $mainframe $menu
+    
+    set menu [$mainframe getmenu view]
+    $menu configure -postcommand [list RamDebugger::ActualizeViewMenu $menu]
+    
+    set menu [$mainframe getmenu recentfiles]
+    $menu configure -postcommand [list RamDebugger::AddRecentfilesToMenu $menu]
+    
+    # very dirty. Without it, the radiobutton indicator is not drawn. Why???
+    set menu [$mainframe getmenu activeconfiguration]
+    $menu conf -postcommand "$menu conf -selectcolor black"
 }
 
 proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
