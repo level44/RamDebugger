@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.70 2006/11/28 20:05:26 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.71 2007/02/20 14:24:33 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
 
 package require Tcl 8.4
@@ -997,6 +997,7 @@ proc RamDebugger::rdebug { args } {
 	    EvalRemote "run"
 	}
     }
+    EvalRemote [list set ::RDC::finished_loading_debugger 1]
     return [_ "Begin debugging of program '%s'" $remoteserver]
 }
 
@@ -6830,6 +6831,13 @@ proc RamDebugger::DropBindingDone { files } {
     }
 }
 
+proc RamDebugger::AddCustomFileTypeMenu { name menu } {
+    variable descmenu
+
+    set descmenu_new [linsert $descmenu 30 $name all filetypemenu 0 $menu]
+    AddFileTypeMenu_do $descmenu_new
+}
+
 proc RamDebugger::AddFileTypeMenu { filetype } {
     variable mainframe
     variable descmenu
@@ -6876,6 +6884,13 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
     if { [$mainframe getmenu filetypemenu] != "" } { set changes 1 }
 
     if { $changes } {
+	AddFileTypeMenu_do $descmenu_new
+    }
+}
+
+proc RamDebugger::AddFileTypeMenu_do { descmenu_new } {
+    variable mainframe
+
 	MainFrame::_create_menubar $mainframe $descmenu_new
 	
 	set menu [$mainframe getmenu activeprograms]
