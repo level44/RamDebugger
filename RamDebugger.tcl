@@ -1,8 +1,8 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.72 2007/02/20 15:58:58 ramsan Exp $        
-# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Jan-2005
+#         $Id: RamDebugger.tcl,v 1.73 2007/03/01 09:17:47 ramsan Exp $        
+# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
 #package require Tk 8.4
@@ -379,6 +379,15 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    wm withdraw .
 	}
 	set debuggerserver [tk appname $debuggerserver]
+    }
+}
+
+proc RamDebugger::SetFont { cual como } {
+    variable options
+
+    set idx [ lsearch {NormalFont FixedFont HelpFont} $cual]
+    if { $idx != -1} {
+	set options($cual) $como
     }
 }
 
