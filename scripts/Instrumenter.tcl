@@ -374,14 +374,23 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 
     switch $what {
 	debug {
+	    if { "$::tcl_platform(machine)" == "amd64"} {
+		set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
+		            RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork64.dll]
+	    } else {
 	    set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
 		            RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork.dll]
+	    }
 	    load $dynlib Ramdebuggerinstrumenter
 	    set FastInstrumenterLoaded 1
 	}
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
+		if { "$::tcl_platform(machine)" == "amd64"} {
+		    set dynlib_base RamDebuggerInstrumenter64[info sharedlibextension]
+		} else {
 		set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
+		}
 		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
 		set err [catch { load $dynlib }]
 		if { $err } {

@@ -465,7 +465,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
   Tcl_Obj *blockinfo,*blockinfocurrent,*word0,*wordi,*tmpObj;
   char c,lastc,buf[1024],*pword0=NULL;
 
-  length=strlen(block);
+  length = ( int)strlen(block);
   if(length>1000 && progress){
 /*     RamDebugger::ProgressVar 0 1 */
   }
@@ -580,7 +580,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	    newllen-=len;
 	    if(lastinstrumentedline==line){
 	      sprintf(buf,"RDC::F %d %d ; ",filenum,line);
-	      newllen-=strlen(buf);
+	      newllen -= ( int)strlen(buf);
 	    }
 	    Tcl_SetObjLength(is->newblock[R],newllen);
 	    RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);
@@ -658,7 +658,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 		newllen-=len;
 		if(lastinstrumentedline==line){
 		  sprintf(buf,"RDC::F %d %d ; ",filenum,line);
-		  newllen-=strlen(buf);
+		  newllen -= ( int)strlen(buf);
 		}
 		Tcl_SetObjLength(is->newblock[R],newllen);
 		RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);
@@ -723,7 +723,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	      newllen-=len;
 	      if(lastinstrumentedline==line){
 		sprintf(buf,"RDC::F %d %d ; ",filenum,line);
-		newllen-=strlen(buf);
+		newllen -= ( int)strlen(buf);
 	      }
 	      Tcl_SetObjLength(is->newblock[R],newllen);
 	      RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);

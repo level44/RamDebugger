@@ -3306,6 +3306,16 @@ proc RamDebugger::DisplayPositionsStackDo { what args } {
     catch { $DialogWinTop::user(list) selection set [lindex $curr 0] }
 }
 
+if { [info command lreverse] eq "" } {
+    proc lreverse { L } {
+	set res {}
+	set i [llength $L]
+	#while {[incr i -1]>=0} {lappend res [lindex $L $i]}
+	while {$i} {lappend res [lindex $L [incr i -1]]} ;# rmax
+	return $res
+    }
+}
+
 # what can be save or go or clean
 proc RamDebugger::PositionsStack { what args } {
     variable options
@@ -3355,14 +3365,12 @@ proc RamDebugger::PositionsStack { what args } {
 	}
 	goto {
 	    set file_new [lindex $args 2]
-	    set ipos 0
 	    set found 0
-	    foreach i $options(saved_positions_stack) {
+	    foreach i [lreverse $options(saved_positions_stack)] {
 		if { $file_new eq [lindex $i 0] && $line == [lindex $i 1] } {
 		    set found 1
 		    break
 		}
-		incr ipos
 	    }
 	    if { !$found } {
 		WarnWin "Position not valid"
@@ -3376,14 +3384,14 @@ proc RamDebugger::PositionsStack { what args } {
 	    SetMessage "Gone to position in line $line"
 	}
 	go {
-	    set ipos 0
+	    set ipos [expr {[llength $options(saved_positions_stack)]-1}]
 	    set found 0
-	    foreach i $options(saved_positions_stack) {
+	    foreach i [lreverse $options(saved_positions_stack)] {
 		if { $file eq [lindex $i 0] && $line == [lindex $i 1] } {
 		    set found 1
 		    break
 		}
-		incr ipos
+		incr ipos -1
 	    }
 	    if { $found } {
 		incr ipos -1
@@ -3404,14 +3412,14 @@ proc RamDebugger::PositionsStack { what args } {
 	    SetMessage "Gone to position in line $line"
 	}
 	clean {
-	    set ipos 0
+	    set ipos [expr {[llength $options(saved_positions_stack)]-1}]
 	    set found 0
-	    foreach i $options(saved_positions_stack) {
+	    foreach i [lreverse $options(saved_positions_stack)] {
 		if { $file eq [lindex $i 0] && $line == [lindex $i 1] } {
 		    set found 1
 		    break
 		}
-		incr ipos
+		incr ipos -1
 	    }
 	    if { !$found } {
 		WarnWin "There is no saved position at current line"
