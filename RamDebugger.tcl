@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.73 2007/03/01 09:17:47 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.74 2007/05/11 19:14:31 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -3237,7 +3237,8 @@ proc RamDebugger::ExitGUI {} {
     if { $readwriteprefs eq "yes" } {
 	set err [catch {
 	    if { $::tcl_platform(platform) == "windows" } {
-		registry set {HKEY_CURRENT_USER\Software\RamDebugger} IniData [array get options]
+		    registry set {HKEY_CURRENT_USER\Software\RamDebugger} IniData \
+		        [array get options]
 	    } else {
 		set fout [open ~/.ramdebugger_prefs w]
 		puts -nonewline $fout [array get options]
@@ -4486,6 +4487,8 @@ proc RamDebugger::ChooseViewFile { what args } {
 		                                keyrelease %K $list]
 	    bind $w._choosevf <KeyPress> [list RamDebugger::ChooseViewFile \
 		                              keypress %K $what]
+	    bind $w._choosevf.note <1> [list RamDebugger::ChooseViewFile \
+		                                nexttab $what]
 	    raise $w._choosevf
 	    if { [llength $list] > 1 } {
 		after idle [list catch [list focus -force $w._choosevf.l1]]
@@ -4520,6 +4523,21 @@ proc RamDebugger::ChooseViewFile { what args } {
 		}
 		ChooseViewFile $whatnext
 	    }
+	}
+	nexttab {
+	    foreach "what_in" $args break
+	    switch $what_in {
+		start {
+		    set whatnext startrecent
+		}
+		startrecent {
+		    set whatnext startcurrdir
+		}
+		startcurrdir {
+		    set whatnext start
+		}
+	    }
+	    ChooseViewFile $whatnext
 	}
 	next {
 	    set i [lindex $args 0]
@@ -5808,6 +5826,7 @@ proc RamDebugger::CutCopyPasteText { what } {
 	    }
 	}
 	paste {
+	    scan [$text index insert] "%d.%d" line -
 	    if { [package vcompare $::tcl_version 8.4] >= 0 } {
 		# paste is made here in order to substitute tabs by spaces
 		global tcl_platform
@@ -5835,6 +5854,7 @@ proc RamDebugger::CutCopyPasteText { what } {
 	    } else {
 		tk_textPaste $text
 	    }
+	    RamDebugger::IndentLine $line
 	}
 	paste_stack {
 	    if { ![llength $oldPasteStack] } {
@@ -6547,6 +6567,11 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
 	set indent_val 0
     } else { return }
 
+
+    if { $line eq "" } {
+	 scan [$text index insert] "%d.%d" line -
+    }
+
     set level 0
     set type ""
     foreach "level type" [lindex $instrumentedfilesInfo($currentfile) [expr $line-1]] break
@@ -7051,6 +7076,10 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
 	$menu.m add command -label $txt -command \
 	    [list RamDebugger::PositionsStack goto $text $line $file]
     }
+
+    $menu add command -label [_ "Last Position"] -command \
+	"RamDebugger::PositionsStack go"
+    $menu add separator
     $menu add command -label [_ "Positions window"] -command \
 	[list RamDebugger::DisplayPositionsStack $text $line]
     $menu add command -label [_ "Breakpoints window"] -command \
@@ -7968,6 +7997,17 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 #     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Tab> "RamDebugger::Indent ; break"
+    bind $text <Return> "[bind Text <Return>] ; RamDebugger::IndentLine {} ; break"
+
+    set cmd {
+	if { "%A" eq "\}" } {
+	    %OLD_CMD%
+	    RamDebugger::IndentLine {}
+	    break
+	}
+    }
+    bind $text <KeyPress> [string map [list %OLD_CMD% [bind Text <KeyPress>]] $cmd]
+   
     bind $text <Control-x> "RamDebugger::CutCopyPasteText cut   ; break"
     bind $text <Control-c> "RamDebugger::CutCopyPasteText copy  ; break"
     bind $text <Control-v> "RamDebugger::CutCopyPasteText paste ; break"
