@@ -11,33 +11,23 @@ See license.terms for details.
 Introduction
 ============
 
-RamDebugger is a graphical debugger for the scripting lenguage
-Tcl-TK. It can operate basically in two modes: * GUI mode: The normal
-one, is the one that appears when opening normally the program and has
-a Graphical User Interface.  * Text mode: In this mode, the GUI is not
-displayed and the debugger is executed as a set of text commands,
-similar to GDB. To use RamDebugger in this mode, load it inside Tkcon.
-With RamDebugger, it is possible to make Local Debugging, where the
-debugger starts the program to be debugged. and Remote debugging,
-where the program to debug is already started and RamDebugger connects
-to it.
+RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.
+With RamDebugger, it is possible to make Local Debugging, where the debugger starts the program to be debugged. and Remote debugging, where the program to debug is already started and RamDebugger connects to it.
 
 RamDebugger has additional capabilities like:
-   * Editing the code. It is possible to edit the code inside its own
-     editor and resend the new code without closing the debugged
-     program.
-   * The TCL-TK source code is colorized and supports automatic indentation.
-   * When stopping the debugger is one source code line, it is
-     possible to view all the variables and expression values, as well
-     as change them.
-   * It has additional options to measure execution times in the debugged program.
-   * Works in Linux and Windows
-   * Includes additional packages, like Tkcon and VisualRegexp,
-     developed by third party people, as a convenience for RamDebugger
-     users.
-   * The same program is an IDE for compiling and debugging c and c++
 
+ * Editing the code. It is possible to edit the code inside its own editor and resend the new code without closing the debugged program.
 
+ * The TCL-TK source code is colorized and supports automatic indentation.
+
+ * When stopping the debugger is one source code line, it is possible to view all the variables and expression values, as well as change them.
+
+ * It has additional options to measure execution times in the debugged program.
+Works in Linux and Windows
+
+ * Includes additional packages, like Tkcon and VisualRegexp, developed by third party people, as a convenience for RamDebugger users.
+
+ * The same program is an IDE for compiling and debugging c and c++
 
 Note: RamDebugger can also be an IDE for compiling and debugging c/c++
 code. It uses GDB as a backend. See *Note Compiling/Debugging c++::
@@ -45,6 +35,12 @@ for details.
 
 Changes
 =======
+
+Changes From version 5.6 to version 6.0
+
+ * Partly converted to tile
+ * Prepared for working with TabletPC
+ * Highy optimized XML parsing and colorize
 
 Changes From version 5.5 to version 5.6
 
@@ -206,16 +202,3 @@ similar to: wish RamDebugger.tcl
 or just: RamDebugger.tcl if you followed the instructions in *Note
 Installation and prerequisites::.
 
-To start RamDebugger in text mode inside Tkcon, one of the following
-possibilities can be done:
-   * Open Tkcon and do:
-	  source RamDebugger.tcl
-	  namespace import RamDebugger::*
-	  rhelp
-   * Modify the Tkcon initialization file (tkcon.cfg or .tkconrc) and add:
-
-	     set ::tkcon::OPT(slaveeval) {
-		 source "<Path to RamDebugger>/RamDebugger.tcl"
-		 namespace import RamDebugger::*
-		 puts "Welcome to Ramdebugger inside tkcon. Use 'rhelp' for help"
-	     }

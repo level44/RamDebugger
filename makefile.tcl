@@ -3,14 +3,14 @@ package require createdistribution
 namespace import createdistribution::*
 
 set name RamDebugger
-set version 5.7
+set version 6.0
 
 IconifiedConsole
 
 set createdistribution::doencrypt 0
 set createdistribution::add_packages [list treectrl BWidgetR tkhtml]
-set createdistribution::remove_packages [list trf bwidget tcllibc \
-	vfs::ftp]
+lappend createdistribution::remove_packages trf bwidget \
+    vfs::ftp he_dialog wce
 
 createdistribution::regsubfiles [list \
       {set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \
