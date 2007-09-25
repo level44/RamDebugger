@@ -8,6 +8,7 @@ proc RamDebugger::GetFile { what types title }  {
     variable mainframe
     variable getFileToolbar
     variable getFile_done
+    variable getfileentry
     variable getfilestring
     variable getFile_dirs
     variable currentfile
@@ -42,31 +43,38 @@ proc RamDebugger::GetFile { what types title }  {
 	    package require registry
 	    foreach winfolder {Personal Desktop} {
 		set key {HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders}
-		lappend getFile_dirs [file normalize [registry get $key $winfolder]]/
+		set err [catch { registry get $key $winfolder } ret]
+		if { $err } { continue }
+		lappend getFile_dirs [file normalize $ret]/
 	    }
 	} else {
 	    lappend getFile_dirs [file normalize ~]/
 	}
     }
 
-    label $f.l1 -text "File:"
-    ComboBox $f.e1 -textvariable ::RamDebugger::getfilestring \
+    ttk::label $f.l1 -text [_ "File:"]
+    ttk::combobox $f.e1 -textvariable ::RamDebugger::getfilestring \
 	-values $getFile_dirs
+    set getfileentry $f.e1
 
-    Button $f.b1 -image fileopen16 -relief link -bd 1 -helptext "Select file" \
+    ttk::button $f.b1 -image fileopen16 -style Toolbutton \
 	-command [list RamDebugger::GetFile_Browser $w $what $types $title]
-    grid $f.l1 $f.e1 $f.b1 -sticky nw -padx 2
-    grid $f.e1 -sticky new
+    tooltip::tooltip $f.b1 [_ "Select file"]
+    
+    grid $f.l1 $f.e1 $f.b1 -sticky w -padx 2
+    grid $f.e1 -sticky ew
     grid columnconfigure $f 1 -weight 1
 
-    $f.e1 bind <Tab> "[list RamDebugger::GetFile_Complete $f.e1] ; break"
+    bind $f.e1 <Tab> "[list RamDebugger::GetFile_Complete $f.e1] ; break"
     bind $f <Destroy> "[list unset ::RamDebugger::getFileToolbar]"
 
-    $f.e1 bind <Control-o> "[list $f.b1 invoke] ; break"
-    $f.e1 bind <Return> "[list set RamDebugger::getFile_done 1] ; break"
-    $f.e1 configure -modifycmd [list set RamDebugger::getFile_done 1]
-    $f.e1 bind <Escape> [list set RamDebugger::getFile_done 0]
-    $f.e1 bind <Alt-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
+    bind $f.e1 <<ComboboxSelected>> [list set RamDebugger::getFile_done 1]
+    bind $f.e1 <Control-o> "[list $f.b1 invoke] ; break"
+    bind $f.e1 <Return> "[list set RamDebugger::getFile_done 1] ; break"
+    bind $f.e1 <Escape> [list set RamDebugger::getFile_done 0]
+    bind $f.e1 <Alt-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
+    bind $f.e1 <Home> [list RamDebugger::GetFile_Home home]
+    bind $f.e1 <Shift-Home> [list RamDebugger::GetFile_Home desktop]
     bind $f <1> {
 	if { %Y < [winfo rooty %W] || %Y > \
 	    [expr {[winfo rooty %W]+[winfo height %W]}] } {
@@ -81,11 +89,11 @@ proc RamDebugger::GetFile { what types title }  {
     bind $f.l1 <3> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
 
     bind $f.e1 <3> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
-    bind $f.e1.e <3> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
+    #bind $f.e1.e <3> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
 
-    $f.e1 bind <Control-Tab> "[list set RamDebugger::getFile_done 0] ; [bind $text <Control-KeyPress-Tab>]"
+    bind $f.e1 <Control-Tab> "[list set RamDebugger::getFile_done 0] ; [bind $text <Control-KeyPress-Tab>]"
 
-    DynamicHelp::register $f.e1 balloon "\
+    tooltip::tooltip $f.e1 "\
 	Enter the filename path. Remote paths are also allowed. Examples:\n\
 	\tplink://user@host/filename"
 
@@ -98,8 +106,8 @@ proc RamDebugger::GetFile { what types title }  {
 	set getfilestring $options(defaultdir)/
     }
     focus $f.e1
-    $f.e1.e xview end
-    $f.e1.e icursor end
+    $f.e1 xview moveto 1
+    $f.e1 icursor end
 
     set getFileToolbar 1
     grab $f
@@ -127,9 +135,9 @@ proc RamDebugger::GetFile { what types title }  {
 		if { [file isfile $getfilestring] } { break }
 	    }
 	}
-	focus $f.e1.e
-	$f.e1.e xview end
-	$f.e1.e icursor end
+	focus $f.e1
+	$f.e1 xview moveto 1
+	$f.e1 icursor end
     }
     GetFile_close $f
     if { $getFile_done } {
@@ -197,6 +205,26 @@ proc RamDebugger::GetFile_contextual { f combo button x y } {
 	[list RamDebugger::GetFile_close $f]
 
     tk_popup $menu $x $y
+}
+
+proc RamDebugger::GetFile_Home { where } {
+    variable getfilestring
+    variable getfileentry
+    
+    switch $where {
+	home {
+	    set err [catch { set getfilestring [file normalize $::env(HOME)]/ }]
+	}
+	desktop {
+	    set err [catch {
+		    package require registry
+		    set key {HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders}
+		    set getfilestring [file normalize [registry get $key Desktop]]/
+		}]
+	}
+    }
+    $getfileentry icursor end
+    if { !$err } { return -code break }
 }
 
 proc RamDebugger::GetFile_del_backwards {} {
@@ -375,9 +403,9 @@ proc RamDebugger::GetFile_Complete { combo } {
 	eval lappend values $getFile_dirs
 	$combo configure -values $values
     }
-    $combo.e xview end
-    $combo.e icursor end
-    $combo.e selection clear
+    $combo xview moveto 1
+    $combo icursor end
+    $combo selection clear
 }
 
 proc RamDebugger::GetFile_close { f } {

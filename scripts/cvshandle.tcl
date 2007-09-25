@@ -220,7 +220,7 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	lappend list [list $revision $date $author $lines]
     }
 
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
     $w set_uservar_value tablelist [tablelist::tablelist $sw.lb -width 50\
 		  -exportselection 0 \
 		  -columns [list \
@@ -383,7 +383,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
     foreach "list totalsize_show retcvslog" [_showallfiles_update] break
 
     label $f.lsize -text "Total size of revision storage: $totalsize_show"
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
     $w set_uservar_value tablelist [tablelist::tablelist $sw.lb -width 85\
 		  -exportselection 0 \
 		  -columns [list \

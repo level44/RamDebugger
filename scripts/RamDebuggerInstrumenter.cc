@@ -3,6 +3,7 @@
 #include <string.h>
 #include <tcl.h>
 
+
 enum P_or_R {P=0,R=1,PP=2};
 enum Word_types { NONE_WT,W_WT,BRACE_WT,DQUOTE_WT,BRACKET_WT};
 
@@ -938,17 +939,507 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
   return result;
 }
 
+struct Xml_state_tag
+{
+  char* tag;
+  int charlen;
+  int line;
+};
 
+enum Xml_states_names {
+  NONE_XS,
+  doctype_XS,
+  doctypeM_XS,
+  pi_XS,
+  comment_XS,
+  cdata_XS,
+  tag_XS,
+  tag_end_XS,
+  enter_tagtext_XS,
+  entered_tagtext_XS,
+  text_XS,
+  att_text_XS,
+  att_after_equal_XS,
+  att_quote_XS,
+  att_dquote_XS,
+  att_after_name_XS,
+  att_entername_XS
+};
 
+const int MaxStackLen=1000;
+
+struct Xml_state
+{
+  Tcl_Interp *ip;
+  int indentlevel;
+  int xml_state_tag_listNum;
+  Xml_state_tag xml_state_tag_list[MaxStackLen];
+  int xml_states_names_listNum;
+  Xml_states_names xml_states_names_list[MaxStackLen];
+
+  Xml_state(Tcl_Interp *_ip,int _indentlevel): ip(_ip),indentlevel(_indentlevel),
+    xml_state_tag_listNum(0),xml_states_names_listNum(0) {}
+
+  void push_state(Xml_states_names state);
+  void pop_state();
+  int state_is(Xml_states_names state,int idx=-1);
+
+  void push_tag(char* tag,int len,int line);
+  void pop_tag(char* tag,int raiseerror,int len);
+  void raise_error_if_tag_stack();
+
+  void raise_error(char* txt,int raiseerror,int line,int icharline);
+};
+
+void Xml_state::push_state(Xml_states_names state)
+{
+  if(xml_states_names_listNum>=MaxStackLen){
+    Tcl_SetObjResult(ip,Tcl_NewStringObj("error in push_state. Stack full",-1));
+    throw 1;
+  }
+  xml_states_names_list[xml_states_names_listNum++]=state;
+}
+
+void Xml_state::pop_state()
+{
+  xml_states_names_listNum--;
+  if(xml_states_names_listNum<0){
+    Tcl_SetObjResult(ip,Tcl_NewStringObj("error in pop_state. Stack empty",-1));
+    throw 1;
+  }
+}
+
+int Xml_state::state_is(Xml_states_names state,int idx)
+{
+  if(idx<0) idx=xml_states_names_listNum+idx;
+  if(idx<0 || idx>=xml_states_names_listNum){
+    return state==NONE_XS;
+  }
+  return state==xml_states_names_list[idx];
+}
+
+void Xml_state::push_tag(char* tag,int charlen,int line)
+{
+  if(xml_state_tag_listNum>=MaxStackLen){
+    Tcl_SetObjResult(ip,Tcl_NewStringObj("error in push_tag. Stack full",-1));
+    throw 1;
+  }
+  xml_state_tag_list[xml_state_tag_listNum].tag=tag;
+  xml_state_tag_list[xml_state_tag_listNum].charlen=charlen;
+  xml_state_tag_list[xml_state_tag_listNum].line=line;
+  xml_state_tag_listNum++;
+  indentlevel++;
+}
+
+void Xml_state::pop_tag(char* tag,int raiseerror,int charlen)
+{
+  int idx=xml_state_tag_listNum-1;
+  if(tag && (charlen!=xml_state_tag_list[idx].charlen ||
+    strncmp(tag,xml_state_tag_list[idx].tag,charlen)!=0)){
+    if(!raiseerror) return;
+    char buf[1024];
+    if(charlen>800) charlen=800;
+    sprintf(buf,"closing tag '%.*s' is not correct. tags stack=\n",charlen,tag);
+    Tcl_Obj *resPtr=Tcl_NewStringObj(buf,-1);
+    for(int i=0;i<xml_state_tag_listNum;i++){
+      sprintf(buf,"\t%.*s\tLine: %d\n",xml_state_tag_list[i].charlen,
+	      xml_state_tag_list[i].tag,xml_state_tag_list[i].line);
+      Tcl_AppendToObj(resPtr,buf,-1);
+    }
+    Tcl_SetObjResult(ip,resPtr);
+    throw 1;
+  }
+  xml_state_tag_listNum--;
+  indentlevel--;
+  if(xml_state_tag_listNum<0){
+    Tcl_SetObjResult(ip,Tcl_NewStringObj("error in pop_tag. Stack empty",-1));
+    throw 1;
+  }
+}
+
+void Xml_state::raise_error_if_tag_stack()
+{
+  if(xml_state_tag_listNum){
+    char buf[1024];
+    Tcl_Obj *resPtr=Tcl_NewStringObj("There are non-closed tags. tags stack=\n",-1);
+    for(int i=0;i<xml_state_tag_listNum;i++){
+      sprintf(buf,"\t%.*s\tLine: %d\n",xml_state_tag_list[i].charlen,
+	xml_state_tag_list[i].tag,xml_state_tag_list[i].line);
+      Tcl_AppendToObj(resPtr,buf,-1);
+    }
+    Tcl_SetObjResult(ip,resPtr);
+    throw 1;
+  }
+}
+
+void Xml_state::raise_error(char* txt,int raiseerror,int line,int icharline)
+{
+  if(!raiseerror) return;
+  char buf[1024];
+  int charlen=strlen(txt);
+  if(charlen>800) charlen=800;
+  sprintf(buf,"error in line=%d position=%d. %.*s",line,icharline+1,charlen,txt);
+  Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));
+  throw 1;
+}
+
+int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* blockinfoname,int progress,
+					   int indentlevel_ini,int raiseerror) {
+
+  int i,length,state_start,state_start_global;
+  char c,buf[1024];
+  Tcl_Obj *blockinfo,*blockinfocurrent;
+
+  length = ( int)strlen(block);
+  if(length>1000 && progress){
+    /*     RamDebugger::ProgressVar 0 1 */
+  }
+  blockinfo=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfo);
+  blockinfocurrent=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfocurrent);
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(indentlevel_ini));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+  int indentLevel0=indentlevel_ini;
+
+  // colors: magenta magenta2 green red
+  
+  Xml_state xml_state(ip,indentlevel_ini);
+  int icharline=0;
+  int iline=1;
+  try {
+    for(i=0;i<length;i++){
+      c=block[i];
+
+      if(i%5000 == 0 && progress){
+	/* RamDebugger::ProgressVar [expr {$ichar*100/$length}] */
+      }
+      if(xml_state.state_is(cdata_XS)){
+	if(strncmp(&block[i-2],"]]>",3)==0){
+	  xml_state.pop_state();
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline-2));
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	}
+      } else if(xml_state.state_is(comment_XS)){
+	if(strncmp(&block[i-2],"-->",3)==0){
+	  xml_state.pop_state();
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("red",-1));
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	} else if(c=='\n'){
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("red",-1));
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	  state_start=0;
+	}
+      } else if(xml_state.state_is(doctype_XS)){
+	if(c=='['){
+	  xml_state.pop_state();
+	  xml_state.push_state(doctypeM_XS);
+	} else if(c=='>'){
+	  xml_state.pop_state();
+	}
+      } else if(xml_state.state_is(doctypeM_XS)){
+	if(strncmp(&block[i-1],"]>",2)==0){
+	  xml_state.pop_state();
+	}
+      } else {
+	switch(c){
+	case '<':
+	  if(xml_state.state_is(att_dquote_XS) || xml_state.state_is(att_quote_XS)){
+	    //nothing
+	  } else if(!xml_state.state_is(NONE_XS) && !xml_state.state_is(text_XS)){
+	    Tcl_SetObjResult(ip,Tcl_NewStringObj("Not valid <",-1));
+	  } else if(strncmp(&block[i],"<?",2)==0){
+	    xml_state.push_state(pi_XS);
+	  } else if(strncmp(&block[i],"<!DOCTYPE",9)==0){
+	    xml_state.push_state(doctype_XS);
+	  } else if(strncmp(&block[i],"<!--",4)==0){
+	    xml_state.push_state(comment_XS);
+	    state_start=icharline;
+	    state_start_global=i;
+	  } else if(strncmp(&block[i],"<![CDATA[",9)==0){
+	    xml_state.push_state(cdata_XS);
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+9));
+	  } else {
+	    if(xml_state.state_is(text_XS)) { xml_state.pop_state(); }
+	    xml_state.push_state(tag_XS);
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	  }
+	  break;
+	case '>':
+	  if(xml_state.state_is(enter_tagtext_XS)){
+	    xml_state.pop_state();
+	    int isend;
+	    if(xml_state.state_is(tag_end_XS)){
+	      isend=1;
+	      xml_state.pop_state();
+	    } else { isend=0; }
+	    if(xml_state.state_is(tag_XS)){
+	      if(isend){
+		xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
+	      } else {
+		xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
+	      }
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    } else {
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    }
+	    xml_state.push_state(entered_tagtext_XS);
+	  }
+	  if(xml_state.state_is(att_dquote_XS) || xml_state.state_is(att_quote_XS)){
+	    // nothing
+	  } else {
+	    if(!xml_state.state_is(entered_tagtext_XS)){
+	      xml_state.raise_error("Not valid >",raiseerror,iline,icharline);
+	    }
+	    xml_state.pop_state();
+	    if(xml_state.state_is(pi_XS) && strncmp(&block[i-1],"?>",2)==0){
+	      xml_state.pop_state();
+	    } else if(xml_state.state_is(tag_XS)){
+	      xml_state.pop_state();
+	      xml_state.push_state(text_XS);
+	    } else {
+	      xml_state.raise_error("Not valid > (2)",raiseerror,iline,icharline);
+	    }
+	  }
+	  break;
+	case '/':
+	  if(xml_state.state_is(tag_XS) || xml_state.state_is(pi_XS)){
+	    xml_state.push_state(tag_end_XS);
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("red",-1));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	  } else if(xml_state.state_is(enter_tagtext_XS)){
+	    xml_state.pop_state();
+	    if(xml_state.state_is(tag_XS)){
+	      xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
+	      xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
+	    }
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    xml_state.push_state(entered_tagtext_XS);
+	  } else if(xml_state.state_is(entered_tagtext_XS)){
+	     xml_state.pop_tag(NULL,raiseerror,0);
+	  } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_text_XS) &&
+	     !xml_state.state_is(att_quote_XS) && !xml_state.state_is(att_dquote_XS)){
+	       xml_state.raise_error("Not valid /",raiseerror,iline,icharline);
+	  }
+	  break;
+	  case '=':
+	    if(xml_state.state_is(att_entername_XS) || xml_state.state_is(att_after_name_XS)){
+	      xml_state.pop_state();
+	      xml_state.push_state(att_after_equal_XS);
+	    } else if(!xml_state.state_is(text_XS) &&
+	      !xml_state.state_is(att_quote_XS) && !xml_state.state_is(att_dquote_XS)){
+		xml_state.raise_error("Not valid =",raiseerror,iline,icharline);
+	    }
+	    break;
+	  case '\'':
+	    if(xml_state.state_is(att_after_equal_XS)){
+	      xml_state.pop_state();
+	      xml_state.push_state(att_quote_XS);
+	      state_start=icharline;
+	      state_start_global=i;
+	    } else if(xml_state.state_is(att_quote_XS)){
+	      char cm1=block[i+1];
+	      if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
+		xml_state.raise_error("Not valid close '",raiseerror,iline,icharline);
+	      }
+	      xml_state.pop_state();
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_dquote_XS)){
+		xml_state.raise_error("Not valid '",raiseerror,iline,icharline);
+	    }
+	    break;
+	  case '"':
+	    if(xml_state.state_is(att_after_equal_XS)){
+	      xml_state.pop_state();
+	      xml_state.push_state(att_dquote_XS);
+	      state_start=icharline;
+	      state_start_global=i;
+	    } else if(xml_state.state_is(att_dquote_XS)){
+	      char cm1=block[i+1];
+	      if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
+		xml_state.raise_error("Not valid close \"",raiseerror,iline,icharline);
+	      }
+	      xml_state.pop_state();
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_quote_XS)){
+		xml_state.raise_error("Not valid \"",raiseerror,iline,icharline);
+	    }
+	    break;
+	  case '\n':
+	     if(xml_state.state_is(enter_tagtext_XS)){
+	       xml_state.pop_state();
+	       if(xml_state.state_is(tag_XS,-2)){
+		 if(xml_state.state_is(tag_end_XS)){
+		   xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
+		   xml_state.pop_state();
+		 } else {
+		   xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
+		 }
+	       }
+	       xml_state.push_state(entered_tagtext_XS);
+	       blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	       Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
+	       Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	       Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline-1));
+	     } else if(xml_state.state_is(att_entername_XS)){
+	       xml_state.pop_state();
+	       xml_state.push_state(att_after_name_XS);
+	     }
+	     break;
+	  case ' ': case '\t':
+	    if(xml_state.state_is(enter_tagtext_XS)){
+	       xml_state.pop_state();
+	       int isend;
+	       if(xml_state.state_is(tag_end_XS)){
+		 isend=1;
+		 xml_state.pop_state();
+	       } else {
+		 isend=0;
+	       }
+	       if(xml_state.state_is(tag_XS)){
+		 if(isend){
+		   xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
+		 } else {
+		   xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
+		 }
+		 blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
+		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	       } else {
+		 blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
+		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	       }
+	       xml_state.push_state(entered_tagtext_XS);
+	    } else if(xml_state.state_is(att_entername_XS)){
+	      xml_state.pop_state();
+	      xml_state.push_state(att_after_name_XS);
+
+	    }
+	    break;
+	  default:
+	    if(xml_state.state_is(tag_XS) || xml_state.state_is(pi_XS) ||
+	      xml_state.state_is(tag_end_XS)){
+		xml_state.push_state(enter_tagtext_XS);
+		state_start=icharline;
+		state_start_global=i;
+	    } else if(xml_state.state_is(entered_tagtext_XS)){
+	      if(c!='?'){
+		xml_state.push_state(att_entername_XS);
+		state_start=icharline;
+		state_start_global=i;
+	      }
+	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_quote_XS) &&
+	      !xml_state.state_is(att_dquote_XS) && !xml_state.state_is(enter_tagtext_XS) &&
+	      !xml_state.state_is(att_entername_XS)){
+		sprintf(buf,"Not valid character '%c'",c);
+		xml_state.raise_error(buf,raiseerror,iline,icharline);
+	    }
+	    break;
+	 }
+       }
+       if(c=='\t'){
+	 icharline+=8;
+       } else if(c=='\n'){
+	 iline++;
+	 icharline=0;
+	 if(xml_state.indentlevel<indentLevel0){
+	   if(iline==2){
+	     xml_state.indentlevel++;
+	   } else {
+	     Tcl_Obj *objPtr;
+	     Tcl_ListObjIndex(ip,blockinfocurrent,0,&objPtr);
+	     Tcl_SetIntObj(objPtr,xml_state.indentlevel);
+	   }
+	 }
+	 blockinfo=Tcl_CopyIfShared(blockinfo);
+	 Tcl_ListObjAppendElement(ip,blockinfo,blockinfocurrent);
+	 blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	 Tcl_SetListObj(blockinfocurrent,0,NULL);
+	 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(xml_state.indentlevel));
+	 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+	 indentLevel0=xml_state.indentlevel;
+       } else {
+	 icharline++;
+       }
+     }
+     if(xml_state.indentlevel<indentLevel0){
+       if(iline==2){
+	 xml_state.indentlevel++;
+       } else {
+	 Tcl_Obj *objPtr;
+	 Tcl_ListObjIndex(ip,blockinfocurrent,0,&objPtr);
+	 Tcl_SetIntObj(objPtr,xml_state.indentlevel);
+       }
+     }
+     blockinfo=Tcl_CopyIfShared(blockinfo);
+     Tcl_ListObjAppendElement(ip,blockinfo,blockinfocurrent);
+     blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+
+     xml_state.raise_error_if_tag_stack();
+
+     Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+     Tcl_SetVar2Ex(ip,"blockinfo",NULL,blockinfo,0);
+
+#ifdef _DEBUG
+     char* tmpblockinfo=Tcl_GetString(blockinfo);
+#endif
+     if(length>1000 && progress){
+       /*     RamDebugger::ProgressVar 100 */
+     }
+     Tcl_DecrRefCount(blockinfo);
+     Tcl_DecrRefCount(blockinfocurrent);
+     return TCL_OK;
+   }   
+   catch(...){
+     Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+     Tcl_SetVar2Ex(ip,"blockinfo",NULL,blockinfo,0);
+
+     Tcl_DecrRefCount(blockinfo);
+     Tcl_DecrRefCount(blockinfocurrent);
+     return TCL_ERROR;
+   }
+}
 
 
 int RamDebuggerInstrumenterDoWork(ClientData clientData, Tcl_Interp *ip, int objc,
-		                  Tcl_Obj *CONST objv[])
+				  Tcl_Obj *CONST objv[])
 {
   int result,filenum,progress=1;
   if (objc<6) {
     Tcl_WrongNumArgs(ip, 1, objv,
-		     "block filenum newblocknameP newblocknameR blockinfoname ?progress?");
+      "block filenum newblocknameP newblocknameR blockinfoname ?progress?");
     return TCL_ERROR;
   }
   result=Tcl_GetIntFromObj(ip,objv[2],&filenum);
@@ -962,6 +1453,35 @@ int RamDebuggerInstrumenterDoWork(ClientData clientData, Tcl_Interp *ip, int obj
   return result;
 }
 
+
+
+int RamDebuggerInstrumenterDoWorkForXML(ClientData clientData, Tcl_Interp *ip, int objc,
+		                  Tcl_Obj *CONST objv[])
+{
+  int result,progress=1,indentlevel_ini=0,raiseerror=1;
+  if (objc<3) {
+    Tcl_WrongNumArgs(ip, 1, objv,
+		     "block blockinfoname ?progress? ?indentlevel_ini? ?raiseerror?");
+    return TCL_ERROR;
+  }
+  if (objc>=4){
+    result=Tcl_GetIntFromObj(ip,objv[3],&progress);
+    if(result) return TCL_ERROR;
+  }
+  if (objc>=5){
+    result=Tcl_GetIntFromObj(ip,objv[4],&indentlevel_ini);
+    if(result) return TCL_ERROR;
+  }
+  if (objc==6){
+    result=Tcl_GetBooleanFromObj(ip,objv[5],&raiseerror);
+    if(result) return TCL_ERROR;
+  }
+  result=RamDebuggerInstrumenterDoWorkForXML_do(ip,Tcl_GetString(objv[1]),Tcl_GetString(objv[2]),
+						progress,indentlevel_ini,raiseerror);
+  return result;
+}
+
+
 extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
 {
 #ifdef USE_TCL_STUBS
@@ -970,6 +1490,8 @@ extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
 #endif
 
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWork",RamDebuggerInstrumenterDoWork,
+		        ( ClientData)0, NULL);
+  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForXML",RamDebuggerInstrumenterDoWorkForXML,
 		        ( ClientData)0, NULL);
   return TCL_OK;
 }

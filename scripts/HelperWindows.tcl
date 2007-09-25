@@ -77,22 +77,20 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 # DisplayVarWindow
 ################################################################################
 
-proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
+proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
     variable remoteserver
     variable remoteserverType
     variable options
 
-    set w [winfo toplevel $f]
-
     if { $what == "do" } {
-	if { [string trim $DialogWinTop::user($w,expression)] == "" } {
-	    set DialogWinTop::user($w,type) ""
+	if { [string trim [$w give_uservar_value expression]] == "" } {
+	    $w set_uservar_value type ""
 	    return
 	}
-	set var $DialogWinTop::user($w,expression)
+	set var [$w give_uservar_value expression]
 
 	if { $remoteserver == "" } {
-	    WarnWin "Debugger is not active"
+	    WarnWin [_ "Debugger is not active"]
 	    return
 	}
 
@@ -102,7 +100,7 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 	}
 	set options(old_expressions) [linsert [lrange $options(old_expressions) 0 20] 0 $var]
 
-	$DialogWinTop::user($w,combo) configure -values $options(old_expressions)
+	[$w give_uservar_value combo] configure -values $options(old_expressions)
 
 	if { $remoteserverType == "gdb" } {
 	    if { ![regexp {\[([0-9]+):([0-9]+)\]} $var {} ini1 end1] } {
@@ -114,7 +112,7 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 		set end2 1
 	    }
 	    set remoteserver [lreplace $remoteserver 2 2 [list getdata \
-		"RamDebugger::DisplayVarWindowEval res $f"]]
+		[list RamDebugger::DisplayVarWindowEval res $w]]]
 
 	    set comm ""
 	    set isinit 0
@@ -147,11 +145,11 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 	    }
 	    set comm [string map [list VAR [string trim $var]] $comm]
 	}
-	reval -handler [list RamDebugger::DisplayVarWindowEval res $f] $comm
+	reval -handler [list RamDebugger::DisplayVarWindowEval res $w] $comm
     } else {
-	set var $DialogWinTop::user($w,expression)
-	$DialogWinTop::user($w,textv) conf -state normal
-	$DialogWinTop::user($w,textv) delete 1.0 end
+	set var [$w give_uservar_value expression]
+	[$w give_uservar_value textv] configure -state normal
+	[$w give_uservar_value textv] delete 1.0 end
 
 	if { $remoteserverType == "gdb" } {
 	    if { [regexp {^(\s*MULTIPLE RESULT\s*type\s+=\s+char\s)(.*)} $res {} ini rest] } {
@@ -164,55 +162,50 @@ proc RamDebugger::DisplayVarWindowEval { what f { res "" } } {
 	    }
 	    set res [list 0 [list variable $res]]
 	}
-
 	switch [lindex $res 0] {
 	    0 {
-		$DialogWinTop::user($w,textv) conf -fg black
-		set DialogWinTop::user($w,type) [lindex [lindex $res 1] 0]
-		if { $DialogWinTop::user($w,type) == "array" } {
-		    set DialogWinTop::user($w,type) array
+		[$w give_uservar_value textv] configure -fg black
+		$w set_uservar_value type [lindex [lindex $res 1] 0]
+		if { [$w give_uservar_value type] eq "array" } {
+		    $w set_uservar_value type array
 		    foreach "name val" [lindex [lindex $res 1] 1] {
-		        $DialogWinTop::user($w,textv) insert end "${var}($name) = $val\n"
+		        [$w give_uservar_value textv] insert end "${var}($name) = $val\n"
 		    }
-		} elseif { $DialogWinTop::user($w,aslist) eq "list" } {
-		    set DialogWinTop::user($w,type) list
+		} elseif { [$w give_uservar_value aslist] eq "list" } {
+		    $w set_uservar_value type list
 		    if { [catch { set list [lrange [lindex [lindex $res 1] 1] 0 end] }] } {
-		        $DialogWinTop::user($w,textv) insert end "Error: variable is not a list"
+		        [$w give_uservar_value textv] insert end [_ "Error: variable is not a list"]
 		    } else {
 		        set ipos 0
 		        foreach i $list {
-		            $DialogWinTop::user($w,textv) insert end "$ipos = $i\n"
+		            [$w give_uservar_value textv] insert end "$ipos = $i\n"
 		            incr ipos
 		        }
 		    }
-		}  elseif { $DialogWinTop::user($w,aslist) eq "dict" } {
-		    set DialogWinTop::user($w,type) dict
+		}  elseif { [$w give_uservar_value aslist] eq "dict" } {
+		    $w set_uservar_value type dict
 		    set dict [lindex [lindex $res 1] 1]
 		    if { [catch { dict info $dict }] } {
-		        $DialogWinTop::user($w,textv) insert end "Error: variable is not a dict"
+		        [$w give_uservar_value textv] insert end [_ "Error: variable is not a dict"]
 		    } else {
 		        foreach key [lsort -dictionary [dict keys $dict]] {
-		            $DialogWinTop::user($w,textv) insert end "$key = [dict get $dict $key]\n"
+		            [$w give_uservar_value textv] insert end "$key = [dict get $dict $key]\n"
 		        }
 		    }
 		} else {
-		    set DialogWinTop::user($w,type) ""
-		    $DialogWinTop::user($w,textv) insert end [lindex [lindex $res 1] 1]
+		    $w set_uservar_value type ""
+		    [$w give_uservar_value textv] insert end [lindex [lindex $res 1] 1]
 		}
 	    }
 	    1 {
-		set DialogWinTop::user($w,type) error
-		$DialogWinTop::user($w,textv) conf -fg red
-		$DialogWinTop::user($w,textv) insert end [lindex $res 1]
+		$w set_uservar_value type error
+		[$w give_uservar_value textv] configure -fg red
+		[$w give_uservar_value textv] insert end [lindex $res 1]
 	    }
 	}
-	$DialogWinTop::user($w,textv) see end
-	$DialogWinTop::user($w,textv) conf -state disabled
+	[$w give_uservar_value textv] see end
+	[$w give_uservar_value textv] configure -state disabled
     }
-}
-
-proc RamDebugger::DisplayVarWindowCancel { f } {
-    destroy [winfo toplevel $f]
 }
 
 proc RamDebugger::GetSelOrWordInIndex { idx } {
@@ -278,9 +271,9 @@ proc RamDebugger::AddAlwaysOnTopFlag { w mainwindow } {
     $w conf -menu $w._topmenu
     menu $w._topmenu.system -tearoff 0
     $w._topmenu add cascade -menu $w._topmenu.system
-    $w._topmenu.system add checkbutton -label "Always on top" -var \
+    $w._topmenu.system add checkbutton -label [_ "Always on top"] -var \
 	RamDebugger::options(TransientVarWindow) -command \
-	"RamDebugger::ToggleTransientWinAll $mainwindow"
+	[list RamDebugger::ToggleTransientWinAll $mainwindow]
 }
 
 proc RamDebugger::InvokeAllDisplayVarWindows {} {
@@ -288,7 +281,8 @@ proc RamDebugger::InvokeAllDisplayVarWindows {} {
 
     if { ![info exists varwindows] } { return }
     foreach i $varwindows {
-	catch { DialogWinTop::InvokeOK $i }
+	set w [winfo toplevel $i]
+	catch { $w invokeok }
     }
 }
 
@@ -325,11 +319,10 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	set var [GetSelOrWordInIndex insert]
     }
 
-    set commands [list "RamDebugger::DisplayVarWindowEval do" RamDebugger::DisplayVarWindowCancel]
-    set f [DialogWinTop::Init $text "View expression or variable" separator $commands \
-	       "" Eval Close]
-    set w [winfo toplevel $f]
-
+    set w [dialogwin_snit $text.%AUTO% -title [_ "View expression or variable"] -okname \
+	    [_ Eval] -cancelname [_ Close] -grab 0 -callback [list RamDebugger::DisplayVarWindowDo]]
+    set f [$w giveframe]
+ 
     lappend varwindows $f
     bind $f <Destroy> {
 	set ipos [lsearch -exact $RamDebugger::varwindows %W]
@@ -337,9 +330,9 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     }
     ToggleTransientWin $w $mainwindow
 
-    Label $f.l1 -text "Expression:" -grid "0 w px3"
+    ttk::label $f.l1 -text [_ "Expression:"]
 
-    $f.l1 configure -helptext {
+    tooltip::tooltip $f.l1 [_ {
 	Examples of possible expressions in TCL:
 
 	*  variablename: Enter the name of a variable 
@@ -353,48 +346,65 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	*  $variablename+4: Enter any expression that gdb accepts
 	*  $variablename[4:2][6::8]: One extension to the gdb expressions. Permmits to
 	   print part of a string or vector
-    }
+    }]
 
     if { ![info exists options(old_expressions)] } {
 	set options(old_expressions) ""
     }
 
-    set DialogWinTop::user($w,combo) [ComboBox $f.e1 -textvariable DialogWinTop::user($w,expression) \
-	-values $options(old_expressions) -grid "1 3 ew px3"]
+    $w set_uservar_value combo [ttk::combobox $f.e1 -textvariable [$w give_uservar expression] \
+	-values $options(old_expressions)]
 
-    set DialogWinTop::user($w,expression) $var
+    $w set_uservar_value expression $var
     
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 4"]
-    set DialogWinTop::user($w,textv) [text $sw.text -background white -wrap word -width 40 -height 10 \
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
+    $w set_uservar_value textv [text $sw.text -background white -wrap word -width 40 -height 10 \
 		                       -exportselection 0 -font FixedFont -highlightthickness 0]
 
+    bind $f.l1 <1> [list $w invokeok]
     bind $sw.text <3> [list RamDebugger::DisplayVarWindow_contextual %W %X %Y]
 
 
-    $sw setwidget $DialogWinTop::user($w,textv)
+    $sw setwidget $sw.text
 
     if { $::tcl_platform(platform) != "windows" } {
 	$sw.text conf -exportselection 1
     }
 
-    label $f.l2 -textvar DialogWinTop::user($w,type) -grid "0 w" -bg [CCColorActivo [$w  cget -bg]]
-    radiobutton $f.cb1 -text "As var" -variable DialogWinTop::user($w,aslist) -grid "1 wwe" \
-       -command "DialogWinTop::InvokeOK $f" -value "var"
-    radiobutton $f.cb2 -text "As list" -variable DialogWinTop::user($w,aslist) -grid "2 wwe" \
-       -command "DialogWinTop::InvokeOK $f" -value "list"
-    radiobutton $f.cb3 -text "As dict" -variable DialogWinTop::user($w,aslist) -grid "3 wwe" \
-       -command "DialogWinTop::InvokeOK $f" -value "dict"
+    label $f.l2 -textvar [$w give_uservar type] -bg [CCColorActivo [$w  cget -bg]]
+    ttk::radiobutton $f.cb1 -text [_ "As var"] -variable [$w give_uservar aslist] \
+	-command [list $w invokeok] -value "var"
+    ttk::radiobutton $f.cb2 -text [_ "As list"] -variable [$w give_uservar aslist] \
+	-command [list $w invokeok] -value "list"
+    ttk::radiobutton $f.cb3 -text [_ "As dict"] -variable [$w give_uservar aslist] \
+	-command [list $w invokeok] -value "dict"
 
-    set DialogWinTop::user($w,aslist) var
-    supergrid::go $f
+    $w set_uservar_value aslist var
+    
+    grid $f.l1 $f.e1 - - -sticky w -pady 2
+    grid $f.lf - - - -sticky nsew
+    grid $f.l2 $f.cb1 $f.cb2 $f.cb3 -sticky w
+    
+    grid configure $f.l2 -sticky ew
+    grid configure $f.e1 -sticky ew
+    grid columnconfigure $f 3 -weight 1
+    grid rowconfigure $f 1 -weight 1
 
-    tkTabToWindow $f.e1
-    $DialogWinTop::user($w,combo) bind <Return> "DialogWinTop::InvokeOK $f ; break"
-    $DialogWinTop::user($w,textv) conf -state disabled
-    bind $DialogWinTop::user($w,textv) <1> "focus $DialogWinTop::user($w,textv)"
+    tk::TabToWindow $f.e1
+    bind [$w give_uservar_value combo] <Return> "[list $w invokeok] ; break"
+    [$w give_uservar_value textv] configure -state disabled
+    bind [$w give_uservar_value textv] <1> [list focus [$w give_uservar_value textv]]
 
-    DialogWinTop::CreateWindow $f
-    DialogWinTop::InvokeOK $f
+    $w createwindow
+    $w invokeok
+}
+
+proc RamDebugger::DisplayVarWindowDo { w } {
+    if { [$w giveaction] < 1 } {
+	destroy $w
+	return
+    }
+    DisplayVarWindowEval do $w
 }
 
 ################################################################################
@@ -402,12 +412,12 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 ################################################################################
 
 
-proc RamDebugger::DisplayBreakpointsWindowSetCond {} {
+proc RamDebugger::DisplayBreakpointsWindowSetCond { w } {
 
-    set curr [$DialogWinBreak::user(list) curselection]
+    set curr [[$w give_uservar_value list] curselection]
     if { [llength $curr] != 1 } { return }
 
-    set DialogWinBreak::user(cond) [lindex [$DialogWinBreak::user(list) get $curr] 4]
+    $w set_uservar_value cond [lindex [[$w give_uservar_value list] get $curr] 4]
 }
 
 proc RamDebugger::DisplayBreakpointsWindow {} {
@@ -415,60 +425,66 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     variable breakpoints
     variable currentfile
     
-    CopyNamespace ::DialogWin ::DialogWinBreak
-
-    set f [DialogWinBreak::Init $text [_ "Breakpoints window"] separator [list \
-		[_ Delete] [_ "Delete all"] [_ View] [_ En/Dis] [_ Trace]] [_ "Apply Cond"] \
-	    [_ Close]]
-    set w [winfo toplevel $f]
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Breakpoints window"] -okname \
+	    [_ "Apply Cond"] -cancelname [_ Close] -morebuttons [list \
+		[_ Delete] [_ "Delete all"] [_ View] [_ En/Dis] [_ Trace]]]
+    set f [$w giveframe]
 
     set help [_ {Examples of conditions:
 	$i > $j+1
 	[string match *.tcl $file]
     }]
 
-    Label $f.l1 -text [_ "Condition:"] -helptext $help -grid 0
-    entry $f.e1 -textvariable DialogWinBreak::user(cond) -width 80 -grid "1 px3 py3"
+    ttk::label $f.l1 -text [_ "Condition:"]
+    tooltip::tooltip $f.l1 $help
+    ttk::entry $f.e1 -textvariable [$w give_uservar cond ""] -width 80
 
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    
-    set DialogWinBreak::user(list) [tablelist::tablelist $sw.lb -width 55\
+    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
+
+    $w set_uservar_value list [tablelist::tablelist $sw.lb -width 55\
 		  -exportselection 0 \
 		  -columns [list \
 		                4  [_ Num]        left \
 		                6  [_ En/dis]     center \
 		                20 [_ File]        right \
 		                5  [_ Line] left \
-		                20 [_ Condition] left \
-		                40 [_ Path] left
+		                12 [_ Condition] left \
+		                40 [_ Path] left \
 		               ] \
 		  -labelcommand tablelist::sortByColumn \
 		  -background white \
 		  -selectbackground navy -selectforeground white \
-		  -stretch 1 -selectmode extended \
+		  -stretch all -selectmode extended \
 		  -highlightthickness 0]
 
-    $sw setwidget $DialogWinBreak::user(list)
+    $sw setwidget $sw.lb
+    
+    grid $f.l1 $f.e1 -sticky w -padx 2 -pady 2
+    grid $sw   -     -sticky nsew -padx 2 -pady 2
+    
+    grid configure $f.e1 -sticky ew
+    grid columnconfigure $f 1 -weight 1
+    grid rowconfigure $f 1 -weight 1
 
-    supergrid::go $f
-
-    focus $DialogWinBreak::user(list)
-    bind [$DialogWinBreak::user(list) bodypath] <Double-1> {
-	focus $DialogWinBreak::user(list)
-	RamDebugger::DisplayBreakpointsWindowSetCond
+    focus $sw.lb
+    bind [$sw.lb bodypath] <Double-1> {
+	set w [winfo toplevel %W]
+	focus [$w give_uservar_value list]
+	RamDebugger::DisplayBreakpointsWindowSetCond $w
     }
-    bind [$DialogWinBreak::user(list) bodypath] <ButtonPress-3> \
+    bind [$sw.lb bodypath] <ButtonPress-3> \
 	    [bind TablelistBody <ButtonPress-1>]
 
-    bind [$DialogWinBreak::user(list) bodypath] <ButtonRelease-3> {
+    bind [$sw.lb bodypath] <ButtonRelease-3> {
+	set w [winfo toplevel %W]
 	catch { destroy %W.menu }
 	set menu [menu %W.menu]
-	$menu add command -label [_ "Apply condition"] -command "DialogWinBreak::InvokeOK"
-	$menu add command -label [_ "View"] -command "DialogWinBreak::InvokeButton 4"
-	$menu add command -label [_ "Enable/disable"] -command "DialogWinBreak::InvokeButton 5"
-	$menu add command -label [_ "Trace"] -command "DialogWinBreak::InvokeButton 6"
+	$menu add command -label [_ "Apply condition"] -command [list $w invokeok]
+	$menu add command -label [_ "View"] -command [list $w invokebutton 4]
+	$menu add command -label [_ "Enable/disable"] -command [list $w invokebutton 5]
+	$menu add command -label [_ "Trace"] -command [list $w invokebutton 6]
 	$menu add separator
-	$menu add command -label [_ "Delete"] -command "DialogWinBreak::InvokeButton 2"
+	$menu add command -label [_ "Delete"] -command [list $w invokebutton 2]
 	tk_popup $menu %X %Y
     }
 
@@ -479,32 +495,31 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	    set tail [file tail $file]
 	    set dir [file dirname $file]
 	} else { foreach "tail dir" [list "" ""] break }
-	$DialogWinBreak::user(list) insert end [list $num $endis $tail $line $cond \
+	$sw.lb insert end [list $num $endis $tail $line $cond \
 		$dir]
 	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
-	    $DialogWinBreak::user(list) selection set end
-	    $DialogWinBreak::user(list) see end
+	    $sw.lb selection set end
+	    $sw.lb see end
 	}
     }
 
-    set action [DialogWinBreak::CreateWindow]
+    set action [$w createwindow]
     while 1 {
 	switch $action {
 	    0 {
-		DialogWinBreak::DestroyWindow
-		namespace delete ::DialogWinBreak
+		destroy $w
 		return
 	    }
 	    1 {
-		set curr [$DialogWinBreak::user(list) curselection]
+		set curr [[$w give_uservar_value list] curselection]
 		if { [llength $curr] != 1 } {
 		    WarnWin [_ "Select just one breakpoint before applying condition"] $w
 		} else {
-		    set val [$DialogWinBreak::user(list) get $curr]
-		    rcond [lindex $val 0] $DialogWinBreak::user(cond)
-		    $DialogWinBreak::user(list) delete $curr
-		    $DialogWinBreak::user(list) insert $curr [lreplace $val 4 4 \
-		            $DialogWinBreak::user(cond)]
+		    set val [[$w give_uservar_value list] get $curr]
+		    rcond [lindex $val 0] [$w give_uservar_value cond]
+		    [$w give_uservar_value list] delete $curr
+		    [$w give_uservar_value list] insert $curr [lreplace $val 4 4 \
+		            [$w give_uservar_value cond]]
 		    set file [file join [lindex $val 5 ] [lindex $val 2]]
 		    set line [lindex $val 3]
 		    if { $file == $currentfile } {
@@ -514,8 +529,8 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		}
 	    }
 	    2 {
-		foreach i [$DialogWinBreak::user(list) curselection] {
-		    set ent [$DialogWinBreak::user(list) get $i]
+		foreach i [[$w give_uservar_value list] curselection] {
+		    set ent [[$w give_uservar_value list] get $i]
 		    set num [lindex $ent 0]
 		    set file [file join [lindex $ent 5 ] [lindex $ent 2]]
 		    set line [lindex $ent 3]
@@ -524,19 +539,19 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		    }
 		    rdel $num
 		}
-		$DialogWinBreak::user(list) delete 0 end
+		[$w give_uservar_value list] delete 0 end
 		foreach i $breakpoints {
 		    foreach "num endis file line cond" $i break
-		    $DialogWinBreak::user(list) insert end [list $num $endis [file tail $file] $line $cond \
+		    [$w give_uservar_value list] insert end [list $num $endis [file tail $file] $line $cond \
 		            [file dirname $file]]
 		}
 	    }
 	    3 {
-		set ret [DialogWinBreak::messageBox -default ok -icon warning -message \
-		             [_ "Are you sure to delete all breakpoints?"] -parent $f \
-		             -title [_ "delete all breakpoints"] -type okcancel]
+		set ret [snit_messageBox -default ok -icon warning -message \
+		        [_ "Are you sure to delete all breakpoints?"] -parent $w \
+		        -title [_ "delete all breakpoints"] -type okcancel]
 		if { $ret == "ok" } {
-		    $DialogWinBreak::user(list) delete 0 end
+		    [$w give_uservar_value list] delete 0 end
 		    foreach i $breakpoints {
 		        set num [lindex $i 0]
 		        set file [lindex $i 2]
@@ -549,12 +564,12 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		}
 	    }
 	    4 {
-		set curr [$DialogWinBreak::user(list) curselection]
+		set curr [[$w give_uservar_value list] curselection]
 		if { [llength $curr] != 1 } {
 		    WarnWin [_ "Select just one breakpoint in order to see the file"] $w
 		    return
 		}
-		set val [$DialogWinBreak::user(list) get $curr]
+		set val [[$w give_uservar_value list] get $curr]
 		set file [file join [lindex $val 5] [lindex $val 2]]
 		set line [lindex $val 3]
 		if { $file != $currentfile } {
@@ -564,15 +579,15 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		$text see $line.0
 	    }
 	    5 {
-		foreach i [$DialogWinBreak::user(list) curselection] {
-		    set val [$DialogWinBreak::user(list) get $i]
+		foreach i [[$w give_uservar_value list] curselection] {
+		    set val [[$w give_uservar_value list] get $i]
 		    renabledisable [lindex $val 0]
-		    $DialogWinBreak::user(list) delete $i
+		    [$w give_uservar_value list] delete $i
 		    if { [lindex $val 1] } {
 		        set enabledisable 0
 		    } else { set enabledisable 1 }
-		    $DialogWinBreak::user(list) insert $i [lreplace $val 1 1 $enabledisable]
-		    $DialogWinBreak::user(list) selection set $i
+		    [$w give_uservar_value list] insert $i [lreplace $val 1 1 $enabledisable]
+		    [$w give_uservar_value list] selection set $i
 		    set file [file join [lindex $val 5 ] [lindex $val 2]]
 		    set line [lindex $val 3]
 		    if { $file == $currentfile } {
@@ -583,20 +598,20 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		}
 	    }
 	    6 {
-		set txt [_ "A trace is a breakpoint that is applied to every line. "]
-		append txt [_ "It should be used with a condition. "]
-		append txt [_ "to trace changes in a variable, write as cond '%s' " "variable varname"]
-		append txt [_ "Proceed?"]
+		set txt [_ "A trace is a breakpoint that is applied to every line.\
+		           It should be used with a condition.\
+		           to trace changes in a variable, write as cond '%s'.\
+		           Proceed?" "variable varname"]
 		set ret [snit_messageBox -type okcancel -message $txt -parent $w]
 		if { $ret eq "ok" } {
-		    foreach i [$DialogWinBreak::user(list) curselection] {
-		        set val [$DialogWinBreak::user(list) get $i]
+		    foreach i [[$w give_uservar_value list] curselection] {
+		        set val [[$w give_uservar_value list] get $i]
 		        set file [file join [lindex $val 5 ] [lindex $val 2]]
 		        set line [lindex $val 3]
 		        rbreaktotrace [lindex $val 0]
 		        set val [lreplace $val 2 3 "" ""]
 		        set val [lreplace $val 5 5 ""]
-		        $DialogWinBreak::user(list) insert $i $val
+		        [$w give_uservar_value list] insert $i $val
 		        if { $file == $currentfile } {
 		            UpdateArrowAndBreak $line "" "" 0
 		        }
@@ -604,7 +619,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		}
 	    }
 	}
-	set action [DialogWinBreak::WaitForWindow]
+	set action [$w waitforwindow]
     }
 }
 
@@ -664,18 +679,20 @@ proc RamDebugger::CreateModifyFonts {} {
 # Preferences
 ################################################################################
 
-proc RamDebugger::PreferencesAddDelProcs { listbox what } {
+proc RamDebugger::PreferencesAddDelProcs { w listbox what } {
     variable options
     
     switch $what {
 	add {
-	    set proc [string trim $DialogWin::user(nonInstrumentingProc)]
+	    set proc [string trim [$w give_uservar_value nonInstrumentingProc]]
 	    if { $proc eq "" } {
-		WarnWin "Write a proc in order to add it to list"
+		WarnWin [_ "Write a proc in order to add it to list"]
 		return
 	    }
-	    if { [lsearch -exact $DialogWin::user(nonInstrumentingProcs) $proc] == -1 } {
-		lappend DialogWin::user(nonInstrumentingProcs) $proc
+	    if { [lsearch -exact [$w give_uservar_value nonInstrumentingProcs] $proc] == -1 } {
+		set l [$w give_uservar_value nonInstrumentingProcs]
+		lappend l $proc
+		$w set_uservar_value nonInstrumentingProcs $l
 	    }
 	}
 	delete {
@@ -734,19 +751,24 @@ proc RamDebugger::_giveopposite_color { col } {
     return [format "#%04x%04x%04x" $r $g $b]
 }
 
-proc RamDebugger::_chooseColor { button what } {
+proc RamDebugger::_chooseColor { w button what } {
 
-    set col [tk_chooseColor -initialcolor $DialogWin::user(colors,$what) \
+    set col [tk_chooseColor -initialcolor [$w give_uservar_value colors,$what] \
 	    -parent $button -title "Choose color"]
     if { $col ne "" } {
-	set DialogWin::user(colors,$what) $col
+	$w set_uservar_value colors,$what $col
 	$button configure -background $col -text $col \
 	    -foreground [_giveopposite_color $col]
     }
 }
 
-proc RamDebugger::_update_pref_font { label selectfont } {
-    $label configure -font [$selectfont cget -font]
+proc RamDebugger::_update_pref_font { w label fontname } {
+    
+    set font ""
+    foreach i [list family size weight slant underline] {
+	lappend font -$i [$w give_uservar_value font_$i,$fontname]
+    }
+    $label configure -font $font
 }
 
 proc RamDebugger::PreferencesWindow {} {
@@ -754,248 +776,284 @@ proc RamDebugger::PreferencesWindow {} {
     variable text_secondary
     variable options
     variable options_def
+    variable iswince
     
-    set fb [DialogWin::Init $text "Preferences window" separator [list Apply Defaults]]
-    set w [winfo toplevel $fb]
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Preferences window"] -morebuttons \
+	    [list [_ Apply] [_ Defaults]]]
+    set f [$w giveframe]
 
-    set notebook [NoteBook $fb.nb -homogeneous 1 -bd 1 -internalborderwidth 3  \
-	-grid "0 px3 py3"]
+    set nb [ttk::notebook $f.nb]
     
-    set f [$fb.nb insert end basic -text "Basic"]
-
-    TitleFrame $f.f1 -text [_ debugging] -grid "0 nsew"
-    set f1 [$f.f1 getframe]
+    set f1 [ttk::labelframe $nb.f1 -text [_ Debugging]]
+    $nb add $f1 -text [_ Debugging] -sticky nsew
 
     if { $::tcl_platform(platform) == "windows" } {
-	checkbutton $f1.cb0 -text "Automatically check remote files" -variable \
-	DialogWin::user(CheckRemotes) -grid "0 3 w"
-	DynamicHelp::register $f1.cb0 balloon [string trim {
+	ttk::checkbutton $f1.cb0 -text "Automatically check remote files" -variable \
+	    [$w give_uservar CheckRemotes]
+	tooltip::tooltip $f1.cb0 [string trim {
 	    this variable is only used on windows. It can be:
 	    0: Only check remote programs on demand (useful if not making remote debugging, the
 	       start up is faster)
 	    1: Register as remote and check remote programs on start up. The start up can be slower
 		but is better when making remote debugging
 	}]
-	set DialogWin::user(CheckRemotes) $options(CheckRemotes)
+	$w set_uservar_value CheckRemotes $options(CheckRemotes)
+    }
+    ttk::checkbutton $f1.cb1 -text [_ "Confirm restart debugging"] -variable \
+	[$w give_uservar ConfirmStartDebugging]
+    tooltip::tooltip $f1.cb1 [_ "\
+	    If this option is set, a confirmation window will be displayed\n\
+	    when restarting the execution of the debugger"]
+    
+    $w set_uservar_value ConfirmStartDebugging $options(ConfirmStartDebugging)
+
+    ttk::checkbutton $f1.cb2 -text [_ "Confirm modify variable"] -variable \
+	[$w give_uservar ConfirmModifyVariable]
+    tooltip::tooltip $f1.cb2 [_ "\
+	    If this option is set, a confirmation window will be displayed\n\
+	    before changing the value of a variable in the debugged program\n\
+	    by pressing return in the 'User defined variables' or in the\n\
+	    'Local variables'"]
+    
+    $w set_uservar_value ConfirmModifyVariable $options(ConfirmModifyVariable)
+
+    ttk::checkbutton $f1.cb25 -text [_ "Use browser to open files"] -variable \
+	[$w give_uservar openfile_browser]
+    tooltip::tooltip $f1.cb25 [_ "\
+	    If this option is set, files names are chosen with the default\n\
+	    browser. If not, file names are chosen inline. This last option\n\
+	    permmits to use remote protocols like ssh,..."]
+    
+    $w set_uservar_value openfile_browser $options(openfile_browser)
+
+    ttk::label $f1.isf -text [_ "Instrument sourced files"]
+    ttk::menubutton $f1.cb3 -textvariable [$w give_uservar instrument_source_p] -menu \
+	$f1.cb3.m
+    menu $f1.cb3.m -tearoff 0
+    foreach i [list auto autoprint always never ask] j [list [_ Auto] [_ "Auto print"] \
+	    [_ Always] [_ Never] [_ Ask]] {
+	set cmd1 [list $w set_uservar_value instrument_source $i]
+	set cmd2 [list $w set_uservar_value instrument_source_p $j]
+	$f1.cb3.m add command -label $j -command "$cmd1 ; $cmd2"
+	if { $options(instrument_source) eq $i } {
+	    $w set_uservar_value instrument_source_p $j
+	}
+    }
+    tooltip::tooltip $f1.isf [_ "\
+	    This variable controls what to do when the debugged program tries\n\
+	    to source a file. Depending on the option chosen, the source file\n\
+	    will be instrumented or not.\n\
+	    If 'auto' is chosen, only the already instrumented files will be sent\n\
+	    instrumented"]
+    
+    if { [string match *ask* $options(instrument_source)] } {
+	$w set_uservar_value instrument_source ask
+	$w set_uservar_value instrument_source_p [_ Ask]
+    } else {
+	$w set_uservar_value instrument_source $options(instrument_source)
     }
 
-    checkbutton $f1.cb1 -text "Confirm restart debugging" -variable \
-       DialogWin::user(ConfirmStartDebugging) -grid "0 3 w"
-    DynamicHelp::register $f1.cb1 balloon "\
-	If this option is set, a confirmation window will be displayed\n\
-	when restarting the execution of the debugger"
-    
-    set DialogWin::user(ConfirmStartDebugging) $options(ConfirmStartDebugging)
+    ttk::checkbutton $f1.cb23 -text [_ "Instrument proc last line"] -variable \
+	[$w give_uservar instrument_proc_last_line]
+    tooltip::tooltip $f1.cb23 [_ "\
+	    If this option is set, it is possible to put stops in the last line\n\
+	    of one proc. It can make the debugged program fail if the proc wants\n\
+	    to return a value without using command return. A typical example of\n\
+	    failure are the procs that finish using 'set a 23' instead of 'return 23'"]
 
-    checkbutton $f1.cb2 -text "Confirm modify variable" -variable \
-       DialogWin::user(ConfirmModifyVariable) -grid "0 3 w"
-    DynamicHelp::register $f1.cb2 balloon "\
-	If this option is set, a confirmation window will be displayed\n\
-	before changing the value of a variable in the debugged program\n\
-	by pressing return in the 'User defined variables' or in the\n\
-	'Local variables'"
-    
-    set DialogWin::user(ConfirmModifyVariable) $options(ConfirmModifyVariable)
+    $w set_uservar_value instrument_proc_last_line $options(instrument_proc_last_line)
 
-    checkbutton $f1.cb25 -text "Use browser to open files" -variable \
-       DialogWin::user(openfile_browser) -grid "0 3 w"
-    DynamicHelp::register $f1.cb25 balloon "\
-	If this option is set, files names are chosen with the default\n\
-	browser. If not, file names are chosen inline. This last option\n\
-	permmits to use remote protocols like ssh,..."
+    ttk::label $f1.l15 -text [_ "Local debugging type:"]
+    tooltip::tooltip $f1.l15 [_ "When debugging locally, choose here if the debugged script\n\
+	    is only TCL or also TK"]
+    ttk::frame $f1.rads
+    ttk::radiobutton $f1.rads.r1 -text "TCL" -variable [$w give_uservar LocalDebuggingType] \
+	-value tcl
+    ttk::radiobutton $f1.rads.r2 -text "TK" -variable [$w give_uservar LocalDebuggingType] \
+	-value tk
+    grid $f1.rads.r1 $f1.rads.r2 -sticky w
     
-    set DialogWin::user(openfile_browser) $options(openfile_browser)
+    $w set_uservar_value LocalDebuggingType $options(LocalDebuggingType)
 
-    label $f1.isf -text "Instrument sourced files" -grid "0 e"
-    tk_optionMenu $f1.cb3 DialogWin::user(instrument_source) auto autoprint always never ask
-    $f1.cb3 conf -width 10
-    supergrid::gridinfo $f1.cb3 "1 w"
-    DynamicHelp::register $f1.isf balloon "\
-	This variable controls what to do when the debugged program tries\n\
-	to source a file. Depending on the option chosen, the source file\n\
-	will be instrumented or not.\n\
-	If 'auto' is chosen, only the already instrumented files will be sent\n\
-	instrumented"
-    
-    set DialogWin::user(instrument_source) $options(instrument_source)
-    if { [string match *ask* $DialogWin::user(instrument_source)] } {
-	set DialogWin::user(instrument_source) ask
+    ttk::label $f1.l2 -text [_ "Indent size TCL:"]
+    tooltip::tooltip $f1.l2 [_ "Size used when indenting TCL with key: <Tab>"]
+
+    spinbox $f1.sb -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeTCL] \
+       -width 4
+    $w set_uservar_value indentsizeTCL $options(indentsizeTCL)
+
+    ttk::label $f1.l3 -text [_ "Indent size c++:"]
+    tooltip::tooltip $f1.l3 [_ "Size used when indenting c++ with key: <Tab>"]
+
+    spinbox $f1.sb2 -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeC++] \
+       -width 4
+    $w set_uservar_value indentsizeC++ $options(indentsizeC++)
+
+    ttk::checkbutton $f1.cb12 -text [_ "Compile fast instrumenter"] -variable \
+	[$w give_uservar CompileFastInstrumenter]
+    tooltip::tooltip $f1.cb1 [_ "\
+      If this option is set, RamDebugger tries to compile automatically the fast C++ instrumented code"]
+
+    $w set_uservar_value CompileFastInstrumenter $options(CompileFastInstrumenter)
+
+    if { $::tcl_platform(platform) == "windows" } {
+	grid $f1.cb0 - -sticky w
     }
-
-    checkbutton $f1.cb23 -text "Instrument proc last line" -variable \
-       DialogWin::user(instrument_proc_last_line) -grid "0 3 w"
-    DynamicHelp::register $f1.cb23 balloon "\
-	If this option is set, it is possible to put stops in the last line\n\
-	of one proc. It can make the debugged program fail if the proc wants\n\
-	to return a value without using command return. A typical example of\n\
-	failure are the procs that finish using 'set a 23' instead of 'return 23'"
-
-    set DialogWin::user(instrument_proc_last_line) $options(instrument_proc_last_line)
-
-    set helptext "When debugging locally, choose here if the debugged script is only TCL "
-    append helptext "or also TK"
-    Label $f1.l15 -text "Local debugging type:" -helptext $helptext -grid "0 e"
-    frame $f1.rads -grid "1 2 w"
-    radiobutton $f1.rads.r1 -text "TCL" -variable DialogWin::user(LocalDebuggingType) -value tcl \
-	    -grid "0 w"
-    radiobutton $f1.rads.r2 -text "TK" -variable DialogWin::user(LocalDebuggingType) -value tk \
-	    -grid "1 w"
-
-    set DialogWin::user(LocalDebuggingType) $options(LocalDebuggingType)
-
-    Label $f1.l2 -text "Indent size TCL:" -helptext "Size used when indenting TCL with key: <Tab>" \
-       -grid "0 e"
-    spinbox $f1.sb -from 0 -to 10 -increment 1 -textvariable DialogWin::user(indentsizeTCL) \
-       -width 4 -grid "1 2 px3"
-    set DialogWin::user(indentsizeTCL) $options(indentsizeTCL)
-
-    Label $f1.l3 -text "Indent size c++:" -helptext "Size used when indenting c++ with key: <Tab>" \
-       -grid "0 e"
-    spinbox $f1.sb2 -from 0 -to 10 -increment 1 -textvariable DialogWin::user(indentsizeC++) \
-       -width 4 -grid "1 2 px3"
-    set DialogWin::user(indentsizeC++) $options(indentsizeC++)
-
-    checkbutton $f1.cb12 -text "Compile fast instrumenter" -variable \
-	DialogWin::user(CompileFastInstrumenter) -grid "0 2 w"
-    DynamicHelp::register $f1.cb1 balloon "\
-      If this option is set, RamDebugger tries to compile automatically the fast C++ instrumented code"
-
-    set DialogWin::user(CompileFastInstrumenter) $options(CompileFastInstrumenter)
-
-    TitleFrame $f.f2 -text [_ fonts] -grid "0 nsew"
-    set f2 [$f.f2 getframe]
+    grid $f1.cb1 - -sticky w
+    grid $f1.cb2 - -sticky w
+    grid $f1.cb25 - -sticky w
+    grid $f1.isf $f1.cb3 -sticky w
+    grid $f1.cb23 - -sticky w
+    grid $f1.l15 $f1.rads -sticky w
+    grid $f1.l2 $f1.sb -sticky w
+    grid $f1.l3 $f1.sb2 -sticky w
+    grid $f1.cb12 - -sticky w
     
-#     foreach "but type fontname" [list $f2.b1 {GUI font} NormalFont $f2.b2 {Text font} FixedFont \
-#         $f2.b3 {Help font} HelpFont] {
-#         set btext "$type: [font conf $fontname -family] [font conf $fontname -size] "
-#         append btext "[font conf $fontname -weight] [font conf $fontname -slant]"
-#         Button $but -text $btext -font $fontname -relief link -command \
-#             "RamDebugger::UpdateFont $w $but $fontname" -grid "0 w"
-#     }
-
+    grid configure $f1.l2 $f1.l3 -padx "20 0"
+    
+    grid rowconfigure $f1 10 -weight 1
+    
+    set f2 [ttk::labelframe $nb.f2 -text [_ Fonts]]
+    $nb add $f2 -text [_ Fonts] -sticky nsew
+    
+    set families [font families]
+    set sizes [list 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]
+    set irow 0
     foreach "but type fontname" [list b1 {GUI font} NormalFont b2 {Text font} \
 	    FixedFont b3 {Help font} HelpFont] {
-	label $f2.l$but -text $type: -font $fontname -grid "0 w" \
-	    -anchor w
-	SelectFont $f2.$but -type toolbar -font $fontname -command \
-	    [list RamDebugger::_update_pref_font $f2.l$but $f2.$but]
-	supergrid::gridinfo $f2.$but "1 new"
+	label $f2.l$but -text $type: -font $fontname -anchor w
+	ttk::combobox $f2.cbf$irow -textvariable [$w give_uservar font_family,$fontname] \
+	    -values $families -width 8 -state readonly
+	ttk::combobox $f2.cbs$irow -textvariable [$w give_uservar font_size,$fontname] \
+	    -values $sizes -width 2
+	ttk::checkbutton $f2.cbb$irow -image format-text-bold-16 \
+	    -variable [$w give_uservar font_weight,$fontname] \
+	    -style Toolbutton -onvalue bold -offvalue normal
+	ttk::checkbutton $f2.cbsl$irow -image format-text-italic-16 \
+	    -variable [$w give_uservar font_slant,$fontname] \
+	    -style Toolbutton -onvalue italic -offvalue roman
+	ttk::checkbutton $f2.cbu$irow -image format-text-underline-16 \
+	    -variable [$w give_uservar font_underline,$fontname] \
+	    -style Toolbutton
+	
+	grid $f2.l$but $f2.cbf$irow $f2.cbs$irow $f2.cbb$irow $f2.cbsl$irow \
+	    $f2.cbu$irow -sticky w
+	grid configure $f2.cbf$irow -sticky ew
+	grid columnconfigure $f2 1 -weight 1
+	
+	foreach i [list family size weight slant underline] {
+	    $w set_uservar_value font_$i,$fontname [font configure $fontname -$i]
+	    set cmd [list RamDebugger::_update_pref_font $w $f2.l$but $fontname]
+	    $w add_trace_to_uservar font_$i,$fontname $cmd
+	}
+	incr irow
     }
+    grid rowconfigure $f2 $irow -weight 1
+    
+    set fco [ttk::labelframe $nb.fco -text [_ Colors]]
+    $nb add $fco -text [_ Colors] -sticky nsew
 
-
-    set fco [$fb.nb insert end colors -text "Colors"]
-
-    TitleFrame $fco.f1 -text "colors" -grid "0 nsew"
-    set fco1 [$fco.f1 getframe]
-
+    set irow 0
     foreach i [list foreground background commands defines procnames \
 	    quotestrings set comments varnames] {
-	label $fco1.l$i -text $i -grid "0 nw px3"
-	set DialogWin::user(colors,$i) $options(colors,$i)
-	button $fco1.b$i -width 15 -background $options(colors,$i) \
-	    -grid "1 w px3 py2" -text $options(colors,$i) \
+	ttk::label $fco.l$i -text $i
+	$w set_uservar_value colors,$i $options(colors,$i)
+	button $fco.b$i -width 15 -background $options(colors,$i) \
+	    -text $options(colors,$i) \
 	    -foreground [_giveopposite_color $options(colors,$i)] \
-	    -command [list RamDebugger::_chooseColor $fco1.b$i $i] \
+	    -command [list RamDebugger::_chooseColor $w $fco.b$i $i] \
 	    -anchor center
+	grid $fco.l$i $fco.b$i -sticky w -padx 3 -pady 2
+	incr irow
     }
-    supergrid::go $fco
-    supergrid::go $fco1
+    grid rowconfigure $fco $irow -weight 1
  
-    set fde [$fb.nb insert end extensions -text "Extensions"]
+    set fde [ttk::labelframe $nb.fde -text [_ Extensions]]
+    $nb add $fde -text [_ Extensions] -sticky nsew
 
-    TitleFrame $fde.f1 -text "extensions" -grid "0 nsew"
-    set fde1 [$fde.f1 getframe]
-
-    label $fde1.ll -text "Choose extensions for every file type:" -grid "0 2 w"
-    set ic 0
+    ttk::label $fde.ll -text [_ "Choose extensions for every file type:"]
+    grid $fde.ll - -sticky w -pady 3
+    set ic 1
     foreach "type extsdefaultlist" [list TCL [list ".tcl" ".tcl .tk *"] \
 	    C/C++ [list ".c .cpp .cc .h"] \
 	    XML [list ".xml .html .htm"] \
 	    "GiD BAS file" .bas \
 	    "GiD data files" [list ".prb .mat .cnd"]] {
-	label $fde1.l$ic -text $type: -grid "0 e"
+	ttk::label $fde.l$ic -text $type:
 	if { ![info exists options(extensions,$type)] } {
-	    set DialogWin::user(extensions,$type) $options_def(extensions,$type)
+	    $w set_uservar_value extensions,$type $options_def(extensions,$type)
 	} else {
-	    set DialogWin::user(extensions,$type) $options(extensions,$type)
+	    $w set_uservar_value extensions,$type $options(extensions,$type)
 	}
-	ComboBox $fde1.cb$ic -textvariable DialogWin::user(extensions,$type) -values \
-	    $extsdefaultlist -grid 1
+	ttk::combobox $fde.cb$ic -textvariable [$w give_uservar extensions,$type] -values \
+	    $extsdefaultlist
+	grid $fde.l$ic $fde.cb$ic -sticky w -pady 2
+	grid configure $fde.cb$ic -sticky ew
 	incr ic
     }
-    supergrid::go $fde
-    supergrid::go $fde1
+    grid rowconfigure $fde $ic -weight 1
 
-    set fd [$fb.nb insert end directories -text "Directories"]
+    set fd [ttk::labelframe $nb.fd -text [_ Directories]]
+    $nb add $fd -text [_ Directories] -sticky nsew
 
-    TitleFrame $fd.f1 -text "executable directories" -grid "0 nsew"
-    set fd1 [$fd.f1 getframe]
-
-    set sw [ScrolledWindow $fd1.lf -relief sunken -borderwidth 0]
+    set sw [ScrolledWindow $fd.lf -relief sunken -borderwidth 0]
     listbox $sw.lb -listvariable DialogWin::user(executable_dirs) -selectmode extended
     $sw setwidget $sw.lb
+    
+    ttk::frame $fd.bbox1
+    set icol 0
+    foreach "img cmd help" [list \
+	    folderopen16 add [_ "Add include directory"] \
+	    actcross16 delete [_ "Delete include directory"] \
+	    playeject16 up [_ "Increase directory priority"] \
+	    ] {
+	ttk::button $fd.bbox1.b$icol -image $img -style Toolbutton -command \
+	    [list RamDebugger::PreferencesAddDelDirectories $sw.lb $cmd]
+	tooltip::tooltip $fd.bbox1.b$icol $help
+	grid $fd.bbox1.b$icol -sticky w -row 0 -column $icol
+	incr icol
+    }
+    grid columnconfigure $fd.bbox1 $icol -weight 1
 
-    set bbox [ButtonBox $fd1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
-    $bbox add -image folderopen16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add include directory"] \
-	 -command "RamDebugger::PreferencesAddDelDirectories $sw.lb add"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete include directory"] \
-	 -command "RamDebugger::PreferencesAddDelDirectories $sw.lb delete"
-    $bbox add -image playeject16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Increase directory priority"] \
-	 -command "RamDebugger::PreferencesAddDelDirectories $sw.lb up"
+    $w set_uservar_value executable_dirs $options(executable_dirs)
 
-    grid $fd1.lf -sticky nsew
-    grid $fd1.bbox1 -sticky nw
-    grid columnconfigure $fd1 0 -weight 1
-    grid rowconfigure $fd1 0 -weight 1
+    set tt [_ "Include here all directories where RamDebugger should find executables\n\
+	    This is primary useful in Windows to describe where mingw is installed"]
+    tooltip::tooltip $sw.lb $tt
 
-    set DialogWin::user(executable_dirs) $options(executable_dirs)
+    grid $fd.lf -sticky nsew
+    grid $fd.bbox1 -sticky w
+    
+    grid columnconfigure $fd 0 -weight 1
+    grid rowconfigure $fd 0 -weight 1
 
-    set tt "Include here all directories where RamDebugger should find executables\n"
-    append tt "This is primary useful in Windows to describe where mingw is installed"
-    DynamicHelp::register $sw.lb balloon $tt
+    set lb [ttk::labelframe $nb.lb -text [_ "Auto save revisions"]]
+    $nb add $lb -text [_ "Auto save"] -sticky nsew
 
-    supergrid::go $f1
-    supergrid::go $f2
-    supergrid::go $f
-    supergrid::go $fd
+    ttk::checkbutton $lb.c1 -text [_ "Perform auto save revisions"] -variable \
+	[$w give_uservar AutoSaveRevisions]
+    ttk::label $lb.l1 -text [_ "Auto save time"]:
+    spinbox $lb.cb1 -textvariable [$w give_uservar AutoSaveRevisions_time] \
+	-from 0 -to 10000 -increment 1 -width 4
+    ttk::label $lb.l2 -text [_ "seconds"]
+    tooltip::tooltip $lb.l1 [_ "Time in seconds before performing an auto-save"]
 
-    set fas [$fb.nb insert end autosave -text "Auto save"]
-
-    set lb [labelframe $fas.l1 -text "auto save revisions"]
-
-    checkbutton $lb.c1 -text "Perform auto save revisions" -variable \
-	DialogWin::user(AutoSaveRevisions)
-    label $lb.l1 -text "Auto save time"
-    spinbox $lb.cb1 -textvariable DialogWin::user(AutoSaveRevisions_time) \
-	-from 0 -to 10000 -increment 1
-    label $lb.l2 -text "seconds"
-    DynamicHelp::register $lb.l1 balloon "Time in seconds before performing an auto-save"
-
-    label $lb.l3 -text "Auto save idle time"
-    spinbox $lb.cb2 -textvariable DialogWin::user(AutoSaveRevisions_idletime) \
-	-from 0 -to 10000 -increment 1
-    label $lb.l4 -text "seconds"
-    set tt "Time in seconds without user activity before performing an auto-save"
-    DynamicHelp::register $lb.l3 balloon $tt
-
-    set cmd "switch \$DialogWin::user(AutoSaveRevisions) 1 { $lb.cb1 configure -state normal ;"
-    append cmd "$lb.cb2 configure -state normal } 0 { $lb.cb1 configure -state disabled ;"
-    append cmd "$lb.cb2 configure -state disabled }"
-
-    trace add variable DialogWin::user(AutoSaveRevisions) write "$cmd ;#"
-    bind $lb.cb1 <Destroy> [list trace remove variable DialogWin::user(AutoSaveRevisions) \
-		                write "$cmd ;#"]
+    ttk::label $lb.l3 -text [_ "Auto save idle time"]:
+    spinbox $lb.cb2 -textvariable [$w give_uservar AutoSaveRevisions_idletime] \
+	-from 0 -to 10000 -increment 1 -width 4
+    ttk::label $lb.l4 -text [_ "seconds"]
+    set tt [_ "Time in seconds without user activity before performing an auto-save"]
+    tooltip::tooltip $lb.l3 $tt
+    
+    set d [dict create 1 "$lb.l1 $lb.cb1 $lb.l2 $lb.l3 $lb.cb2 $lb.l4"]
+    $w enable_disable_on_key AutoSaveRevisions $d
 
     if { [info exists options(AutoSaveRevisions)] } {
-	set DialogWin::user(AutoSaveRevisions_time) $options(AutoSaveRevisions_time)
-	set DialogWin::user(AutoSaveRevisions_idletime) $options(AutoSaveRevisions_idletime)
-	set DialogWin::user(AutoSaveRevisions) $options(AutoSaveRevisions)
+	$w set_uservar_value AutoSaveRevisions_time $options(AutoSaveRevisions_time)
+	$w set_uservar_value AutoSaveRevisions_idletime $options(AutoSaveRevisions_idletime)
+	$w set_uservar_value AutoSaveRevisions $options(AutoSaveRevisions)
+    } else {
+	$w set_uservar_value AutoSaveRevisions 1
     }
 
     grid $lb.c1 - - -sticky nw
@@ -1004,88 +1062,86 @@ proc RamDebugger::PreferencesWindow {} {
 
     grid configure $lb.cb1 $lb.cb2 -sticky new
     grid configure $lb.l1 $lb.l3 -padx "10 0"
-    grid columnconfigure $lb 1 -weight 1
     grid rowconfigure $lb 2 -weight 1
 
-    grid $lb -sticky nsew
-    grid columnconfigure $fas 0 -weight 1
-    grid rowconfigure $fas 0 -weight 1
+    set fdi [ttk::labelframe $nb.fdi -text [_ "Non instrument procs"]]
+    $nb add $fdi -text [_ "Instrument"] -sticky nsew
 
-    set fd [$fb.nb insert end noninstrument -text "Instrument"]
-
-    TitleFrame $fd.f1 -text "non instrument procs" -grid "0 nsew"
-    set fd1 [$fd.f1 getframe]
-
-    set sw [ScrolledWindow $fd1.lf -relief sunken -borderwidth 0]
-    listbox $sw.lb -listvariable DialogWin::user(nonInstrumentingProcs) \
+    set sw [ScrolledWindow $fdi.lf -relief sunken -borderwidth 0]
+    listbox $sw.lb -listvariable [$w give_uservar nonInstrumentingProcs] \
 	-selectmode extended
     $sw setwidget $sw.lb
+    
+    ttk::frame $fdi.bbox1
+    set icol 0
+    foreach "img cmd help" [list \
+	    folderopen16 add [_ "Add proc"] \
+	    actcross16 delete [_ "Delete proc"] \
+	    ] {
+	ttk::button $fdi.bbox1.b$icol -image $img -style Toolbutton -command \
+	    [list RamDebugger::PreferencesAddDelProcs $w $sw.lb $cmd]
+	tooltip::tooltip $fdi.bbox1.b$icol $help
+	grid $fdi.bbox1.b$icol -sticky w -row 0 -column $icol
+	incr icol
+    }
+    grid columnconfigure $fdi.bbox1 $icol -weight 1
 
-    set bbox [ButtonBox $fd1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
-    $bbox add -image folderopen16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add proc"] \
-	 -command "RamDebugger::PreferencesAddDelProcs $sw.lb add"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete proc"] \
-	 -command "RamDebugger::PreferencesAddDelProcs $sw.lb delete"
-    label $fd1.l1 -text "Proc:"
-    entry $fd1.e1 -textvariable DialogWin::user(nonInstrumentingProc)
+    ttk::label $fdi.l1 -text [_ "Proc"]:
+    ttk::entry $fdi.e1 -textvariable [$w give_uservar nonInstrumentingProc]
 
-    bind $fd1.e1 <Return> "RamDebugger::PreferencesAddDelProcs $sw.lb add"
+    bind $fdi.e1 <Return> "RamDebugger::PreferencesAddDelProcs $w $sw.lb add"
 
-    grid $fd1.lf - -sticky nsew
-    grid $fd1.bbox1 - -sticky nw
-    grid $fd1.l1 $fd1.e1 -sticky nw -pady 3 -padx 3
-    grid configure $fd1.e1 -sticky new
-    grid columnconfigure $fd1 1 -weight 1
-    grid rowconfigure $fd1 0 -weight 1
+    grid $fdi.lf - -sticky nsew
+    grid $fdi.bbox1 - -sticky nw
+    grid $fdi.l1 $fdi.e1 -sticky nw -pady 3 -padx 3
+    grid configure $fdi.e1 -sticky new
+    grid columnconfigure $fdi 1 -weight 1
+    grid rowconfigure $fdi 0 -weight 1
 
-    grid $fd.f1 -sticky nsew
-    grid columnconfigure $fd 0 -weight 1
-    grid rowconfigure $fd 0 -weight 1
+    $w set_uservar_value nonInstrumentingProc ""
+    $w set_uservar_value nonInstrumentingProcs $options(nonInstrumentingProcs)
 
-    set DialogWin::user(nonInstrumentingProcs) $options(nonInstrumentingProcs)
+    set tt [_ "The procs with this name will not be instrumented"]
+    tooltip::tooltip $sw.lb $tt
+    tooltip::tooltip $fdi.l1 $tt
 
-    set tt "The procs with this name will not be instrumented"
-    DynamicHelp::register $sw.lb balloon $tt
-    DynamicHelp::register $fd1.l1 balloon $tt
-
-    $fb.nb compute_size
-    $fb.nb raise basic
-
-    supergrid::go $fb
+    grid $nb -sticky nsew
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1
 
     focus $f1.cb1
 
-    set action [DialogWin::CreateWindow "" "" 200]
+    set action [$w createwindow]
     while 1 {
 	switch $action {
 	    0 {
-		DialogWin::DestroyWindow
+		destroy $w
 		return
 	    }
 	    1 - 2 {
+		foreach i [list indentsizeTCL indentsizeC++ AutoSaveRevisions \
+		        AutoSaveRevisions_time AutoSaveRevisions_idletime] {
+		    set $i [$w give_uservar_value $i]
+		}
 		set good 1
-		if { ![string is integer -strict $DialogWin::user(indentsizeTCL)] || \
-		    $DialogWin::user(indentsizeTCL) < 0 || $DialogWin::user(indentsizeTCL) > 10 } {
-		    WarnWin "Error: indent size must be between 0 and 10" $w
+		if { ![string is integer -strict $indentsizeTCL] || \
+		    $indentsizeTCL < 0 || $indentsizeTCL > 10 } {
+		    WarnWin [_ "Error: indent size must be between 0 and 10"] $w
 		    set good 0
-		} elseif { ![string is integer -strict $DialogWin::user(indentsizeC++)] || \
-		    $DialogWin::user(indentsizeC++) < 0 || $DialogWin::user(indentsizeC++) > 10 } {
-		    WarnWin "Error: indent size must be between 0 and 10" $w
+		} elseif { ![string is integer -strict ${indentsizeC++}] || \
+		    ${indentsizeC++} < 0 || ${indentsizeC++} > 10 } {
+		    WarnWin [_ "Error: indent size must be between 0 and 10"] $w
 		    set good 0
 		}
-		if { $good && $DialogWin::user(AutoSaveRevisions) != 0 } {
-		    if { ![string is double -strict $DialogWin::user(AutoSaveRevisions_time)] || \
-		             $DialogWin::user(AutoSaveRevisions_time) < 0 } {
-		        WarnWin "Error: Auto save revisions time must be a number" $w
+		if { $good && $AutoSaveRevisions != 0 } {
+		    if { ![string is double -strict $AutoSaveRevisions_time] || \
+		             $AutoSaveRevisions_time < 0 } {
+		        WarnWin [_ "Error: Auto save revisions time must be a number"] $w
 		        set good 0
 		    } elseif { ![string is double -strict \
-		                     $DialogWin::user(AutoSaveRevisions_idletime)] || \
-		                   $DialogWin::user(AutoSaveRevisions_idletime) < 0 } {
-		        WarnWin "Error: Auto save revisions idle time must be a number" $w
+		                     $AutoSaveRevisions_idletime] || \
+		                   $AutoSaveRevisions_idletime < 0 } {
+		        WarnWin [_ "Error: Auto save revisions idle time must be a number"] $w
 		        set good 0
 		    }
 		}
@@ -1095,38 +1151,47 @@ proc RamDebugger::PreferencesWindow {} {
 		            LocalDebuggingType AutoSaveRevisions AutoSaveRevisions_time \
 		            AutoSaveRevisions_idletime CompileFastInstrumenter \
 		            nonInstrumentingProcs] {
-		        set options($i) $DialogWin::user($i)
+		        set options($i) [$w give_uservar_value $i]
 		    }
 		    foreach i [list foreground background commands defines procnames \
 		            quotestrings set comments varnames] {
-		        set options(colors,$i) $DialogWin::user(colors,$i)
+		        set options(colors,$i) [$w give_uservar_value colors,$i]
 		    }
 		    foreach "but type fontname" [list b1 {GUI font} NormalFont b2 {Text font} \
 		            FixedFont b3 {Help font} HelpFont] {
-		        $f2.l$but configure -font $fontname
-		        set options($fontname) [font actual [$f2.$but cget -font]]
+		        set font ""
+		        foreach i [list family size weight slant underline] {
+		            lappend font -$i [$w give_uservar_value font_$i,$fontname]
+		        }
+		        set options($fontname) $font
 		    }
 		    CreateModifyFonts
 
 		    if { [info exists options(CheckRemotes)] } {
-		        set options(CheckRemotes) $DialogWin::user(CheckRemotes)
+		        set options(CheckRemotes) [$w give_uservar_value CheckRemotes]
 		    }
 
 		    foreach i [array names options_def extensions,*] {
-		        set options($i) $DialogWin::user($i)
+		        set options($i) [$w give_uservar_value $i]
 		    }
-		    set options(executable_dirs) $DialogWin::user(executable_dirs)
+		    set options(executable_dirs) [$w give_uservar_value executable_dirs]
 		    UpdateExecDirs
 		    RamDebugger::CVS::ManageAutoSave
-		    if { $options(CompileFastInstrumenter) } {
+		    if { $options(CompileFastInstrumenter) == 1 } {
 		        Instrumenter::TryCompileFastInstrumenter 1
 		    }
 		    ApplyColorPrefs $text
 		    if { [info exists text_secondary] && [winfo exists text_secondary] } {
 		        ApplyColorPrefs $text_secondary
 		    }
+		    
 		    if { $action == 1 } {
-		        DialogWin::DestroyWindow
+		        destroy $w
+		    }
+		    
+		    RamDebugger::SavePreferences 1
+		    
+		    if { $action == 1 } {
 		        return
 		    }
 		}
@@ -1139,22 +1204,23 @@ proc RamDebugger::PreferencesWindow {} {
 		              AutoSaveRevisions_idletime] {
 		    if { [info exists options_def($i)] } {
 		        set options($i) $options_def($i)
-		        set DialogWin::user($i) $options_def($i)
+		        $w set_uservar_value $i $options_def($i)
 		    }
 		}
 		foreach i [list foreground background commands defines procnames \
 		        quotestrings set comments varnames] {
 		    set options(colors,$i) $options_def(colors,$i)
-		    set DialogWin::user(colors,$i) $options_def(colors,$i)
-		    $fco1.b$i configure -background $options(colors,$i) \
+		    $w set_uservar_value colors,$i $options_def(colors,$i)
+		    $fco.b$i configure -background $options(colors,$i) \
 		        -text $options(colors,$i) -foreground \
 		        [_giveopposite_color $options(colors,$i)]
 		}
 		CreateModifyFonts
 		foreach "but type fontname" [list b1 {GUI font} NormalFont b2 {Text font} \
 		        FixedFont b3 {Help font} HelpFont] {
-		    $f2.l$but configure -font $fontname
-		    $f2.$but configure -font $fontname
+		    foreach i [list family size weight slant underline] {
+		        $w set_uservar_value font_$i,$fontname [font configure $fontname -$i]
+		    }
 		}
 		ApplyColorPrefs $text
 		if { [info exists text_secondary] && [winfo exists text_secondary] } {
@@ -1174,7 +1240,7 @@ proc RamDebugger::PreferencesWindow {} {
 		RamDebugger::CVS::ManageAutoSave
 	    }
 	}
-	set action [DialogWin::WaitForWindow]
+	set action [$w waitforwindow]
     }
 }
 
@@ -1658,44 +1724,49 @@ proc RamDebugger::GotoLine {} {
 	set active_text $text_secondary
     } else { set active_text $text }
 
-    set f [DialogWin::Init $active_text "Goto line" separator ""]
-    set w [winfo toplevel $f]
+    set w [dialogwin_snit $active_text._ask -title [_ "Goto line"]]
+    set f [$w giveframe]
 
-    label $f.l -text "Go to line:" -grid "0 px3 py5"
-    spinbox $f.sb -from 1 -to 1000 -increment 1 -textvariable DialogWin::user(line) \
-	    -width 8 -grid "1 px3"
+    ttk::label $f.l -text [_ "Go to line:"]
+    spinbox $f.sb -from 1 -to 10000 -increment 1 -textvariable [$w give_uservar line] \
+	    -width 8
 
-    checkbutton $f.cb1 -text "Relative to current line" -variable DialogWin::user(relative) \
-	    -grid "0 2 w"
+    ttk::checkbutton $f.cb1 -text [_ "Relative to current line"] -variable \
+	[$w give_uservar relative]
+    
+    grid $f.l $f.sb -sticky w -padx 5 -pady 3
+    grid $f.cb1 - -sticky w
+    
+    grid $f.sb -sticky ew
+    grid columnconfigure $f 1 -weight 1
+    grid rowconfigure $f 2 -weight 1
+  
+    $w set_uservar_value relative 0
 
-    set DialogWin::user(relative) 0
-
-    tkTabToWindow $f.sb
-
-    bind $w <Return> "DialogWin::InvokeOK"
-
-    supergrid::go $f
-
-    set action [DialogWin::CreateWindow]
+    tk::TabToWindow $f.sb
+    bind $w <Return> [list $w invokeok]
+    set action [$w createwindow]
     while 1 {
 	switch $action {
 	    0 {
-		DialogWin::DestroyWindow
+		destroy $w
 		return
 	    }
 	    1 {
-		set line $DialogWin::user(line)
+		set line [$w give_uservar_value line]
 		set good 1
 		if { ![string is integer -strict $line] } {
-		    WarnWin "Line number must be a positive number" $w
+		    snit_messageBox -message [_ "Line number must be a positive number"] \
+		        -parent $w
 		    set good 0
 		}
-		if { $good && $DialogWin::user(relative) } {
+		if { $good && [$w give_uservar_value relative] } {
 		    set insline [scan [$active_text index insert] %d]
 		    set lastline [scan [$active_text index end-1c] %d]
 		    set line [expr $insline+$line]
 		    if { $line < 1 || $line > $lastline } {
-		        WarnWin "Trying to go to line $line. Out of limits" $w
+		        snit_messageBox -message [_ "Trying to go to line %s. Out of limits" \
+		                $line] -parent $w
 		        set good 0
 		    }
 		}
@@ -1706,12 +1777,12 @@ proc RamDebugger::GotoLine {} {
 		    $active_text mark set insert $line.0
 		    $active_text see $line.0
 		    focus $active_text
-		    DialogWin::DestroyWindow
+		    destroy $w
 		    return
 		}
 	    }
 	}
-	set action [DialogWin::WaitForWindow]
+	set action [$w waitforwindow]
     }
 }
 
@@ -1900,113 +1971,127 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
 	lappend args $arg_in
 	lappend tcl_or_tks $tcl_or_tk_in
     }
-
-    set f [DialogWin::Init $text "TCL Execution arguments" separator [list Clear]]
-    set w [winfo toplevel $f]
     
-    label $f.l -text "Currentfile to debug:" -grid "0 e px3 py5"
+    set w [dialogwin_snit $text._ask -title [_ "TCL Execution arguments"]]
+    set f [$text._ask giveframe]
 
-    ComboBox $f.cb1 -textvariable DialogWin::user(curr) -width 60 -grid 1 -values \
+    ttk::label $f.l -text [_ "Current file to debug:"]
+
+    ttk::combobox $f.cb1 -textvariable [$w give_uservar curr] -width 60 -values \
 	    $currs
-    Button $f.b1 -image [Bitmap::get file] -width 16 -grid 2 -relief link
+    ttk::button $f.b1 -image fileopen16 -width 16 -style Toolbutton
 
-    label $f.lb -text "File to debug as:" -grid "0 e px3 py5"
-    ComboBox $f.cb1b -textvariable DialogWin::user(curr_as) -width 40 -grid 1 -values \
-	$currs_as -helptext "Select another TCL file to execute when 'Current file' is open"
-    Button $f.b1b -image [Bitmap::get file] -width 16 -grid 2 -relief link
+    ttk::label $f.lb -text [_ "File to debug as:"]
+    ttk::combobox $f.cb1b -textvariable [$w give_uservar curr_as] -width 40 -values \
+	$currs_as
+    tooltip::tooltip $f.cb1b [_ "Select another TCL file to execute when 'Current file' is open"]
+    ttk::button $f.b1b -image fileopen16 -width 16 -style Toolbutton
 
-    label $f.l2 -text "Directory:" -grid "0 e px3 py5"
-    ComboBox $f.cb2 -textvariable DialogWin::user(directory) -width 40 -grid "1" -values \
+    ttk::label $f.l2 -text [_ "Directory:"]
+    ttk::combobox $f.cb2 -textvariable [$w give_uservar directory] -width 40 -values \
 	    $dirs
-    Button $f.b2 -image [Bitmap::get folder] -grid 2 -relief link
+    ttk::button $f.b2 -image folderopen16 -style Toolbutton
 
-    label $f.l3 -text "Arguments:" -grid "0 e"
-    ComboBox $f.cb3 -textvariable DialogWin::user(arguments) -width 40 -grid "1 2" -values \
+    ttk::label $f.l3 -text [_ "Arguments:"]
+    ttk::combobox $f.cb3 -textvariable [$w give_uservar arguments] -width 40 -values \
 	    $args
 
-    label $f.l4 -text "File type:" -grid "0 e"
-    frame $f.f1 -grid "1 2 w"
-    radiobutton $f.f1.r1 -text "Auto" -variable DialogWin::user(tcl_or_tk) -value auto -grid 0
-    radiobutton $f.f1.r2 -text "Tcl" -variable DialogWin::user(tcl_or_tk) -value tcl -grid 1
-    radiobutton $f.f1.r3 -text "Tk" -variable DialogWin::user(tcl_or_tk) -value tk -grid 2
+    ttk::label $f.l4 -text [_ "File type:"]
+    ttk::frame $f.f1
+    ttk::radiobutton $f.f1.r1 -text [_ "Auto"] -variable [$w give_uservar tcl_or_tk] -value auto
+    ttk::radiobutton $f.f1.r2 -text [_ "Tcl"] -variable [$w give_uservar tcl_or_tk] -value tcl
+    ttk::radiobutton $f.f1.r3 -text [_ "Tk"] -variable [$w give_uservar tcl_or_tk] -value tk
+ 
+    grid $f.f1.r1 $f.f1.r2 $f.f1.r3 -sticky w
 
-
-    set DialogWin::user(curr) $currentfile
-    set DialogWin::user(curr_as) $curr_as
-    set DialogWin::user(directory) $dir
-    set DialogWin::user(arguments) $arg
-    set DialogWin::user(tcl_or_tk) $tcl_or_tk
+    grid $f.l $f.cb1 $f.b1 -sticky w
+    grid $f.lb $f.cb1b $f.b1b -sticky w
+    grid $f.l2 $f.cb2 $f.b2 -sticky w
+    grid $f.l3 $f.cb3 -sticky w
+    grid $f.l4 $f.f1 - -sticky w
+    
+    grid $f.cb1 $f.cb1b $f.cb2 $f.cb3 $f.f1 -sticky ew
+    grid columnconfigure $f 1 -weight 1
+    grid rowconfigure $f 5 -weight 1
+  
+    $w set_uservar_value curr $currentfile
+    $w set_uservar_value curr_as $curr_as
+    $w set_uservar_value directory $dir
+    $w set_uservar_value arguments $arg
+    $w set_uservar_value tcl_or_tk $tcl_or_tk
 
     set comm {
+	set w %PARENT%
 	set initial $RamDebugger::options(defaultdir)
-	catch { set initial [file dirname $DialogWin::user(curr)] }
+	catch { set initial [file dirname [$w give_uservar_value curr]] }
 	set curr [tk_getOpenFile -filetypes {{{TCL Scripts} {.tcl} } {{All Files} *}} \
-		     -initialdir $initial -parent PARENT -title "Debug TCL file"]
-	if { $curr != "" } { set DialogWin::user(curr) $curr }
+		     -initialdir $initial -parent $w -title [_ "Debug TCL file"]]
+	if { $curr != "" } { $w set_uservar_value curr $curr }
     }
-    set comm [string map [list PARENT $w] $comm]
+    set comm [string map [list %PARENT% $w] $comm]
     $f.b1 configure -command $comm
 
     set comm {
+	set w %PARENT%
 	set initial $RamDebugger::options(defaultdir)
-	catch { set initial [file dirname $DialogWin::user(curr_as)] }
+	catch { set initial [file dirname [$w give_uservar_value curr_as]] }
 	set curr_as [tk_getOpenFile -filetypes {{{TCL Scripts} {.tcl} } {{All Files} *}} \
-		         -initialdir $initial -parent PARENT -title "Debug as TCL file"]
-	if { $curr_as != "" } { set DialogWin::user(curr_as) $curr_as }
+	       -initialdir $initial -parent $w -title [_ "Debug as TCL file"]]
+	if { $curr_as != "" } { $w set_uservar_value curr_as $curr_as }
     }
-    set comm [string map [list PARENT $w] $comm]
+    set comm [string map [list %PARENT% $w] $comm]
     $f.b1b configure -command $comm
 
     set comm {
+	set w %PARENT%
 	set initial $RamDebugger::options(defaultdir)
-	catch { set initial [file dirname $DialogWin::user(curr)] }
-	set DialogWin::user(directory) [RamDebugger::filenormalize [tk_chooseDirectory \
-	    -initialdir $initial -parent PARENT \
-	    -title "Debug directory" -mustexist 1]]
+	catch { set initial [file dirname [$w give_uservar_value curr]] }
+	$w set_uservar_value directory [RamDebugger::filenormalize [tk_chooseDirectory \
+	    -initialdir $initial -parent $w \
+	    -title [_ "Debug directory"] -mustexist 1]]
     }
-    set comm [string map [list PARENT $w] $comm]
+    set comm [string map [list %PARENT% $w] $comm]
     $f.b2 configure -command $comm
 
-    tkTabToWindow $f.cb1
+    tk::TabToWindow $f.cb1
+    bind $w <Return> [list $w invokeok]
+    set action [$w createwindow]
 
-    bind $w <Return> "DialogWin::InvokeOK"
-
-    supergrid::go $f
-
-    set action [DialogWin::CreateWindow]
     while 1 {
 	switch $action {
 	    0 {
-		DialogWin::DestroyWindow
+		destroy $w
 		return
 	    }
 	    1 - 2 {
 		if { $action == 2 } {
-		    set DialogWin::user(curr_as) ""
-		    set DialogWin::user(directory) ""
-		    set DialogWin::user(arguments) ""
-		    set DialogWin::user(tcl_or_tk) auto
+		    $w set_uservar_value curr_as ""
+		    $w set_uservar_value directory ""
+		    $w set_uservar_value arguments ""
+		    $w set_uservar_value tcl_or_tk auto
 		}
 		set ipos 0
 		foreach "curr curr_as dir args tcl_or_tk" $options(currentfileargs5) {
-		    if { $curr == $DialogWin::user(curr) } {
+		    if { $curr == [$w give_uservar_value curr] } {
 		        set options(currentfileargs5) [lreplace $options(currentfileargs5) $ipos \
 		            [expr $ipos+4]]
 		        break
 		    }
 		    incr ipos 5
 		}
-		if { $DialogWin::user(directory) != "" || $DialogWin::user(arguments) != "" || \
-		     $DialogWin::user(curr_as) != "" || $DialogWin::user(tcl_or_tk) != "auto" } {
-		    lappend options(currentfileargs5) $DialogWin::user(curr) \
-		        $DialogWin::user(curr_as) $DialogWin::user(directory) \
-		        $DialogWin::user(arguments) $DialogWin::user(tcl_or_tk)
+		if { [$w give_uservar_value directory] ne "" || 
+		    [$w give_uservar_value arguments] ne "" ||
+		    [$w give_uservar_value curr_as] ne "" ||
+		    [$w give_uservar_value tcl_or_tk] ne "auto" } {
+		    lappend options(currentfileargs5) [$w give_uservar_value curr] \
+		        [$w give_uservar_value curr_as] [$w give_uservar_value directory] \
+		        [$w give_uservar_value arguments] [$w give_uservar_value tcl_or_tk]
 		}
-		DialogWin::DestroyWindow
+		destroy $w
 		return
 	    }
 	}
-	set action [DialogWin::WaitForWindow]
+	set action [$w waitforwindow]
     }
 }
 
@@ -2127,10 +2212,16 @@ proc RamDebugger::FindFilesWithPattern { dir patternlist recurse } {
     return $retval
 }
 
-proc RamDebugger::SearchInFilesDo {} {
+proc RamDebugger::SearchInFilesDo { w } {
     variable options
     variable MainDir
+    variable searchstring
     
+    if { [$w giveaction] < 1 || $searchstring eq "" } {
+	destroy $w
+	return
+    }
+
     set grep grep
 #     if { $::tcl_platform(platform) == "windows" } {
 #         set grep [file join $MainDir addons grep.exe]
@@ -2160,6 +2251,8 @@ proc RamDebugger::SearchInFilesDo {} {
 	return
     }
 
+    set toctree [$w give_uservar_value toctree]
+    $toctree item delete all
     set result ""
     set ifile 0
     while { $ifile < [llength $files] } {
@@ -2167,8 +2260,17 @@ proc RamDebugger::SearchInFilesDo {} {
 	eval lappend comm2 [lrange $files $ifile [expr {$ifile+50}]]
 	incr ifile 50
 	set fin [open "|$comm2" r]
-	while { ![eof $fin] } {
-	    append result [gets $fin]\n
+	while { [gets $fin line] > -1 } {
+	    append result $line\n
+	    set ret [regexp {^(.+):(\d+):(.*)} $line {} path linenum txt]
+	    if { $ret } {
+		set file [file tail $path]
+		set path [file dirname $path]
+	    } else {
+		foreach "file path linenum" [list "" "" ""] break
+		set txt $line
+	    }
+	    $toctree insert end [list $file $linenum $txt $path]
 	}
 	set result [string trim $result]\n
 	set err [catch { close $fin } errstring]
@@ -2194,14 +2296,40 @@ proc RamDebugger::SearchInFilesDo {} {
     WaitState 0
 }
 
+proc RamDebugger::SearchInFilesGo { w tree ids } {
+    variable options
+    variable currentfile
+    variable text
+    
+    if { $ids eq "" } { return }
+    foreach "file line txt path" [$tree item text [lindex $ids 0]] break
+    set file [file join $path $file]
+    if { ![file exists $file] && [file exists [file join $options(defaultdir) \
+	$file]] } {
+	set file [file join $options(defaultdir) $file]
+    }
+    
+    if { [file exists $file] } {
+	set file [filenormalize $file]
+	if { $file ne $currentfile } {
+	    OpenFileF $file
+	}
+	$text see $line.0
+	$text mark set insert $line.0
+	focus $text
+    } 
+}
+
 proc RamDebugger::SearchInFiles {} {
     variable options
     variable text
 
     set txt [GetSelOrWordInIndex insert]
     
-    set f [DialogWin::Init $text "Search in files" separator]
-    set w [winfo toplevel $f]
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Search in files"] \
+	    -grab 0 -transient 1 -callback [namespace code SearchInFilesDo] \
+	    -cancelname [_ Close]]
+    set f [$w giveframe]
 
     if { ![info exists options(SearchInFiles,texts)] } {
 	set options(SearchInFiles,texts) ""
@@ -2209,15 +2337,15 @@ proc RamDebugger::SearchInFiles {} {
 	set options(SearchInFiles,dirs) ""
     }
 
-    label $f.l1 -text "Text:" -grid 0
-    ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -grid "1 2 px3 py3" \
+    ttk::label $f.l1 -text [_ "Text:"]
+    ttk::combobox $f.e1 -textvariable ::RamDebugger::searchstring \
 	    -values $options(SearchInFiles,texts) -width 40
 
     if { [string trim $txt] != "" } {
 	set ::RamDebugger::searchstring $txt
     } else { set ::RamDebugger::searchstring [lindex $options(SearchInFiles,texts) 0] }
 
-    label $f.l2 -text "File ext:" -grid 0
+    ttk::label $f.l2 -text [_ "File ext:"]
 
     set values $options(SearchInFiles,exts)
     foreach i [list "*.tcl" "*.h,*.cc,*.c"] {
@@ -2227,22 +2355,22 @@ proc RamDebugger::SearchInFiles {} {
 	if { [lsearch -exact $values $options($i)] == -1 } { lappend values $options($i) }
     }
 
-    ComboBox $f.e2 -textvariable ::RamDebugger::searchextensions -grid "1 2 px3 py3" \
-	    -values $values]
+    ttk::combobox $f.e2 -textvariable ::RamDebugger::searchextensions \
+	    -values $values
 
     set ::RamDebugger::searchextensions [lindex [$f.e2 cget -values] 0]
 
-    label $f.l3 -text "Directory:" -grid 0
-    ComboBox $f.e3 -textvariable ::RamDebugger::searchdir -grid "1 1 px3 py3" \
+    ttk::label $f.l3 -text [_ "Directory:"]
+    ttk::combobox $f.e3 -textvariable ::RamDebugger::searchdir \
 	    -values $options(SearchInFiles,dirs) -width 70
-    Button $f.b3 -image [Bitmap::get folder] -relief link -grid "2" 
+    ttk::button $f.b3 -image fileopen16 -style Toolbutton
 
 
     set comm {
 	set initial $::RamDebugger::searchdir
 	set ::RamDebugger::searchdir [RamDebugger::filenormalize [tk_chooseDirectory   \
 	    -initialdir $initial -parent PARENT \
-	    -title "Search directory" -mustexist 1]]
+	    -title [_ "Search directory"] -mustexist 1]]
     }
     set comm [string map [list PARENT $w] $comm]
     $f.b3 configure -command $comm
@@ -2251,46 +2379,58 @@ proc RamDebugger::SearchInFiles {} {
 	set ::RamDebugger::searchdir $options(defaultdir)
     }
 
-    set f1 [frame $f.f1 -bd 0 -grid "0 3 w"]
-    set f2 [frame $f1.f2 -bd 1 -relief ridge -grid "0 w px3"]
-    radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
-	-value -exact -grid "0 w"
-    radiobutton $f2.r2 -text Regexp -variable ::RamDebugger::searchmode \
-	-value -regexp -grid "0 w"
+    set f1 [ttk::frame $f.f1]
+    set f2 [frame $f1.f2 -bd 1 -relief ridge]
+    ttk::radiobutton $f2.r1 -text Exact -variable ::RamDebugger::searchmode \
+	-value -exact
+    ttk::radiobutton $f2.r2 -text Regexp -variable ::RamDebugger::searchmode \
+	-value -regexp
 
-    set f3 [frame $f1.f3 -grid "1 w"]
-    checkbutton $f3.cb1 -text "Consider case" -variable ::RamDebugger::searchcase \
-	-grid 0
-    checkbutton $f3.cb2 -text "Recurse dirs" -variable ::RamDebugger::searchrecursedirs \
-	-grid 0
-   
-    supergrid::go $f
+    grid $f2.r1 -sticky w
+    grid $f2.r2 -sticky w
+
+    set f3 [ttk::frame $f1.f3]
+    ttk::checkbutton $f3.cb1 -text [_ "Consider case"] -variable ::RamDebugger::searchcase
+    ttk::checkbutton $f3.cb2 -text [_ "Recurse dirs"] -variable ::RamDebugger::searchrecursedirs
+
+    grid $f3.cb1 -sticky w
+    grid $f3.cb2 -sticky w
+    
+    grid $f2 $f3 -sticky w -padx 3
+    
+    set columns [list \
+	    [list 20 [_ "File"] left item 0] \
+	    [list  5 [_ "Line"] left text 0] \
+	    [list 50 [_ "Text"] left text 0] \
+	    [list 35 [_ "Path"] left text 0] \
+	]
+
+    $w set_uservar_value toctree [fulltktree $f.toctree \
+	    -selecthandler2 [list RamDebugger::SearchInFilesGo $w] \
+	    -columns $columns -expand 0 \
+	    -selectmode extended -showheader 1 -showlines 0  \
+	    -indent 0 -sensitive_cols all]
+    
+    
+    grid $f.l1 $f.e1 - -sticky w -padx 3 -pady 1
+    grid $f.l2 $f.e2 - -sticky w -padx 3 -pady 1
+    grid $f.l3 $f.e3 $f.b3 -sticky w -padx 3 -pady 1
+    grid $f1     -     -  -sticky w
+    grid $f.toctree - - -sticky nsew -padx 3 -pady 3
+    
+    grid configure $f.e1 $f.e2 $f.e3 -sticky ew
+    grid columnconfigure $f 1 -weight 1
+    grid rowconfigure $f 4 -weight 1
 
 
     set ::RamDebugger::searchmode -exact
     set ::RamDebugger::searchcase 0
     set ::RamDebugger::searchrecursedirs 1
 
-    tkTabToWindow $f.e1
-    bind $w <Return> "DialogWin::InvokeOK"
+    tk::TabToWindow $f.e1
+    bind $w <Return> [list $w invokeok]
     
-    set action [DialogWin::CreateWindow]
-    switch $action {
-	0 {
-	    DialogWin::DestroyWindow
-	    return
-	}
-	1 {
-	    if { $::RamDebugger::searchstring == "" } {
-		DialogWin::DestroyWindow
-		return
-	    }
-	    DialogWin::DestroyWindow
-	    update
-	    SearchInFilesDo
-	    return
-	}
-    }
+    set action [$w createwindow]
 }
 
 ################################################################################
@@ -2320,7 +2460,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     variable mainframe
     variable SearchToolbar
     variable searchFromBegin
-
+    variable iswince
+    
     set istoplevel 0
 
     if { ![info exists options(SearchToolbar_autoclose)] } {
@@ -2402,8 +2543,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     }
     set ::RamDebugger::SearchToolbar [list 1 $replace]
 
-    label $f.l1 -text "Search:"
-    ComboBox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs)
+    ttk::label $f.l1 -text "Search:"
+    ttk::combobox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs)
 
     set cmd "$f.e1 configure -values \$RamDebugger::options(old_searchs)"
     trace add variable ::RamDebugger::options(old_searchs) write "$cmd ;#"
@@ -2433,32 +2574,36 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     checkbutton $f3.cb2 -text "From beginning" -variable ::RamDebugger::searchFromBegin
 
     grid $f3.cb1 $f3.cb2 -sticky w
+ 
+    ttk::button $f.r09 -image find-16 -style Toolbutton -command \
+	[list RamDebugger::Search $w begin 0 $f]
 
-    radiobutton $f.r1 -image navup16 -variable ::RamDebugger::SearchType \
-	-value -backwards -indicatoron 0 -bd 1
-    radiobutton $f.r2 -image navdown16 -variable ::RamDebugger::SearchType \
-	-value -forwards -indicatoron 0 -bd 1
-    Separator $f.sp1 -orient vertical
-    checkbutton $f.cb1 -image navhome16 -variable ::RamDebugger::searchFromBegin \
-	-indicatoron 0 -bd 1
-    checkbutton $f.cb2 -image uppercase_lowercase -variable ::RamDebugger::searchcase\
-	 -indicatoron 0 -bd 1
-    checkbutton $f.cb3 -text Regexp -variable ::RamDebugger::searchmode \
-	-onvalue -regexp -offvalue -exact
+    ttk::radiobutton $f.r1 -image navup16 -variable ::RamDebugger::SearchType \
+	-value -backwards -style Toolbutton
+    ttk::radiobutton $f.r2 -image navdown16 -variable ::RamDebugger::SearchType \
+	-value -forwards -style Toolbutton
+    ttk::separator $f.sp1 -orient vertical
+    ttk::checkbutton $f.cb1 -image navhome16 -variable ::RamDebugger::searchFromBegin \
+	-style Toolbutton
+    ttk::checkbutton $f.cb2 -image uppercase_lowercase -variable ::RamDebugger::searchcase\
+	-style Toolbutton
+    ttk::checkbutton $f.cb3 -text Regexp -variable ::RamDebugger::searchmode \
+	-onvalue -regexp -offvalue -exact -style Toolbutton
 
     set helps [list \
+	    $f.r09 "Search" \
 	    $f.r1 "Search backwards (PgUp)" \
 	    $f.r2 "Search forwards (PgDn)" \
 	    $f.cb1 "From beginning (Home)" \
 	    $f.cb2 "Consider case" \
 	    $f.cb3 "Rexexp mode"]
     foreach "widget help" $helps {
-	DynamicHelp::register $widget balloon $help
+	tooltip::tooltip $widget $help
     }
 
     if { $replace } {
-	label $f.l11 -text "Replace:"
-	ComboBox $f.e11 -textvariable ::RamDebugger::replacestring \
+	ttk::label $f.l11 -text "Replace:"
+	ttk::combobox $f.e11 -textvariable ::RamDebugger::replacestring \
 	    -values $options(old_replaces)
 	raise $f.e11 $f2.r1
 	frame $f.buts
@@ -2467,23 +2612,40 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	foreach "txt cmd help" [list "Skip" beginreplace "Search next (Shift-Return)" \
 		"Replace" replace "Replace (Return)" \
 		"Replace all" replaceall "Replace all"] {
-	    button $f.buts.b[incr ic] -text $txt -padx 0 -pady 0 -width 9 \
-		-relief flat -overrelief raised -bd 1 -command \
+	    ttk::button $f.buts.b[incr ic] -text $txt -width 9 \
+		-style Toolbutton -command \
 		[list RamDebugger::SearchReplace $w $cmd]
-	    DynamicHelp::register $f.buts.b$ic balloon $help
+	    tooltip::tooltip $f.buts.b$ic $help
 	}
 	grid $f.buts.b1 $f.buts.b2 $f.buts.b3 -sticky nw -padx 2
     }
 
     if { !$istoplevel } {
-	grid $f.l1 $f.e1 $f.r1 $f.r2 $f.sp1 $f.cb1 $f.cb2 $f.cb3 -sticky nw -padx 2
-	if { [winfo exists $f.l11] } {
-	    grid $f.l11 $f.e11 $f.buts - - - - - -sticky nw -padx 2 -pady 1
-	    grid configure $f.e11 -sticky new
+	if { !$iswince } {
+	    grid $f.l1 $f.e1 $f.r09 $f.r1 $f.r2 $f.sp1 $f.cb1 $f.cb2 $f.cb3 -sticky w -padx 2
+	} else {
+	    grid $f.e1 $f.r09 $f.r1 $f.r2 $f.sp1 $f.cb1 $f.cb2 $f.cb3 -sticky w -padx 0
 	}
-	grid $f.e1 -sticky new
+	grid $f.e1 -sticky ew
+
+	if { [winfo exists $f.l11] } {
+	    if { !$iswince } {
+		grid $f.l11 $f.e11 $f.buts - - - - - - -sticky w -padx 2 -pady 0
+	    } else {
+		grid $f.e11 $f.buts - - - - - - -sticky w -padx 0 -pady 0
+		$f.cb1 configure -width 6
+		$f.cb2 configure -width 6
+		grid configure $f.buts.b1 $f.buts.b2 $f.buts.b3 -sticky nw -padx 0
+	    }
+	    grid configure $f.e11 -sticky ew
+	}
+	if { $iswince } {
+	    set col 0
+	} else {
+	    set col 1
+	}
 	grid $f.sp1 -sticky nsw
-	grid columnconfigure $f 1 -weight 1
+	grid columnconfigure $f $col -weight 1
     } else {
 	grid $f.l1 $f.e1    - -sticky nw -padx 3 -pady 3
 	if { [winfo exists $f.l11] } {
@@ -2502,30 +2664,32 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     set ::RamDebugger::SearchType -forwards
 
     bind $f.l1 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
-    $f.e1 bind <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+    bind $f.e1 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
 
-    $f.e1 bind <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
-    $f.e1 bind <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
-    $f.e1 bind <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
-    $f.e1 bind <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
+    bind $f.e1 <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
+    bind $f.e1 <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
+    bind $f.e1 <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
+    bind $f.e1 <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
 
     tkTabToWindow $f.e1
     if { !$replace } {
-	$f.e1 bind <Return> "RamDebugger::Search $w begin 0 $f"
-	$f.e1 bind <Escape> [list RamDebugger::SearchWindow_autoclose force]
+	bind $f.l1 <1> "RamDebugger::Search $w begin 0 $f"
+	bind $f.e1 <Return> "RamDebugger::Search $w begin 0 $f"
+	bind $f.e1 <Escape> [list RamDebugger::SearchWindow_autoclose force]
     } else {
-	$f.e1 bind <Return> "RamDebugger::SearchReplace $w replace"
-	$f.e1 bind <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
-	$f.e11 bind <Return> "RamDebugger::SearchReplace $w replace ; break"
-	$f.e11 bind <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
+	bind $f.l1 <1> "RamDebugger::SearchReplace $w replace"
+	bind $f.e1 <Return> "RamDebugger::SearchReplace $w replace"
+	bind $f.e1 <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
+	bind $f.e11 <Return> "RamDebugger::SearchReplace $w replace ; break"
+	bind $f.e11 <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
 	bind $f.l11 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
-	$f.e11 bind <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
-	$f.e11 bind <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
-	$f.e11 bind <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
-	$f.e11 bind <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
-	$f.e11 bind <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
-	$f.e1 bind <Escape> [list RamDebugger::SearchWindow_autoclose force]
-	$f.e11 bind <Escape> [list RamDebugger::SearchWindow_autoclose force]
+	bind $f.e11 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+	bind $f.e11 <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
+	bind $f.e11 <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
+	bind $f.e11 <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
+	bind $f.e11 <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
+	bind $f.e1  <Escape> [list RamDebugger::SearchWindow_autoclose force]
+	bind $f.e11 <Escape> [list RamDebugger::SearchWindow_autoclose force]
     }
 
     if { $istoplevel } {
@@ -2646,7 +2810,8 @@ proc RamDebugger::SearchReplace { w what args } {
 		::RamDebugger::searchmode -onvalue -regexp -offvalue -exact
 	    $menu add separator
 	    $menu add check -label "Auto close toolbar" -variable \
-		::RamDebugger::options(SearchToolbar_autoclose)
+		::RamDebugger::options(SearchToolbar_autoclose) \
+		-command RamDebugger::SearchWindow_autoclose
 	    $menu add separator
 	    if { !$replace } {
 		$menu add command -label Close -command \
@@ -3194,6 +3359,7 @@ proc RamDebugger::DisplayPositionsStack { args } {
 	    $DialogWinTop::user(list) selection set end
 	}
     }
+    $DialogWinTop::user(list) see end
     DialogWinTop::CreateWindow $f
 }
 
@@ -3847,6 +4013,116 @@ proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
 }
 
 
+
+################################################################################
+#    parse args
+#
+# example:
+#  proc myproc { args } {
+#     set optional {
+#         { -view_binding binding "" }
+#         { -file file "" }
+#         { -restart_file boolean 0 }
+#         { -flag1 "" 0 }
+#     }
+#     set compulsory "levels"
+#     parse_args $optional $compulsory $args
+#
+#     if { $view_binding ne "" } { puts hohoho }
+#     if { $flag1 } { puts "activated flag" }
+#  }
+# 
+################################################################################
+
+proc ::parse_args { args } {
+
+    set optional {
+	{ -raise_compulsory_error boolean 1 }
+	{ -compulsory_min min_number "" }
+    }
+    set compulsory "optional compulsory arguments"
+
+    set cmdname [lindex [info level [expr {[info level]-1}]] 0]
+
+    if { [string match -* [lindex $args 0]] } {
+	parse_args $optional $compulsory $args
+    } else {
+	set raise_compulsory_error 1
+	set compulsory_min ""
+	if { [llength $args] != [llength $compulsory] } {
+	    uplevel 1 [list error [_parse_args_string $cmdname $optional \
+		        $compulsory $args]]
+	    return ""
+	}
+	foreach $compulsory $args break
+    }
+
+    foreach i $optional {
+	foreach "name namevalue default" $i break
+	set opts_value($name) $namevalue
+	set opts($name) $default
+    }
+    while { [string match -* [lindex $arguments 0]] } {
+	if { [lindex $arguments 0] eq "--" } { break }
+	foreach "name value" [lrange $arguments 0 1] break
+	if { [regexp {(.*)=(.*)} $name {} name value] } {
+	    set has_att_value 1
+	} else {
+	    set has_att_value 0
+	}
+	if { [info exists opts($name)] } {
+	    if { $has_att_value } {
+		set opts($name) $value
+		set arguments [lrange $arguments 1 end]
+	    } elseif { $opts_value($name) eq "" } {
+		set opts($name) 1
+		set arguments [lrange $arguments 1 end]
+	    } else {
+		set opts($name) $value
+		set arguments [lrange $arguments 2 end]
+	    }
+	} else {
+	    uplevel 1 [list error [_parse_args_string $cmdname $optional \
+		        $compulsory $args]]
+	    return ""
+	}
+    }
+    if { $raise_compulsory_error } {
+	if { $compulsory_min ne "" } {
+	    if { [llength $arguments] < $compulsory_min || \
+		[llength $arguments] > [llength $compulsory] } {
+		uplevel 1 [list error [_parse_args_string $cmdname $optional $compulsory]]
+		return ""
+	    }
+	} elseif { [llength $arguments] != [llength $compulsory] } {
+	    uplevel 1 [list error [_parse_args_string $cmdname $optional \
+		        $compulsory $args]]
+	    return ""
+	}
+
+    }
+    foreach name [array names opts] {
+	uplevel 1 [list set [string trimleft $name -] $opts($name)]
+    }
+    set inum 0
+    foreach i $compulsory {
+	uplevel 1 [list set $i [lindex $arguments $inum]]
+	incr inum
+    }
+    return [lrange $arguments $inum end]
+}
+
+proc ::_parse_args_string { cmd optional compulsory arguments } {
+
+    set str "error. usage: $cmd "
+    foreach i $optional {
+	foreach "name namevalue default" $i break
+	append str "?$name $namevalue? "
+    }
+    append str $compulsory
+    append str "\n\targs: $arguments"
+    return $str
+}
 
 
 

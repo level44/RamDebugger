@@ -325,15 +325,18 @@ proc RamDebugger::Instrumenter::NeedsToInsertSnitPackage { name } {
 proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } {
     variable MainDir
 
+    if { $RamDebugger::iswince } { return }
+    
     set MainDir $RamDebugger::MainDir
     set AppDataDir $RamDebugger::AppDataDir
 
-    set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
+    set dynlib_base RamDebuggerInstrumenter6[info sharedlibextension]
     set dynlib [file join $AppDataDir $dynlib_base]
 
     catch { load $dynlib }
     if {[info command RamDebuggerInstrumenterDoWork] ne "" } { return }
 
+    file delete -force [file join $AppDataDir compile]
     file copy -force [file join $MainDir scripts RamDebuggerInstrumenter.cc] \
 	[file join $MainDir scripts compile] \
 	$AppDataDir
@@ -374,22 +377,22 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 
     switch $what {
 	debug {
-	    if { "$::tcl_platform(machine)" == "amd64"} {
+	    if { $::tcl_platform(machine) eq "amd64"} {
 		set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
-		            RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork64.dll]
+		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork64.dll]
 	    } else {
-	    set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
-		            RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork.dll]
+		set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
+		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork.dll]
 	    }
 	    load $dynlib Ramdebuggerinstrumenter
 	    set FastInstrumenterLoaded 1
 	}
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
-		if { "$::tcl_platform(machine)" == "amd64"} {
-		    set dynlib_base RamDebuggerInstrumenter64[info sharedlibextension]
+		if { $::tcl_platform(machine) == "amd64"} {
+		    set dynlib_base RamDebuggerInstrumenter664[info sharedlibextension]
 		} else {
-		set dynlib_base RamDebuggerInstrumenter[info sharedlibextension]
+		    set dynlib_base RamDebuggerInstrumenter6[info sharedlibextension]
 		}
 		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
 		set err [catch { load $dynlib }]
@@ -1407,6 +1410,56 @@ proc RamDebugger::Instrumenter::lappend_info { color i1 i2 } {
 
 proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" { indentlevel_ini 0 } \
     { raiseerror 1 } } {
+    variable FastInstrumenterLoaded
+
+    # this variable is used to make tests
+    set what c++
+
+    switch $what {
+	debug {
+	   # nothing
+	}
+	c++ {
+	    if { ![info exists FastInstrumenterLoaded] } {
+		if { $::tcl_platform(machine) == "amd64"} {
+		    set dynlib_base RamDebuggerInstrumenter664[info sharedlibextension]
+		} else {
+		    set dynlib_base RamDebuggerInstrumenter6[info sharedlibextension]
+		}
+		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+		set err [catch { load $dynlib }]
+		if { $err } {
+		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
+		}
+		catch { load $dynlib }
+		if { [info command RamDebuggerInstrumenterDoWorkForXML] eq "" && \
+		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
+		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
+		        TryCompileFastInstrumenter 0
+		        set RamDebugger::options(CompileFastInstrumenter) 0
+		    } else {
+		        TryCompileFastInstrumenter 1
+		    }
+		    catch { load $dynlib }
+		}
+		set FastInstrumenterLoaded 1
+	    }
+	}
+	tcl {
+	    # nothing
+	}
+    }
+
+    if { [info command RamDebuggerInstrumenterDoWorkForXML] ne "" } {
+	RamDebuggerInstrumenterDoWorkForXML $block $blockinfoname \
+	    $progress $indentlevel_ini $raiseerror
+    } else {
+	uplevel [list RamDebugger::Instrumenter::DoWorkForXML_do $block $blockinfoname \
+		$progress $indentlevel_ini $raiseerror]
+    }
+}
+proc RamDebugger::Instrumenter::DoWorkForXML_do { block blockinfoname "progress 1" { indentlevel_ini 0 } \
+    { raiseerror 1 } } {
 
     set length [string length $block]
     if { $length >= 5000 && $progress } {
@@ -1543,7 +1596,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		        push_state att_after_equal
 		    } elseif { ![state_is text] && ![state_is att_dquote] \
 		        && ![state_is att_quote]} {
-		        raise_error "Not valid '"
+		        raise_error "Not valid ="
 		    }
 		}
 		' {
