@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.75 2007/09/18 10:07:12 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.76 2007/09/25 10:18:16 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -7735,6 +7735,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		editpaste-16 [_ "Past text from clipboard"] "RamDebugger::CutCopyPasteText paste" \
 		find-16 [_ "Search text in source file"] "RamDebugger::SearchWindow" \
 		- - - \
+		"" [_ "Activate TabletPC drag"] "" \
 		colorize-16 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile" \
 		]
     } else {
@@ -7755,8 +7756,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		down-22 [_ "continue one command, entering in subcommands"] "RamDebugger::ContNextGUI rstep" \
 		stop-22 [_ "stop debugging"] "RamDebugger::DisconnectStop" \
 		- - - \
-		colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile" \
 		"" [_ "Activate TabletPC drag"] "" \
+		colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile" \
 		]
     }
     set idx 0
@@ -7771,7 +7772,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	grid $toolbar.bbox$idx -row 0 -column $idx -sticky ns
 	incr idx
     }
-    set tabletPC_drag_button $toolbar.bbox[expr {$idx-1}]
+    set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
     
     ################################################################################
     # the horizontal 3 levels pane
@@ -7862,8 +7863,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     ApplyColorPrefs $text
     
     if { !$iswince } {
-	tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode)
+	set res 20
+    } else {
+	set res 16
     }
+    tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) $res
 
     #set pane2in2 [$pwin add -weight $weight2in]
     set pane2in2 [frame $pwin.pane2in2]
