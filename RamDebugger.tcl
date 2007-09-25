@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.76 2007/09/25 10:18:16 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.77 2007/09/25 11:13:18 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -7772,6 +7772,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	grid $toolbar.bbox$idx -row 0 -column $idx -sticky ns
 	incr idx
     }
+    grid columnconfigure $toolbar $idx -weight 1
     set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
     
     ################################################################################
