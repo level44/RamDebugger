@@ -1,11 +1,11 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.77 2007/09/25 11:13:18 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.78 2007/10/17 16:01:14 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
-#package require Tk 8.4
+package require Tk 8.4
 
 
 if { [info exists ::starkit::topdir] } {
@@ -61,7 +61,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 6.0
+    set Version 6.1.2
 
     ################################################################################
     #    Non GUI commands
@@ -7392,6 +7392,16 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require textutil
     package require tooltip
     package require tile
+
+    if { ![catch { package vcompare [package provide Tk] 8.5 } ret] && $ret < 0} {
+	interp alias "" ttk::style "" style
+    }
+    catch {
+	ttk::style theme settings winnative {
+	    ttk::style configure Toolbutton -padding 1
+	}
+    }
+    
     #needed a catch for wince
     catch { package require tkdnd } ;# only if it is compiled
     package require fulltktree
@@ -7868,8 +7878,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } else {
 	set res 16
     }
-    tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) $res
-
+    catch {
+	tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) $res
+    }
     #set pane2in2 [$pwin add -weight $weight2in]
     set pane2in2 [frame $pwin.pane2in2]
     $pwin add $pane2in2 -height $weight2in

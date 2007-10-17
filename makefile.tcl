@@ -3,7 +3,7 @@ package require createdistribution
 namespace import createdistribution::*
 
 set name RamDebugger
-set version 6.0
+set version 6.1.2
 
 IconifiedConsole
 
@@ -24,17 +24,21 @@ createdistribution::regsubfiles [list \
 
 auto_mkindex scripts *.tcl
 
-CreateDistribution zip $name . RamDebugger.tcl \
-    [list license.terms Readme addons scripts Examples help \
-	       pkgIndex.tcl] \
-    addons/ramdebugger.ico $version
-
 set createdistribution::libdir ""
 
 # cannot contain file pkgIndex.tcl
 CreateDistribution starkit $name . RamDebugger.tcl \
     [list license.terms Readme addons scripts Examples help] \
-    addons/ramdebugger.ico $version
+   addons/ramdebugger.ico $version
 
+set createdistribution::libdir addons
+
+lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
+    htmlparse img ncgi sha1 snit struct textutil tile vfs treectrl
+
+CreateDistribution zip $name . RamDebugger.tcl \
+    [list license.terms Readme addons scripts Examples help \
+	       pkgIndex.tcl] \
+    addons/ramdebugger.ico $version
 
 DeiconifyConsole
