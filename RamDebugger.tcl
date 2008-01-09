@@ -1,12 +1,11 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.78 2007/10/17 16:01:14 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.79 2008/01/09 13:58:21 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
 package require Tk 8.4
-
 
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
@@ -126,6 +125,7 @@ namespace eval RamDebugger {
     variable WindowFilesList ""
     variable WindowFilesListLineNums ""
     variable oldPasteStack ""
+    variable CustomFileTypeMenuStack ""
 
     ################################################################################
     # Handlers to save files. Array with names: filename
@@ -4077,7 +4077,13 @@ proc RamDebugger::SaveFileF { file } {
     #         puts -nonewline $fout $files($file)
     #         close $fout
     #     }
-    set currentfile $file
+    
+    if { $file ne $currentfile } {
+	set currentfile $file
+	set changed_name 1
+    } else {
+	set changed_name 0
+    }
 
     catch { unset instrumentedfilesP($currentfile) instrumentedfilesR($currentfile) }
     catch { unset instrumentedfilesTime($currentfile) }
@@ -4112,9 +4118,10 @@ proc RamDebugger::SaveFileF { file } {
 	set options(defaultdir) [file dirname $file]
 	#FillListBox
     }
-    set filetype [GiveFileType $file]
-    RamDebugger::AddFileTypeMenu $filetype
-
+    if { $changed_name } {
+	set filetype [GiveFileType $file]
+	RamDebugger::AddFileTypeMenu $filetype
+    }
     if { [info exists currentfile_secondary] } {
 	if { $currentfile eq $currentfile_secondary } {
 	    $text configure -synctextwidget $text_secondary
@@ -6963,9 +6970,27 @@ proc RamDebugger::DropBindingDone { files } {
 
 proc RamDebugger::AddCustomFileTypeMenu { name menu } {
     variable descmenu
+    variable CustomFileTypeMenuStack
 
+    lappend CustomFileTypeMenuStack [list $name $menu]
     set descmenu_new [linsert $descmenu 30 $name all filetypemenu 0 $menu]
     AddFileTypeMenu_do $descmenu_new
+}
+
+proc RamDebugger::RemoveCustomFileTypeMenu {} {
+    variable descmenu
+    variable CustomFileTypeMenuStack
+
+    set CustomFileTypeMenuStack [lrange $CustomFileTypeMenuStack 0 end-1]
+    
+    set name ""
+    foreach "name menu" [lindex $CustomFileTypeMenuStack end] break
+    if { $name ne "" } {
+	set descmenu_new [linsert $descmenu 30 $name all filetypemenu 0 $menu]
+    } else {
+	set descmenu_new $descmenu
+    }
+    AddFileTypeMenu_do $descmenu_new 
 }
 
 proc RamDebugger::AddFileTypeMenu { filetype } {
@@ -6973,7 +6998,8 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
     variable descmenu
     variable text
     variable currentfile
-
+    variable CustomFileTypeMenuStack
+    
     set menu [$mainframe getmenu filetypemenu]
     
     set changes 0
@@ -7358,7 +7384,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable pane2
     variable pane3
     variable iswince
-    
+
     if { !$iswince } {
 	proc ::bgerror { errstring } {
 	    if { [info command RamDebugger::TextOutRaise] != "" } {
@@ -7426,7 +7452,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     if { $iswince } { pocketpc::init }
     #pocketpc::init
-    
+
     if { $topleveluse == "" } {
 	toplevel $w
     } else {
@@ -7784,7 +7810,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     grid columnconfigure $toolbar $idx -weight 1
     set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
-    
+
     ################################################################################
     # the horizontal 3 levels pane
     ################################################################################
@@ -7802,7 +7828,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     if { ![info exists options(defaultdir)] } {
 	set options(defaultdir) [pwd]
     }
-
     #set pane1 [$pw add -weight $weight1]
 
     set listboxlabelframe [frame $f.lflf]
@@ -7870,7 +7895,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     scrollbar $fulltext.yscroll -orient vertical -grid 2 -command \
 	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can]
     scrollbar $fulltext.xscroll -orient horizontal -grid "0 2" -command "$fulltext.text xview"
-    
+
     ApplyColorPrefs $text
     
     if { !$iswince } {
@@ -7878,9 +7903,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } else {
 	set res 16
     }
+
     catch {
 	tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) $res
     }
+
     #set pane2in2 [$pwin add -weight $weight2in]
     set pane2in2 [frame $pwin.pane2in2]
     $pwin add $pane2in2 -height $weight2in
@@ -7953,7 +7980,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     #set pane3 [$pw add -weight $weight3]
     set pane3 [frame $pw.pane3]
     $pw add $pane3 -sticky nsew -width $weight3
-
 
     ################################################################################
     # the vertical user defined - local
@@ -8281,7 +8307,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set menu [$mainframe getmenu macros]
     AddActiveMacrosToMenu $mainframe $menu
 
-
     if { [info exists options(breakpoints)] } {
 	if { [llength [lindex $options(breakpoints) 0]] == 4 } {
 	    set breakpoints ""
@@ -8470,7 +8495,7 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set topleveluse [lindex $argv $iposm1]
 	set argv [lreplace $argv $ipos $iposm1]
     } else { set topleveluse "" }
-    
+
     RamDebugger::Init $readwriteprefs $registerasremote
     
     ################################################################################
@@ -8479,7 +8504,9 @@ if { ![info exists SkipRamDebuggerInit] } {
     
     if { [info command wm] != "" && [info commands tkcon_puts] == "" } {
 	wm withdraw .
+
 	RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
+
 	if { [llength $argv] } {
 	    RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
 	} elseif { $opendefault } {
