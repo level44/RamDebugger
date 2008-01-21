@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.79 2008/01/09 13:58:21 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.80 2008/01/21 20:15:31 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -6120,6 +6120,11 @@ proc RamDebugger::ListBoxEvents { listb exec_callback menu_callback } {
 }
 
 proc RamDebugger::UndoCallback {} {
+    MarkAsNotModified
+    bell
+}
+
+proc RamDebugger::MarkAsNotModified {} {
     variable text
     variable currentfileIsModified
 
@@ -6129,8 +6134,8 @@ proc RamDebugger::UndoCallback {} {
 	wm title [winfo toplevel $text] $title
 	set currentfileIsModified 0
     }
-    bell
 }
+
 
 proc RamDebugger::CheckTextBefore { command args } {
     variable text
@@ -8393,10 +8398,17 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
 }
 
-proc RamDebugger::OpenFileInNewWindow {} {
+proc RamDebugger::OpenFileInNewWindow { args } {
     variable info_script
     variable text
     variable options
+    
+    set optional {
+	{ -ask_for_file boolean 1 }
+    }
+    set compulsory ""
+    parse_args $optional $compulsory $args
+
 
     set w [winfo toplevel $text]
     set geomkey maingeometry_newwin_$options(ViewOnlyTextOrAll)
@@ -8426,7 +8438,10 @@ proc RamDebugger::OpenFileInNewWindow {} {
     }
     $ip eval [list source $info_script]
     $ip eval [list array set RamDebugger::options [array get options]]
-    $ip eval [list after 1 [list RamDebugger::OpenFile]]
+    if { $ask_for_file } {
+	$ip eval [list after 1 [list RamDebugger::OpenFile]]
+    }
+    return $ip
 }
 
 proc RamDebugger::OpenFileInNewWindow_exit { ip } {
