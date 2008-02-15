@@ -271,8 +271,8 @@ proc RamDebugger::Instrumenter::PopState { type line newblocknameP newblocknameR
     set words_old $words
     foreach [list words currentword wordtype wordtypeline wordtypepos DoInstrument OutputType \
 	NeedsNamespaceClose braceslevel] [lindex $stack end] break
-    if { $words_old eq "expand" } {
-	lappend words expand
+    if { $words_old eq "*" } {
+	lappend words "*"
     }
     set stack [lreplace $stack end end]
     incr level -1
@@ -571,7 +571,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		        if { $braceslevelNoEval == 0 } {
 		            set wordtype ""
 		            lappend words $currentword
-		            if { [lindex $words 0] != "\#" && $currentword ne "expand" } {
+		            if { [lindex $words 0] != "\#" && $currentword ne "*" } {
 		                set checkExtraCharsAfterCQB \}
 		            }
 		            set currentword ""
@@ -601,7 +601,7 @@ proc RamDebugger::Instrumenter::DoWork { block filenum newblocknameP newblocknam
 		                error $text
 		            }
 		            set consumed 1
-		            if { [lindex $words 0] != "\#" && [lindex $words end] ne "expand" } {
+		            if { [lindex $words 0] != "\#" && [lindex $words end] ne "*" } {
 		                set checkExtraCharsAfterCQB \}
 		            }
 		        }

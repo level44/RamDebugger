@@ -94,6 +94,7 @@ proc RamDebugger::CVS::ManageAutoSave {} {
 proc RamDebugger::CVS::_ManageAutoSaveDo {} {
     variable lasttimeautosave
     variable autosaveidle_after
+    variable autosave_warning
 
     set autosaveidle_after ""
 
@@ -112,8 +113,10 @@ proc RamDebugger::CVS::_ManageAutoSaveDo {} {
     } else {
 	set err [catch {SaveRevision 1} errstring]
 	if { $err } {
-	    WarnWin "Failed auto saving revisions. Feature disconnected. Reason: $errstring"
-	    set RamDebugger::options(AutoSaveRevisions) ""
+	    if { ![info exists autosave_warning] } {
+		WarnWin "Failed auto saving revisions. Feature disconnected for this session. Reason: $errstring"
+		set autosave_warning 1
+	    }
 	} else {
 	    set lasttimeautosave [clock seconds]
 	    ManageAutoSave
@@ -248,75 +251,81 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     grid columnconfigure $f 0 -weight 1
 
     set action [$w createwindow]
-    set selecteditems ""
-    foreach i [$sw.lb curselection] {
-	lappend selecteditems [$sw.lb get $i]
-    }
-    destroy $w
-    if { $action <= 0 } {  return }
-    if { $action == 1 } {
-	if { [llength $selecteditems] != 1  } {
-	    WarnWin "Select one revision in order to visualize it"
+    while 1 {
+	set selecteditems ""
+	foreach i [$sw.lb curselection] {
+	    lappend selecteditems [$sw.lb get $i]
+	}
+	if { $action <= 0 } {
+	    destroy $w
 	    return
 	}
-	set revision [lindex $selecteditems 0 0]
-	cd $cvsworkdir
-	set data [exec cvs -Q update -p -r $revision $lfile]
-	cd $pwd
-	RamDebugger::OpenFileSaveHandler *[file tail $file].$revision* $data ""
-    } else {
-	if { [llength $selecteditems] < 1 || [llength $selecteditems] > 2 } {
-	    WarnWin "Select one or two revisions in order to visualize the differences"
-	    return
-	}
-	cd $cvsworkdir
-	set deletefiles ""
-	if { [llength $selecteditems] == 1 } {
+	if { $action == 1 } {
+	    if { [llength $selecteditems] != 1  } {
+		WarnWin "Select one revision in order to visualize it" $w
+		destroy $w
+		return
+	    }
 	    set revision [lindex $selecteditems 0 0]
-	    if { [regexp {^\*.*\*$} $RamDebugger::currentfile] } {
-		set currentfile [string trim $RamDebugger::currentfile *]
-	    } else {
-		set currentfile [file normalize $RamDebugger::currentfile]
-	    }
-	    if { $file eq $currentfile } {
-		set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
-		set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
-		set file1 [file tail $file]
-		RamDebugger::_savefile_only $file1 $data
-		lappend deletefiles [file join $cvsworkdir $file1]
-	    } else {
-		set file1 $file
-	    }
-	    set file2 [file tail $file].$revision
-	    exec cvs -Q update -p -r $revision $lfile > $file2
-	    lappend deletefiles [file join $cvsworkdir $file2]
+	    cd $cvsworkdir
+	    set data [exec cvs -Q update -p -r $revision $lfile]
+	    cd $pwd
+	    RamDebugger::OpenFileSaveHandler *[file tail $file].$revision* $data ""
+	    destroy $w
+	    return
+	} elseif { [llength $selecteditems] < 1 || [llength $selecteditems] > 2 } {
+	    WarnWin "Select one or two revisions in order to visualize the differences" $w
 	} else {
-	    set r1 [lindex $selecteditems 0 0]
-	    set r2 [lindex $selecteditems 1 0]
-	    set file1 [file tail $file].$r1
-	    exec cvs -Q update -p -r $r1 $lfile > $file1
-	    set file2 [file tail $file].$r2
-	    exec cvs -Q update -p -r $r2 $lfile > $file2
-	    lappend deletefiles [file join $cvsworkdir $file1] \
-		[file join $cvsworkdir $file2]
+	    cd $cvsworkdir
+	    set deletefiles ""
+	    if { [llength $selecteditems] == 1 } {
+		set revision [lindex $selecteditems 0 0]
+		if { [regexp {^\*.*\*$} $RamDebugger::currentfile] } {
+		    set currentfile [string trim $RamDebugger::currentfile *]
+		} else {
+		    set currentfile [file normalize $RamDebugger::currentfile]
+		}
+		if { $file eq $currentfile } {
+		    set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
+		    set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
+		    set file1 [file tail $file]
+		    RamDebugger::_savefile_only $file1 $data
+		    lappend deletefiles [file join $cvsworkdir $file1]
+		} else {
+		    set file1 $file
+		}
+		set file2 [file tail $file].$revision
+		exec cvs -Q update -p -r $revision $lfile > $file2
+		lappend deletefiles [file join $cvsworkdir $file2]
+	    } else {
+		set r1 [lindex $selecteditems 0 0]
+		set r2 [lindex $selecteditems 1 0]
+		set file1 [file tail $file].$r1
+		exec cvs -Q update -p -r $r1 $lfile > $file1
+		set file2 [file tail $file].$r2
+		exec cvs -Q update -p -r $r2 $lfile > $file2
+		lappend deletefiles [file join $cvsworkdir $file1] \
+		    [file join $cvsworkdir $file2]
+	    }
+	    set ex ""
+	    set interp diff
+	    while { [interp exists $interp] } {
+		if { $ex eq "" } { set ex 2} else { incr ex }
+		set interp diff$ex
+	    }
+	    interp create $interp
+	    $interp eval package require Tk
+	    interp alias $interp exit_interp "" interp delete $interp
+	    set cmd "file delete $deletefiles ; exit_interp"
+	    $interp eval [list proc exit { args } $cmd]
+	    $interp eval [list cd $cvsworkdir]
+	    $interp eval [list set argc 2]
+	    $interp eval [list set argv [list [file join $cvsworkdir $file1] \
+		        [file join $cvsworkdir $file2]]]
+	    $interp eval [list source [file join $RamDebugger::MainDir addons tkdiff.tcl]]
+	    cd $pwd
 	}
-	set ex ""
-	set interp diff
-	while { [interp exists $interp] } {
-	    if { $ex eq "" } { set ex 2} else { incr ex }
-	    set interp diff$ex
-	}
-	interp create $interp
-	$interp eval package require Tk
-	interp alias $interp exit_interp "" interp delete $interp
-	set cmd "file delete $deletefiles ; exit_interp"
-	$interp eval [list proc exit { args } $cmd]
-	$interp eval [list cd $cvsworkdir]
-	$interp eval [list set argc 2]
-	$interp eval [list set argv [list [file join $cvsworkdir $file1] \
-		                         [file join $cvsworkdir $file2]]]
-	$interp eval [list source [file join $RamDebugger::MainDir addons tkdiff.tcl]]
-	cd $pwd
+	set action [$w waitforwindow]
     }
 }
 

@@ -456,6 +456,12 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		  -selectbackground navy -selectforeground white \
 		  -stretch all -selectmode extended \
 		  -highlightthickness 0]
+    
+    $sw.lb columnconfigure 0 -sortmode integer
+    $sw.lb columnconfigure 2 -sortmode dictionary
+    $sw.lb columnconfigure 3 -sortmode integer
+    $sw.lb columnconfigure 5 -sortmode dictionary
+ 
 
     $sw setwidget $sw.lb
     
@@ -2873,12 +2879,12 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	set ::RamDebugger::Lastsearchstring ""
     } elseif { $what != "any" } {
 	if { ![winfo exists $w.search] } {
-	    entry $w.search -width 25 -textvariable RamDebugger::searchstring
-	    place $w.search -in $w -x 0 -rely 1 -y -1 -anchor sw
+	    entry $w.search -width 25 -textvariable RamDebugger::searchstring -relief solid -bd 1
+	    place $w.search -in $w -x 2 -rely 1 -y -1 -anchor sw
 
 	    focus $active_text
 	    bindtags $active_text [linsert [bindtags $active_text] 0 $w.search]
-	    bind $w.search <FocusOut> "destroy $w.search ; break"
+	    #bind $w.search <FocusOut> "destroy $w.search ; break"
 	    bind $w.search <Escape> "destroy $w.search ; break"
 	    bind $w.search <KeyPress> [list if { ![string equal "%A" ""] && ([string is print %A] || \
 		[string is space %A]) } \

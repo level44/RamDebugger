@@ -370,7 +370,7 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
 
   int wordslen,isexpand=0;
   Tcl_ListObjLength(is->ip,is->words,&wordslen);
-  if(!wordslen && strcmp(Tcl_GetString(is->currentword),"expand")==0) isexpand=1;
+  if(!wordslen && strcmp(Tcl_GetString(is->currentword),"*")==0) isexpand=1;
 
   is->level--;
   if(is->level<0) return 0;
@@ -387,7 +387,7 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
   is->braceslevel=is->stack[is->level].braceslevel;
 
   is->words=Tcl_CopyIfShared(is->words);
-  if(isexpand) Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("expand",-1));
+  if(isexpand) Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("*",-1));
 //   else Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("",-1));
 
   if(is->NeedsNamespaceClose){
@@ -647,7 +647,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	      Tcl_ListObjIndex(is->ip,is->words,0,&word0);
 	      pword0=Tcl_GetStringFromObj(word0,NULL);
 	      if(*pword0==':' && *(pword0+1)==':') pword0+=2;
-	      if(*pword0!='#' && strcmp(Tcl_GetString(is->currentword),"expand")!=0)
+	      if(*pword0!='#' && strcmp(Tcl_GetString(is->currentword),"*")!=0)
 		checkExtraCharsAfterCQB=BRACE_WT;
 	      is->currentword=Tcl_ResetString(is->currentword);
 	      consumed=1;
@@ -697,7 +697,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	      consumed=1;
 	      if(wordslen){
 		Tcl_ListObjIndex(is->ip,is->words,wordslen-1,&wordi);
-		if(*pword0!='#' && strcmp(Tcl_GetString(wordi),"expand")!=0)
+		if(*pword0!='#' && strcmp(Tcl_GetString(wordi),"*")!=0)
 		  checkExtraCharsAfterCQB=BRACE_WT;
 	      }
 	    }
@@ -1084,7 +1084,7 @@ void Xml_state::raise_error(char* txt,int raiseerror,int line,int icharline)
 }
 
 int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* blockinfoname,int progress,
-					   int indentlevel_ini,int raiseerror) {
+		                           int indentlevel_ini,int raiseerror) {
 
   int i,length,state_start,state_start_global;
   char c,buf[1024];
@@ -1434,7 +1434,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 
 
 int RamDebuggerInstrumenterDoWork(ClientData clientData, Tcl_Interp *ip, int objc,
-				  Tcl_Obj *CONST objv[])
+		                  Tcl_Obj *CONST objv[])
 {
   int result,filenum,progress=1;
   if (objc<6) {
@@ -1477,7 +1477,7 @@ int RamDebuggerInstrumenterDoWorkForXML(ClientData clientData, Tcl_Interp *ip, i
     if(result) return TCL_ERROR;
   }
   result=RamDebuggerInstrumenterDoWorkForXML_do(ip,Tcl_GetString(objv[1]),Tcl_GetString(objv[2]),
-						progress,indentlevel_ini,raiseerror);
+		                                progress,indentlevel_ini,raiseerror);
   return result;
 }
 

@@ -221,4 +221,5 @@ set auto_index(::RamDebugger::DisplayWindowsHierarchyFind) [list source [file jo
 set auto_index(::RamDebugger::DisplayWindowsPickWindow) [list source [file join $dir WindowsHierarchy.tcl]]
 set auto_index(::RamDebugger::DisplayWindowsPickWindowDo) [list source [file join $dir WindowsHierarchy.tcl]]
 set auto_index(::RamDebugger::DisplayWindowsHierarchyCancel) [list source [file join $dir WindowsHierarchy.tcl]]
+set auto_index(::RamDebugger::DisplayWindowsHierarchyDoChangeFontSize) [list source [file join $dir WindowsHierarchy.tcl]]
 set auto_index(::RamDebugger::DisplayWindowsHierarchy) [list source [file join $dir WindowsHierarchy.tcl]]
