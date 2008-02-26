@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.80 2008/01/21 20:15:31 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.81 2008/02/26 18:54:15 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -7442,7 +7442,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } else {
 	bind Panedwindow <Configure> [list RamDebugger::ResizePanedWindow %W]
     }
-    
 
     CreateImages
     TkBackCompatibility
@@ -7451,7 +7450,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     
     package require tktablet
 
-    if { !$iswince } {
+    if { !$iswince && [info command ::tktablet::init_input_panel] ne "" } {
 	tktablet::init_input_panel
 	tktablet::init_input_panel_text
     }
@@ -8144,7 +8143,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <1> [list focus $text]
     bind $text <ButtonRelease-3> "%W mark set insert @%x,%y ; RamDebugger::TextMotion -1 -1 -1 -1;\
 	    tk_popup $menu %X %Y"
-    pocketpc::add $text
+    catch { pocketpc::add $text }
 
     bind $text <Double-1> "RamDebugger::SearchBraces %x %y ;break" 
     
@@ -8249,7 +8248,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	event delete <<PasteSelection>>
     }
     
-    pocketpc::add $marker
+    catch { pocketpc::add $marker }
 
     ################################################################################
     # start up options
