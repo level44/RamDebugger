@@ -333,9 +333,11 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     set dynlib_base RamDebuggerInstrumenter6[info sharedlibextension]
     set dynlib [file join $AppDataDir $dynlib_base]
 
-    catch { load $dynlib }
-    if {[info command RamDebuggerInstrumenterDoWork] ne "" } { return }
-
+    if { [file readable $dynlib] && [file mtime $dynlib] >= \
+	     [file mtime [file join $MainDir scripts RamDebuggerInstrumenter.cc]] } {
+	catch { load $dynlib }
+	if {[info command RamDebuggerInstrumenterDoWork] ne "" } { return }
+    }
     file delete -force [file join $AppDataDir compile]
     file copy -force [file join $MainDir scripts RamDebuggerInstrumenter.cc] \
 	[file join $MainDir scripts compile] \
