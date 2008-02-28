@@ -12,20 +12,25 @@ Introduction
 ============
 
 RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.
-With RamDebugger, it is possible to make Local Debugging, where the debugger starts the program to be debugged. and Remote debugging, where the program to debug is already started and RamDebugger connects to it.
+With RamDebugger, it is possible to make Local Debugging, where the debugger
+starts the program to be debugged. and Remote debugging, where the program to 
+debug is already started and RamDebugger connects to it.
 
 RamDebugger has additional capabilities like:
 
- * Editing the code. It is possible to edit the code inside its own editor and resend the new code without closing the debugged program.
+ * Editing the code. It is possible to edit the code inside its own editor and 
+resend the new code without closing the debugged program.
 
  * The TCL-TK source code is colorized and supports automatic indentation.
 
- * When stopping the debugger is one source code line, it is possible to view all the variables and expression values, as well as change them.
+ * When stopping the debugger is one source code line, it is possible to view all 
+the variables and expression values, as well as change them.
 
  * It has additional options to measure execution times in the debugged program.
 Works in Linux and Windows
 
- * Includes additional packages, like Tkcon and VisualRegexp, developed by third party people, as a convenience for RamDebugger users.
+ * Includes additional packages, like Tkcon and VisualRegexp, developed by third 
+party people, as a convenience for RamDebugger users.
 
  * The same program is an IDE for compiling and debugging c and c++
 
@@ -36,6 +41,10 @@ for details.
 Changes
 =======
 
+Changes From version 6.1 to version 6.2
+
+* Prepared for new TCL syntax {*}
+
 Changes From version 5.6 to version 6.1
 
  * Partly converted to tile
@@ -44,7 +53,8 @@ Changes From version 5.6 to version 6.1
 
 Changes From version 5.5 to version 5.6
 
- * Added trace command in the Breakpoints window (checking in every line if a variable changes)
+ * Added trace command in the Breakpoints window (checking in every line if a variable 
+   changes)
  * New debug option: Continue out of loop
 
 Changes From version 5.4 to version 5.5
@@ -95,7 +105,8 @@ Changes From version 3.1 to version 3.2
    * Added command stop in the Debug menu
    * Added command to break execution in any moment
    * Added zoom option to Display Windows hierarchy
-   * The cache directory (used internally by RamDebugger) is now created in the user directories instead of inside the installation directory
+   * The cache directory (used internally by RamDebugger) is now created in the user 
+     directories instead of inside the installation directory
    * Option Pick window in Windows hierarchy
    * It is necessary to stop debugging before start debugging again
 
@@ -105,7 +116,8 @@ Changes From version 3.0 to version 3.1
    * User can choose file extensions for every file type
    * New macro for applying regsub to a region
    * New option in Current file arguments: file type can be TCL or TK
-   * New option in Current file arguments: Another file can be started to begin local debugging
+   * New option in Current file arguments: Another file can be started to begin local
+     debugging
    * RamDebugger::OpenFileSaveHandler
 
 Changes From version 2.8 to version 3.0
@@ -157,7 +169,7 @@ Changes From version 1 to version 2
 web page
 ========
 
-RamDebugger web page is at: `http://gid.cimne.com/RamDebugger'
+RamDebugger web page is at: http://www.compassis.com/ramdebugger
 
 
 Download
@@ -172,8 +184,8 @@ Installation and prerequisites
 ==============================
 
 The only prerequisite before executing RamDebugger is to have Tcl-Tk
-installed. The tested version is Tcl-Tk8.4 They can be obtained from
-`http://tcl.activestate.com'.
+installed. The tested version is Tcl-Tk8.4 and 8.5 They can be obtained from
+http://www.tcl.tk.
 
 RamDebugger has been tested on Windows and on Linux. For other UNIXes
 and MAC, it is necessary to obtain, separately, the package Tkhtml

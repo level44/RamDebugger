@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.81 2008/02/26 18:54:15 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.82 2008/02/28 15:30:28 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -60,7 +60,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 6.1.2
+    set Version 6.2
 
     ################################################################################
     #    Non GUI commands
@@ -7455,7 +7455,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	tktablet::init_input_panel_text
     }
     if { $iswince } { pocketpc::init }
-    #pocketpc::init
 
     if { $topleveluse == "" } {
 	toplevel $w
@@ -7775,9 +7774,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		editpaste-16 [_ "Past text from clipboard"] "RamDebugger::CutCopyPasteText paste" \
 		find-16 [_ "Search text in source file"] "RamDebugger::SearchWindow" \
 		- - - \
-		"" [_ "Activate TabletPC drag"] "" \
-		colorize-16 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile" \
 		]
+	if { [tktablet::is_tablet_pc] } {
+	    lappend data "" [_ "Activate TabletPC drag"] ""
+	}
+	lappend data colorize-16 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
     } else {
 	set data [list \
 		filenew22 [_ "Begin new file"] "RamDebugger::NewFile" \
@@ -7796,9 +7797,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		down-22 [_ "continue one command, entering in subcommands"] "RamDebugger::ContNextGUI rstep" \
 		stop-22 [_ "stop debugging"] "RamDebugger::DisconnectStop" \
 		- - - \
-		"" [_ "Activate TabletPC drag"] "" \
-		colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile" \
 		]
+	if { [tktablet::is_tablet_pc] } {
+	    lappend data "" [_ "Activate TabletPC drag"] ""
+	}
+	lappend data colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
     }
     set idx 0
     foreach "img help cmd" $data {
@@ -7813,8 +7816,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	incr idx
     }
     grid columnconfigure $toolbar $idx -weight 1
-    set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
-
+    if { [tktablet::is_tablet_pc] } {
+	set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
+    }
     ################################################################################
     # the horizontal 3 levels pane
     ################################################################################
@@ -7908,7 +7912,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set res 16
     }
 
-    catch {
+    if { [info exists tabletPC_drag_button] } {
 	tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) $res
     }
 
@@ -8143,7 +8147,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <1> [list focus $text]
     bind $text <ButtonRelease-3> "%W mark set insert @%x,%y ; RamDebugger::TextMotion -1 -1 -1 -1;\
 	    tk_popup $menu %X %Y"
-    catch { pocketpc::add $text }
+    if { $iswince } { pocketpc::add $text }
 
     bind $text <Double-1> "RamDebugger::SearchBraces %x %y ;break" 
     
@@ -8248,7 +8252,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	event delete <<PasteSelection>>
     }
     
-    catch { pocketpc::add $marker }
+    if { $iswince } { pocketpc::add $marker }
 
     ################################################################################
     # start up options
