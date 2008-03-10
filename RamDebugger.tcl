@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.82 2008/02/28 15:30:28 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.83 2008/03/11 00:07:54 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -757,7 +757,7 @@ proc RamDebugger::rdebug { args } {
 	    variable data
 	    set data(visited,filenum) $filenum
 	    set data(visited,line) $line
-
+	    
 	    set procstack ""
 	    set procname ""
 	    for { set i [expr {[info level]-1}] } { $i >= 1 } { incr i -1 } {
