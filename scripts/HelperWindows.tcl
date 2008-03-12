@@ -2908,6 +2908,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		"[list RamDebugger::Search $w {}];#"]
 	    bind $w.search <Destroy> "+ [list bindtags $active_text [lreplace [bindtags $active_text] 0 0]] ; break"
 	    foreach i [bind Text] {
+		if { [lsearch -exact [list <Motion>] $i] != -1 } { continue }
 		if { [bind $w.search $i] == "" } {
 		    if { [string match *nothing* [bind Text $i]] } {
 		        bind $w.search $i [bind Text $i]

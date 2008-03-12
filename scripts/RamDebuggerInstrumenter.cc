@@ -1294,28 +1294,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 		xml_state.raise_error("Not valid \"",raiseerror,iline,icharline);
 	    }
 	    break;
-	  case '\n':
-	     if(xml_state.state_is(enter_tagtext_XS)){
-	       xml_state.pop_state();
-	       if(xml_state.state_is(tag_XS,-2)){
-		 if(xml_state.state_is(tag_end_XS)){
-		   xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
-		   xml_state.pop_state();
-		 } else {
-		   xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
-		 }
-	       }
-	       xml_state.push_state(entered_tagtext_XS);
-	       blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
-	       Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
-	       Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
-	       Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline-1));
-	     } else if(xml_state.state_is(att_entername_XS)){
-	       xml_state.pop_state();
-	       xml_state.push_state(att_after_name_XS);
-	     }
-	     break;
-	  case ' ': case '\t':
+	case ' ': case '\t': case '\n':
 	    if(xml_state.state_is(enter_tagtext_XS)){
 	       xml_state.pop_state();
 	       int isend;

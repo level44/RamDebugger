@@ -1633,25 +1633,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML_do { block blockinfoname "progress 
 		        raise_error "Not valid \""
 		    }
 		}
-		\n {
-		    if { [state_is enter_tagtext] } {
-		        pop_state
-		        if { [state_is "tag" end-1] } {
-		            if { [state_is tag_end] } {
-		                pop_tag [range $state_start_global $i-1]
-		                pop_state
-		            } else {
-		                push_tag [range $state_start_global $i-1] $iline
-		            }
-		        }
-		        push_state entered_tagtext
-		        lappend_info magenta $state_start $icharline-1
-		    } elseif { [state_is att_entername] } {
-		        pop_state
-		        push_state att_after_name
-		    }
-		}
-		{ } - \t {
+		{ } - \t - \n {
 		    if { [state_is enter_tagtext] } {
 		        pop_state
 		        if { [state_is tag_end] } {
