@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.83 2008/03/11 00:07:54 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.84 2008/03/18 18:19:28 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -5078,6 +5078,13 @@ proc RamDebugger::TextMotion { X Y x y } {
 
     RamDebugger::CVS::SetUserActivity
 
+    set err [catch { lindex [after info $TextMotionAfterId] 0 } cmd]
+    if { !$err && $cmd ne "" }  {
+	foreach "- x_old y_old" $cmd break
+	if { abs($X-$x_old) <= 3 && abs($Y-$y_old) <= 3 } {
+	    return
+	}   
+    }
     after cancel $TextMotionAfterId
     if { [winfo exists $text.help] } { destroy $text.help }
     if { $X == -1 || $currentfile == "" || !$IsInStop } { return }
