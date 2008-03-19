@@ -11,7 +11,7 @@ proc RamDebugger::DisplayVar { X Y x y } {
 
     if { $debuggerstate != "debug" } { return }
 
-    if { $X != [winfo pointerx $text] || $Y != [winfo pointery $text] } {
+    if { abs($X-[winfo pointerx $text])> 3 || abs($Y-[winfo pointery $text])> 3 } {
 	return
     }
     set var [GetSelOrWordInIndex @$x,$y]

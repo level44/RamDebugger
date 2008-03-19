@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.84 2008/03/18 18:19:28 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.85 2008/03/19 13:57:12 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -7455,9 +7455,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     CreateModifyFonts
     InitOptions
     
-    package require tktablet
+    set tktablet_ok [expr {![catch { package require tktablet }]}]
 
-    if { !$iswince && [info command ::tktablet::init_input_panel] ne "" } {
+    if { !$iswince && $tktablet_ok && [info command ::tktablet::init_input_panel] ne "" } {
 	tktablet::init_input_panel
 	tktablet::init_input_panel_text
     }
@@ -7782,7 +7782,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		find-16 [_ "Search text in source file"] "RamDebugger::SearchWindow" \
 		- - - \
 		]
-	if { [tktablet::is_tablet_pc] } {
+	if { $tktablet_ok && [tktablet::is_tablet_pc] } {
 	    lappend data "" [_ "Activate TabletPC drag"] ""
 	}
 	lappend data colorize-16 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
@@ -7805,7 +7805,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		stop-22 [_ "stop debugging"] "RamDebugger::DisconnectStop" \
 		- - - \
 		]
-	if { [tktablet::is_tablet_pc] } {
+	if { $tktablet_ok && [tktablet::is_tablet_pc] } {
 	    lappend data "" [_ "Activate TabletPC drag"] ""
 	}
 	lappend data colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
@@ -7823,7 +7823,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	incr idx
     }
     grid columnconfigure $toolbar $idx -weight 1
-    if { [tktablet::is_tablet_pc] } {
+    if { $tktablet_ok && [tktablet::is_tablet_pc] } {
 	set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
     }
     ################################################################################
@@ -7919,7 +7919,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set res 16
     }
 
-    if { [info exists tabletPC_drag_button] } {
+    if { $tktablet_ok && [info exists tabletPC_drag_button] } {
 	tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) $res
     }
 
