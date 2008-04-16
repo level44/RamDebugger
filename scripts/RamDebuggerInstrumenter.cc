@@ -90,7 +90,7 @@ void RamDebuggerInstrumenterInitState(InstrumenterState* is)
     "foreach i [list return break while eval foreach for if else elseif error switch default continue] {\n"
 	     "set ::RamDebugger::Instrumenter::colors($i) magenta\n"
 	     "}\n"
-	     "foreach i [list variable set global incr] {\n"
+	     "foreach i [list variable set global incr lassign] {\n"
 	     "set ::RamDebugger::Instrumenter::colors($i) green\n"
 	     "}",-1,0);
 

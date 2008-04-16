@@ -40,7 +40,7 @@ proc RamDebugger::Instrumenter::InitState {} {
 	    error switch default continue] {
 	set colors($i) magenta
     }
-    foreach i [list variable set global incr] {
+    foreach i [list variable set global incr lassign] {
 	set colors($i) green
     }
 }

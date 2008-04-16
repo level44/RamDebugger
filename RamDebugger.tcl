@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.85 2008/03/19 13:57:12 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.86 2008/04/16 18:33:46 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -7081,6 +7081,7 @@ proc RamDebugger::AddFileTypeMenu_do { descmenu_new } {
 
 proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
     variable text
+    variable currentfileIsModified
     
     set err [catch { package require tdom }]
     if { $err } {
@@ -7099,6 +7100,7 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
 	tk_messageBox -message [_ "XML in file is not correct (%s)" $errstring]
 	return
     }
+    set currentfileIsModified_save $currentfileIsModified
     $text delete 1.0 end
     $text insert end $header
     set root [$doc documentElement]
@@ -7108,6 +7110,7 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
 	$text insert end [$root asXML -indent $none]
     }
     ReinstrumentCurrentFile
+    set currentfileIsModified $currentfileIsModified_save
 }
 
 if { [llength [info command lrepeat]] == 0 } {
