@@ -1076,7 +1076,7 @@ void Xml_state::raise_error(char* txt,int raiseerror,int line,int icharline)
 {
   if(!raiseerror) return;
   char buf[1024];
-  int charlen=strlen(txt);
+  int charlen=(int)strlen(txt);
   if(charlen>800) charlen=800;
   sprintf(buf,"error in line=%d position=%d. %.*s",line,icharline+1,charlen,txt);
   Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));

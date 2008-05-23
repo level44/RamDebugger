@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.86 2008/04/16 18:33:46 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.87 2008/05/23 17:41:45 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -214,14 +214,20 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 		file copy [file join $MainDir addons $i] $exe
 	    }
 	}
+    }
+    if { $::tcl_platform(platform) eq "windows" && !$iswince } {
+	set exe [file join $AppDataDir exe]
 	if { ![info exists ::env(PATH)] } {
 	    set list ""
 	} else {
 	    set list [split $::env(PATH) \;]
 	}
 	set shortname [file native [file attributes $exe -shortname]]
-	if { [lsearch -exact $list $shortname] == -1 } {
-	    lappend list $shortname
+	if { [set ipos [lsearch -exact $list $shortname]] != 0 } {
+	    if { $ipos != -1 } {
+		set list [lreplace $list $ipos $ipos]
+	    }
+	    set list [linsert $list 0 $shortname]
 	    set ::env(PATH) [join $list \;]
 	    # this is a variable from the TCL library
 	    array unset ::auto_execs
@@ -7785,6 +7791,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		find-16 [_ "Search text in source file"] "RamDebugger::SearchWindow" \
 		- - - \
 		]
+	set tktablet_ok 0
 	if { $tktablet_ok && [tktablet::is_tablet_pc] } {
 	    lappend data "" [_ "Activate TabletPC drag"] ""
 	}
