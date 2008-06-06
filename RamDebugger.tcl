@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.87 2008/05/23 17:41:45 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.88 2008/06/06 15:44:41 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.4
@@ -6153,6 +6153,9 @@ proc RamDebugger::MarkAsNotModified {} {
 proc RamDebugger::CheckTextBefore { command args } {
     variable text
     variable CheckTextSave
+    variable CheckTextInactive
+    
+    if { [info exists CheckTextInactive] && $CheckTextInactive } { return }
 
     if { $command eq "tag" && [regexp {^(add|delete|remove)$} [lindex $args 0]] && \
 	     [lindex $args 1] eq "sel" } {
@@ -6197,7 +6200,10 @@ proc RamDebugger::CheckText { command args } {
     variable currentfile
     variable currentfile_secondary
     variable CheckTextSave
+    variable CheckTextInactive
     variable breakpoints
+
+    if { [info exists CheckTextInactive] && $CheckTextInactive } { return }
 
     foreach "l1 l2 txt NumlinesOld" $CheckTextSave break
     if { $txt == "" } { return }
@@ -6657,7 +6663,8 @@ proc RamDebugger::CommentSelection { what } {
 
 proc RamDebugger::Indent {} {
     variable text
-
+    variable CheckTextInactive
+    
     set pos -1
     if { [catch {
 	scan [$text index sel.first] "%d" line1
@@ -6666,9 +6673,12 @@ proc RamDebugger::Indent {} {
 	scan [$text index insert] "%d.%d" line1 pos
 	set line2 $line1
     }
+    set CheckTextInactive 1
+
     for { set i $line1 } { $i <= $line2 } { incr i } {
 	IndentLine $i $pos
     }
+    unset CheckTextInactive
 }
 
 proc RamDebugger::IndentLine { line { pos -1 } } {

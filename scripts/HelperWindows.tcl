@@ -2552,6 +2552,9 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     ttk::label $f.l1 -text "Search:"
     ttk::combobox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs)
 
+    # to avoid problems with paste, that sometimes pastes too to the main window
+    bind $f.e1 "[bind [winfo class $f.e1] $f.e1]; break"
+    
     set cmd "$f.e1 configure -values \$RamDebugger::options(old_searchs)"
     trace add variable ::RamDebugger::options(old_searchs) write "$cmd ;#"
     bind $f.e1 <Destroy> [list trace remove variable \
