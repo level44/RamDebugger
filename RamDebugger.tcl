@@ -1,16 +1,16 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.88 2008/06/06 15:44:41 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.89 2008/06/18 14:39:54 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
-package require Tcl 8.4
-package require Tk 8.4
+package require Tcl 8.5
+package require Tk 8.5
 
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
     # that the following line out if you want to run without GUI
-    package require Tk 8.4
+    package require Tk 8.5
 }
 
 package require msgcat
@@ -184,6 +184,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     lappend ::auto_path [file dirname $MainDir]
     lappend ::auto_path [file join $MainDir scripts]
     lappend ::auto_path [file join $MainDir addons]
+
 
     if { $iswince } {
 	set AppDataDir $MainDir
@@ -6673,12 +6674,15 @@ proc RamDebugger::Indent {} {
 	scan [$text index insert] "%d.%d" line1 pos
 	set line2 $line1
     }
-    set CheckTextInactive 1
-
+    
+    switch -- [GiveFileType $currentfile] {
+	"TCL" { # nothing }
+	default { set CheckTextInactive 1 } 
+    }
     for { set i $line1 } { $i <= $line2 } { incr i } {
 	IndentLine $i $pos
     }
-    unset CheckTextInactive
+    unset -nocomplain CheckTextInactive
 }
 
 proc RamDebugger::IndentLine { line { pos -1 } } {
