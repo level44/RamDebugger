@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.89 2008/06/18 14:39:54 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.90 2008/06/20 14:21:52 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -6665,6 +6665,7 @@ proc RamDebugger::CommentSelection { what } {
 proc RamDebugger::Indent {} {
     variable text
     variable CheckTextInactive
+    variable currentfile
     
     set pos -1
     if { [catch {
