@@ -3057,10 +3057,18 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 
 proc RamDebugger::OpenProgram { what } {
     variable MainDir
-
+    variable currentfile
+    
+    set argv ""
+    
     switch $what {
 	visualregexp { set file [file join $MainDir addons visualregexp visual_regexp.tcl] }
-	tkcvs { set file [file join $MainDir addons tkcvs bin tkcvs.tcl] }
+	tkcvs {
+	    set file [file join $MainDir addons tkcvs bin tkcvs.tcl]
+	    if { [file isdirectory [file dirname $currentfile]] } {
+		lappend argv -dir [file dirname $currentfile]
+	    }
+	}
 	tkdiff { set file [file join $MainDir addons tkdiff.tcl] }
     }
 #tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
@@ -3069,7 +3077,8 @@ proc RamDebugger::OpenProgram { what } {
     interp alias $what exit_interp "" interp delete $what
     $what eval [list proc exit { args } "destroy . ; exit_interp"]
     $what eval [list load {} Tk]
-    $what eval { set argc 0 ; set argv "" }
+    $what eval [list set argc 0]
+    $what eval [list set argv $argv]
     $what eval [list source $file]
 }
 
