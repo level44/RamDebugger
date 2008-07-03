@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.91 2008/07/03 13:57:09 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.92 2008/07/03 21:01:41 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7439,7 +7439,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # dirty trick to avoid conflicts with other bwidget packages
     # only necessary when working inside a master
     #auto_load ComboBox
-    package require Tablelist
+
+    package require tablelist
+
     #require BWidgetR, a BWidget with some modifications, marked with RAMSAN
     #inside the GiD scripts BWidget is really BWidgetR, to avoid duplicate it
     if { [catch {package require BWidgetR}] } { 
