@@ -1654,6 +1654,7 @@ proc RamDebugger::AboutWindow {} {
 	icons "Adrian Davis" BSD NO
 	tkdnd "George Petasis" BSD NO
 	tkdiff "John M. Klassa" GPL NO
+	tkcvs  "DEL" GPL YES
     }
     foreach "pack author lic mod" $data {
 	$w.lf.lb insert end [list $pack $author $lic $mod]
@@ -3069,9 +3070,8 @@ proc RamDebugger::OpenProgram { what } {
 		lappend argv -dir [file dirname $currentfile]
 	    }
 	}
-	tkdiff { set file [file join $MainDir addons tkdiff.tcl] }
+	tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
     }
-#tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
     if { [interp exists $what] } { interp delete $what }
     interp create $what
     interp alias $what exit_interp "" interp delete $what

@@ -322,7 +322,7 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	    $interp eval [list set argc 2]
 	    $interp eval [list set argv [list [file join $cvsworkdir $file1] \
 		        [file join $cvsworkdir $file2]]]
-	    $interp eval [list source [file join $RamDebugger::MainDir addons tkdiff.tcl]]
+	    $interp eval [list source [file join $RamDebugger::MainDir addons tkcvs bin tkdiff.tcl]]
 	    cd $pwd
 	}
 	set action [$w waitforwindow]
