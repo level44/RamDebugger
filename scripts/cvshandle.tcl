@@ -569,6 +569,8 @@ proc RamDebugger::CVS::indicator_update_do {} {
     
     set f $cvs_indicator_frame
     set currentfile $RamDebugger::currentfile
+    set cfile [file tail $currentfile]
+    set cdir [file tail [file dirname $currentfile]]
     
     if { ![info exists cvs_indicator_fileid] } { return }
     append cvs_indicator_data "[gets $cvs_indicator_fileid]\n"
@@ -582,22 +584,22 @@ proc RamDebugger::CVS::indicator_update_do {} {
     foreach line [split $cvs_indicator_data \n] {
 	if { ![regexp {^\s*(\w)\s+(\S.*)} $line {} mode file] } { continue }
 	lappend files $line
-	if { $file eq [file tail $currentfile] } {
+	if { $file eq $cfile } {
 	    set currentfile_mode $mode
 	}
     }
     switch -- $currentfile_mode {
 	"" {
 	    $f.l2 configure -image ""
-	    tooltip::tooltip $f.l2 [_ "CVS up to date for current file"]
+	    tooltip::tooltip $f.l2 [_ "CVS up to date for current file '%s'" $cfile]
 	}
 	M {
 	    $f.l2 configure -image up-16
-	    tooltip::tooltip $f.l2 [_ "It is necessary to COMMIT current file"]
+	    tooltip::tooltip $f.l2 [_ "It is necessary to COMMIT current file '%s'" $cfile]
 	}
 	default {
 	    $f.l2 configure -image down-16
-	    tooltip::tooltip $f.l2 [_ "CVS is NOT up to date for current file"]
+	    tooltip::tooltip $f.l2 [_ "CVS is NOT up to date for current file '%s'" $cfile]
 	}
     }
     if { [llength $files] > 10 } {
@@ -608,6 +610,6 @@ proc RamDebugger::CVS::indicator_update_do {} {
 	tooltip::tooltip $f.l3 [join $files \n]
     } else {
 	$f.l3 configure -image ""
-	tooltip::tooltip $f.l3 [_ "CVS up to date for current directory"]
+	tooltip::tooltip $f.l3 [_ "CVS up to date for current directory '%s'" $cdir]
     }
 }
