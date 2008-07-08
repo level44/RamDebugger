@@ -122,6 +122,7 @@ proc RamDebugger::CVS::_ManageAutoSaveDo {} {
 	    ManageAutoSave
 	}
     }
+    indicator_update
 }
 
 proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
@@ -518,3 +519,95 @@ proc RamDebugger::CVS::ShowAllFiles {} {
     }
 }
 
+################################################################################
+#    CVS indicator
+################################################################################
+
+proc RamDebugger::CVS::indicator_init { f } {
+    variable cvs_indicator_frame
+
+    if { [auto_execok cvs] eq "" } { return }
+
+    set cvs_indicator_frame $f
+    ttk::label $f.l1 -text CVS:
+    ttk::label $f.l2 -width 3
+    ttk::label $f.l3 -width 3
+    
+    foreach i [list 1 2 3] {
+	bind $f.l$i <1> [list RamDebugger::OpenProgram tkcvs]
+    }
+    grid $f.l1 $f.l2 $f.l3 -sticky w
+}
+
+proc RamDebugger::CVS::indicator_update {} {
+    variable cvs_indicator_fileid
+    variable cvs_indicator_data
+    variable cvs_indicator_frame
+    
+    set currentfile $RamDebugger::currentfile
+    
+    if { [auto_execok cvs] eq "" } { return }
+    if { [info exists cvs_indicator_fileid] } {
+	catch { close $cvs_indicator_fileid }
+	unset cvs_indicator_fileid
+    }
+    set f $cvs_indicator_frame
+    foreach i [list 1 2 3] {
+	raise $f.l$i
+    }
+    cd [file dirname $currentfile]
+    set cvs_indicator_data ""
+    set cvs_indicator_fileid [open "|cvs -n update" r]
+    fconfigure $cvs_indicator_fileid -blocking 0
+    fileevent $cvs_indicator_fileid readable [list RamDebugger::CVS::indicator_update_do]
+}
+
+proc RamDebugger::CVS::indicator_update_do {} {
+    variable cvs_indicator_fileid
+    variable cvs_indicator_data
+    variable cvs_indicator_frame
+    
+    set f $cvs_indicator_frame
+    set currentfile $RamDebugger::currentfile
+    
+    if { ![info exists cvs_indicator_fileid] } { return }
+    append cvs_indicator_data "[gets $cvs_indicator_fileid]\n"
+    
+    if { ![eof $cvs_indicator_fileid] } { return }
+    catch { close $cvs_indicator_fileid }
+    unset cvs_indicator_fileid
+    
+    set files ""
+    set currentfile_mode ""
+    foreach line [split $cvs_indicator_data \n] {
+	if { ![regexp {^\s*(\w)\s+(\S.*)} $line {} mode file] } { continue }
+	lappend files $line
+	if { $file eq [file tail $currentfile] } {
+	    set currentfile_mode $mode
+	}
+    }
+    switch -- $currentfile_mode {
+	"" {
+	    $f.l2 configure -image ""
+	    tooltip::tooltip $f.l2 [_ "CVS up to date for current file"]
+	}
+	M {
+	    $f.l2 configure -image up-16
+	    tooltip::tooltip $f.l2 [_ "It is necessary to COMMIT current file"]
+	}
+	default {
+	    $f.l2 configure -image down-16
+	    tooltip::tooltip $f.l2 [_ "CVS is NOT up to date for current file"]
+	}
+    }
+    if { [llength $files] > 10 } {
+	set files [lrange $files 0 9]
+    }
+    if { [llength $files] > 0 } {
+	$f.l3 configure -image reload-16
+	tooltip::tooltip $f.l3 [join $files \n]
+    } else {
+	$f.l3 configure -image ""
+	tooltip::tooltip $f.l3 [_ "CVS up to date for current directory"]
+    }
+}
