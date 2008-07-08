@@ -4042,8 +4042,3 @@ proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
 
 
 
-
-
-
-
-
