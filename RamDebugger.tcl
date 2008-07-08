@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.92 2008/07/03 21:01:41 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.93 2008/07/08 10:35:33 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3706,6 +3706,7 @@ proc RamDebugger::OpenFileF { args } {
 	}
     }
     ManagePositionsImages
+    RamDebugger::CVS::indicator_update
     WaitState 0
     if { [focus -lastfor $text] eq $text || \
 	     [focus -lastfor $text] eq [winfo toplevel $text] } {
@@ -4137,6 +4138,7 @@ proc RamDebugger::SaveFileF { file } {
 	}
     }
     ManagePositionsImages
+    RamDebugger::CVS::indicator_update
     WaitState 0
     SetMessage [_ "Saved file '%s'" $file]
 }
@@ -7406,6 +7408,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable listbox
     variable listboxlabel
     variable listboxlabelframe
+    variable cvs_indicator_frame
     variable pane2in1
     variable images
     variable textST
@@ -7751,7 +7754,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     if { ![info exists ::starkit::topdir] } {
 	$mainframe setmenustate extractexamples disabled
     }
-
+    
+    set cvs_indicator_frame [$mainframe addindicator -width 10 \
+	    -anchor e -padx 3]
+    RamDebugger::CVS::indicator_init $cvs_indicator_frame
+    
     set label [$mainframe addindicator -textvariable RamDebugger::debuggerstate -width 6 \
 	    -anchor e -padx 3]
 
