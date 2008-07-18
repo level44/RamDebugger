@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.93 2008/07/08 10:35:33 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.94 2008/07/18 09:58:34 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -81,6 +81,7 @@ namespace eval RamDebugger {
     variable debuggerserver ""
     variable debuggerserverNum ""
     variable services
+    variable usecommR 0
     
     ################################################################################
     # debugger state
@@ -158,6 +159,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     variable readwriteprefs $_readwriteprefs
     variable iswince
     variable info_script
+    variable usecommR
 
     set info_script [info script]
     if { [info exists ::freewrap::scriptFile] } {
@@ -189,6 +191,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     if { $iswince } {
 	set AppDataDir $MainDir
     } elseif { $::tcl_platform(platform) eq "windows" } {
+	set usecommR 1
 	if { [info exists ::env(APPDATA)] } {
 	    set AppDataDir [file join $::env(APPDATA) RamDebugger]
 	} else {
@@ -326,7 +329,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     # 1: Register as remote and check remote programs on start up. It can be slower the
     #    start up but is better when making remote debugging
 
-    if { $::tcl_platform(platform) == "windows" } {
+    if { $usecommR } {
 	set options_def(CheckRemotes) 1
     }
 
@@ -368,7 +371,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set debuggerserver ramdebugger
 
-    if { $::tcl_platform(platform) == "windows" && !$iswince } {
+    if { $usecommR } {
 	if { $options(CheckRemotes) == 1 } {
 	    uplevel \#0 package require commR  ;#modification (commR) of tcllib comm package
 	    set debuggerserverNum [commR::register RamDebugger 1]
@@ -483,6 +486,7 @@ proc RamDebugger::rdebug { args } {
     variable MainDir
     variable options
     variable initialcommands
+    variable usecommR
 
     set usagestring {usage: rdebug ?switches? ?program?
 	-h:             displays usage
@@ -975,7 +979,7 @@ proc RamDebugger::rdebug { args } {
 	if { [lindex $opts(program) 1] != "" } {
 	    append remotecomm "set args [lindex $opts(program) 2]"
 	}
-    } elseif { $::tcl_platform(platform) == "windows" } {
+    } elseif { $usecommR } {
 	set remotecomm [string map [list SENDDEVBODY "commR::comm send $debuggerserverNum \$comm"] \
 		            $remotecomm]
     } else {
@@ -2230,8 +2234,9 @@ proc RamDebugger::FindActivePrograms { force } {
     variable debuggerserverNum
     variable options
     variable iswince
+    variable usecommR
 
-    if { $::tcl_platform(platform) == "windows" } {
+    if { $usecommR } {
 	if { !$options(CheckRemotes) && !$force } {
 	    # dirty trick to make array exist
 	    set services(11) ""
@@ -2416,6 +2421,7 @@ proc RamDebugger::EvalRemote { comm } {
     variable remoteserverNum
     variable remoteserverType
     variable gdblog
+    variable usecommR
 
     if { $remoteserver == "" } {
 	error [_ "Error: a program to debug must be selected using rdebug"]
@@ -2432,7 +2438,7 @@ proc RamDebugger::EvalRemote { comm } {
 	append gdblog $commlog
 	puts $fid $comm
 	flush $fid
-    } elseif { $::tcl_platform(platform) eq "windows" } {
+    } elseif { $usecommR } {
 	set err [catch { commR::comm send $remoteserverNum $comm } errstring]
     } else {
 	set err [catch { send $remoteserver $comm } errstring]
@@ -2450,6 +2456,7 @@ proc RamDebugger::EvalRemoteAndReturn { comm } {
     variable remoteserverNum
     variable remoteserverType
     variable gdblog
+    variable usecommR
 
     if { $remoteserver == "" } {
 	error [_ "Error: a program to debug must be selected using rdebug"]
@@ -2465,7 +2472,7 @@ proc RamDebugger::EvalRemoteAndReturn { comm } {
 	puts $fid $comm
 	flush $fid
 	set ret ""
-    } elseif { $::tcl_platform(platform) == "windows" } {
+    } elseif { $usecommR } {
 	set ret [commR::comm send $remoteserverNum $comm]
     } else {
 	set ret [send $remoteserver $comm]
@@ -4295,6 +4302,7 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     variable mainframe
     variable remoteserver
     variable remoteserverType
+    variable usecommR
 
     # the correct thing would be to check remoteserverType but it is not
     # set at program start up
@@ -4334,7 +4342,7 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
 
     if { [llength $services] == 0 } {
 	$menu add command -label [_ "There are no active programs"] -state disabled
-	if { $::tcl_platform(platform) == "windows" } {
+	if { $usecommR } {
 	    $menu add command -label [_ "Use 'Remote TCL update' to actualize"] -state disabled
 	}
     } else {
@@ -4354,13 +4362,16 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     }
     $menu add separator
 
-    if { $::tcl_platform(platform) == "windows" } {
-	$menu add command -label [_ "Remote TCL update"] -font $fontbold -state disabled \
-	    -background grey85
+    $menu add command -label [_ "Remote TCL update"] -font $fontbold -state disabled \
+	-background grey85
+    if { $usecommR } {
 	$menu add command -label [_ "Update remotes"] -command \
 	    "RamDebugger::ActualizeActivePrograms $menu 1"
-	$menu add separator
+    } else {
+	$menu add command -label [_ "Use commR"] -command \
+	    "[list set RamDebugger::usecommR 1]; [list RamDebugger::ActualizeActivePrograms $menu 1]"
     }
+    $menu add separator
 
     $menu add command -label [_ "Local TCL debugging"] -font $fontbold -state disabled \
 	-background grey85
