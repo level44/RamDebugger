@@ -555,11 +555,13 @@ proc RamDebugger::CVS::indicator_update {} {
     foreach i [list 1 2 3] {
 	raise $f.l$i
     }
+    set pwd [pwd]
     cd [file dirname $currentfile]
     set cvs_indicator_data ""
     set cvs_indicator_fileid [open "|cvs -n update" r]
     fconfigure $cvs_indicator_fileid -blocking 0
     fileevent $cvs_indicator_fileid readable [list RamDebugger::CVS::indicator_update_do]
+    cd $pwd
 }
 
 proc RamDebugger::CVS::indicator_update_do {} {
