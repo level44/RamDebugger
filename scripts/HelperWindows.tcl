@@ -3889,7 +3889,7 @@ proc RamDebugger::CountLOCInFiles { parent } {
 	-helptext [_ "Delete dir from the list"] -command "RamDebugger::DelDirFromLOC"
 
     label $f.l2 -text [_ "Enter patterns (ex: .tcl .cc):"] -grid "0 2 w"
-    entry $f.e2 -textvar DialogWin::user(patterns) -width 30 -grid "0 2 px3"
+    entry $f.e2 -textvar DialogWin::user(patterns) -width 80 -grid "0 2 px3"
 
     trace var DialogWin::user(programname) w "RamDebugger::UpdateProgramNameInLOC $f ;#"
 
@@ -3999,7 +3999,7 @@ proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
     set w [winfo toplevel $f]
     
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    text $sw.text -background white -wrap word -width 80 -height 40 \
+    text $sw.text -background white -wrap word -width 80 -height 35 \
 	-exportselection 0 -font FixedFont -highlightthickness 0
     $sw setwidget $sw.text
     

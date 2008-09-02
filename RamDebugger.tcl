@@ -1,11 +1,14 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.94 2008/07/18 09:58:34 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.95 2008/09/02 15:01:40 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
 package require Tk 8.5
+
+# package require compass_utils
+# mylog::init -view_binding <Control-L> debug
 
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
@@ -318,7 +321,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set options_def(extensions,TCL) ".tcl *"
     set options_def(extensions,C/C++) ".c .cpp .cc .h"
-    set options_def(extensions,XML) ".xml .spd"
+    set options_def(extensions,XML) ".xml .spd .xsl .xslt"
     set "options_def(extensions,GiD BAS file)" .bas
     set "options_def(extensions,GiD data files)" ".prb .mat .cnd"
 
@@ -3236,7 +3239,13 @@ proc RamDebugger::ExitGUI {} {
     if { [wm state [winfo toplevel $text]] == "zoomed" } {
 	set options($geomkey) zoomed
     } else {
-	set options($geomkey) [wm geometry [winfo toplevel $text]]
+	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [wm geometry [winfo toplevel $text]] \
+	    {} width height x y
+	if { $x < -20 } { set x -20 }
+	if { $y < -20 } { set y -20 }
+	if { $x > [winfo screenwidth $text]-20 } { set x [expr {[winfo screenwidth $text]-20}] }
+	if { $y > [winfo screenheight $text]-20 } { set y [expr {[winfo screenheight $text]-20}] }
+	set options($geomkey) ${width}x$height+$x+$y
     }
 
     _secondtextsavepos
@@ -4447,6 +4456,7 @@ proc RamDebugger::ChooseViewFile { what args } {
     variable currentfile
     variable currentfile_secondary
     variable options
+    variable ChooseViewFile_keypress
 
     if { [info exists text_secondary] && [focus -lastfor $text] eq \
 	     $text_secondary } {
@@ -4521,6 +4531,10 @@ proc RamDebugger::ChooseViewFile { what args } {
 	    toplevel $w._choosevf -relief raised -bd 2
 	    wm withdraw $w._choosevf
 	    wm overrideredirect $w._choosevf 1
+	    
+	    set ChooseViewFile_keypress ""
+	    lappend ChooseViewFile_keypress [list start new]
+	    after 200 [list RamDebugger::ChooseViewFile keypress_end start]
 
 	    label $w._choosevf.ld -bd 2 -relief sunken -anchor ne \
 		-justify right -width 20
@@ -4553,6 +4567,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 		bind $w._choosevf.l$i <Down> "[list RamDebugger::ChooseViewFile down $row $col] ; break"
 		bind $w._choosevf.l$i <FocusIn> [list $w._choosevf.ld configure -text $path]
 		bind $w._choosevf.l$i <1> "[list focus $w._choosevf.l$i] ;
+		    [list RamDebugger::ChooseViewFile keypress button1 $list] ;
 		    [list RamDebugger::ChooseViewFile keyrelease button1 $list] ; break"
 		incr col
 	    }
@@ -4586,28 +4601,50 @@ proc RamDebugger::ChooseViewFile { what args } {
 		                                keyrelease %K $list]
 	    bind $w._choosevf <KeyPress> [list RamDebugger::ChooseViewFile \
 		                              keypress %K $what]
-	    bind $w._choosevf.note <1> [list RamDebugger::ChooseViewFile \
-		                                nexttab $what]
+	    foreach i [list $w._choosevf.note $w._choosevf.ld] {
+		bind $i <1> [list RamDebugger::ChooseViewFile \
+		        nexttab $what]
+	    }
 	    raise $w._choosevf
 	    if { [llength $list] > 1 } {
 		after idle [list catch [list focus -force $w._choosevf.l1]]
 	    } else { after idle [list catch [list focus -force $w._choosevf.l0]] }
 	}
 	keyrelease {
-	    foreach "K list" $args break
-	    if { [regexp {(?i)^(control|return|button1)} $K] } {
+	    lassign $args K list
+	    
+	    set ipos [lsearch -exact $ChooseViewFile_keypress [list $K new]]
+	    if { $ipos == -1 } {
+		set ipos [lsearch -exact $ChooseViewFile_keypress [list $K old]]
+	    }
+	    if { $ipos == -1 } { set ipos 0 }
+	    
+	    if { ![regexp {(?i)^(control)} $K] } {
+		set isfast 0
+	    } elseif { [lindex $ChooseViewFile_keypress $ipos 1] eq "new" } {
+		set isfast 1
+	    } else {
+		set isfast 0
+	    }
+	    
+	    if { !$isfast && [regexp {(?i)^(control|return|button1)} $K] } {
 		regexp {[0-9]+$} [focus] pos
+		set ChooseViewFile_keypress ""
 		destroy $w._choosevf
 		if { [lindex $list $pos] ne $file } {
 		    update ;# to let focus change
 		    OpenFileF [lindex $list $pos]
 		}
 	    } elseif { [regexp {(?i)^escape} $K] } {
+		set ChooseViewFile_keypress ""
 		destroy $w._choosevf
 	    }
 	}
 	keypress {
-	    foreach "K what_in" $args break
+	    lassign $args K what_in
+	    after 200 [list RamDebugger::ChooseViewFile keypress_end $K]
+	    lappend ChooseViewFile_keypress [list $K new]
+	    
 	    if { [regexp {(?i)^space} $K] } {
 		switch $what_in {
 		    start {
@@ -4621,6 +4658,13 @@ proc RamDebugger::ChooseViewFile { what args } {
 		    }
 		}
 		ChooseViewFile $whatnext
+	    }
+	}
+	keypress_end {
+	    lassign $args K
+	    set ipos [lsearch -exact $ChooseViewFile_keypress [list $K new]]
+	    if { $ipos != -1 } {
+		lset ChooseViewFile_keypress $ipos 1 old
 	    }
 	}
 	nexttab {
@@ -4697,7 +4741,7 @@ proc RamDebugger::ActualizeViewMenu { menu } {
     $menu add command -label [_ "Next"] -acc "Alt-Right" -command \
 	"RamDebugger::GotoPreviusNextInWinList next"
     $menu add command -label [_ "Select"]... -acc "Ctrl Tab" -command \
-	[list RamDebugger::ChooseViewFile start]
+	[list RamDebugger::ChooseViewFile start] -underline 1
 
     set needssep 1
     foreach i $WindowFilesList {
@@ -5915,7 +5959,7 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     }
 }
 
-proc RamDebugger::CutCopyPasteText { what } {
+proc RamDebugger::CutCopyPasteText { what args } {
     variable text
     variable oldPasteStack
 
@@ -5977,14 +6021,22 @@ proc RamDebugger::CutCopyPasteText { what } {
 	    RamDebugger::IndentLine $line
 	}
 	paste_stack {
-	    if { ![llength $oldPasteStack] } {
-		WarnWin [_ "There is no old paste stack. It can be filled with copy and paste"]
-		return
+	    if { [lindex $args 0] ne "" } {
+		set menu [lindex $args 0]
+		$menu delete 0 end
+	    } else {
+		if { ![llength $oldPasteStack] } {
+		    WarnWin [_ "There is no old paste stack. It can be filled with copy and paste"]
+		    return
+		}
+		set menu $text.menu
+		catch { destroy $menu }
+		
+		menu $menu
 	    }
-	    set menu $text.menu
-	    catch { destroy $menu }
-	    
-	    menu $menu
+	    if { ![llength $oldPasteStack] } {
+		$menu add command -label [_ "There is no old paste stack"] -state disabled
+	    }
 	    foreach sel $oldPasteStack {
 		set label $sel
 		if { [string length $label] > 50 } {
@@ -5993,15 +6045,22 @@ proc RamDebugger::CutCopyPasteText { what } {
 		$menu add command -label $label -command \
 		    "[list clipboard clear] ; [list clipboard append $sel] ; RamDebugger::CutCopyPasteText paste"
 	    }
-	    set bbox [$text bbox insert]
-	    if { $bbox eq "" } {
-		set x [winfo pointerx $text]
-		set y [winfo pointery $text]
+	    if { [lindex $args 0] eq "" } {
+		set bbox [$text bbox insert]
+		if { $bbox eq "" } {
+		    set x [winfo pointerx $text]
+		    set y [winfo pointery $text]
+		} else {
+		    set x [expr {[winfo rootx $text]+[lindex $bbox 0]}]
+		    set y [expr {[winfo rooty $text]+[lindex $bbox 1]}]
+		}
+		tk_popup $menu $x $y 0
 	    } else {
-		set x [expr {[winfo rootx $text]+[lindex $bbox 0]}]
-		set y [expr {[winfo rooty $text]+[lindex $bbox 1]}]
+		$menu add separator
+		$menu add checkbutton -label [_ "Only menu"] -variable \
+		    [[winfo parent $menu] give_is_button_active_var] \
+		    -onvalue 0 -offvalue 1
 	    }
-	    tk_popup $menu $x $y 0
 	}
     }
 }
@@ -7557,7 +7616,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::CutCopyPasteText cut"] \
 		[list command [_ "C&opy"] {} [_ "Copy selected text to clipboard"] "Ctrl c" \
 		-command "RamDebugger::CutCopyPasteText copy"] \
-		[list command &[_ "Paste"] {} [_ "Past text from clipboard"] "Ctrl v" \
+		[list command &[_ "Paste"] {} [_ "Paste text from clipboard"] "Ctrl v" \
 		-command "RamDebugger::CutCopyPasteText paste"] \
 		[list command "&Paste stack" {} "Past text from previus pastes" "ShiftCtrl v" \
 		-command "RamDebugger::CutCopyPasteText paste_stack"] \
@@ -7617,13 +7676,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::CheckListFilesPane" \
 		-variable RamDebugger::options(listfilespane)] \
 		[list command &[_ "Secondary view"] {} \
-		[_ "Toggle between activating a secondary view for files"] "Ctrl 2" \
+		[_ "Toggle between activating a secondary view for files"] "Ctrl 3" \
 		-command "RamDebugger::ViewSecondText"] \
 		[list command &[_ "Toggle focus"] {} \
-		[_ "Toggle between activating the main or the secondary view"] "Ctrl 3" \
+		[_ "Toggle between activating the main or the secondary view"] "Ctrl 4" \
 		-command "RamDebugger::FocusSecondTextToggle"] \
 		[list command &[_ "Toggle views"] {} \
-		[_ "Toggle files between the main and the secondary view"] "Ctrl 4" \
+		[_ "Toggle files between the main and the secondary view"] "Ctrl 5" \
 		-command "RamDebugger::ToggleViews"] \
 		separator \
 		[list checkbutton [_ "Status bar"] {} \
@@ -7824,12 +7883,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		undo-16 [_ "Undo previus insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
 		editcut-16 [_ "Cut selected text to clipboard"] "RamDebugger::CutCopyPasteText cut" \
 		editcopy-16 [_ "Copy selected text to clipboard"] "RamDebugger::CutCopyPasteText copy" \
-		editpaste-16 [_ "Past text from clipboard"] "RamDebugger::CutCopyPasteText paste" \
+		editpaste-16 [_ "Paste text from clipboard"] "RamDebugger::CutCopyPasteText paste" \
 		find-16 [_ "Search text in source file"] "RamDebugger::SearchWindow" \
 		- - - \
 		]
 	set tktablet_ok 0
-	if { $tktablet_ok && [tktablet::is_tablet_pc] } {
+	if { $tktablet_ok } {
 	    lappend data "" [_ "Activate TabletPC drag"] ""
 	}
 	lappend data colorize-16 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
@@ -7842,7 +7901,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		actundo22 [_ "Undo previus insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
 		editcut22 [_ "Cut selected text to clipboard"] "RamDebugger::CutCopyPasteText cut" \
 		editcopy-22 [_ "Copy selected text to clipboard"] "RamDebugger::CutCopyPasteText copy" \
-		editpaste22 [_ "Past text from clipboard"] "RamDebugger::CutCopyPasteText paste" \
+		editpaste22 [_ "Paste text from clipboard"] \
+		    [list menubutton_button "RamDebugger::CutCopyPasteText paste" "RamDebugger::CutCopyPasteText paste_stack %W"] \
 		find-22 [_ "Search text in source file"] "RamDebugger::SearchWindow" \
 		- - - \
 		player_end-22 [_ "begin/continue execution"] "RamDebugger::ContNextGUI rcont" \
@@ -7852,14 +7912,21 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		stop-22 [_ "stop debugging"] "RamDebugger::DisconnectStop" \
 		- - - \
 		]
-	if { $tktablet_ok && [tktablet::is_tablet_pc] } {
+	if { $tktablet_ok } {
 	    lappend data "" [_ "Activate TabletPC drag"] ""
 	}
 	lappend data colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
     }
     set idx 0
     foreach "img help cmd" $data {
-	if { $img ne "-" } {
+	if { [string match "menubutton_button *" $cmd] } {
+	    cu::menubutton_button $toolbar.bbox$idx -image $img -style Toolbutton \
+		-command [lindex $cmd 1] -menu $toolbar.bbox$idx.m \
+		-takefocus 0
+	    set c [string map [list %W $toolbar.bbox$idx.m] [lindex $cmd 2]]
+	    menu $toolbar.bbox$idx.m -tearoff 0 -postcommand $c
+	    tooltip::tooltip $toolbar.bbox$idx $help
+	} elseif { $img ne "-" } {
 	    ttk::button $toolbar.bbox$idx -image $img -style Toolbutton -command $cmd \
 		-takefocus 0
 	    tooltip::tooltip $toolbar.bbox$idx $help
@@ -7870,7 +7937,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	incr idx
     }
     grid columnconfigure $toolbar $idx -weight 1
-    if { $tktablet_ok && [tktablet::is_tablet_pc] } {
+    if { $tktablet_ok } {
 	set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
     }
     ################################################################################
@@ -7943,7 +8010,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set marker [canvas $fulltext.can -bg grey90 -grid "0 wns" -width 14 -bd 0 \
 	    -highlightthickness 0]
 
-    bind $marker <ButtonRelease-3> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
+    event add <<Contextual>> <ButtonRelease-3>
+    event add <<Contextual>> <App>
+
+    
+    bind $marker <<Contextual>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
     
     set text [supertext::text $fulltext.text -background white -foreground black \
 		  -wrap none -width 80 -height 40 \
@@ -8199,7 +8270,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set menu [$mainframe getmenu edit]   
     }
     bind $text <1> [list focus $text]
-    bind $text <ButtonRelease-3> "%W mark set insert @%x,%y ; RamDebugger::TextMotion -1 -1 -1 -1;\
+    bind $text <<Contextual>> "%W mark set insert @%x,%y ; RamDebugger::TextMotion -1 -1 -1 -1;\
 	    tk_popup $menu %X %Y"
     if { $iswince } { pocketpc::add $text }
 
@@ -8225,11 +8296,18 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     bind $text <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev ; break"
     bind $text <Control-Tab> "[list RamDebugger::ChooseViewFile start] ; break"
+
 #     bind $text <Control-Tab> "RamDebugger::GotoPreviusNextInWinList prev ; break"
 #     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
     bind $text <Tab> "RamDebugger::Indent ; break"
     bind $text <Return> "[bind Text <Return>] ; RamDebugger::IndentLine {} ; break"
+
+    set c [list $text mark set insert "insert-1c"]
+    bind $text <Control-Key-2> "[list $text insert insert {""}];$c"
+    bind $text <Control-Key-9> "[list $text insert insert {()}];$c"
+    bind $text <Control-plus> "[list $text insert insert {[]}];$c"
+    bind $text <Control-ccedilla> "[list $text insert insert {{}}];$c"
 
     set cmd {
 	if { "%A" eq "\}" } {
