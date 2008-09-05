@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.95 2008/09/02 15:01:40 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.96 2008/09/05 17:33:14 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -4472,6 +4472,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 
     set entrylen 16
     set numcols 6
+    set after_time 100
 
     switch $what {
 	start - startrecent - startcurrdir {
@@ -4534,7 +4535,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 	    
 	    set ChooseViewFile_keypress ""
 	    lappend ChooseViewFile_keypress [list start new]
-	    after 200 [list RamDebugger::ChooseViewFile keypress_end start]
+	    after $after_time [list RamDebugger::ChooseViewFile keypress_end start]
 
 	    label $w._choosevf.ld -bd 2 -relief sunken -anchor ne \
 		-justify right -width 20
@@ -4642,7 +4643,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 	}
 	keypress {
 	    lassign $args K what_in
-	    after 200 [list RamDebugger::ChooseViewFile keypress_end $K]
+	    after $after_time [list RamDebugger::ChooseViewFile keypress_end $K]
 	    lappend ChooseViewFile_keypress [list $K new]
 	    
 	    if { [regexp {(?i)^space} $K] } {
