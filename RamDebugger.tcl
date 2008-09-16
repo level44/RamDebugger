@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.96 2008/09/05 17:33:14 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.97 2008/09/16 17:28:26 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -8305,10 +8305,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Return> "[bind Text <Return>] ; RamDebugger::IndentLine {} ; break"
 
     set c [list $text mark set insert "insert-1c"]
-    bind $text <Control-Key-2> "[list $text insert insert {""}];$c"
-    bind $text <Control-Key-9> "[list $text insert insert {()}];$c"
-    bind $text <Control-plus> "[list $text insert insert {[]}];$c"
-    bind $text <Control-ccedilla> "[list $text insert insert {{}}];$c"
+    bind $text <Control-Key-2> "[list tk::TextInsert $text {""}];$c"
+    bind $text <Control-Key-9> "[list tk::TextInsert $text {()}];$c"
+    bind $text <Control-plus> "[list tk::TextInsert $text {[]}];$c"
+    bind $text <Control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
 
     set cmd {
 	if { "%A" eq "\}" } {
@@ -8322,6 +8322,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Control-x> "RamDebugger::CutCopyPasteText cut   ; break"
     bind $text <Control-c> "RamDebugger::CutCopyPasteText copy  ; break"
     bind $text <Control-v> "RamDebugger::CutCopyPasteText paste ; break"
+    bind [winfo toplevel $text] <Control-v> ""
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
 
