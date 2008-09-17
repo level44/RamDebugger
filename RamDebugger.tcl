@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.97 2008/09/16 17:28:26 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.98 2008/09/17 17:32:57 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -4472,7 +4472,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 
     set entrylen 16
     set numcols 6
-    set after_time 100
+    set after_time 50
 
     switch $what {
 	start - startrecent - startcurrdir {
@@ -4528,14 +4528,15 @@ proc RamDebugger::ChooseViewFile { what args } {
 		    eval lappend list [lrange $tmplist 0 [expr {$ipos-1}]]
 		}
 	    }
-	    destroy $w._choosevf
-	    toplevel $w._choosevf -relief raised -bd 2
-	    wm withdraw $w._choosevf
-	    wm overrideredirect $w._choosevf 1
 	    
 	    set ChooseViewFile_keypress ""
 	    lappend ChooseViewFile_keypress [list start new]
 	    after $after_time [list RamDebugger::ChooseViewFile keypress_end start]
+
+	    destroy $w._choosevf
+	    toplevel $w._choosevf -relief raised -bd 2
+	    wm withdraw $w._choosevf
+	    wm overrideredirect $w._choosevf 1
 
 	    label $w._choosevf.ld -bd 2 -relief sunken -anchor ne \
 		-justify right -width 20
