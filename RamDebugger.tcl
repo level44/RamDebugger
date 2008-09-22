@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.98 2008/09/17 17:32:57 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.99 2008/09/22 09:09:52 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -8013,8 +8013,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    -highlightthickness 0]
 
     event add <<Contextual>> <ButtonRelease-3>
-    event add <<Contextual>> <App>
-
+    if { $::tcl_platform(platform) eq "windows" } {
+      event add <<Contextual>> <App>
+    }
     
     bind $marker <<Contextual>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
     
