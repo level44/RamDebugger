@@ -68,10 +68,16 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	if { ![catch [list pack info WIDGET] info] } {
 	    append retval "PACK SLAVE\n$info\n"
 	}
-	if { ![catch [list WIDGET panes] info] } {
+	if { [winfo class WIDGET] eq "Panedwindow" } {
 	    append retval "PANEDWINDOW MASTER\n"
 	    foreach i [WIDGET panes] {
 		append retval "    $i [WIDGET paneconfigure $i]\n"
+	    }
+	}
+	if { [winfo class WIDGET] eq "TPanedwindow" } {
+	    append retval "TKPANEDWINDOW MASTER\n"
+	    foreach i [WIDGET panes] {
+		append retval "    $i [WIDGET pane $i]\n"
 	    }
 	}
 	append retval "OPTIONS\n"
@@ -94,6 +100,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	append retval "SIZES\n"
 	append retval "    width=[winfo width WIDGET] reqwidth=[winfo reqwidth WIDGET]\n"
 	append retval "    height=[winfo height WIDGET] reqheight=[winfo reqheight WIDGET]\n"
+	append retval "    rootX=[winfo rootx WIDGET] rootY=[winfo rooty WIDGET]\n"
 	append retval "BINDTAGS\n[bindtags WIDGET]\n"
 	EVAL
     }
