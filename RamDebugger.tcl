@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.99 2008/09/22 09:09:52 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.100 2008/11/10 07:55:07 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7912,6 +7912,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		finish-22 [_ "continue one command"] "RamDebugger::ContNextGUI rnext" \
 		down-22 [_ "continue one command, entering in subcommands"] "RamDebugger::ContNextGUI rstep" \
 		stop-22 [_ "stop debugging"] "RamDebugger::DisconnectStop" \
+		- - - \
+		navback22 [_ "Go to position"] "RamDebugger::PositionsStack go" \
+		actbookmark22 [_ "Save/clear position"] "RamDebugger::PositionsStack save" \
 		- - - \
 		]
 	if { $tktablet_ok } {
