@@ -121,7 +121,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 }
 
 proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
-
+    
     set w $canvas.help
     if { [winfo exists $w] } { destroy $w }
     toplevel $w
@@ -163,7 +163,18 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     set widgetname [lindex [split $res \n] 0]
     bind $w.l <Control-x> "clipboard clear; [list clipboard append $widgetname]"
     bind $w.l <Control-c> "clipboard clear; [list clipboard append $res]"
-
+    
+    if { [regexp {width=([-\d]+).*height=([-\d]+).*rootX=([-\d]+).*rootY=([-\d]+)} $res {} \
+	width height rootX rootY] && $::tcl_platform(platform) eq "windows" } {
+	set wpos $w.helppos
+	if { [winfo exists $wpos] } { destroy $wpos }
+	toplevel $wpos
+	$wpos configure -background blue -bd 2 -relief solid
+	wm overrideredirect $wpos 1
+	wm geometry $wpos ${width}x$height+$rootX+$rootY
+	wm attributes $wpos -alpha .3
+	raise $w
+    }
 }
 
 proc RamDebugger::DisplayWindowsHierarchyDoDraw { w canvas list x y linespace } {

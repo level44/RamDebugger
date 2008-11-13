@@ -2366,6 +2366,13 @@ proc RamDebugger::SearchInFiles {} {
 	    -values $values
 
     set ::RamDebugger::searchextensions [lindex [$f.e2 cget -values] 0]
+    
+    set dir $options(defaultdir)
+    set ipos [lsearch -exact $options(SearchInFiles,dirs) $dir]
+    if { $ipos != -1 } {
+	set options(SearchInFiles,dirs) [lreplace $options(SearchInFiles,dirs) $ipos $ipos]
+    }
+    set options(SearchInFiles,dirs) [linsert $options(SearchInFiles,dirs) 0 $dir]
 
     ttk::label $f.l3 -text [_ "Directory:"]
     ttk::combobox $f.e3 -textvariable ::RamDebugger::searchdir \
