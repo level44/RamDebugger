@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.100 2008/11/10 07:55:07 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.101 2008/11/18 19:44:16 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -321,7 +321,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set options_def(extensions,TCL) ".tcl *"
     set options_def(extensions,C/C++) ".c .cpp .cc .h"
-    set options_def(extensions,XML) ".xml .spd .xsl .xslt"
+    set options_def(extensions,XML) ".xml .spd .xsl .xslt (xml)*"
     set "options_def(extensions,GiD BAS file)" .bas
     set "options_def(extensions,GiD data files)" ".prb .mat .cnd"
 
@@ -1591,6 +1591,7 @@ proc RamDebugger::rlist { args } {
 	} else {
 	    set header [read $fin 256]
 	    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+	    append rex {|<\?xml\s+version=\S+\s*\?>}
 	    if { [regexp -nocase -line -- $rex $header] } {
 		fconfigure $fin -encoding utf-8
 	    }
@@ -5146,7 +5147,8 @@ proc RamDebugger::TextMotion { X Y x y } {
 
     set err [catch { lindex [after info $TextMotionAfterId] 0 } cmd]
     if { !$err && $cmd ne "" }  {
-	foreach "- x_old y_old" $cmd break
+	lassign $cmd - x_old y_old
+	if { $x_old eq "" || $y_old eq "" || $X eq "" || $Y eq "" } { return }
 	if { abs($X-$x_old) <= 3 && abs($Y-$y_old) <= 3 } {
 	    return
 	}   
