@@ -48,11 +48,13 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	    }
 	    append retval "  ROWS\n"
 	    for { set i 0 } { $i < $rows } { incr i } {
-		append retval "    $i [grid rowconfigure WIDGET $i]\n" 
+		lassign [grid bbox WIDGET 0 $i] x y wi hei
+		append retval "    $i [grid rowconfigure WIDGET $i] bbox_row=$y,$hei\n"
 	    }
 	    append retval "  COLUMNS\n"
 	    for { set j 0 } { $j < $cols } { incr j } {
-		append retval "    $j [grid columnconfigure WIDGET $j]\n" 
+		lassign [grid bbox WIDGET $j 0] x y wi hei
+		append retval "    $j [grid columnconfigure WIDGET $j] bbox_col=$x,$wi\n" 
 	    }
 	}
 	set info [grid info WIDGET]
@@ -133,7 +135,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     pack [label $w.l -fg black -justify left -anchor w -bg grey95]
     $w.l conf -bd 0
 
-    append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all"
+    append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all.  Ctrl-a to reduce"
 
     $w.l conf -text $res
 
@@ -155,12 +157,14 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 
     focus -force $w.l
 
-    wm geom $w +$x+$y
+    wm geometry $w +$x+$y
     wm deiconify $w
     update
     bind $w <Motion> "destroy $w"
 
     set widgetname [lindex [split $res \n] 0]
+    bind $w.l <Escape> "destroy $w"
+    bind $w.l <Control-a> [list $w.l configure -text [lindex [split $res \n] 0]]
     bind $w.l <Control-x> "clipboard clear; [list clipboard append $widgetname]"
     bind $w.l <Control-c> "clipboard clear; [list clipboard append $res]"
     
@@ -170,6 +174,27 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 	if { [winfo exists $wpos] } { destroy $wpos }
 	toplevel $wpos
 	$wpos configure -background blue -bd 2 -relief solid
+	
+	set idx 0
+	foreach "- y hei" [regexp -inline -all {bbox_row=(\d+),(\d+)} $res] {
+	    set c [lindex "orange green" [expr {$idx%2}]]
+	    frame $wpos.fa$idx -background $c
+	    place $wpos.fa$idx -x 0 -y $y -width 2 -height $hei -anchor nw
+	    frame $wpos.fb$idx -background $c
+	    place $wpos.fb$idx -x [expr {$width-2}] -y $y -width 2 -height $hei -anchor nw
+	    incr idx
+	}
+	if { $idx } { $wpos configure -bd 0 }
+	set idx 0
+	foreach "- x wi" [regexp -inline -all {bbox_col=(\d+),(\d+)} $res] {
+	    set c [lindex "orange green" [expr {$idx%2}]]
+	    frame $wpos.fc$idx -background $c
+	    place $wpos.fc$idx -x $x -y 0 -width $wi -height 2 -anchor nw
+	    frame $wpos.fd$idx -background $c
+	    place $wpos.fd$idx -x $x -y [expr {$height-2}] -width $wi -height 2 -anchor nw
+	    incr idx
+	}
+	if { $idx } { $wpos configure -bd 0 }
 	wm overrideredirect $wpos 1
 	wm geometry $wpos ${width}x$height+$rootX+$rootY
 	wm attributes $wpos -alpha .3
