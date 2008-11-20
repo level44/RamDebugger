@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.102 2008/11/19 19:49:31 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.103 2008/11/20 16:23:20 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -321,7 +321,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set options_def(extensions,TCL) ".tcl *"
     set options_def(extensions,C/C++) ".c .cpp .cc .h"
-    set options_def(extensions,XML) ".xml .spd .xsl .xslt (xml)*"
+    set options_def(extensions,XML) ".xml .spd .xsl .xslt .svg (xml)*"
     set "options_def(extensions,GiD BAS file)" .bas
     set "options_def(extensions,GiD data files)" ".prb .mat .cnd"
 

@@ -330,7 +330,12 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     set MainDir $RamDebugger::MainDir
     set AppDataDir $RamDebugger::AppDataDir
 
-    set dynlib_base RamDebuggerInstrumenter6[info sharedlibextension]
+    if { $::tcl_platform(machine) == "amd64" } {
+	set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
+    } else {
+	set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
+    }
+
     set dynlib [file join $AppDataDir $dynlib_base]
 
     if { [file readable $dynlib] && [file mtime $dynlib] >= \
@@ -381,10 +386,10 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 	debug {
 	    if { $::tcl_platform(machine) eq "amd64"} {
 		set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
-		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork64.dll]
+		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork6_x64.dll]
 	    } else {
 		set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
-		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork.dll]
+		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork6_x32.dll]
 	    }
 	    load $dynlib Ramdebuggerinstrumenter
 	    set FastInstrumenterLoaded 1
@@ -392,9 +397,9 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
 		if { $::tcl_platform(machine) == "amd64"} {
-		    set dynlib_base RamDebuggerInstrumenter664[info sharedlibextension]
+		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
 		} else {
-		    set dynlib_base RamDebuggerInstrumenter6[info sharedlibextension]
+		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
 		}
 		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
 		set err [catch { load $dynlib }]
@@ -1424,9 +1429,9 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
 		if { $::tcl_platform(machine) == "amd64"} {
-		    set dynlib_base RamDebuggerInstrumenter664[info sharedlibextension]
+		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
 		} else {
-		    set dynlib_base RamDebuggerInstrumenter6[info sharedlibextension]
+		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
 		}
 		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
 		set err [catch { load $dynlib }]

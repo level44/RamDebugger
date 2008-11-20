@@ -128,7 +128,7 @@ snit::widget tablestree {
 	if {$height < 18} { set height 18 }
 
 	install tree as treectrl $win.t -highlightthickness 0 -borderwidth 0 \
-	    -xscrollincrement 20 -showheader 1 -indent 5 \
+	    -xscrollincrement 20 -yscrollincrement 20 -showheader 1 -indent 5 \
 	    -font $SystemFont -itemheight $height -selectmode browse -showroot no \
 	    -showrootbutton no -showbuttons yes -showlines yes \
 	    -scrollmargin 16 -xscrolldelay "500 50" -yscrolldelay "500 50" \

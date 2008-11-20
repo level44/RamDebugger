@@ -1464,8 +1464,8 @@ int RamDebuggerInstrumenterDoWorkForXML(ClientData clientData, Tcl_Interp *ip, i
 extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
 {
 #ifdef USE_TCL_STUBS
-  const char* retchar=Tcl_InitStubs(interp,"8.4",0);
-  //Tk_InitStubs(interp,"8.4",0);
+  const char* retchar=Tcl_InitStubs(interp,"8.5",0);
+  //Tk_InitStubs(interp,"8.5",0);
 #endif
 
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWork",RamDebuggerInstrumenterDoWork,
