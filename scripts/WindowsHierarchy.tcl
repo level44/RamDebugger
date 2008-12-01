@@ -82,6 +82,12 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 		append retval "    $i [WIDGET pane $i]\n"
 	    }
 	}
+	if { [winfo class WIDGET] eq "TNotebook" } {
+	    append retval "TNOTEBOOK MASTER\n"
+	    foreach i [WIDGET tabs] {
+		append retval "    $i [WIDGET tab $i]\n"
+	    }
+	}
 	append retval "OPTIONS\n"
 	set retval_in ""
 	foreach i [WIDGET configure] {
