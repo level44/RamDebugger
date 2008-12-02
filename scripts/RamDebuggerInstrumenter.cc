@@ -976,19 +976,22 @@ struct Xml_state
   Xml_state_tag xml_state_tag_list[MaxStackLen];
   int xml_states_names_listNum;
   Xml_states_names xml_states_names_list[MaxStackLen];
+  int iline,icharline;
 
   Xml_state(Tcl_Interp *_ip,int _indentlevel): ip(_ip),indentlevel(_indentlevel),
-    xml_state_tag_listNum(0),xml_states_names_listNum(0) {}
+					       xml_state_tag_listNum(0),xml_states_names_listNum(0),
+					       iline(0),icharline(0) {}
+  void enter_line_icharline(int _iline,int _icharline) { iline=_iline ; icharline=_icharline; }
 
   void push_state(Xml_states_names state);
   void pop_state();
   int state_is(Xml_states_names state,int idx=-1);
 
-  void push_tag(char* tag,int len,int line);
+  void push_tag(char* tag,int len);
   void pop_tag(char* tag,int raiseerror,int len);
   void raise_error_if_tag_stack();
 
-  void raise_error(char* txt,int raiseerror,int line,int icharline);
+  void raise_error(char* txt,int raiseerror);
 };
 
 void Xml_state::push_state(Xml_states_names state)
@@ -1018,7 +1021,7 @@ int Xml_state::state_is(Xml_states_names state,int idx)
   return state==xml_states_names_list[idx];
 }
 
-void Xml_state::push_tag(char* tag,int charlen,int line)
+void Xml_state::push_tag(char* tag,int charlen)
 {
   if(xml_state_tag_listNum>=MaxStackLen){
     Tcl_SetObjResult(ip,Tcl_NewStringObj("error in push_tag. Stack full",-1));
@@ -1026,7 +1029,7 @@ void Xml_state::push_tag(char* tag,int charlen,int line)
   }
   xml_state_tag_list[xml_state_tag_listNum].tag=tag;
   xml_state_tag_list[xml_state_tag_listNum].charlen=charlen;
-  xml_state_tag_list[xml_state_tag_listNum].line=line;
+  xml_state_tag_list[xml_state_tag_listNum].line=iline;
   xml_state_tag_listNum++;
   indentlevel++;
 }
@@ -1039,7 +1042,8 @@ void Xml_state::pop_tag(char* tag,int raiseerror,int charlen)
     if(!raiseerror) return;
     char buf[1024];
     if(charlen>800) charlen=800;
-    sprintf(buf,"closing tag '%.*s' is not correct. tags stack=\n",charlen,tag);
+    sprintf(buf,"closing tag '%.*s' is not correct. line=%d position=%d. tags stack=\n",charlen,tag,
+	    iline,icharline+1);
     Tcl_Obj *resPtr=Tcl_NewStringObj(buf,-1);
     for(int i=0;i<xml_state_tag_listNum;i++){
       sprintf(buf,"\t%.*s\tLine: %d\n",xml_state_tag_list[i].charlen,
@@ -1052,7 +1056,9 @@ void Xml_state::pop_tag(char* tag,int raiseerror,int charlen)
   xml_state_tag_listNum--;
   indentlevel--;
   if(xml_state_tag_listNum<0){
-    Tcl_SetObjResult(ip,Tcl_NewStringObj("error in pop_tag. Stack empty",-1));
+    char buf[1024];
+    sprintf(buf,"error in pop_tag. Stack empty. line=%d position=%d",iline,icharline+1);
+    Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));
     throw 1;
   }
 }
@@ -1072,13 +1078,13 @@ void Xml_state::raise_error_if_tag_stack()
   }
 }
 
-void Xml_state::raise_error(char* txt,int raiseerror,int line,int icharline)
+void Xml_state::raise_error(char* txt,int raiseerror)
 {
   if(!raiseerror) return;
   char buf[1024];
   int charlen=(int)strlen(txt);
   if(charlen>800) charlen=800;
-  sprintf(buf,"error in line=%d position=%d. %.*s",line,icharline+1,charlen,txt);
+  sprintf(buf,"error in line=%d position=%d. %.*s",iline,icharline+1,charlen,txt);
   Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));
   throw 1;
 }
@@ -1107,6 +1113,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
   Xml_state xml_state(ip,indentlevel_ini);
   int icharline=0;
   int iline=1;
+  xml_state.enter_line_icharline(iline,icharline);
   try {
     for(i=0;i<length;i++){
       c=block[i];
@@ -1189,7 +1196,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	      if(isend){
 		xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
 	      } else {
-		xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
+		xml_state.push_tag(&block[state_start_global],i-state_start_global);
 	      }
 	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
 	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
@@ -1207,7 +1214,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    // nothing
 	  } else {
 	    if(!xml_state.state_is(entered_tagtext_XS)){
-	      xml_state.raise_error("Not valid >",raiseerror,iline,icharline);
+	      xml_state.raise_error("Not valid >",raiseerror);
 	    }
 	    xml_state.pop_state();
 	    if(xml_state.state_is(pi_XS) && strncmp(&block[i-1],"?>",2)==0){
@@ -1216,7 +1223,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	      xml_state.pop_state();
 	      xml_state.push_state(text_XS);
 	    } else {
-	      xml_state.raise_error("Not valid > (2)",raiseerror,iline,icharline);
+	      xml_state.raise_error("Not valid > (2)",raiseerror);
 	    }
 	  }
 	  break;
@@ -1230,7 +1237,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	  } else if(xml_state.state_is(enter_tagtext_XS)){
 	    xml_state.pop_state();
 	    if(xml_state.state_is(tag_XS)){
-	      xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
+	      xml_state.push_tag(&block[state_start_global],i-state_start_global);
 	      xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
 	    }
 	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
@@ -1242,7 +1249,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	     xml_state.pop_tag(NULL,raiseerror,0);
 	  } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_text_XS) &&
 	     !xml_state.state_is(att_quote_XS) && !xml_state.state_is(att_dquote_XS)){
-	       xml_state.raise_error("Not valid /",raiseerror,iline,icharline);
+	       xml_state.raise_error("Not valid /",raiseerror);
 	  }
 	  break;
 	  case '=':
@@ -1251,7 +1258,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	      xml_state.push_state(att_after_equal_XS);
 	    } else if(!xml_state.state_is(text_XS) &&
 	      !xml_state.state_is(att_quote_XS) && !xml_state.state_is(att_dquote_XS)){
-		xml_state.raise_error("Not valid =",raiseerror,iline,icharline);
+		xml_state.raise_error("Not valid =",raiseerror);
 	    }
 	    break;
 	  case '\'':
@@ -1263,7 +1270,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    } else if(xml_state.state_is(att_quote_XS)){
 	      char cm1=block[i+1];
 	      if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
-		xml_state.raise_error("Not valid close '",raiseerror,iline,icharline);
+		xml_state.raise_error("Not valid close '",raiseerror);
 	      }
 	      xml_state.pop_state();
 	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
@@ -1271,7 +1278,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
 	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
 	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_dquote_XS)){
-		xml_state.raise_error("Not valid '",raiseerror,iline,icharline);
+		xml_state.raise_error("Not valid '",raiseerror);
 	    }
 	    break;
 	  case '"':
@@ -1283,7 +1290,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    } else if(xml_state.state_is(att_dquote_XS)){
 	      char cm1=block[i+1];
 	      if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
-		xml_state.raise_error("Not valid close \"",raiseerror,iline,icharline);
+		xml_state.raise_error("Not valid close \"",raiseerror);
 	      }
 	      xml_state.pop_state();
 	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
@@ -1291,7 +1298,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
 	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
 	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_quote_XS)){
-		xml_state.raise_error("Not valid \"",raiseerror,iline,icharline);
+		xml_state.raise_error("Not valid \"",raiseerror);
 	    }
 	    break;
 	case ' ': case '\t': case '\n':
@@ -1308,7 +1315,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 		 if(isend){
 		   xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
 		 } else {
-		   xml_state.push_tag(&block[state_start_global],i-state_start_global,iline);
+		   xml_state.push_tag(&block[state_start_global],i-state_start_global);
 		 }
 		 blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
 		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
@@ -1343,7 +1350,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	      !xml_state.state_is(att_dquote_XS) && !xml_state.state_is(enter_tagtext_XS) &&
 	      !xml_state.state_is(att_entername_XS)){
 		sprintf(buf,"Not valid character '%c'",c);
-		xml_state.raise_error(buf,raiseerror,iline,icharline);
+		xml_state.raise_error(buf,raiseerror);
 	    }
 	    break;
 	 }
@@ -1372,6 +1379,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
        } else {
 	 icharline++;
        }
+       xml_state.enter_line_icharline(iline,icharline);
      }
      if(xml_state.indentlevel<indentLevel0){
        if(iline==2){

@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.103 2008/11/20 16:23:20 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.104 2008/12/02 15:34:28 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -1525,6 +1525,7 @@ proc RamDebugger::rlist { args } {
 	-asmainfile:   When debugging locally, the first file, first time  must be list like this
 	-returndata:   Instead of sending instr file, return it
 	-encoding enc: open file with the given encoding
+	-return_error:  Instead of opening a warning window, returns an error
 	--:            end of options
     }
     ParseArgs $args $usagestring opts
@@ -1661,7 +1662,11 @@ proc RamDebugger::rlist { args } {
 		    RamDebugger::TextOutRaise
 		    RamDebugger::TextOutInsertRed $::errorInfo
 		}
-		WarnWin $errstring
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
 	    }
 	}
 	if { $filetype == "XML" } {
@@ -1674,7 +1679,11 @@ proc RamDebugger::rlist { args } {
 		    RamDebugger::TextOutInsertRed $einfo
 		}
 		#WarnWin $errstring--$einfo
-		WarnWin $errstring
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
 	    }
 	}
 	if { $filetype == "GiD BAS file" } {
@@ -1686,7 +1695,11 @@ proc RamDebugger::rlist { args } {
 		    RamDebugger::TextOutRaise
 		    RamDebugger::TextOutInsertRed $::errorInfo
 		}
-		WarnWin $errstring
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
 	    }
 	}
 	if { $filetype == "GiD data files" } {
@@ -1698,7 +1711,11 @@ proc RamDebugger::rlist { args } {
 		    RamDebugger::TextOutRaise
 		    RamDebugger::TextOutInsertRed $::errorInfo
 		}
-		WarnWin $errstring
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
 	    }
 	}
 	if { $filetype == "TCL" } {
@@ -1717,7 +1734,11 @@ proc RamDebugger::rlist { args } {
 		    RamDebugger::TextOutRaise
 		    RamDebugger::TextOutInsertRed $::errorInfo
 		}
-		WarnWin $errstring
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
 	    }
 	}
 	
@@ -1799,7 +1820,10 @@ proc RamDebugger::rlist { args } {
 	
 	if { $err == 1 } {
 	    set errstring $::errorInfo
-	    if { [catch {
+	    
+	    if { $opts(-return_error) } {
+		error $errstring
+	    } elseif { [catch {
 		WarnWin $errstring
 	    }] } {
 		puts $errstring
@@ -3911,7 +3935,15 @@ proc RamDebugger::ReinstrumentCurrentFile {} {
 
     set idx [$text index insert]
     set sel [$text tag nextrange sel 1.0 end]
-    rlist -quiet -reinstrument $currentfile
+    set err [catch { rlist -quiet -reinstrument -return_error $currentfile } errstring]
+    
+    if { $err } {
+	if { [regexp {line=(\d+)\s+position=(\d+)} $errstring {} line pos] } {
+	    set idx "$line.[expr {$pos-1}]"
+	    $text see $idx
+	}
+	WarnWin $errstring   
+    }
     Colorize
     $text mark set insert $idx
     if { $sel ne "" } {
@@ -6575,7 +6607,11 @@ proc RamDebugger::SearchBraces { x y } {
 	set level_alt 0
 	set idx_alt ""
 	while { [set idx2 [$text search $dir -regexp -- {\{|\}|\[|\]} $idx $stopindex]] != "" } {
-	    if { [$text get "$idx2-1c"] == "\\" && [$text get "$idx2-2c"] != "\\" } {
+	    set ret [$text search -backwards -regexp -count ::nppar {\\+} $idx2 "$idx2 linestart"]
+	    if { $ret eq "" || [$text compare "$ret+${::nppar}c" != $idx2] } {
+		set ::nppar 0
+	    }
+	    if { $::nppar%2 == 1 } {
 		if { $dir == "-forwards" } {
 		    set idx [$text index $idx2+1c]
 		} else { set idx $idx2 }
