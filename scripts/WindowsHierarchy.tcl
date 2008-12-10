@@ -174,7 +174,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     bind $w.l <Control-x> "clipboard clear; [list clipboard append $widgetname]"
     bind $w.l <Control-c> "clipboard clear; [list clipboard append $res]"
     
-    if { [regexp {width=([-\d]+).*height=([-\d]+).*rootX=([-\d]+).*rootY=([-\d]+)} $res {} \
+    if { [regexp {\mwidth=([-\d]+).*\mheight=([-\d]+).*rootX=([-\d]+).*rootY=([-\d]+)} $res {} \
 	width height rootX rootY] && $::tcl_platform(platform) eq "windows" } {
 	set wpos $w.helppos
 	if { [winfo exists $wpos] } { destroy $wpos }
