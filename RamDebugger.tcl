@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.104 2008/12/02 15:34:28 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.105 2009/01/12 00:36:53 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3618,6 +3618,7 @@ proc RamDebugger::OpenFileF { args } {
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListLineNums
+    variable FileSaveHandlers
     variable options
     variable currentfile_secondary
     
@@ -3712,7 +3713,7 @@ proc RamDebugger::OpenFileF { args } {
 	    set WindowFilesList [lreplace $WindowFilesList $pos $pos]
 	    set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
 	}
-	if { [string index $file 0] != "*" } {
+	if { [string index $file 0] != "*" || [info exists FileSaveHandlers($file)] } {
 	    lappend WindowFilesList $file
 	    lappend WindowFilesListLineNums $linenum
 	}
@@ -3830,7 +3831,9 @@ proc RamDebugger::UpdateHandlerForFileSave { file handler } {
 
     if { $handler ne "" } {
 	set FileSaveHandlers($file) $handler
-    } else { unset -nocomplain FileSaveHandlers($file) }
+    } else {
+	unset -nocomplain FileSaveHandlers($file)
+    }
 }
 
 proc RamDebugger::OpenFileSaveHandler { file data handler } {
@@ -3910,8 +3913,9 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
 
     if { $handler ne "" } {
 	set FileSaveHandlers($file) $handler
-    } else { unset -nocomplain FileSaveHandlers($file) }
-
+    } else {
+	unset -nocomplain FileSaveHandlers($file)
+    }
     if { [info exists currentfile_secondary] } {
 	if { $currentfile eq $currentfile_secondary } {
 	    $text configure -synctextwidget $text_secondary
@@ -4156,7 +4160,7 @@ proc RamDebugger::SaveFileF { file } {
 	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
     }
-    if { [string index $file 0] != "*" } {
+    if { [string index $file 0] != "*" || [info exists FileSaveHandlers($file)] } {
 	lappend WindowFilesList $file
 	lappend WindowFilesListLineNums $linenum
     }
