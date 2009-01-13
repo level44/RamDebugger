@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.105 2009/01/12 00:36:53 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.106 2009/01/13 20:05:19 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3908,6 +3908,13 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
 
     set_title [file tail $currentfile]
     set currentfileIsModified 0
+
+    if { [set pos [lsearch -exact $WindowFilesList $file]] != -1 } {
+	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
+	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
+    }
+    lappend WindowFilesList $file
+    lappend WindowFilesListLineNums $linenum
 
     $text conf -editable 1
 
