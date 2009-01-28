@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.106 2009/01/13 20:05:19 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.107 2009/01/28 13:14:43 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7179,7 +7179,7 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 		        "" -command "RamDebugger::XMLIndent"] \
 		    [list command "Indent 2" {} \
 		        "Indent all the file 2 spaces" \
-		        "" -command "RamDebugger::XMLIndent 2"] \
+		        "F8" -command "RamDebugger::XMLIndent 2"] \
 		    [list command "Indent &none" {} \
 		        "Take all the indentation out of the file" \
 		        "" -command "RamDebugger::XMLIndent none"] \
@@ -8565,8 +8565,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     if { $::tcl_platform(platform) != "windows" } {
 	wm iconbitmap $w @$MainDir/addons/ramdebugger.xbm
     } elseif { !$iswince } {
-	wm iconbitmap $w  $MainDir/addons/ramdebugger.ico
-	catch { wm iconbitmap $w -default $MainDir/addons/ramdebugger.ico }
+	wm iconbitmap $w $MainDir/addons/ramdebugger.ico
+	if { ![info exists ::is_package] || !$::is_package } {
+	    catch { wm iconbitmap $w -default $MainDir/addons/ramdebugger.ico }
+	}
     }
     if { !$iswince } {
 	RamDebugger::CVS::ManageAutoSave
