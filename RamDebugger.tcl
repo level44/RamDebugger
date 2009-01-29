@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.107 2009/01/28 13:14:43 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.108 2009/01/29 20:03:13 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -2398,7 +2398,7 @@ proc RamDebugger::RecieveErrorFromProgram { err errInfo args } {
     TextOutRaise
     after idle [string map [list %e [list $err] %n \n] {
 	WarnWin {Recieved Error from Debugged program:%n%e%nCheck Output for details}
-	RamDebugger::StopAtGUI "" -1
+	#RamDebugger::StopAtGUI "" -1
     }]
 }
 

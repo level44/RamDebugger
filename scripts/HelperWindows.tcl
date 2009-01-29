@@ -2842,6 +2842,62 @@ proc RamDebugger::SearchReplace { w what args } {
     }
 }
 
+proc RamDebugger::inline_replace { w search_entry } {
+    variable text
+    
+    set focus [focus]
+    set grab [grab current]
+    
+    set x [dict get [place info $search_entry] -x]
+    set x1 [expr {$x+[winfo width $search_entry]+2}]
+    destroy $w.replace
+    entry $w.replace -width 25 -textvariable RamDebugger::replacestring -relief solid -bd 1
+    place $w.replace -in $w -x $x1 -rely 1 -y -1 -anchor sw
+    set err [catch { clipboard get } data]
+    if { !$err && [string length $data] < 20 } {
+	$w.replace insert end $data
+	$w.replace selection range 0 end
+    }
+    focus $w.replace
+    grab $w.replace
+    
+    bind $w.replace <Return> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
+    bind $w.replace <Control-i> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
+    bind $w.replace <Escape> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry end]
+    bind $w.replace <1> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry end]
+    
+    set cmd1 "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]"
+    set cmd2 "[list tk_textPaste $text];RamDebugger::Search $w iforward"
+    set cmd3 "[list tk_textPaste $text];RamDebugger::Search $w iforward_all"
+    bind $w.replace <Control-j> "$cmd1; $cmd2; break"
+    bind $w.replace <Control-J> "$cmd1; $cmd3; break"
+
+    set msg [_ "Press <Return> or Ctrl+I to continue search and replace\nCtrl+J to replace\nCtrl+Shift+J to replace all"]
+    tooltip::tooltip $w.replace $msg
+    
+    label $w.searchl2 -text $msg -justify left
+    set x2 [expr {$x1+[winfo reqwidth $w.replace]+2}]
+    place $w.searchl2 -in $w -x $x2 -rely 1 -y -1 -anchor sw
+    after 1500 [list catch [list destroy $w.searchl2]]
+}
+
+proc RamDebugger::inline_replace_end { w focus grab search_entry what } {
+    variable text
+    
+    if { $what eq "accept" } {
+	clipboard clear
+	clipboard append $RamDebugger::replacestring
+	
+	set cmd1 "[list tk_textPaste $text];RamDebugger::Search $w iforward"
+	set cmd2 "[list tk_textPaste $text];RamDebugger::Search $w iforward_all"
+	bind $search_entry <Control-j> "$cmd1; break"
+	bind $search_entry <Control-J> "$cmd2; break"
+    }
+    destroy $w.replace
+    if { $focus ne "" } { focus -force $focus }
+    if { $grab ne "" } { grab $grab }
+}
+
 proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     variable text
     variable options
@@ -2893,6 +2949,9 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    entry $w.search -width 25 -textvariable RamDebugger::searchstring -relief solid -bd 1
 	    place $w.search -in $w -x 2 -rely 1 -y -1 -anchor sw
 
+	    set msg [_ "Press Ctrl+J to replace"]
+	    tooltip::tooltip $w.search $msg
+
 	    focus $active_text
 	    bindtags $active_text [linsert [bindtags $active_text] 0 $w.search]
 	    #bind $w.search <FocusOut> "destroy $w.search ; break"
@@ -2903,8 +2962,8 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
-	    bind $w.search <1> "destroy $w.search"
-	    bind $w.search <3> "destroy $w.search"
+	    bind $w.search <1> "destroy $w.search; break"
+	    bind $w.search <3> "destroy $w.search; break"
 	    foreach i [list F1 F2 F5 F6 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
 	    }
@@ -2912,7 +2971,15 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
 	    bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
-
+	    
+	    if { $active_text eq $text } {
+		bind $w.search <Control-j> "RamDebugger::inline_replace $w $w.search; break"
+		
+		label $w.searchl1 -text $msg
+		set x1 [expr {2+[winfo reqwidth $w.search]+2}]
+		place $w.searchl1 -in $w -x $x1 -rely 1 -y -1 -anchor sw
+		after 1000 [list catch [list destroy $w.searchl1]]
+	    }
 	    set ::RamDebugger::searchstring ""
 	    trace var RamDebugger::searchstring w "[list RamDebugger::Search $w {}];#"
 	    bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
@@ -2947,7 +3014,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	}
     }
     switch $what {
-	iforward {
+	iforward - iforward_all {
 	    set ::RamDebugger::SearchType -forwards
 	}
 	ibackward {
@@ -2997,6 +3064,10 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	set idx [eval $active_text search $search_options [list $RamDebugger::searchstring] \
 		     $idx $stopindex]
 	if { $idx == "" } {
+	    if { $what eq "iforward_all" } {
+		destroy $w.search
+		return
+	    }
 	    if { $raiseerror } {
 		error "Search not found"
 	    }
@@ -3053,9 +3124,13 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    }
 	    $active_text mark set insert $idx2
 	    $active_text see $RamDebugger::SearchPos
+	    
+	    if { $what eq "iforward_all" } {
+		tk_textPaste $text
+		after idle [list RamDebugger::Search $w iforward_all]
+	    }
 	}
 	set RamDebugger::Lastsearchstring $RamDebugger::searchstring
-
     }
 }
 
