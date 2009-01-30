@@ -2864,7 +2864,7 @@ proc RamDebugger::inline_replace { w search_entry } {
     bind $w.replace <Return> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
     bind $w.replace <Control-i> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
     bind $w.replace <Escape> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry end]
-    bind $w.replace <1> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry end]
+    bind $w.replace <1> "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry end];break"
     
     set cmd1 "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]"
     set cmd2 "[list tk_textPaste $text];RamDebugger::Search $w iforward"
@@ -2875,10 +2875,10 @@ proc RamDebugger::inline_replace { w search_entry } {
     set msg [_ "Press <Return> or Ctrl+I to continue search and replace\nCtrl+J to replace\nCtrl+Shift+J to replace all"]
     tooltip::tooltip $w.replace $msg
     
-    label $w.searchl2 -text $msg -justify left
+    label $w.searchl2 -text $msg -justify left -bd 1 -relief solid
     set x2 [expr {$x1+[winfo reqwidth $w.replace]+2}]
     place $w.searchl2 -in $w -x $x2 -rely 1 -y -1 -anchor sw
-    after 1500 [list catch [list destroy $w.searchl2]]
+    bind $w.replace <Destroy> [list destroy $w.searchl2]
 }
 
 proc RamDebugger::inline_replace_end { w focus grab search_entry what } {
@@ -2978,12 +2978,13 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		label $w.searchl1 -text $msg
 		set x1 [expr {2+[winfo reqwidth $w.search]+2}]
 		place $w.searchl1 -in $w -x $x1 -rely 1 -y -1 -anchor sw
-		after 1000 [list catch [list destroy $w.searchl1]]
+		after 2000 [list catch [list destroy $w.searchl1]]
 	    }
 	    set ::RamDebugger::searchstring ""
 	    trace var RamDebugger::searchstring w "[list RamDebugger::Search $w {}];#"
 	    bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
 		"[list RamDebugger::Search $w {}];#"]
+	    bind $w.search <Destroy> "+ [list destroy $w.searchl1]"
 	    bind $w.search <Destroy> "+ [list bindtags $active_text [lreplace [bindtags $active_text] 0 0]] ; break"
 	    foreach i [bind Text] {
 		if { [lsearch -exact [list <Motion>] $i] != -1 } { continue }
