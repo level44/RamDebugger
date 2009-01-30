@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.110 2009/01/30 16:40:47 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.111 2009/01/30 16:47:14 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -228,6 +228,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    set list ""
 	} else {
 	    set list [split $::env(PATH) \;]
+	}
+	if { ![file exists $exe] } {
+	    file mkdir $exe
 	}
 	set shortname [file native [file attributes $exe -shortname]]
 	if { [set ipos [lsearch -exact $list $shortname]] != 0 } {
