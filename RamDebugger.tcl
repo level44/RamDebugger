@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.109 2009/01/30 12:07:40 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.110 2009/01/30 16:40:47 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -8377,6 +8377,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind [winfo toplevel $text] <Control-v> ""
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
+    bind $text <Control-I> [list RamDebugger::Search $w iforward_get_insert]
 
     bind $w <Shift-Key-F5> "RamDebugger::DisconnectStop ;break"
 

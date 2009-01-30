@@ -208,13 +208,24 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
     }
 }
 
-proc RamDebugger::GetSelOrWordInIndex { idx } {
+proc RamDebugger::GetSelOrWordInIndex { args } {
     variable text
+    
+    set optional {
+	{ -return_range boolean 0 }
+    }
+    set compulsory "idx"
+    parse_args $optional $compulsory $args
+
     
     set range [$text tag ranges sel]
     if { $range != "" && [$text compare [lindex $range 0] <= $idx] && \
 	[$text compare [lindex $range 1] >= $idx] } {
-	return [eval $text get $range]
+	if { $return_range } {
+	    return $range
+	} else {
+	    return [$text get {*}$range]
+	}
     } else {
 	if { $idx != "" } {
 	    set var ""
@@ -241,7 +252,11 @@ proc RamDebugger::GetSelOrWordInIndex { idx } {
 	    }
 	} else { set var "" }
     }
-    return $var
+    if { $return_range } {
+	return [list [$text index "$idx0+1c"] [$text index "$idx1-1c"]]
+    } else {
+	return $var
+    }
 }
 
 proc RamDebugger::ToggleTransientWinAll { mainwindow } {
@@ -3031,14 +3046,24 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		        bind $w.search $i "destroy $w.search" }
 		}
 	    }
+	    if { $what eq "iforward_get_insert" } {
+		set range [GetSelOrWordInIndex -return_range 1 insert]
+		$active_text mark set insert [lindex $range 0]
+	    }
 	    set idx [$active_text index insert]
+	    
 	    if { $idx == "" } { set idx 1.0 }
 	    set ::RamDebugger::SearchIni $idx
 	    set ::RamDebugger::SearchPos $idx
 	    set ::RamDebugger::searchcase -1
 	    set ::RamDebugger::searchmode -exact
 	    
-	    if { [$active_text tag ranges sel] ne "" } {
+	    if { $what eq "iforward_get_insert" } {
+		set ::RamDebugger::Lastsearchstring ""
+		set ::RamDebugger::SearchType "-forwards"
+		set ::RamDebugger::searchstring [GetSelOrWordInIndex insert]
+		return
+	    } elseif { [$active_text tag ranges sel] ne "" } {
 		set ::RamDebugger::lastwascreation [$active_text get {*}[$active_text tag ranges sel]]
 	    } elseif { [info exists ::RamDebugger::Lastsearchstring] } {
 		set ::RamDebugger::lastwascreation $::RamDebugger::Lastsearchstring
