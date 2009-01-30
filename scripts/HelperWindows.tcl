@@ -2898,6 +2898,38 @@ proc RamDebugger::inline_replace_end { w focus grab search_entry what } {
     if { $grab ne "" } { grab $grab }
 }
 
+proc RamDebugger::Search_get_selection { active_text } {
+    if { [$active_text tag ranges sel] ne "" } {
+	set txt [$active_text get {*}[$active_text tag ranges sel]]
+    } else {
+	set err [catch { clipboard get } txt]
+	if { $err } { set txt "" }
+    }
+    set save_traces [trace info variable RamDebugger::searchstring]
+    foreach i $save_traces {
+	trace remove variable RamDebugger::searchstring {*}$i
+    }
+    set RamDebugger::searchstring $txt
+    set RamDebugger::Lastsearchstring $txt
+    
+    foreach i $save_traces {
+	trace add variable RamDebugger::searchstring {*}$i
+    }
+}
+
+proc RamDebugger::Search_goHome { active_text } {
+    
+    $active_text mark set insert 1.0
+    $active_text see 1.0
+    
+    set ::RamDebugger::SearchIni 1.0
+    set ::RamDebugger::SearchPos 1.0
+#     if { [info exists ::RamDebugger::Lastsearchstring] } {
+#         set ::RamDebugger::lastwascreation $::RamDebugger::Lastsearchstring
+#     } else { set ::RamDebugger::lastwascreation "" }
+    set ::RamDebugger::Lastsearchstring $RamDebugger::searchstring
+}    
+
 proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     variable text
     variable options
@@ -2949,8 +2981,10 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    entry $w.search -width 25 -textvariable RamDebugger::searchstring -relief solid -bd 1
 	    place $w.search -in $w -x 2 -rely 1 -y -1 -anchor sw
 
-	    set msg [_ "Press Ctrl+J to replace"]
-	    tooltip::tooltip $w.search $msg
+	    set msg1 [_ "Press Ctrl+J to replace"]
+	    set msg2 [_ "Press Ctrl+C to use selection for search"]
+	    set msg3 [_ "Press Home to search from beginning"]
+	    tooltip::tooltip $w.search $msg1\n$msg2\n$msg3
 
 	    focus $active_text
 	    bindtags $active_text [linsert [bindtags $active_text] 0 $w.search]
@@ -2962,8 +2996,8 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
-	    bind $w.search <1> "destroy $w.search; break"
-	    bind $w.search <3> "destroy $w.search; break"
+	    bind $w.search <1> "destroy $w.search"
+	    bind $w.search <3> "destroy $w.search"
 	    foreach i [list F1 F2 F5 F6 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
 	    }
@@ -2971,11 +3005,13 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
 	    bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
+	    bind $w.search <Control-c> "RamDebugger::Search_get_selection $active_text; break"
+	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
 	    
 	    if { $active_text eq $text } {
 		bind $w.search <Control-j> "RamDebugger::inline_replace $w $w.search; break"
 		
-		label $w.searchl1 -text $msg
+		label $w.searchl1 -text $msg1
 		set x1 [expr {2+[winfo reqwidth $w.search]+2}]
 		place $w.searchl1 -in $w -x $x1 -rely 1 -y -1 -anchor sw
 		after 2000 [list catch [list destroy $w.searchl1]]
@@ -3001,9 +3037,14 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    set ::RamDebugger::SearchPos $idx
 	    set ::RamDebugger::searchcase -1
 	    set ::RamDebugger::searchmode -exact
-	    if { [info exists ::RamDebugger::Lastsearchstring] } {
+	    
+	    if { [$active_text tag ranges sel] ne "" } {
+		set ::RamDebugger::lastwascreation [$active_text get {*}[$active_text tag ranges sel]]
+	    } elseif { [info exists ::RamDebugger::Lastsearchstring] } {
 		set ::RamDebugger::lastwascreation $::RamDebugger::Lastsearchstring
-	    } else { set ::RamDebugger::lastwascreation "" }
+	    } else {
+		set ::RamDebugger::lastwascreation ""
+	    }
 	    set ::RamDebugger::Lastsearchstring ""
 	} else {
 	    if { $::RamDebugger::searchstring == "" && $::RamDebugger::lastwascreation != "" } {
