@@ -2870,6 +2870,7 @@ proc RamDebugger::inline_replace { w search_entry } {
     place $w.replace -in $w -x $x1 -rely 1 -y -1 -anchor sw
     set err [catch { clipboard get } data]
     if { !$err && [string length $data] < 20 } {
+	$w.replace delete 0 end
 	$w.replace insert end $data
 	$w.replace selection range 0 end
     }

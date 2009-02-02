@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.112 2009/02/02 09:50:41 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.113 2009/02/02 19:53:02 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7708,6 +7708,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::Search $w any"] \
 		[list command [_ "Isearch forward"] {} [_ "Incrementally search forward"] "Ctrl i" \
 		-command "RamDebugger::Search $w iforward"] \
+		[list command [_ "Isearch forward selected"] {} [_ "Incrementally search forward. Begin with selected text or with text at cursor"] "" \
+		-command "RamDebugger::Search $w iforward"] \
 		[list command [_ "Isearch backward"] {} [_ "Incrementally search backward"] "Ctrl r" \
 		-command "RamDebugger::Search $w ibackward"] \
 		[list command &[_ "Replace"]... {} [_ "Replace text in source file"] "" \
@@ -8382,6 +8384,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
     bind $text <Control-I> [list RamDebugger::Search $w iforward_get_insert]
+
+    set menu [$mainframe getmenu edit]
+    $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift-I"
+
 
     bind $w <Shift-Key-F5> "RamDebugger::DisconnectStop ;break"
 
