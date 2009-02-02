@@ -3063,8 +3063,6 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		set ::RamDebugger::SearchType "-forwards"
 		set ::RamDebugger::searchstring [GetSelOrWordInIndex insert]
 		return
-	    } elseif { [$active_text tag ranges sel] ne "" } {
-		set ::RamDebugger::lastwascreation [$active_text get {*}[$active_text tag ranges sel]]
 	    } elseif { [info exists ::RamDebugger::Lastsearchstring] } {
 		set ::RamDebugger::lastwascreation $::RamDebugger::Lastsearchstring
 	    } else {
