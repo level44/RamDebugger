@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.113 2009/02/02 19:53:02 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.114 2009/02/09 20:03:54 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7895,7 +7895,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set label [$mainframe addindicator -textvariable RamDebugger::remoteserver -width 15 \
 		   -anchor e -padx 3]
     set menu [$mainframe getmenu activeprograms]
-    set menu1 [menu $menu.m1 -tearoff 0]
+    set menu1 [menu $w.actualizeprogramsmenu -tearoff 0]
     $menu1 configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu1 1]
 
     bind $label <1> "tk_popup $menu1 %X %Y"

@@ -2882,9 +2882,10 @@ proc RamDebugger::inline_replace { w search_entry } {
     bind $w.replace <Escape> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry end]
     bind $w.replace <1> "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry end];break"
     
-    set cmd1 "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]"
-    set cmd2 "[list tk_textPaste $text];RamDebugger::Search $w iforward"
-    set cmd3 "[list tk_textPaste $text];RamDebugger::Search $w iforward_all"
+    set cmd1 "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept];"
+    append cmd1 "[list RamDebugger::textPaste_insert_after $text];"
+    set cmd2 "RamDebugger::Search $w iforward"
+    set cmd3 "RamDebugger::Search $w iforward_all"
     bind $w.replace <Control-j> "$cmd1; $cmd2; break"
     bind $w.replace <Control-J> "$cmd1; $cmd3; break"
 
@@ -2904,14 +2905,36 @@ proc RamDebugger::inline_replace_end { w focus grab search_entry what } {
 	clipboard clear
 	clipboard append $RamDebugger::replacestring
 	
-	set cmd1 "[list tk_textPaste $text];RamDebugger::Search $w iforward"
-	set cmd2 "[list tk_textPaste $text];RamDebugger::Search $w iforward_all"
+	set cmd1 "[list RamDebugger::textPaste_insert_after $text];RamDebugger::Search $w iforward"
+	set cmd2 "[list RamDebugger::textPaste_insert_after $text];RamDebugger::Search $w iforward_all"
 	bind $search_entry <Control-j> "$cmd1; break"
 	bind $search_entry <Control-J> "$cmd2; break"
     }
     destroy $w.replace
     if { $focus ne "" } { focus -force $focus }
     if { $grab ne "" } { grab $grab }
+}
+
+proc RamDebugger::textPaste_insert_after { w } {
+
+    set err [catch {::tk::GetSelection $w CLIPBOARD} sel]
+    if { $err } { return }
+    
+    set oldSeparator [$w cget -autoseparators]
+    if {$oldSeparator} {
+	$w configure -autoseparators 0
+	$w edit separator
+    }
+    if {[tk windowingsystem] ne "x11"} {
+	catch { $w delete sel.first sel.last }
+    }
+    set d [expr {[string length $sel]-[string length $::RamDebugger::searchstring]}]
+    set RamDebugger::SearchPos [$w index "insert+${d}c"]
+    $w insert insert $sel
+    if {$oldSeparator} {
+	$w edit separator
+	$w configure -autoseparators 1
+    }
 }
 
 proc RamDebugger::Search_get_selection { active_text } {
