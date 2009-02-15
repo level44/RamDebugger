@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.114 2009/02/09 20:03:54 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.115 2009/02/15 23:52:16 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -8556,6 +8556,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     auto_load tcl_wordBreakAfter
     set ::tcl_wordchars "\\w"
     set ::tcl_nonwordchars "\\W"
+#     set ::tcl_wordchars {\S}
+#     set ::tcl_nonwordchars {\s}
 
     # it is done in this way because if not, the definition gets reload
     proc ::tkTabToWindow { w } { after 100 Widget::traverseTo $w }
