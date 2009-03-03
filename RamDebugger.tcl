@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.115 2009/02/15 23:52:16 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.116 2009/03/03 20:04:38 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -526,9 +526,9 @@ proc RamDebugger::rdebug { args } {
 	    error [_ "Error. There is no debugging session active to stop"]
 	}
 	if { $remoteserverType == "master" } {
-	    error [_ "It is not possible to stop this type of debugging. Use 'Quit' instead"]
-	}
-	if { $remoteserverType == "local" } {
+	    # why not?
+	    #error [_ "It is not possible to stop this type of debugging. Use 'Quit' instead"]
+	} elseif { $remoteserverType == "local" } {
 	    catch { local eval destroy . }
 	    catch { interp delete local }
 	} elseif { $remoteserverType == "gdb" } {
@@ -560,7 +560,10 @@ proc RamDebugger::rdebug { args } {
 
 	if { [info exists options(master_type)] } {
 	    set remoteserver $options(master_type)
-	} else { set remoteserver master }
+	} else {
+	    #set remoteserver master
+	    set remoteserver "master proc"
+	}
 	set remoteserverType master
 	TakeArrowOutFromText
     } elseif { $opts(-currentfile) } {
@@ -4364,9 +4367,14 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     # set at program start up
     if { [info command master] != "" } {
 	$menu del 0 end
-	$menu add radio -label [_ "No autosend"] -variable RamDebugger::remoteserver -value master
-	$menu add radio -label [_ "Send procs"] -variable RamDebugger::remoteserver -value "master proc"
-	$menu add radio -label [_ "Send all"] -variable RamDebugger::remoteserver -value "master all"
+#         $menu add radio -label [_ "No autosend"] -variable RamDebugger::remoteserver -value master
+#         $menu add radio -label [_ "Send procs"] -variable RamDebugger::remoteserver -value "master proc"
+#         $menu add radio -label [_ "Send all"] -variable RamDebugger::remoteserver -value "master all"
+
+	$menu add command -label [_ "Start debug"] -command [list RamDebugger::ContNextGUI rcont] \
+	    -acc "F5"
+	$menu add separator
+	$menu add command -label [_ "Disconnect/Stop"] -command RamDebugger::DisconnectStop -acc "Shift+F5"
 
 	DynamicHelp::register $menu menu RamDebugger::status
 	DynamicHelp::register $menu menuentry 0 [_ "Only instrument sourced files"]

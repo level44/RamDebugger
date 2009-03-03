@@ -131,11 +131,14 @@ proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
 
     RamDebugger::WaitState 1
 
-    if { [regexp {^\*.*\*$} $RamDebugger::currentfile] } {
-	set file [string trim $RamDebugger::currentfile *]
+    set map [list > "" < ""]
+    set file [string map $map $RamDebugger::currentfile]
+    
+    if { [regexp {^\*.*\*$} $file] } {
+	set file [string trim $file *]
 	set lfile $file.[sha1::sha1 $file]
     } else {
-	set file [file normalize $RamDebugger::currentfile]
+	set file [file normalize $file]
 	set lfile [file tail $file].[sha1::sha1 $file]
     }
     RamDebugger::SetMessage "Saving revision for file '$file'..."
@@ -177,20 +180,18 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     variable cvsworkdir
 
     RamDebugger::WaitState 1
-    if { $file eq "" } {
-	if { [regexp {^\*.*\*$} $RamDebugger::currentfile] } {
-	    set file $RamDebugger::currentfile
-	} else {
-	    set file [file normalize $RamDebugger::currentfile]
-	}
-    }
+    
+    if { $file eq "" } { set file $RamDebugger::currentfile }
+    set map [list > "" < ""]
+    set file [string map $map $file]
+    
     if { [regexp {^\*.*\*$} $file] } {
 	set file [string trim $file *]
 	set lfile $file.[sha1::sha1 $file]
     } else {
+	set file [file normalize $file]
 	set lfile [file tail $file].[sha1::sha1 $file]
     }
-
     set err [catch { Init } errstring]
     if { $err } {
 	RamDebugger::WaitState 0
@@ -281,12 +282,17 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	    set deletefiles ""
 	    if { [llength $selecteditems] == 1 } {
 		set revision [lindex $selecteditems 0 0]
-		if { [regexp {^\*.*\*$} $RamDebugger::currentfile] } {
-		    set currentfile [string trim $RamDebugger::currentfile *]
+		
+		set currentfileL $RamDebugger::currentfile
+		set map [list > "" < ""]
+		set currentfileL [string map $map $currentfileL]
+    
+		if { [regexp {^\*.*\*$} $currentfileL] } {
+		    set currentfileL [string trim $currentfileL *]
 		} else {
-		    set currentfile [file normalize $RamDebugger::currentfile]
+		    set currentfileL [file normalize $currentfileL]
 		}
-		if { $file eq $currentfile } {
+		if { $file eq $currentfileL } {
 		    set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
 		    set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
 		    set file1 [file tail $file]
