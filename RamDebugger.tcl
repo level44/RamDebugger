@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.116 2009/03/03 20:04:38 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.117 2009/03/05 20:11:58 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -2568,7 +2568,7 @@ proc RamDebugger::UpdateRemoteBreaks {} {
 	EvalRemote "printf \"FINISHED SET BREAKPOINTS\\n\""
     } else {
 	EvalRemote { if { [info exists RDC::breaks] } { unset RDC::breaks } }
-	EvalRemote { set RDC::traces "" }
+	EvalRemote { if { [info exists RDC::traces] } { set RDC::traces "" } }
 	foreach i $breakpoints {
 	    if { ![lindex $i 1] } { continue }
 	    set line [lindex $i 3]
@@ -5078,8 +5078,14 @@ proc RamDebugger::ContNextGUI { what } {
 	# ($remoteserver == "master all" && !$IsInStop) 
 
 
+    if { $remoteserverType ne "" && [info command master] ne "" } {
+	set cmd [master eval info command RDC::F]
+	if { $cmd eq "" } {
+	    DisconnectStop
+	}
+    }
     if { $remoteserverType == "" && [info command master] != "" } {
-	RamDebugger::rdebug -master
+	rdebug -master
     }
 
     if { $remoteserver == "" } {
