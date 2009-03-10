@@ -1,6 +1,19 @@
 
 package require snit
 
+proc info_fullargs { procname } {
+    set ret ""
+    foreach arg [uplevel 1 [list info args $procname]] {
+	if { [uplevel 1 [list info default $procname $arg value]] } {
+	    upvar 1 value value
+	    lappend ret [list $arg $value]
+	} else {
+	    lappend ret $arg
+	}
+    }
+    return $ret
+}
+
 namespace eval cu {}
 
 # for tclIndex to work 
