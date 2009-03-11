@@ -636,10 +636,11 @@ proc RamDebugger::CVS::update_recursive { wp } {
     }
     set script ""
     foreach cmd [list update_recursive_do0 select_directory update_recursive_do1 \
-	    update_recursive_cmd] {
+	    update_recursive_accept update_recursive_cmd] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
+    append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory]\n"
     
     if { 0&&$::tcl_platform(threaded) } {
@@ -663,7 +664,8 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     destroy ._ask
     set w [dialogwin_snit ._ask -title [_ "CVS update recursive"] -entrytext \
 	    [_ "Select origin directory for CVS update recursive:"] \
-	    -okname [_ View] -morebuttons [list [_ "Update CVS"]]]
+	    -okname [_ View] -morebuttons [list [_ "Update CVS"]] \
+	    -grab 0 -callback [list update_recursive_do1]]
     set f [$w giveframe]
     
     set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
@@ -683,6 +685,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
 	-selectmode extended -showheader 1 -showlines 0  \
 	-indent 0 -sensitive_cols all \
 	-contextualhandler_menu [list "update_recursive_cmd" $w contextual]
+    $w set_uservar_value tree $f.toctree
     
     ttk::label $f.l2 -text [_ "Commit messages"]:
     cu::combobox $f.e2 -textvariable [$w give_uservar message ""] -valuesvariable \
@@ -704,25 +707,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     
     tk::TabToWindow $f.e1
     bind [winfo toplevel $f] <Return> [list $w invokeok]
-    set action [$w createwindow]
-    while 1 {
-	if { $action < 1 } {
-	    destroy $w
-	    return
-	} elseif { $action == 1 } {
-	    set what view
-	} else {
-	    set what update
-	}
-	set dir [$w give_uservar_value dir]
-	$w set_uservar_value directories [linsert0 [$w give_uservar_value directories] $dir]
-	set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
-	dict set dict directories [$w give_uservar_value directories]
-	cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
-	$f.toctree item delete all
-	update_recursive_do1 $what $dir $f.toctree 0
-	set action [$w waitforwindow]
-    }
+    $w createwindow
 }
 
 proc RamDebugger::CVS::select_directory { w } {
@@ -732,7 +717,29 @@ proc RamDebugger::CVS::select_directory { w } {
     $w set_uservar_value dir $dir
 }
 
-proc RamDebugger::CVS::update_recursive_do1 { what dir tree itemP { item "" } } {
+proc RamDebugger::CVS::update_recursive_do1 { w } {
+
+    set action [$w giveaction]
+
+    if { $action < 1 } {
+	destroy $w
+	return
+    } elseif { $action == 1 } {
+	set what view
+    } else {
+	set what update
+    }
+    set dir [$w give_uservar_value dir]
+    $w set_uservar_value directories [linsert0 [$w give_uservar_value directories] $dir]
+    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
+    dict set dict directories [$w give_uservar_value directories]
+    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
+    set tree [$w give_uservar_value tree]
+    $tree item delete all
+    update_recursive_accept $what $dir $tree 0
+}
+
+proc RamDebugger::CVS::update_recursive_accept { what dir tree itemP { item "" } } {
     
     if { $item ne "" } {
 	foreach i [$tree item children $item] { $tree item delete $i }
@@ -760,7 +767,7 @@ proc RamDebugger::CVS::update_recursive_do1 { what dir tree itemP { item "" } } 
     } else {
 	if { $item ne "" } { set itemP $item }
 	foreach d [glob -nocomplain -dir $dir -type d *] {
-	    update_recursive_do1 $what $d $tree $itemP
+	    update_recursive_accept $what $d $tree $itemP
 	}
     }
     if { $item ne "" } {
@@ -797,8 +804,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    foreach item $sel_ids {
 		if { ![regexp {^M\s(\S+)} [$tree item text $item 0] {} file] } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
-		set err [catch { exec cvs commit -m $message [file join $dir $file] 2>@1 } ret]
+		set pwd [pwd]
+		cd $dir
+		set err [catch { exec cvs commit -m $message $file 2>@1 } ret]
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
+		cd $pwd
 	    }
 	    $w set_uservar_value messages [linsert0 [$w give_uservar_value messages] $message]
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
@@ -817,7 +827,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    foreach item [lsort -unique $ids] {
 		set dir [$tree item text $item 0]
-		update_recursive_do1 $what_in $dir $tree [$tree item parent $item] $item
+		update_recursive_accept $what_in $dir $tree [$tree item parent $item] $item
 	    }
 	}
 	view {

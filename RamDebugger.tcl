@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.117 2009/03/05 20:11:58 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.118 2009/03/11 18:22:39 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -29,7 +29,7 @@ if { [info command _] eq "" } {
 
 
 ################################################################################
-#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
+#  This software is copyrighted by Ramon RibÃ³ (RAMSAN) ramsan@compassis.com
 #  (http://www.gidhome.com/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
@@ -335,9 +335,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     # 1: Register as remote and check remote programs on start up. It can be slower the
     #    start up but is better when making remote debugging
 
-    if { $usecommR } {
-	set options_def(CheckRemotes) 1
-    }
+    set options_def(CheckRemotes) 1
 
     set options_def(AutoSaveRevisions) 1
     set options_def(AutoSaveRevisions_time) 5
