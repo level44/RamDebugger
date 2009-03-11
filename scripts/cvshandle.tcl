@@ -680,7 +680,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
 
     package require fulltktree
     set columns [list [list 100 [_ "line"] left item 0]]
-    fulltktree $f.toctree -height 400 \
+    fulltktree $f.toctree -height 350 \
 	-columns $columns -expand 0 \
 	-selectmode extended -showheader 1 -showlines 0  \
 	-indent 0 -sensitive_cols all \
