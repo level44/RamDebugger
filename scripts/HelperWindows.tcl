@@ -4,6 +4,8 @@
 # DisplayVar
 ################################################################################
 
+namespace eval RamDebugger {}
+
 proc RamDebugger::DisplayVar { X Y x y } {
     variable text
     variable remoteserverType
@@ -3227,17 +3229,17 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 # OpenProgram OpenConsole
 ################################################################################
 
-proc RamDebugger::OpenProgram { what } {
+proc RamDebugger::OpenProgram { what args } {
     variable MainDir
     variable currentfile
     
-    set argv ""
+    set argv $args
     
     switch $what {
 	visualregexp { set file [file join $MainDir addons visualregexp visual_regexp.tcl] }
 	tkcvs {
 	    set file [file join $MainDir addons tkcvs bin tkcvs.tcl]
-	    if { [file isdirectory [file dirname $currentfile]] } {
+	    if {  [llength $args] == 0 && [file isdirectory [file dirname $currentfile]] } {
 		lappend argv -dir [file dirname $currentfile]
 	    }
 	}
@@ -3248,7 +3250,7 @@ proc RamDebugger::OpenProgram { what } {
     interp alias $what exit_interp "" interp delete $what
     $what eval [list proc exit { args } "destroy . ; exit_interp"]
     $what eval [list load {} Tk]
-    $what eval [list set argc 0]
+    $what eval [list set argc [llength $argv]]
     $what eval [list set argv $argv]
     $what eval [list source $file]
 }

@@ -640,6 +640,8 @@ proc RamDebugger::CVS::update_recursive { wp } {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
+    append script "[list namespace eval RamDebugger ""]\n"
+    append script "[list set RamDebugger::MainDir $RamDebugger::MainDir]\n"
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory]\n"
     
@@ -793,6 +795,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    $menu add command -label [_ "Update CVS"] -command \
 		[list "update_recursive_cmd" $w update update $tree $sel_ids]
 	    $menu add separator
+	    $menu add command -label [_ "View diff"] -command \
+		[list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
+	    $menu add command -label [_ "Open tkcvs"] -command \
+		[list "update_recursive_cmd" $w open_program tkcvs $tree $sel_ids]
+	    $menu add separator
 	    foreach i [list all normal modified] t [list [_ All] [_ Normal] [_ Modified]] {
 		$menu add command -label [_ "View %s" $t] -command \
 		    [list "update_recursive_cmd" $w view $tree 0 $i]
@@ -853,5 +860,42 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    $tree item configure $item -visible $visible
 	}
+	open_program {
+	    lassign $args what_in tree sel_ids
+	    foreach item $sel_ids {
+		if { ![regexp {^M\s(\S+)} [$tree item text $item 0] {} file] } { continue }
+		set dir [$tree item text [$tree item parent $item] 0]
+		set file [file join $dir $file]
+		if { [file exists $file] } {
+		    switch $what_in {
+		        tkdiff {
+		            RamDebugger::OpenProgram tkdiff -r $file
+		        }
+		        tkcvs {
+		            if { [file isdirectory $file] } {
+		                RamDebugger::OpenProgram tkcvs -dir $file
+		            } else {
+		                RamDebugger::OpenProgram tkcvs -dir [file dirname $file]
+		            }
+		        }
+		    }
+		    return
+		}
+	    }
+	}
+	default {
+	    error "error in update_recursive_cmd"
+	}
     } 
 }
+
+
+
+
+
+
+
+
+
+
+
