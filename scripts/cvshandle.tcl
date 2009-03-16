@@ -869,7 +869,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		if { [file exists $file] } {
 		    switch $what_in {
 		        tkdiff {
+		            set pwd [pwd]
+		            cd [file dirname $file]
+		            set file [file tail $file]
 		            RamDebugger::OpenProgram tkdiff -r $file
+		            cd $pwd
 		        }
 		        tkcvs {
 		            if { [file isdirectory $file] } {

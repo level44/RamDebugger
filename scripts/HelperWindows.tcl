@@ -3234,7 +3234,7 @@ proc RamDebugger::OpenProgram { what args } {
     variable currentfile
     
     set argv $args
-    
+    tk_messageBox -message $args
     switch $what {
 	visualregexp { set file [file join $MainDir addons visualregexp visual_regexp.tcl] }
 	tkcvs {
@@ -3245,14 +3245,35 @@ proc RamDebugger::OpenProgram { what args } {
 	}
 	tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
     }
-    if { [interp exists $what] } { interp delete $what }
-    interp create $what
+    if { ![interp exists $what] } {
+	interp create $what
+    }
     interp alias $what exit_interp "" interp delete $what
     $what eval [list proc exit { args } "destroy . ; exit_interp"]
+    interp alias $what puts "" RamDebugger::_OpenProgram_puts
     $what eval [list load {} Tk]
     $what eval [list set argc [llength $argv]]
     $what eval [list set argv $argv]
     $what eval [list source $file]
+}
+
+proc RamDebugger::_OpenProgram_puts { args } {
+    variable textOUT
+    
+    lassign [list stdout "" 1] channelId string hasnewline
+    switch [llength $args] {
+	1 { lassign $args string }
+	2 { lassign $args channelId string }
+	3 { lassign $args channelId string hasnewline }
+	default {
+	    error "error in RamDebugger::_OpenProgram_puts"
+	}
+    }
+    if { [info exists textOUT] && [winfo exists $textOUT] } {
+	RamDebugger::RecieveOutputFromProgram $channelId $string $hasnewline
+    } elseif { $channelId eq "stderr" } {
+	tk_messageBox -message $string
+    }
 }
 
 proc RamDebugger::revalforTkcon { comm } {
