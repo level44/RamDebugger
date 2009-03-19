@@ -3272,7 +3272,7 @@ proc RamDebugger::_OpenProgram_puts { args } {
     if { [info exists textOUT] && [winfo exists $textOUT] } {
 	RamDebugger::RecieveOutputFromProgram $channelId $string $hasnewline
     } elseif { $channelId eq "stderr" } {
-	tk_messageBox -message $string
+	#tk_messageBox -message $string
     }
 }
 
