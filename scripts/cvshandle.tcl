@@ -667,7 +667,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     set w [dialogwin_snit ._ask -title [_ "CVS update recursive"] -entrytext \
 	    [_ "Select origin directory for CVS update recursive:"] \
 	    -okname [_ View] -morebuttons [list [_ "Update CVS"]] \
-	    -grab 0 -callback [list update_recursive_do1]]
+	    -cancelname [_ Close] -grab 0 -callback [list update_recursive_do1]]
     set f [$w giveframe]
     
     set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
