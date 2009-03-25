@@ -863,7 +863,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	open_program {
 	    lassign $args what_in tree sel_ids
 	    foreach item $sel_ids {
-		if { ![regexp {^M\s(\S+)} [$tree item text $item 0] {} file] } { continue }
+		if { ![regexp {^[A-Z]\s(\S+)} [$tree item text $item 0] {} file] } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
 		set file [file join $dir $file]
 		if { [file exists $file] } {
