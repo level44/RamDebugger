@@ -3234,7 +3234,6 @@ proc RamDebugger::OpenProgram { what args } {
     variable currentfile
     
     set argv $args
-    tk_messageBox -message $args
     switch $what {
 	visualregexp { set file [file join $MainDir addons visualregexp visual_regexp.tcl] }
 	tkcvs {
@@ -3268,7 +3267,7 @@ proc RamDebugger::_OpenProgram_puts { args } {
 	default {
 	    error "error in RamDebugger::_OpenProgram_puts"
 	}
-    }
+    } 
     if { [info exists textOUT] && [winfo exists $textOUT] } {
 	RamDebugger::RecieveOutputFromProgram $channelId $string $hasnewline
     } elseif { $channelId eq "stderr" } {
