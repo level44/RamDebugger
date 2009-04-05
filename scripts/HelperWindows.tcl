@@ -3834,6 +3834,7 @@ proc RamDebugger::MacrosDo { what { f "" } } {
 		return
 	    }
 	    set macro [lindex [$DialogWinTop::user($w,list) get $idx] 0]
+	    #tk_messageBox -message [array get ::env]
 	    RamDebugger::Macros::$macro $text
 	}
 	default {
