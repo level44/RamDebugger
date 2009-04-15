@@ -629,7 +629,7 @@ proc RamDebugger::CVS::indicator_update_do {} {
 
 proc RamDebugger::CVS::update_recursive { wp } {
     
-    if { [file isdirectory [file dirname $RamDebugger::currentfile]] } {
+    if { 0 && [file isdirectory [file dirname $RamDebugger::currentfile]] } {
 	set directory [file dirname $RamDebugger::currentfile]
     } else {
 	set directory ""
