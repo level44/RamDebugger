@@ -3,12 +3,14 @@ package require createdistribution
 namespace import createdistribution::*
 
 set name RamDebugger
-set version 6.2
+set version 6.3
 
 IconifiedConsole
 
-set createdistribution::doencrypt 0
-set createdistribution::add_packages [list treectrl BWidgetR tkhtml]
+set createdistribution::doencrypt 1
+set createdistribution::encrypt_packages_list [list compass_utils]
+
+set createdistribution::add_packages [list treectrl BWidgetR tkhtml compass_utils]
 lappend createdistribution::remove_packages trf bwidget \
     vfs::ftp he_dialog wce
 

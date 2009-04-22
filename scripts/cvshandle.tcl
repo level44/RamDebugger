@@ -659,7 +659,7 @@ proc RamDebugger::CVS::update_recursive { wp } {
 proc RamDebugger::CVS::update_recursive_do0 { directory } {
 
     package require dialogwin
-    package require compass_utils
+    #package require compass_utils
 
     wm withdraw .
     
