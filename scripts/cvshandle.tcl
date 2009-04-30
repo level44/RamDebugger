@@ -629,7 +629,7 @@ proc RamDebugger::CVS::indicator_update_do {} {
 
 proc RamDebugger::CVS::update_recursive { wp } {
     
-    if { 0 && [file isdirectory [file dirname $RamDebugger::currentfile]] } {
+    if { [file isdirectory [file dirname $RamDebugger::currentfile]] } {
 	set directory [file dirname $RamDebugger::currentfile]
     } else {
 	set directory ""
@@ -671,7 +671,12 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     set f [$w giveframe]
     
     set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
-    $w set_uservar_value directories [dict_getd $dict directories ""]
+    
+    set directories [dict_getd $dict directories ""]
+    if { $directory ne "" } {
+	set directories [linsert0 $directories $directory]
+    }
+    $w set_uservar_value directories $directories
     $w set_uservar_value messages [dict_getd $dict messages ""]
     
     ttk::label $f.l1 -text [_ "Directory"]:
@@ -699,12 +704,12 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     grid configure $f.e1 $f.e2 -sticky ew
     grid columnconfigure $f 1 -weight 1
     grid rowconfigure $f 2 -weight 1
-   
-    if { $directory ne "" } {
-	$w set_uservar_value dir $directory
-    } else {
-	$w set_uservar_value dir [lindex [$w give_uservar_value directories] 0]
+    
+    set dir [lindex [$w give_uservar_value directories] 0]
+    if { $dir eq "" } {
+	set dir $directory
     }
+    $w set_uservar_value dir $dir
     $w set_uservar_value message ""
     
     tk::TabToWindow $f.e1
