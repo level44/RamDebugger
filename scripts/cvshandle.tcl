@@ -554,6 +554,7 @@ proc RamDebugger::CVS::indicator_update {} {
     set currentfile $RamDebugger::currentfile
     
     if { [auto_execok cvs] eq "" } { return }
+    
     if { [info exists cvs_indicator_fileid] } {
 	catch { close $cvs_indicator_fileid }
 	unset cvs_indicator_fileid
@@ -673,6 +674,8 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
     
     set directories [dict_getd $dict directories ""]
+    set dir [lindex $directories 0]
+    if { $dir eq "" } { set dir $directory }
     if { $directory ne "" } {
 	set directories [linsert0 $directories $directory]
     }
@@ -705,10 +708,6 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     grid columnconfigure $f 1 -weight 1
     grid rowconfigure $f 2 -weight 1
     
-    set dir [lindex [$w give_uservar_value directories] 0]
-    if { $dir eq "" } {
-	set dir $directory
-    }
     $w set_uservar_value dir $dir
     $w set_uservar_value message ""
     
@@ -761,6 +760,7 @@ proc RamDebugger::CVS::update_recursive_accept { what dir tree itemP { item "" }
 	}
 	cd $olddir
 	foreach line [split $ret \n] {
+	    if { ![winfo exists $tree] } { return }
 	    if { $line eq "cvs server: WARNING: global `-l' option ignored." } { continue }
 	    if { $item eq "" } {
 		set item [$tree insert end [list $dir] $itemP]
