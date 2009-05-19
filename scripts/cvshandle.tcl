@@ -555,11 +555,18 @@ proc RamDebugger::CVS::indicator_update {} {
     
     if { [auto_execok cvs] eq "" } { return }
     
+    set f $cvs_indicator_frame
+    if { [regexp {^\*.*\*$} $currentfile] } {
+	$f.l2 configure -image ""
+	tooltip::tooltip $f.l2 [_ "No CVS information"]
+	$f.l3 configure -image ""
+	tooltip::tooltip $f.l3 [_ "No CVS information"]
+	return
+    }
     if { [info exists cvs_indicator_fileid] } {
 	catch { close $cvs_indicator_fileid }
 	unset cvs_indicator_fileid
     }
-    set f $cvs_indicator_frame
     foreach i [list 1 2 3] {
 	raise $f.l$i
     }
