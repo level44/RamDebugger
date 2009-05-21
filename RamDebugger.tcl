@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.120 2009/04/22 10:31:45 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.121 2009/05/21 17:20:03 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -5077,7 +5077,7 @@ proc RamDebugger::ContNextGUI { what } {
 
 
     if { $remoteserverType ne "" && [info command master] ne "" } {
-	set cmd [master eval info command RDC::F]
+	set cmd [master eval info command ::RDC::F]
 	if { $cmd eq "" } {
 	    DisconnectStop
 	}
