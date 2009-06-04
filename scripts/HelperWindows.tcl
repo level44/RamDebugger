@@ -810,18 +810,17 @@ proc RamDebugger::PreferencesWindow {} {
     set f1 [ttk::labelframe $nb.f1 -text [_ Debugging]]
     $nb add $f1 -text [_ Debugging] -sticky nsew
 
-    if { $::tcl_platform(platform) == "windows" } {
-	ttk::checkbutton $f1.cb0 -text "Automatically check remote files" -variable \
-	    [$w give_uservar CheckRemotes]
-	tooltip::tooltip $f1.cb0 [string trim {
+    ttk::checkbutton $f1.cb0 -text "Automatically check remote files" -variable \
+	[$w give_uservar CheckRemotes]
+    tooltip::tooltip $f1.cb0 [string trim {
 	    this variable is only used on windows. It can be:
 	    0: Only check remote programs on demand (useful if not making remote debugging, the
 	       start up is faster)
 	    1: Register as remote and check remote programs on start up. The start up can be slower
 		but is better when making remote debugging
-	}]
-	$w set_uservar_value CheckRemotes $options(CheckRemotes)
-    }
+	    }]
+    $w set_uservar_value CheckRemotes $options(CheckRemotes)
+
     ttk::checkbutton $f1.cb1 -text [_ "Confirm restart debugging"] -variable \
 	[$w give_uservar ConfirmStartDebugging]
     tooltip::tooltip $f1.cb1 [_ "\
@@ -939,7 +938,7 @@ proc RamDebugger::PreferencesWindow {} {
     set f2 [ttk::labelframe $nb.f2 -text [_ Fonts]]
     $nb add $f2 -text [_ Fonts] -sticky nsew
     
-    set families [font families]
+    set families [lsort -dictionary [font families]]
     set sizes [list 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24]
     set irow 0
     foreach "but type fontname" [list b1 {GUI font} NormalFont b2 {Text font} \
@@ -1604,7 +1603,7 @@ proc RamDebugger::AboutWindow {} {
     label $w.l -text RamDebugger -font "-family {new century schoolbook} -size 24 -weight bold" \
 	    -fg \#d3513d -grid 0
 
-    set tt "Author: Ramon Ribó (RAMSAN)\n"
+    set tt "Author: Ramon RibÃ³ (RAMSAN)\n"
     append tt "ramsan@compassis.com\nhttp://www.gidhome.com/ramsan\n"
     append tt "http://www2.compassis.com/ramdebugger"
 
