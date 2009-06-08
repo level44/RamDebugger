@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.121 2009/05/21 17:20:03 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.122 2009/06/08 20:45:36 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -29,7 +29,7 @@ if { [info command _] eq "" } {
 
 
 ################################################################################
-#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
+#  This software is copyrighted by Ramon RibÃ³ (RAMSAN) ramsan@compassis.com
 #  (http://www.gidhome.com/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
@@ -7133,6 +7133,7 @@ proc RamDebugger::ApplyDropBinding { w command } {
 proc RamDebugger::DropBindingDone { files } {
 
     foreach i $files {
+	regsub {^file://} $i {} i
 	OpenFileF $i
     }
 }
@@ -7639,7 +7640,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
-    ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
+    # ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
     set descmenu [list \
 		&[_ "File"] all file 0 [list \
 		[list command &[_ "New"] {} [_ "Begin new file"] "" \
@@ -8451,6 +8452,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
 
     bind all <Control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"
+
+    ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
 
     # BWidgets automatically sets these because they are in the main main
     # we only want them individually in every widget
