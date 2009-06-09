@@ -1603,7 +1603,7 @@ proc RamDebugger::AboutWindow {} {
     label $w.l -text RamDebugger -font "-family {new century schoolbook} -size 24 -weight bold" \
 	    -fg \#d3513d -grid 0
 
-    set tt "Author: Ramon RibÃ³ (RAMSAN)\n"
+    set tt "Author: Ramon Ribó (RAMSAN)\n"
     append tt "ramsan@compassis.com\nhttp://www.gidhome.com/ramsan\n"
     append tt "http://www2.compassis.com/ramdebugger"
 
@@ -3683,7 +3683,7 @@ proc RamDebugger::DisplayPositionsStackDo { what args } {
     catch { $DialogWinTop::user(list) selection set [lindex $curr 0] }
 }
 
-if { [info command lreverse] eq "" } {
+if { [info commands lreverse] eq "" } {
     proc lreverse { L } {
 	set res {}
 	set i [llength $L]

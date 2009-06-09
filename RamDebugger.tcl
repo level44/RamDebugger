@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.122 2009/06/08 20:45:36 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.123 2009/06/09 17:39:31 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -18,7 +18,7 @@ if { [info exists ::starkit::topdir] } {
 
 package require msgcat
 
-if { [info command _] eq "" } {
+if { [info commands _] eq "" } {
     proc ::_ { args } {
 	if { [regexp {(.*)#C#(.*)} [lindex $args 0] {} str comm] } {
 	    set args [lreplace $args 0 0 $str]
@@ -29,7 +29,7 @@ if { [info command _] eq "" } {
 
 
 ################################################################################
-#  This software is copyrighted by Ramon RibÃ³ (RAMSAN) ramsan@compassis.com
+#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
 #  (http://www.gidhome.com/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
@@ -63,7 +63,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 6.3
+    set Version 6.4
 
     ################################################################################
     #    Non GUI commands
@@ -182,7 +182,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	catch { tk_messageBox -message $text }
     }
 
-    if { [info command winfo] ne "" && [winfo screenwidth .] < 350 } {
+    if { [info commands winfo] ne "" && [winfo screenwidth .] < 350 } {
 	set iswince 1
     } else { set iswince 0 }
    
@@ -381,7 +381,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    set debuggerserverNum [commR::register RamDebugger 1]
 	}
     } else {
-	if { [info command wm] != "" } {
+	if { [info commands wm] != "" } {
 	    package require Tk
 	    wm withdraw .
 	}
@@ -460,7 +460,7 @@ proc RamDebugger::rhelp { args } {
     ParseArgs $args $usagestring opts
 
     if { $opts(command) != "" } {
-	if { [info command $opts(command)] == "" } {
+	if { [info commands $opts(command)] == "" } {
 	    error [_ "command '%s' does not exists" $opts(command)]\n$usagestring
 	}
 	catch { $opts(command) -h } string
@@ -1336,7 +1336,7 @@ proc RamDebugger::rtime { args } {
 	    #             set currentfile $remoteserver
 	    rdebug -currentfile
 	}
-	if { $remoteserverType == "" && [info command master] != "" } {
+	if { $remoteserverType == "" && [info commands master] != "" } {
 	    rdebug -master
 	}
 	return [_ "Using 'measure times' mode"]
@@ -3287,7 +3287,7 @@ proc RamDebugger::ExitGUI {} {
 	variable breakpoints ""
 	UpdateRemoteBreaks
 	destroy [winfo toplevel $text]
-    } elseif { [info command exit_final] != "" } {
+    } elseif { [info commands exit_final] != "" } {
 	exit_final
     } else { exit }
 }
@@ -4363,7 +4363,7 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
 
     # the correct thing would be to check remoteserverType but it is not
     # set at program start up
-    if { [info command master] != "" } {
+    if { [info commands master] != "" } {
 	$menu del 0 end
 #         $menu add radio -label [_ "No autosend"] -variable RamDebugger::remoteserver -value master
 #         $menu add radio -label [_ "Send procs"] -variable RamDebugger::remoteserver -value "master proc"
@@ -5076,13 +5076,13 @@ proc RamDebugger::ContNextGUI { what } {
 	# ($remoteserver == "master all" && !$IsInStop) 
 
 
-    if { $remoteserverType ne "" && [info command master] ne "" } {
+    if { $remoteserverType ne "" && [info commands master] ne "" } {
 	set cmd [master eval info command ::RDC::F]
 	if { $cmd eq "" } {
 	    DisconnectStop
 	}
     }
-    if { $remoteserverType == "" && [info command master] != "" } {
+    if { $remoteserverType == "" && [info commands master] != "" } {
 	rdebug -master
     }
 
@@ -5598,7 +5598,7 @@ proc RamDebugger::TextOutInsert { data } {
     $textOUT conf -state normal
     foreach i [::textutil::splitx  $data {(\n)(?!$)}] {
 	TextInsertAndWrap $textOUT "$i" 200
-	if { [info command tkcon_puts] != "" } { catch { tkcon_puts "$i" } }
+	if { [info commands tkcon_puts] != "" } { catch { tkcon_puts "$i" } }
     }
 
     $textOUT conf -state disabled
@@ -5614,7 +5614,7 @@ proc RamDebugger::TextOutInsertRed { data } {
     $textOUT conf -state normal
     foreach i [::textutil::splitx  $data {(\n)(?!$)}] {
 	TextInsertAndWrap $textOUT "$i" 200 red
-	if { [info command tkcon_puts] != "" } { catch { tkcon_puts stderr "$i" } }
+	if { [info commands tkcon_puts] != "" } { catch { tkcon_puts stderr "$i" } }
     }
     $textOUT tag configure red -foreground red
     $textOUT conf -state disabled
@@ -7113,7 +7113,7 @@ proc RamDebugger::InitOptions {} {
 }
 
 proc RamDebugger::ApplyDropBinding { w command } {
-    if { [info command dnd] == "" } { return }
+    if { [info commands dnd] == "" } { return }
     dnd bindtarget $w text/uri-list <Drop> $command
     foreach i [winfo children $w] {
 	ApplyDropBinding $i $command
@@ -7271,7 +7271,7 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
     set currentfileIsModified $currentfileIsModified_save
 }
 
-if { [llength [info command lrepeat]] == 0 } {
+if { [llength [info commands lrepeat]] == 0 } {
     proc lrepeat { count element } {
 	set retval ""
 	for { set i 0 } { $i < $count } { incr i } {
@@ -7561,7 +7561,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     if { !$iswince } {
 	proc ::bgerror { errstring } {
-	    if { [info command RamDebugger::TextOutRaise] != "" } {
+	    if { [info commands RamDebugger::TextOutRaise] != "" } {
 		RamDebugger::TextOutRaise
 		RamDebugger::TextOutInsertRed "-------------ERROR FROM RAMDEBUGGER-----------\n"
 		RamDebugger::TextOutInsertRed $::errorInfo
@@ -7621,7 +7621,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     
     set tktablet_ok [expr {![catch { package require tktablet }]}]
 
-    if { !$iswince && $tktablet_ok && [info command ::tktablet::init_input_panel] ne "" } {
+    if { !$iswince && $tktablet_ok && [info commands ::tktablet::init_input_panel] ne "" } {
 	tktablet::init_input_panel
 	tktablet::init_input_panel_text
     }
@@ -8486,7 +8486,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
 
     # trick to know if we are debugging RamDebugger
-    if { [info command sendmaster] != "" } {
+    if { [info commands sendmaster] != "" } {
 	if { [regexp {(\d+)x(\d+)[+]([-\d]+)[+]([-\d]+)} $options($geomkey) {} wi he xpos ypos] } {
 	    incr xpos 20
 	    incr ypos 20
@@ -8696,7 +8696,7 @@ proc RamDebugger::OpenDefaultFile {} {
 }
 
 if { ![info exists SkipRamDebuggerInit] } {
-    if { [info command master] != "" } {
+    if { [info commands master] != "" } {
 	set registerasremote 0
     } else { set registerasremote 1 }
     
@@ -8736,7 +8736,7 @@ if { ![info exists SkipRamDebuggerInit] } {
     #     Init the GUI part
     ################################################################################
     
-    if { [info command wm] != "" && [info commands tkcon_puts] == "" } {
+    if { [info commands wm] != "" && [info commands tkcon_puts] == "" } {
 	wm withdraw .
 
 	RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
@@ -8752,7 +8752,7 @@ if { ![info exists SkipRamDebuggerInit] } {
 	}
 	bind all <Control-x><Control-l> ReloadScript
 	
-	if { [info command master] != "" } {
+	if { [info commands master] != "" } {
 	    #RamDebugger::rdebug -master
 	}
     }

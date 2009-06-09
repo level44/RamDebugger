@@ -516,7 +516,7 @@ snit::widget procstree {
 	}
 	set procs ""
 	if { $ns eq "::" } { set pattern ::* } else { set pattern ${ns}::* }
-	foreach i [RamDebugger::EvalRemoteAndReturn [list info proc $pattern]] {
+	foreach i [RamDebugger::EvalRemoteAndReturn [list info procs $pattern]] {
 	    lappend procs [namespace tail $i]
 	}
 	foreach i [lsort -dictionary $procs] {

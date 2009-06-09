@@ -341,7 +341,7 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     if { [file readable $dynlib] && [file mtime $dynlib] >= \
 	     [file mtime [file join $MainDir scripts RamDebuggerInstrumenter.cc]] } {
 	catch { load $dynlib }
-	if {[info command RamDebuggerInstrumenterDoWork] ne "" } { return }
+	if {[info commands RamDebuggerInstrumenterDoWork] ne "" } { return }
     }
     file delete -force [file join $AppDataDir compile]
     file copy -force [file join $MainDir scripts RamDebuggerInstrumenter.cc] \
@@ -407,7 +407,7 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
 		}
 		catch { load $dynlib }
-		if { [info command RamDebuggerInstrumenterDoWork] eq "" && \
+		if { [info commands RamDebuggerInstrumenterDoWork] eq "" && \
 		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
 		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
 		        TryCompileFastInstrumenter 0
@@ -425,7 +425,7 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 	}
     }
 
-    if { [info command RamDebuggerInstrumenterDoWork] ne "" } {
+    if { [info commands RamDebuggerInstrumenterDoWork] ne "" } {
 	RamDebuggerInstrumenterDoWork $block $filenum $newblocknameP $newblocknameR \
 	    $blockinfoname $progress
     } else {
@@ -1439,7 +1439,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
 		}
 		catch { load $dynlib }
-		if { [info command RamDebuggerInstrumenterDoWorkForXML] eq "" && \
+		if { [info commands RamDebuggerInstrumenterDoWorkForXML] eq "" && \
 		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
 		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
 		        TryCompileFastInstrumenter 0
@@ -1457,7 +1457,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 	}
     }
 
-    if { [info command RamDebuggerInstrumenterDoWorkForXML] ne "" } {
+    if { [info commands RamDebuggerInstrumenterDoWorkForXML] ne "" } {
 	RamDebuggerInstrumenterDoWorkForXML $block $blockinfoname \
 	    $progress $indentlevel_ini $raiseerror
     } else {

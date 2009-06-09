@@ -21,6 +21,9 @@ proc RamDebugger::CVS::Init {} {
 	error "error: It is necessary to have program 'cvs' in the path"
     }
 
+    unset -nocomplain ::env(CVSROOT)
+    unset -nocomplain ::env(CVS_RSH)
+
     if { ![info exists cvsrootdir] } {
 	if { $::tcl_platform(platform) eq "windows" } {
 	    set null NUL:

@@ -3,7 +3,7 @@ package require createdistribution
 namespace import createdistribution::*
 
 set name RamDebugger
-set version 6.3
+set version 6.4
 
 IconifiedConsole
 
