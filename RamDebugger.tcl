@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.123 2009/06/09 17:39:31 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.124 2009/06/16 22:32:27 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -29,7 +29,7 @@ if { [info commands _] eq "" } {
 
 
 ################################################################################
-#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
+#  This software is copyrighted by Ramon RibÃ³ (RAMSAN) ramsan@compassis.com
 #  (http://www.gidhome.com/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
@@ -4069,7 +4069,11 @@ proc RamDebugger::_savefile_only { file data } {
 	set err [catch {eval $FileSaveHandlers($file) [list $file $data]} errstring]
 	if { $err } { error [_ "Error saving file '%s' (%s)" $file $errstring] }
     } else {
+	set perm ""
 	if { [file exists $file] } {
+	    if { $::tcl_platform(platform) eq "unix" } {
+		set perm [file attributes $file -permissions]
+	    }
 	    set ic 0
 	    while { [file exists $file.~$ic~] } { incr ic }     
 	    set renfile $file.~$ic~
@@ -4086,6 +4090,9 @@ proc RamDebugger::_savefile_only { file data } {
 	}
 	puts -nonewline $fout $data
 	close $fout
+	if { $perm ne "" } {
+	    catch { file attributes $file -permissions $perm }
+	}
 	if { [info exists renfile] } {
 	    file delete -force $renfile
 	}
