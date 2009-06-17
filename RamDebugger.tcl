@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.124 2009/06/16 22:32:27 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.125 2009/06/17 22:15:19 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -8598,7 +8598,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     # if we do it at the beginning, an ugly update is made
     if { $::tcl_platform(platform) != "windows" } {
-	wm iconbitmap $w @$MainDir/addons/ramdebugger.xbm
+	set img [image create photo -file [file join $MainDir addons ramdebugger.png]]
+	wm iconphoto $w $img
+	#wm iconbitmap $w @$MainDir/addons/ramdebugger.xbm
     } elseif { !$iswince } {
 	wm iconbitmap $w $MainDir/addons/ramdebugger.ico
 	if { ![info exists ::is_package] || !$::is_package } {
