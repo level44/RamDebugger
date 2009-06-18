@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.125 2009/06/17 22:15:19 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.126 2009/06/18 08:39:05 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7120,7 +7120,7 @@ proc RamDebugger::InitOptions {} {
 }
 
 proc RamDebugger::ApplyDropBinding { w command } {
-    if { [info commands dnd] == "" } { return }
+    if { [info commands dnd] eq "" } { return }
     dnd bindtarget $w text/uri-list <Drop> $command
     foreach i [winfo children $w] {
 	ApplyDropBinding $i $command
