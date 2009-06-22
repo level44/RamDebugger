@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.126 2009/06/18 08:39:05 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.127 2009/06/22 17:50:51 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3020,7 +3020,7 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     variable pane2
     variable pane3
     variable listboxlabelframe
-
+    
     set f [$mainframe getframe]
     set t [winfo toplevel $mainframe]
     set w [winfo toplevel $text]
@@ -3035,9 +3035,9 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     set delta_ext [expr {2*[$f.pw cget -borderwidth]+4}]
 
     set geomkey maingeometry_$options(ViewOnlyTextOrAll)
-    if { [wm state $w] == "zoomed" } {
+    if { [wm state $w] eq "zoomed" } {
 	set options($geomkey) zoomed
-    } elseif { [winfo width $w] > 1 } {
+    } elseif { [wm state $w] eq "normal" && [winfo width $w] > 1 } {
 	set options($geomkey) [wm geometry $w]
     }
 
@@ -3309,7 +3309,7 @@ proc RamDebugger::ReadPreferences {} {
 	    set data [read $fin]
 	    close $fin
 	}
-	array set options $data 
+	array set options $data
     }
 }
 
