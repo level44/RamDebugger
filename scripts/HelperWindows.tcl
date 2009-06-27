@@ -1603,7 +1603,7 @@ proc RamDebugger::AboutWindow {} {
     label $w.l -text RamDebugger -font "-family {new century schoolbook} -size 24 -weight bold" \
 	    -fg \#d3513d -grid 0
 
-    set tt "Author: Ramon Ribó (RAMSAN)\n"
+    set tt "Author: Ramon RibÃ³ (RAMSAN)\n"
     append tt "ramsan@compassis.com\nhttp://www.gidhome.com/ramsan\n"
     append tt "http://www2.compassis.com/ramdebugger"
 
@@ -2926,9 +2926,8 @@ proc RamDebugger::textPaste_insert_after { w } {
 	$w configure -autoseparators 0
 	$w edit separator
     }
-    if {[tk windowingsystem] ne "x11"} {
-	catch { $w delete sel.first sel.last }
-    }
+    catch { $w delete sel.first sel.last }
+
     set d [expr {[string length $sel]-[string length $::RamDebugger::searchstring]}]
     set RamDebugger::SearchPos [$w index "insert+${d}c"]
     $w insert insert $sel
