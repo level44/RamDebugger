@@ -3305,7 +3305,7 @@ proc RamDebugger::OpenConsole {} {
 	if { $::tcl_platform(platform) == "windows" } {
 	    tkcon font "MS Sans Serif" 8
 	} else {
-	   tkcon font "new century schoolbook" 12
+	   tkcon font "new century schoolbook" 9
 	}
 	# Keep 50 commands in history
 	set ::tkcon::OPT(history)  50
