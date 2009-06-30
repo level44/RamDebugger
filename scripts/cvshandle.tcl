@@ -810,6 +810,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    $menu add command -label [_ "Update CVS"] -command \
 		[list "update_recursive_cmd" $w update update $tree $sel_ids]
 	    $menu add separator
+	    $menu add command -label [_ "CVS add"] -command \
+		[list "update_recursive_cmd" $w add $tree $sel_ids]
+	    $menu add command -label [_ "CVS add binary"] -command \
+		[list "update_recursive_cmd" $w add_binary $tree $sel_ids]
+	    $menu add separator
 	    $menu add command -label [_ "View diff"] -command \
 		[list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
 	    $menu add command -label [_ "Open tkcvs"] -command \
@@ -824,11 +829,52 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign $args tree sel_ids
 	    set message [$w give_uservar_value message]
 	    foreach item $sel_ids {
-		if { ![regexp {^M\s(\S+)} [$tree item text $item 0] {} file] } { continue }
+		if { ![regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
 		set pwd [pwd]
 		cd $dir
 		set err [catch { exec cvs commit -m $message $file 2>@1 } ret]
+		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
+		cd $pwd
+	    }
+	    $w set_uservar_value messages [linsert0 [$w give_uservar_value messages] $message]
+	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
+	    dict set dict messages [$w give_uservar_value messages]
+	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
+	}
+	add - add_binary {
+	    lassign $args tree sel_ids
+	    set message [$w give_uservar_value message]
+	    set files ""
+	    foreach item $sel_ids {
+		if { ![regexp {^\?\s(\S+)} [$tree item text $item 0] {} file] } { continue }
+		lappend files $file
+	    }
+	    if { [string length $files] < 100 } {
+		set filesT $files
+	    } else {
+		set filesT "[lindex $files 0] ... [lindex $files end]"
+	    }
+	    switch $what {
+		add {
+		    set txt [_ "Are you user to add as TEXT file %d files? (%s)" [llength $files] $filesT]
+		    set kopt ""
+		}
+		add_binary {
+		    set txt [_ "Are you user to add as BINARY file %d files? (%s)" [llength $files] $filesT]
+		    set kopt [list -kb]
+		}
+	    }
+	    set ret [snit_messageBox -icon question -title [_ "Add files"] -type okcancel \
+		    -default ok -parent $w -message $txt]
+	    if { $ret eq "cancel" } { return }
+
+	    foreach item $sel_ids {
+		if { ![regexp {^\?\s(\S+)} [$tree item text $item 0] {} file] } { continue }
+		set dir [$tree item text [$tree item parent $item] 0]
+		set pwd [pwd]
+		cd $dir
+		set err [catch { exec cvs add -m $message {*}$kopt $file 2>@1 } ret]
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
 		cd $pwd
 	    }
