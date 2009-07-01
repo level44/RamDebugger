@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.128 2009/06/28 23:06:29 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.129 2009/07/01 20:58:18 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -4645,7 +4645,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 
 	    grid columnconfigure $w._choosevf [expr {$numcols-1}] -weight 1
 
-	    update
+	    update idletasks
 	    set t [winfo toplevel [winfo parent $w._choosevf]]
 	    set x [expr {int([winfo x $t]+.5*[winfo width $t]-.5*[winfo reqwidth $w._choosevf])}]
 	    set y [expr {int([winfo y $t]+.5*[winfo height $t]-.5*[winfo reqheight $w._choosevf])}]
