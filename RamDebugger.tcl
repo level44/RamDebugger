@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.129 2009/07/01 20:58:18 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.130 2009/07/10 15:40:54 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -982,6 +982,7 @@ proc RamDebugger::rdebug { args } {
 		            $remotecomm]
     } elseif {  $remoteserverType == "gdb" } {
 	set remotecomm "set confirm off\n"
+	append remotecomm "set breakpoint pending on\n"
 	append remotecomm "file \"[lindex $opts(program) 0]\"\n"
 	if { [lindex $opts(program) 1] != "" } {
 	    append remotecomm "set args [lindex $opts(program) 2]"
@@ -1006,18 +1007,19 @@ proc RamDebugger::rdebug { args } {
 	    if { $currentfile != "" } {
 		rlist -quiet $currentfile
 	    }
+	    EvalRemote [list set ::RDC::finished_loading_debugger 1]
 	}
 	local {
 	    EvalRemote [list set ::RDC::currentfile $filetodebug]
 	    set todo "[list RamDebugger::rlist -quiet -asmainfile $filetodebug];"
 	    append todo "[list set RamDebugger::currentfile $currentfile]"
 	    after idle $todo
+	    EvalRemote [list set ::RDC::finished_loading_debugger 1]
 	}
 	gdb {
 	    EvalRemote "run"
 	}
     }
-    EvalRemote [list set ::RDC::finished_loading_debugger 1]
     return [_ "Begin debugging of program '%s'" $remoteserver]
 }
 
