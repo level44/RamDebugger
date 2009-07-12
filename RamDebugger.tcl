@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.130 2009/07/10 15:40:54 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.131 2009/07/12 22:29:26 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -4669,10 +4669,15 @@ proc RamDebugger::ChooseViewFile { what args } {
 		bind $i <1> [list RamDebugger::ChooseViewFile \
 		        nexttab $what]
 	    }
+	    bind $w._choosevf <1> [list RamDebugger::ChooseViewFile check_outside %x %y]
+	    
 	    raise $w._choosevf
+	    grab $w._choosevf
 	    if { [llength $list] > 1 } {
 		after idle [list catch [list focus -force $w._choosevf.l1]]
-	    } else { after idle [list catch [list focus -force $w._choosevf.l0]] }
+	    } else {
+		after idle [list catch [list focus -force $w._choosevf.l0]]
+	    }
 	}
 	keyrelease {
 	    lassign $args K list
@@ -4690,7 +4695,6 @@ proc RamDebugger::ChooseViewFile { what args } {
 	    } else {
 		set isfast 0
 	    }
-	    
 	    if { !$isfast && [regexp {(?i)^(control|return|button1)} $K] } {
 		regexp {[0-9]+$} [focus] pos
 		set ChooseViewFile_keypress ""
@@ -4706,6 +4710,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 	}
 	keypress {
 	    lassign $args K what_in
+	    
 	    after $after_time [list RamDebugger::ChooseViewFile keypress_end $K]
 	    lappend ChooseViewFile_keypress [list $K new]
 	    
@@ -4729,6 +4734,13 @@ proc RamDebugger::ChooseViewFile { what args } {
 	    set ipos [lsearch -exact $ChooseViewFile_keypress [list $K new]]
 	    if { $ipos != -1 } {
 		lset ChooseViewFile_keypress $ipos 1 old
+	    }
+	}
+	check_outside {
+	    lassign [lrange $args 0 1] x y
+	    if { $x < 0 || $y < 0 || $x > [winfo width $w._choosevf] || $y > [winfo height $w._choosevf] } {
+		destroy $w._choosevf
+		return -code break
 	    }
 	}
 	nexttab {
@@ -6070,9 +6082,8 @@ proc RamDebugger::CutCopyPasteText { what args } {
 		        $text configure -autoseparators 0
 		        $text edit separator
 		    }
-		    if {[string compare [tk windowingsystem] "x11"]} {
-		        catch { $text delete sel.first sel.last }
-		    }
+		    catch { $text delete sel.first sel.last }
+
 		    $text insert insert $sel
 		    if { $oldSeparator } {
 		        $text edit separator
