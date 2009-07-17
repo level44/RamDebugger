@@ -656,8 +656,9 @@ proc RamDebugger::CVS::update_recursive { wp } {
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory]\n"
     
-    if { 0&&$::tcl_platform(threaded) } {
+    if { $::tcl_platform(threaded) } {
 	package require Thread
+	append script "thread::wait\n"
 	thread::create $script
     } else {
 	if { ![interp exists update_recursive_intp] } {
