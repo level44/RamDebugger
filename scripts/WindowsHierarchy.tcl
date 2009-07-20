@@ -141,7 +141,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     pack [label $w.l -fg black -justify left -anchor w -bg grey95]
     $w.l conf -bd 0
 
-    append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all.  Ctrl-a to reduce"
+    append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all.  Ctrl-a to toggle text visualization"
 
     $w.l conf -text $res
 
@@ -170,12 +170,12 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 
     set widgetname [lindex [split $res \n] 0]
     bind $w.l <Escape> "destroy $w"
-    bind $w.l <Control-a> [list $w.l configure -text [lindex [split $res \n] 0]]
+    bind $w.l <Control-a> [list RamDebugger::DisplayWindowsToggleLongShortText $w $w.l $res]
     bind $w.l <Control-x> "clipboard clear; [list clipboard append $widgetname]"
     bind $w.l <Control-c> "clipboard clear; [list clipboard append $res]"
     
     if { [regexp {\mwidth=([-\d]+).*\mheight=([-\d]+).*rootX=([-\d]+).*rootY=([-\d]+)} $res {} \
-	width height rootX rootY] && $::tcl_platform(platform) eq "windows" } {
+	width height rootX rootY]  } {
 	set wpos $w.helppos
 	if { [winfo exists $wpos] } { destroy $wpos }
 	toplevel $wpos
@@ -203,8 +203,23 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 	if { $idx } { $wpos configure -bd 0 }
 	wm overrideredirect $wpos 1
 	wm geometry $wpos ${width}x$height+$rootX+$rootY
-	wm attributes $wpos -alpha .3
+	after 100 [list wm attributes $wpos -alpha .3]
 	raise $w
+    }
+}
+
+proc RamDebugger::DisplayWindowsToggleLongShortText { w wl txt } {
+    
+    if { [$wl cget -text] eq $txt } {
+	$wl configure -text [lindex [split $txt \n] 0]
+	if  { [winfo exists $w.helppos] } {
+	    wm withdraw $w.helppos
+	}
+    } else {
+	$wl configure -text $txt
+	if  { [winfo exists $w.helppos] } {
+	    wm deiconify $w.helppos
+	}
     }
 }
 
