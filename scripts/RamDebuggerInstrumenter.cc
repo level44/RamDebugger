@@ -939,6 +939,445 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
   return result;
 }
 
+int RamDebuggerInstrumenterDoWorkForC++_do(Tcl_Interp *ip,char* block,char* blockinfoname,int progress) {
+
+  int i,length,braceslevelNoEval,lastinstrumentedline,
+    line,ichar,icharline,consumed,instrument_proc_last_line,wordslen=0,
+    quoteintobraceline=-1,quoteintobracepos,fail,commentpos,result;
+  Word_types checkExtraCharsAfterCQB;
+  Tcl_Obj *blockinfo,*blockinfocurrent,*word0,*wordi,*tmpObj;
+  char c,lastc,buf[1024],*pword0=NULL;
+
+  length = ( int)strlen(block);
+  if(length>1000 && progress){
+/*     RamDebugger::ProgressVar 0 1 */
+  }
+
+  InstrumenterState instrumenterstate,*is;
+  is=&instrumenterstate;
+  is->ip=ip;
+
+  blockinfo=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfo);
+  blockinfocurrent=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfocurrent);
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(0));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+  RamDebuggerInstrumenterInitState(is);
+
+  is->DoInstrument=1;
+
+  braceslevelNoEval=0;
+  checkExtraCharsAfterCQB=NONE_WT;
+  lastc=0;
+  lastinstrumentedline=-1;
+  line=1;
+  ichar=0;
+  icharline=0;
+
+  for(i=0;i<length;i++){
+    c=block[i];
+
+    if(ichar%1000 == 0 && progress){
+/*       RamDebugger::ProgressVar [expr {$ichar*100/$length}] */
+    }
+    consumed=0;
+    switch(c){
+    case '"':
+      if(lastc != '\\' && wordslen> 0 && *pword0!='#') {
+	switch(is->wordtype){
+	case NONE_WT:
+	  is->wordtype=DQUOTE_WT;
+	  is->wordtypeline=line;
+	  is->wordtypepos=icharline;
+	  consumed=1;
+	  break;
+	case DQUOTE_WT:
+	  is->wordtype=NONE_WT;
+	  is->words=Tcl_CopyIfShared(is->words);
+	  Tcl_ListObjAppendElement(is->ip,is->words,is->currentword);
+	  wordslen++;
+	  Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	  pword0=Tcl_GetStringFromObj(word0,NULL);
+	  if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	  is->currentword=Tcl_ResetString(is->currentword);
+	  consumed=1;
+	  checkExtraCharsAfterCQB=DQUOTE_WT;
+	  
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
+	  if(is->wordtypeline==line)
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(is->wordtypepos));
+	  else Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(0));
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	  is->wordtypeline=0;
+
+	  if(is->OutputType==R && RamDebuggerInstrumenterIsProc(is)){
+	    int len,newllen;
+	    Tcl_GetStringFromObj(is->newblock[R],&len);
+	    newllen=len;
+	    Tcl_GetStringFromObj(is->words,&len);
+	    newllen-=len;
+	    if(lastinstrumentedline==line){
+	      sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+	      newllen -= ( int)strlen(buf);
+	    }
+	    Tcl_SetObjLength(is->newblock[R],newllen);
+	    RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);
+	    Tcl_AppendObjToObj(is->newblock[P],is->words);
+	    is->OutputType=P;
+	  }
+	  break;
+	case BRACE_WT:
+	  if(quoteintobraceline==-1){
+	    quoteintobraceline=line;
+	    quoteintobracepos=icharline;
+	  } else {
+	    if(line==quoteintobraceline){
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
+	      Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(quoteintobracepos));
+	      Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	    }
+	    quoteintobraceline=-1;
+	  }
+	  break;
+	}
+      }
+      break;
+      case '{':
+	if(lastc != '\\'){
+	  switch(is->wordtype){
+	  case BRACE_WT:
+	    braceslevelNoEval++;
+	    break;
+	  case DQUOTE_WT: case W_WT:
+	    is->braceslevel++;
+	    break;
+	  default:
+	    consumed=1;
+	    fail=RamDebuggerInstrumenterPushState(is,BRACE_WT,line);
+	    if(fail){
+	      is->wordtype=BRACE_WT;
+	      is->wordtypeline=line;
+	      braceslevelNoEval=1;
+	    } else{
+	      lastinstrumentedline=line;
+	      Tcl_ListObjLength(is->ip,is->words,&wordslen);
+	      if(wordslen){
+		Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+		pword0=Tcl_GetStringFromObj(word0,NULL);
+		if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	      }
+	    }
+	    break;
+	  }
+	}
+	break;
+      case '}':
+	if(lastc != '\\'){
+	  if(is->wordtype==BRACE_WT){
+	    braceslevelNoEval--;
+	    if(braceslevelNoEval==0){
+	      is->wordtype=NONE_WT;
+	      is->words=Tcl_CopyIfShared(is->words);
+	      Tcl_ListObjAppendElement(is->ip,is->words,is->currentword);
+	      wordslen++;
+	      Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	      pword0=Tcl_GetStringFromObj(word0,NULL);
+	      if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	      if(*pword0!='#' && strcmp(Tcl_GetString(is->currentword),"*")!=0)
+		checkExtraCharsAfterCQB=BRACE_WT;
+	      is->currentword=Tcl_ResetString(is->currentword);
+	      consumed=1;
+	      if(is->OutputType==R && RamDebuggerInstrumenterIsProc(is)){
+		int len,newllen;
+		Tcl_GetStringFromObj(is->newblock[R],&len);
+		newllen=len;
+		Tcl_GetStringFromObj(is->words,&len);
+		newllen-=len;
+		if(lastinstrumentedline==line){
+		  sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+		  newllen -= ( int)strlen(buf);
+		}
+		Tcl_SetObjLength(is->newblock[R],newllen);
+		RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);
+		Tcl_AppendObjToObj(is->newblock[P],is->words);
+		is->OutputType=P;
+	      }
+	    }
+	  } else if(is->braceslevel>0) is->braceslevel--;
+	  else {
+	    Word_types wordtype_before=is->wordtype;
+	    fail=RamDebuggerInstrumenterPopState(is,BRACE_WT,line);
+	    if(fail==-1){
+	      Tcl_DecrRefCount(is->newblock[P]);
+	      Tcl_DecrRefCount(is->newblock[R]);
+	      Tcl_DecrRefCount(blockinfo);
+	      Tcl_DecrRefCount(blockinfocurrent);
+	      return TCL_ERROR;
+	    }
+	    if(!fail){
+	      Tcl_ListObjLength(is->ip,is->words,&wordslen);
+	      if(wordslen){
+		Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+		pword0=Tcl_GetStringFromObj(word0,NULL);
+		if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	      }
+	      if(wordtype_before==DQUOTE_WT){
+		sprintf(buf,"Quoted text (\") in line %d contains and invalid brace (})",line);
+		Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
+		Tcl_DecrRefCount(is->newblock[P]);
+		Tcl_DecrRefCount(is->newblock[R]);
+		Tcl_DecrRefCount(blockinfo);
+		Tcl_DecrRefCount(blockinfocurrent);
+		return TCL_ERROR;
+	      }
+	      consumed=1;
+	      if(wordslen){
+		Tcl_ListObjIndex(is->ip,is->words,wordslen-1,&wordi);
+		if(*pword0!='#' && strcmp(Tcl_GetString(wordi),"*")!=0)
+		  checkExtraCharsAfterCQB=BRACE_WT;
+	      }
+	    }
+	  }
+	}
+	break;
+      case ' ': case '\t':
+	if(lastc != '\\'){
+	  if(is->wordtype==W_WT){
+	    consumed=1;
+	    is->wordtype=NONE_WT;
+	    is->words=Tcl_CopyIfShared(is->words);
+	    Tcl_ListObjAppendElement(is->ip,is->words,is->currentword);
+	    wordslen++;
+	    Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	    pword0=Tcl_GetStringFromObj(word0,NULL);
+	    if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	    is->currentword=Tcl_ResetString(is->currentword);
+	    if(is->OutputType==R && RamDebuggerInstrumenterIsProc(is)){
+	      int len,newllen;
+	      Tcl_GetStringFromObj(is->newblock[R],&len);
+	      newllen=len;
+	      Tcl_GetStringFromObj(is->words,&len);
+	      newllen-=len;
+	      if(lastinstrumentedline==line){
+		sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+		newllen -= ( int)strlen(buf);
+	      }
+	      Tcl_SetObjLength(is->newblock[R],newllen);
+	      RamDebuggerInstrumenterInsertSnitPackage_ifneeded(is);
+	      
+	      Tcl_AppendObjToObj(is->newblock[P],is->words);
+	      is->OutputType=P;
+	    }
+	    Tcl_ListObjIndex(is->ip,is->words,wordslen-1,&wordi);
+	    if(RamDebuggerInstrumenterIsProc(is)){
+	      int icharlineold=icharline-Tcl_GetCharLength(wordi);
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      if(wordslen==1)
+		Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
+	      else
+		Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("blue",-1));
+	      Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharlineold));
+	      Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    } else{
+	      tmpObj=Tcl_GetVar2Ex(is->ip,"::RamDebugger::Instrumenter::colors",
+		   Tcl_GetStringFromObj(wordi,NULL),TCL_GLOBAL_ONLY);
+	      if(tmpObj){
+		int icharlineold=icharline-Tcl_GetCharLength(wordi);
+		blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+		Tcl_ListObjAppendElement(is->ip,blockinfocurrent,tmpObj);
+		Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharlineold));
+		Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	      }
+	    }
+	  } else if(is->wordtype==NONE_WT) consumed=1;
+	}
+	break;
+      case '[':
+	if(lastc != '\\' && is->wordtype!=BRACE_WT && (wordslen==0 || *pword0!='#')){
+	  if(is->wordtype==NONE_WT) is->wordtype=W_WT;
+	  consumed=1;
+	  RamDebuggerInstrumenterPushState(is,BRACKET_WT,line);
+	  Tcl_ListObjLength(is->ip,is->words,&wordslen);
+	  if(wordslen){
+	    Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	    pword0=Tcl_GetStringFromObj(word0,NULL);
+	    if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	  }
+	  lastinstrumentedline=line;
+	}
+	break;
+      case ']':
+	if(lastc != '\\' && is->wordtype!=BRACE_WT && is->wordtype!=DQUOTE_WT && 
+	   (wordslen==0 || *pword0!='#')){
+	  fail=RamDebuggerInstrumenterPopState(is,BRACKET_WT,line);
+	  if(fail==-1){
+	    Tcl_DecrRefCount(is->newblock[P]);
+	    Tcl_DecrRefCount(is->newblock[R]);
+	    Tcl_DecrRefCount(blockinfo);
+	    Tcl_DecrRefCount(blockinfocurrent);
+	    return TCL_ERROR;
+	  }
+	  if(!fail){
+	    consumed=1;
+	    Tcl_ListObjLength(is->ip,is->words,&wordslen);
+	    if(wordslen){
+	      Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	      pword0=Tcl_GetStringFromObj(word0,NULL);
+	      if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	    }
+	  }
+	  /*         note: the word inside words is not correct when using [] */
+	}
+	break;
+      case '\n':
+	if(wordslen> 0 && *pword0=='#'){
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("red",-1));
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(commentpos));
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	} else if(is->wordtype==DQUOTE_WT){
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
+	  if(is->wordtypeline==line)
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(is->wordtypepos));
+	  else
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(0));
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	} else if(is->wordtype==W_WT){
+	  tmpObj=Tcl_GetVar2Ex(is->ip,"::RamDebugger::Instrumenter::colors",
+		               Tcl_GetStringFromObj(is->currentword,NULL),TCL_GLOBAL_ONLY);
+	  if(tmpObj){
+	    int icharlineold=icharline-Tcl_GetCharLength(is->currentword);
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,tmpObj);
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharlineold));
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	  }
+	}
+	blockinfo=Tcl_CopyIfShared(blockinfo);
+	Tcl_ListObjAppendElement(is->ip,blockinfo,blockinfocurrent);
+	line++;
+	tmpObj=Tcl_NewIntObj(is->level+braceslevelNoEval);
+	Tcl_IncrRefCount(tmpObj);
+	blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	Tcl_SetListObj(blockinfocurrent,1,&tmpObj);
+	Tcl_DecrRefCount(tmpObj);
+
+	if((is->wordtype==W_WT || is->wordtype==DQUOTE_WT) && is->braceslevel>0){
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+	}
+	else if(is->wordtype!=BRACE_WT){
+	  consumed=1;
+	  if(lastc != '\\' && is->wordtype!=DQUOTE_WT){
+	    is->words=Tcl_ResetList(is->words);
+	    wordslen=0;
+	    is->currentword=Tcl_ResetString(is->currentword);
+	    is->wordtype=NONE_WT;
+
+	    if(is->OutputType==P){
+	      Tcl_AppendToObj(is->newblock[P],&c,1);
+	      is->OutputType=R;
+	    }
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+	  } else {
+	    if(is->wordtype==W_WT){
+	      is->wordtype=NONE_WT;
+	      if(strcmp(Tcl_GetStringFromObj(is->currentword,NULL),"\\")!=0) {
+		is->words=Tcl_CopyIfShared(is->words);
+		Tcl_ListObjAppendElement(is->ip,is->words,is->currentword);
+		wordslen++;
+		Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+		pword0=Tcl_GetStringFromObj(word0,NULL);
+		if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	      }
+	    }
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("c",-1));
+	  }
+	} else{
+	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	  Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+	}
+	break;
+      case '#':
+	if(wordslen==0 && strcmp(Tcl_GetStringFromObj(is->currentword,NULL),"")==0 &&
+	   is->wordtype==NONE_WT){
+	  consumed=1;
+	  is->words=Tcl_CopyIfShared(is->words);
+	  Tcl_ListObjAppendElement(is->ip,is->words,Tcl_NewStringObj("#",-1));
+	  wordslen++;
+	  Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	  pword0=Tcl_GetStringFromObj(word0,NULL);
+	  if(*pword0==':' && *(pword0+1)==':') pword0+=2;
+	  commentpos=icharline;
+	}
+	break;
+      case ';':
+	if(lastc != '\\' && is->wordtype!=BRACE_WT && is->wordtype!=DQUOTE_WT &&
+	   wordslen> 0 && *pword0!='#'){
+	  consumed=1;
+	  is->words=Tcl_ResetList(is->words);
+	  wordslen=0;
+	  Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	  is->currentword=Tcl_ResetString(is->currentword);
+	  is->wordtype=NONE_WT;
+	  
+	  if(is->OutputType==P){
+	    Tcl_AppendToObj(is->newblock[P],&c,1);
+	    is->OutputType=R;
+	  }
+	}
+	break;
+    }
+    
+    Tcl_AppendToObj(is->newblock[is->OutputType],&c,1);
+    if(!consumed){
+      if(is->wordtype==NONE_WT){
+	is->wordtype=W_WT;
+	is->wordtypeline=line;
+      }
+      is->currentword=Tcl_CopyIfShared(is->currentword);
+      Tcl_AppendToObj(is->currentword,&c,1);
+    }
+    if(lastc == '\\' && c=='\\')
+      lastc=0;
+    else lastc=c;
+    ichar++;
+
+    if(c=='\t') icharline+=8;
+    else if(c!='\n') icharline++;
+    else icharline=0;
+  }
+  blockinfo=Tcl_CopyIfShared(blockinfo);
+  Tcl_ListObjAppendElement(is->ip,blockinfo,blockinfocurrent);
+
+  result=RamDebuggerInstrumenterEndState(is);
+
+  Tcl_UpVar(ip,"1",newblocknameP,"newblockP",0);
+  Tcl_SetVar2Ex(is->ip,"newblockP",NULL,is->newblock[P],0);
+  Tcl_UpVar(ip,"1",newblocknameR,"newblockR",0);
+  Tcl_SetVar2Ex(is->ip,"newblockR",NULL,is->newblock[R],0);
+  Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+  Tcl_SetVar2Ex(is->ip,"blockinfo",NULL,blockinfo,0);
+
+#ifdef _DEBUG
+  char* tmpblockinfo=Tcl_GetString(blockinfo);
+#endif
+  if(length>1000 && progress){
+    /*     RamDebugger::ProgressVar 100 */
+  }
+  Tcl_DecrRefCount(is->newblock[P]);
+  Tcl_DecrRefCount(is->newblock[R]);
+  Tcl_DecrRefCount(blockinfo);
+  Tcl_DecrRefCount(blockinfocurrent);
+  return result;
+}
+
 struct Xml_state_tag
 {
   char* tag;

@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.131 2009/07/12 22:29:26 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.132 2009/07/23 17:55:22 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7152,9 +7152,12 @@ proc RamDebugger::ApplyDropBinding { w command } {
 
 proc RamDebugger::DropBindingDone { files } {
 
-    foreach i $files {
-	regsub {^file://} $i {} i
-	OpenFileF $i
+    foreach file $files {
+	if { [regsub {^file://} $file {} file] } {
+	    package require ncgi
+	    set file [encoding convertfrom utf-8 [ncgi::decode $file]]
+	}
+	OpenFileF $file
     }
 }
 
