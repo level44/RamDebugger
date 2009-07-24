@@ -350,7 +350,7 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
 
     set sourcefile [file join $AppDataDir RamDebuggerInstrumenter.cc]
 
-    set OPTS [list -shared -DUSE_TCL_STUBS -O2]
+    set OPTS [list -shared -DUSE_TCL_STUBS -O3]
     if {$::tcl_platform(platform) ne "windows"} { lappend OPTS "-fPIC" }
     set basedir [file dirname [file dirname [info nameofexecutable]]]
     lappend OPTS -I[file join $basedir include] \
@@ -362,7 +362,7 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
 	default {
 	    foreach i [glob -dir [file join $basedir lib] libtclstub*.a] {
 		regexp {[\d.]+} [file tail $i] version
-		if { $version >= 8.4 } { break }
+		if { $version >= 8.5 } { break }
 	    }
 	    set lib $i
 	}
@@ -801,8 +801,59 @@ proc RamDebugger::Instrumenter::DoWorkForTime { block filename newblockname time
     append newblock $newblock2
 }
 
+proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" { indentlevel_ini 0 } \
+    { raiseerror 1 } } {
+    variable FastInstrumenterLoaded
 
-proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" { braceslevelIni 0 } } {
+    # this variable is used to make tests
+    set what c++
+
+    switch $what {
+	debug {
+	   # nothing
+	}
+	c++ {
+	    if { ![info exists FastInstrumenterLoaded] } {
+		if { $::tcl_platform(machine) == "amd64"} {
+		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
+		} else {
+		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
+		}
+		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+		set err [catch { load $dynlib }]
+		if { $err } {
+		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
+		}
+		catch { load $dynlib }
+		if { [info commands RamDebuggerInstrumenterDoWorkForXML] eq "" && \
+		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
+		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
+		        TryCompileFastInstrumenter 0
+		        set RamDebugger::options(CompileFastInstrumenter) 0
+		    } else {
+		        TryCompileFastInstrumenter 1
+		    }
+		    catch { load $dynlib }
+		}
+		set FastInstrumenterLoaded 1
+	    }
+	}
+	tcl {
+	    # nothing
+	}
+    }
+
+    if { [info commands RamDebuggerInstrumenterDoWorkForCpp] ne "" } {
+	RamDebuggerInstrumenterDoWorkForCpp $block $blockinfoname \
+	    $progress
+    } else {
+	uplevel [list RamDebugger::Instrumenter::DoWorkForC++_do $block $blockinfoname \
+		$progress $indentlevel_ini]
+    }
+}
+
+
+proc RamDebugger::Instrumenter::DoWorkForC++_do { block blockinfoname "progress 1" { braceslevelIni 0 } } {
 
     set length [string length $block]
     if { $length >= 5000 && $progress } {
@@ -878,7 +929,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" 
 		}
 	    }
 	    ' {
-		if { !$commentlevel && $wordtype != "\"" } {
+		if { !$commentlevel && $wordtype != "\"" && $lastc != "\\" } {
 		    set simplechar [list $line $icharline]
 		}
 	    }
@@ -1465,6 +1516,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		$progress $indentlevel_ini $raiseerror]
     }
 }
+
 proc RamDebugger::Instrumenter::DoWorkForXML_do { block blockinfoname "progress 1" { indentlevel_ini 0 } \
     { raiseerror 1 } } {
 
