@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.132 2009/07/23 17:55:22 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.133 2009/07/27 14:44:56 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -130,7 +130,10 @@ namespace eval RamDebugger {
     variable WindowFilesListLineNums ""
     variable oldPasteStack ""
     variable CustomFileTypeMenuStack ""
-
+    variable oldGrab
+    variable grabStatus
+    variable oldFocus
+    
     ################################################################################
     # Handlers to save files. Array with names: filename
     ################################################################################
@@ -4519,6 +4522,9 @@ proc RamDebugger::ChooseViewFile { what args } {
     variable currentfile_secondary
     variable options
     variable ChooseViewFile_keypress
+    variable oldGrab
+    variable grabStatus
+    variable oldFocus
 
     if { [info exists text_secondary] && [focus -lastfor $text] eq \
 	     $text_secondary } {
@@ -4672,11 +4678,37 @@ proc RamDebugger::ChooseViewFile { what args } {
 	    bind $w._choosevf <1> [list RamDebugger::ChooseViewFile check_outside %x %y]
 	    
 	    raise $w._choosevf
+	    
+	    set oldGrab [grab current $w]
+	    if { $oldGrab ne "" && [winfo exists $oldGrab] } {
+		set grabStatus [grab status $oldGrab]
+		grab release $oldGrab
+	    }
+	    set oldFocus [focus]
+
 	    grab $w._choosevf
 	    if { [llength $list] > 1 } {
 		after idle [list catch [list focus -force $w._choosevf.l1]]
 	    } else {
 		after idle [list catch [list focus -force $w._choosevf.l0]]
+	    }
+	}
+	destroy {
+	    destroy $w._choosevf
+	    
+	    if { $oldGrab ne "" }  {
+		if { [info exists grabStatus] && $grabStatus ne "global" } {
+		    if { [winfo exists $oldGrab] && [winfo ismapped $oldGrab] } {
+		        grab $oldGrab
+		    }
+		} else {
+		    if { [winfo exists $oldGrab] && [winfo ismapped $oldGrab] } {
+		        grab -global $oldGrab
+		    }
+		}
+	    }
+	    if { [winfo exists $oldFocus] && [winfo ismapped $oldFocus]  } {
+		focus $oldFocus
 	    }
 	}
 	keyrelease {
@@ -4698,14 +4730,14 @@ proc RamDebugger::ChooseViewFile { what args } {
 	    if { !$isfast && [regexp {(?i)^(control|return|button1)} $K] } {
 		regexp {[0-9]+$} [focus] pos
 		set ChooseViewFile_keypress ""
-		destroy $w._choosevf
+		ChooseViewFile destroy
 		if { [lindex $list $pos] ne $file } {
 		    update ;# to let focus change
 		    OpenFileF [lindex $list $pos]
 		}
 	    } elseif { [regexp {(?i)^escape} $K] } {
 		set ChooseViewFile_keypress ""
-		destroy $w._choosevf
+		ChooseViewFile destroy
 	    }
 	}
 	keypress {
@@ -4739,7 +4771,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 	check_outside {
 	    lassign [lrange $args 0 1] x y
 	    if { $x < 0 || $y < 0 || $x > [winfo width $w._choosevf] || $y > [winfo height $w._choosevf] } {
-		destroy $w._choosevf
+		ChooseViewFile destroy
 		return -code break
 	    }
 	}
