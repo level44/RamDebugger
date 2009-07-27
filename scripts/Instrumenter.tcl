@@ -900,10 +900,13 @@ proc RamDebugger::Instrumenter::DoWorkForC++_do { block blockinfoname "progress 
 	    if { $line > $iline } {
 		error "error in line $iline, position $icharinto. There is no closing (')"
 	    }
-	    if { $c == "'" } {
+	    if { $c == "'"  && $lastc != "\\" } {
 		set simplechar ""
 	    }
-	    set lastc $c 
+	    if { $lastc == "\\" && $c == "\\" } {
+		set lastc "\\\\"
+	    } else { set lastc $c }
+
 	    incr ichar
 	
 	    if { $c == "\t" } {

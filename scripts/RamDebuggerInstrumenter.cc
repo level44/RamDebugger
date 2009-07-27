@@ -1107,10 +1107,12 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 	Tcl_DecrRefCount(blockinfocurrent);
 	return TCL_ERROR;
       }
-      if(c=='\''){
+      if(c=='\'' && lastc != '\\'){
 	simplechar_line=0;
       }
-      lastc=c;
+      if(lastc == '\\' && c=='\\')
+	lastc=0;
+      else lastc=c;
       ichar++;
 
       if(c=='\t') icharline+=8;
@@ -1137,7 +1139,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
       }
       break;
     case '\'':
-      if(!commentlevel && is->wordtype!=DQUOTE_WT){
+      if(!commentlevel && is->wordtype!=DQUOTE_WT && lastc != '\\'){
 	simplechar_line=line;
 	simplechar_pos=icharline;
       }
