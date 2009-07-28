@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.133 2009/07/27 14:44:56 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.134 2009/07/28 15:00:41 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -4708,7 +4708,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 		}
 	    }
 	    if { [winfo exists $oldFocus] && [winfo ismapped $oldFocus]  } {
-		focus $oldFocus
+		focus -force $oldFocus
 	    }
 	}
 	keyrelease {
