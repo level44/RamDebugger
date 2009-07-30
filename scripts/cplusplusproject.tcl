@@ -254,10 +254,10 @@ proc cproject::SaveProjectC { w } {
 }
 
 
-proc cproject::UpdateComboValues { combo varname } {
-    if { ![winfo exists $combo] } { return }
-    $combo configure -values [set $varname]
-}
+# proc cproject::UpdateComboValues { combo varname } {
+#     if { ![winfo exists $combo] } { return }
+#     $combo configure -values [set $varname]
+# }
 
 proc cproject::NewProject { w } {
     variable project
@@ -622,18 +622,20 @@ proc cproject::CreateModifyGroup { w what } {
 
 }
 
-proc cproject::CreateDo { what f } {
-
-    set w [winfo toplevel $f]
-    switch $what {
-	Ok {
+proc cproject::CreateDo { w } {
+    
+    if { [$w giveaction] < 1 } {
+	destroy $w
+	return
+    }
+    switch  [$w giveaction]  {
+	1 {
 	    SaveProjectC $w
 	    destroy $w
 	}
-	Apply {
+	2 {
 	    SaveProjectC $w
 	}
-	Cancel { destroy $w }
     }
 }
 
@@ -643,235 +645,195 @@ proc cproject::Create { par } {
     if { ![info exists RamDebugger::options(recentprojects)] } {
 	set RamDebugger::options(recentprojects) ""
     }
+    destroy $par.mpt
+    set w [dialogwin_snit $par.mpt -title [_ "C++ compilation project"] -grab 1 \
+	    -morebuttons [list [_ "Apply"]]  -callback [list cproject::CreateDo]]
+    set f [$w giveframe]
 
-    set commands [list "cproject::CreateDo Ok" "cproject::CreateDo Apply" \
-		      "cproject::CreateDo Cancel"]
-
-    set f [DialogWinTop::Init $par "C++ compilation project" separator $commands [list Apply]]
-    set w [winfo toplevel $f]
-
-    set f1 [frame $f.f1 -grid "0 n"]
-    Label $f1.l1 -text "Project:" -grid 0 -helptext \
-       "A project includes all the compilation information. Create a project before entering data"
-    ComboBox $f1.cb1 -textvariable cproject::project -grid "1 3" -width 100 -editable 0 \
-	 -values $RamDebugger::options(recentprojects) -modifycmd "cproject::OpenProject $w 0"
-
-    focus $f1.cb1
-
-    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "4 nw"]
-    $bbox add -image filenew16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Create new project"] \
-	 -command "cproject::NewProject $w"
-    $bbox add -image fileopen16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Open existing project"] \
-	 -command "cproject::OpenProject $w"
-    $bbox add -image filesave16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Save as project"] \
-	 -command "cproject::SaveProject $w"
- 
-    Label $f1.l2 -text "Group:" -grid "0 py3" -helptext \
-       "A group is a set of files with common compilation options. The special group 'all'\
-	always exists and affects all files"
-    ComboBox $f1.cb2 -textvariable cproject::group -grid 1 -values $cproject::groups \
-       -editable 0
-
-    trace var cproject::groups w "cproject::UpdateComboValues $f1.cb2 cproject::groups ;#"
-
-    set bbox [ButtonBox $f1.bbox2 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "2 w"]
-    $bbox add -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Create new group"] \
-	 -command "cproject::CreateModifyGroup $w create"
-    $bbox add -image edit16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Rename group"] \
-	 -command "cproject::CreateModifyGroup $w rename"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete group"] \
-	 -command "cproject::CreateModifyGroup $w delete"
-
-    frame $f1.f1 -grid "3 2 px3 py3 ew" -bd 2 -relief raised
-    radiobutton $f1.f1.r1 -text Debug -variable cproject::debugrelease -value debug \
-	    -grid 0
-    radiobutton $f1.f1.r2 -text Release -variable cproject::debugrelease -value release \
-	    -grid "1"
-    radiobutton $f1.f1.r3 -text Both -variable cproject::debugrelease -value both \
-	    -grid "2"
-
-    set pw [panedwindow $f.pw -orient horizontal -grid 0]
-
-    foreach "weight1 weight2" [RamDebugger::ManagePanes $pw h "2 3"] break
-
-#     set pane1 [$pw add -weight $weight1]
-    set pane1 [frame $pw.pane1]
-    $pw add $pane1 -sticky nsew -width $weight1
-
-    set sw [ScrolledWindow $pane1.lf -relief sunken -borderwidth 0]
-    set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 -height 20\
-	    -exportselection 0 \
-	    -columns [list \
-	    14 File   left \
-	    5  Type center \
-	    11 Group right \
-	    15 Path left \
-	    ] \
-	    -labelcommand tablelist::sortByColumn \
-	    -background white \
-	    -selectbackground navy -selectforeground white \
-	    -stretch 1 -selectmode extended \
-	    -highlightthickness 0 \
-	    -listvariable cproject::files]
+    set f1 [ttk::frame $f.f1]
     
-    $sw setwidget $DialogWinTop::user($w,list)
+    ttk::label $f1.l1 -text [_ "Project"]:
+    ttk::combobox $f1.cb1  -textvariable cproject::project -width 80 -state readonly \
+	-values $RamDebugger::options(recentprojects) 
+    bind $f1.cb1 <<ComboboxSelected>> [list cproject::OpenProject $w 0]
+    tooltip::tooltip $f1.cb1 [_ "A project includes all the compilation information. Create a project before entering data"]
 
-    bind [$sw.lb bodypath] <1> "focus $sw.lb"
+    ttk::button $f1.b1 -image filenew16 -command [list cproject::NewProject $w] -style Toolbutton
+    tooltip::tooltip $f1.b1 [_ "Create new project"]
+    
+    ttk::button $f1.b2 -image fileopen16 -command [list cproject::OpenProject $w] -style Toolbutton
+    tooltip::tooltip $f1.b2 [_ "Open existing project"]
+ 
+    ttk::button $f1.b3 -image filesave16 -command [list cproject::SaveProject $w] -style Toolbutton
+    tooltip::tooltip $f1.b3 [_ "Save as project"]
 
-    set bbox [ButtonBox $pane1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
-    $bbox add -image fileopen16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add file to project"] \
-	 -command "cproject::AddModFiles $sw.lb file"
-    $bbox add -image folderopen16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add files from directory to project"] \
-	 -command "cproject::AddModFiles $sw.lb dir"
-    $bbox add -image edit16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Assign selected files to active group"] \
-	 -command "cproject::AddModFiles $sw.lb edit"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete files from project"] \
-	 -command "cproject::AddModFiles $sw.lb delete"
-    $bbox add -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "View file"] \
-	 -command "cproject::AddModFiles $sw.lb view"
+    ttk::label $f1.l2 -text [_ "Group"]:
+    cu::combobox $f1.cb2  -textvariable cproject::group -state readonly \
+	-valuesvariable cproject::groups
+    tooltip::tooltip $f1.cb2 [_ "A group is a set of files with common compilation options. The special group 'all' always exists and affects all files"]
 
-    grid $sw -sticky nsew
-    grid $bbox -sticky nw -pady 3
-    grid columnconfigure $pane1 0 -weight 1
+    ttk::button $f1.b4 -image acttick16 -command [list cproject::CreateModifyGroup $w create] -style Toolbutton
+    tooltip::tooltip $f1.b4 [_ "Create new group"]
+
+    ttk::button $f1.b5 -image edit16 -command [list cproject::CreateModifyGroup $w rename] -style Toolbutton
+    tooltip::tooltip $f1.b5 [_ "Rename group"]
+
+    ttk::button $f1.b6 -image actcross16 -command [list cproject::CreateModifyGroup $w delete] -style Toolbutton
+    tooltip::tooltip $f1.b6 [_ "Delete group"]
+
+    set f11 [ttk::frame $f1.f1]
+    
+    ttk::radiobutton $f11.r1 -text [_ "Debug"] -variable cproject::debugrelease -value debug
+    ttk::radiobutton $f11.r2 -text [_ "Release"] -variable cproject::debugrelease -value release
+    ttk::radiobutton $f11.r3 -text [_ "Both"] -variable cproject::debugrelease -value both
+    
+    grid $f11.r1 $f11.r2 $f11.r3 -sticky w -padx 2
+   
+    set pw [panedwindow $f1.pw -orient horizontal]
+
+    lassign [RamDebugger::ManagePanes $pw h "2 3"] weight1 weight2
+
+    set pane1 [ttk::frame $pw.pane1]
+    $pw add $pane1 -sticky nsew -width $weight1
+    
+    set columns [list \
+	    [list 14 [_ "File"] left text 1] \
+	    [list 5 [_ "Type"] center text 1] \
+	    [list 11 [_ "Group"] right text 1] \
+	    [list 15 [_ "Path"] left text 1] \
+	    ]
+
+    package require fulltktree
+    fulltktree $pane1.list  \
+	-columns $columns  \
+	-contextualhandler [list cproject::contextual_files_list $w] \
+	-selectmode extended -showlines 0 -indent 0
+    $w set_uservar_value list $pane1.list
+    
+    set idx 1
+    foreach "img cmd help" [list \
+	    fileopen16 [list cproject::AddModFiles $w file] [_ "Add file to project"] \
+	    folderopen16 [list cproject::AddModFiles $w dir] [_ "Add files from directory to project"] \
+	    edit16 [list cproject::AddModFiles $w edit] [_ "Assign selected files to active group"] \
+	    actcross16 [list cproject::AddModFiles $w delete] [_ "Delete files from project"] \
+	    acttick16 [list cproject::AddModFiles $w view] [_ "View file"] \
+	    ] {
+	ttk::button $pane1.b$idx -image $img -command $cmd -style Toolbutton
+	tooltip::tooltip $pane1.b$idx $help
+	incr idx
+    }
+    
+    grid $pane1.list  - - - - -sticky nsew -padx 2 -pady 2
+    grid $pane1.b1 $pane1.b2 $pane1.b3 $pane1.b4 $pane1.b5 -sticky w
+    grid columnconfigure $pane1 4 -weight 1
     grid rowconfigure $pane1 0 -weight 1
 
-    bind [$DialogWinTop::user($w,list) bodypath] <ButtonPress-3> \
-	[bind TablelistBody <ButtonPress-1>]
-
-    bind [$DialogWinTop::user($w,list) bodypath] <ButtonRelease-3> {
-	catch { destroy %W.menu }
-	set menu [menu %W.menu]
-	set lb [winfo parent %W]
-	
-	$menu add command -label "Assign group" -command "cproject::AddModFiles $lb edit"
-	$menu add command -label "View file" -command "cproject::AddModFiles $lb view"
-	$menu add separator
-	$menu add command -label "Delete from project" -command "cproject::AddModFiles $lb delete"
-	tk_popup $menu %X %Y
-    }
-
-    #set pane2 [$pw add -weight $weight2]
-    set pane2 [frame $pw.pane2]
+    set pane2 [ttk::frame $pw.pane2]
     $pw add $pane2 -sticky nsew -width $weight2
 
-
-    set notebook [NoteBook $pane2.nb -homogeneous 1 -bd 1 -internalborderwidth 3  \
-	-grid "0 px3 py3"]
-
-    set f21 [$pane2.nb insert end compilation -text "Compilation"]
-
-    TitleFrame $f21.f1 -text "include directories" -grid 0
-    set f121 [$f21.f1 getframe]
-
-    set sw [ScrolledWindow $f121.lf -relief sunken -borderwidth 0]
-    listbox $sw.lb -listvariable cproject::thisdataC(includedirs)
-    $sw setwidget $sw.lb
-
-    set bbox [ButtonBox $f121.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
-    $bbox add -image folderopen16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add include directory"] \
-	 -command "cproject::AddDelDirectories $sw.lb add"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete include directory"] \
-	 -command "cproject::AddDelDirectories $sw.lb delete"
-
-    grid $f121.lf -sticky nsew
-    grid $bbox -sticky nw
-    grid rowconfigure $f121 0 -weight 1
-    grid columnconfigure $f121 0 -weight 1
+    set nb [ttk::notebook $pane2.nb]
+    set notebook $nb
     
-    TitleFrame $f21.f15 -text "compiler" -grid "0 n"
-    set f1215 [$f21.f15 getframe]
+    set nf1 [ttk::frame $nb.f1]
+    $nb add $nf1 -text [_ Compilation] -sticky nsew
+
+    set nf11 [ttk::labelframe $nf1.f1 -text [_  "include directories"]]
+    listbox $nf11.lb -listvariable cproject::thisdataC(includedirs) -yscrollcommand [list $nf11.sb set]
+    ttk::scrollbar $nf11.sb -orient vertical -command [list $nf11.lb yview]
+
+    set idx 1
+    foreach "img cmd help" [list \
+	    folderopen16 [list cproject::AddDelDirectories $nf1.lb add] [_ "Add include directory"] \
+	    actcross16 [list cproject::AddDelDirectories $nf1.lb delete] [_ "Delete include directory"] \
+	    ] {
+	ttk::button $nf11.b$idx -image $img -command $cmd -style Toolbutton
+	tooltip::tooltip $nf11.b$idx $help
+	incr idx
+    }
+
+    grid $nf11.lb - - $nf11.sb -sticky nsew -padx 2 -pady 2
+    grid $nf11.b1 $nf11.b2 -sticky w -padx 1
+    
+    grid rowconfigure $nf11 0 -weight 1
+    grid columnconfigure $nf11 2 -weight 1
+    
+    set nf12 [ttk::labelframe $nf1.f2 -text [_  "compiler"]]
 
     set values [list "" gcc g++]
-    ComboBox $f1215.cb -textvariable cproject::thisdataC(compiler) -values $values \
-	-grid "0 w" -width 10
+    ttk::combobox $nf12.cb1 -textvariable cproject::thisdataC(compiler) -values $values \
+	-width 10
 
-    TitleFrame $f21.f2 -text "defines" -grid "0 n"
-    set f122 [$f21.f2 getframe]
+    grid $nf12.cb1 -sticky ew -padx "2 20" -pady 2
+    grid columnconfigure $nf12 0 -weight 1
+    
+    set nf13 [ttk::labelframe $nf1.f3 -text [_  "defines"]]
 
-    entry $f122.e -grid 0 -textvariable cproject::thisdataC(defines)
+    ttk::entry $nf13.e -textvariable cproject::thisdataC(defines)
+    
+    grid $nf13.e -sticky ew -padx "2 20" -pady 2
+    grid columnconfigure $nf13 0 -weight 1
 
-    TitleFrame $f21.f3 -text "additional compile flags" -grid "0 n"
-    set f123 [$f21.f3 getframe]
+    set nf14 [ttk::labelframe $nf1.f4 -text [_  "additional compile flags"]]
 
-    entry $f123.e -grid 0 -textvariable cproject::thisdataC(flags)
+    ttk::entry $nf14.e -textvariable cproject::thisdataC(flags)
+    
+    grid $nf14.e -sticky ew -padx "2 20" -pady 2
+    grid columnconfigure $nf14 0 -weight 1
+    
+    grid $nf11 -sticky nsew -padx 2 -pady 2
+    grid $nf12 -sticky nsew -padx 2 -pady 2
+    grid $nf13 -sticky nsew -padx 2 -pady 2
+    grid $nf14 -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $nf1 0 -weight 1
 
-    set f23 [$pane2.nb insert end execute -text "Execute"]
+    set nf3 [ttk::frame $nb.f3]
+    $nb add $nf3 -text [_ Execute] -sticky nsew
+    
+    set nf31 [ttk::labelframe $nf3.f1 -text [_  "executable file"]]
 
-    TitleFrame $f23.f1 -text "executable file" -grid "0 n"
-    set f321 [$f23.f1 getframe]
+    ttk::entry $nf31.e -textvariable cproject::thisdataC(flags)
+    ttk::button $nf31.b -image [Bitmap::get file]  -style Toolbutton 
+    
+    grid $nf31.e $nf31.b -sticky ew -padx 2 -pady 2
+    grid columnconfigure $nf31 0 -weight 1
 
-    entry $f321.e -grid 0 -textvariable cproject::thisdataE(exe)
-    Button $f321.b1 -image [Bitmap::get file] -width 16 -grid 1 -relief link
+    set nf32 [ttk::labelframe $nf3.f2 -text [_  "working directory"]]
 
-    TitleFrame $f23.f2 -text "working directory" -grid "0 n"
-    set f322 [$f23.f2 getframe]
+    ttk::entry $nf32.e -textvariable cproject::thisdataE(execdir)
+    ttk::button $nf32.b -image [Bitmap::get file]  -style Toolbutton 
+    
+    grid $nf32.e $nf32.b -sticky ew -padx 2 -pady 2
+    grid columnconfigure $nf32 0 -weight 1
 
-    entry $f322.e -grid 0 -textvariable cproject::thisdataE(execdir)
-    Button $f322.b1 -image [Bitmap::get folder] -width 16 -grid 1 -relief link
+    set nf33 [ttk::labelframe $nf3.f3 -text [_  "arguments"]]
 
-    TitleFrame $f23.f3 -text "arguments" -grid "0 n"
-    set f323 [$f23.f3 getframe]
-
-    entry $f323.e -grid 0 -textvariable cproject::thisdataE(exeargs)
+    ttk::entry $nf33.e -textvariable cproject::thisdataE(exeargs)
+    
+    grid $nf33.e -sticky ew -padx "2 22" -pady 2
+    grid columnconfigure $nf33 0 -weight 1
 
     set comm {
 	set cproject::thisdataE(exe) [tk_getOpenFile -filetypes {{{All Files} *}} \
 		-initialdir $RamDebugger::options(defaultdir) -initialfile \
-		[file tail $cproject::thisdataE(exe)] -parent PARENT -title "Executable file"]
+		[file tail $cproject::thisdataE(exe)] -parent PARENT -title [_ "Executable file"]]
     }
     set comm [string map [list PARENT $w] $comm]
-    $f321.b1 configure -command $comm
+    $nf31.b configure -command $comm
 
     set comm {
 	set initial $RamDebugger::options(defaultdir)
 	catch { set initial [file dirname $cproject::thisdataE(exe)] }
 	set cproject::thisdataE(execdir) [RamDebugger::filenormalize [tk_chooseDirectory   \
 	    -initialdir $initial -parent PARENT \
-	    -title "Working directory" -mustexist 1]]
+	    -title [_ "Working directory"] -mustexist 1]]
     }
     set comm [string map [list PARENT $w] $comm]
-    $f322.b1 configure -command $comm
+    $nf32.b configure -command $comm
 
-
-    $pane2.nb compute_size
-    $pane2.nb raise compilation
- 
-    supergrid::go $f1215
-    supergrid::go $f122
-    supergrid::go $f123
-    supergrid::go $f21
-    supergrid::go $f321
-    supergrid::go $f322
-    supergrid::go $f323
-    supergrid::go $f23
-    supergrid::go $pane2
-    supergrid::go $f
+    grid $nf31 -sticky nsew -padx 2 -pady 2
+    grid $nf32 -sticky nsew -padx 2 -pady 2
+    grid $nf33 -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $nf3 0 -weight 1
 
     UpdateLinktabs
     # if it exists from before, it will be deleted
@@ -884,10 +846,36 @@ proc cproject::Create { par } {
     trace vdelete ::cproject::scripttabs w "UpdateScripttabs ;#"
     trace var cproject::scripttabs w "UpdateScripttabs ;#"
 
-
-    bind $w <Return> "DialogWinTop::InvokeOK $f"
+    grid $f1.l1 $f1.cb1     -           -           -       -       $f1.b1 $f1.b2 $f1.b3 -sticky w
+    grid $f1.l2 $f1.cb2 $f1.b4 $f1.b5 $f1.b6 $f11 -       -          -   -   -sticky w
+    grid $f1.pw     -             -           -         -           -    -       -          -   - -sticky nsew
+    grid configure $f11 -padx "40 2"
+    grid columnconfigure $f1 4 -weight 1
+    grid rowconfigure $f1 2 -weight 1
     
-    DialogWinTop::CreateWindow $f "" "" 500
+    grid $pane2.nb -sticky nsew
+    grid columnconfigure $pane2 0 -weight 1
+    grid rowconfigure $pane2 0 -weight 1
+    
+    grid $f1 -sticky nsew
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1
+
+    tk::TabToWindow $f1.cb1
+    bind $w <Return> [list $w invokeok]
+    $w createwindow
+}
+
+proc cproject::contextual_files_list { w - items x y } {
+    
+    catch { destroy $w.menu }
+    set menu [menu $w.menu -tearoff 0]
+    
+    $menu add command -label [_ "Assign group"] -command [list cproject::AddModFiles $w edit]
+    $menu add command -label [_  "View file"] -command [list cproject::AddModFiles $w view]
+    $menu add separator
+    $menu add command -label [_ "Delete from project"] -command [list cproject::AddModFiles $w delete]
+    tk_popup $menu $x $y
 }
 
 proc cproject::UpdateLinktabs {} {
@@ -897,17 +885,21 @@ proc cproject::UpdateLinktabs {} {
     if { ![info exists notebook] || ![winfo exists $notebook] } { return }
     if { ![info exists links] } { set links Link }
 
-    set pages [$notebook pages 1 end-1]
+    set pages [$notebook tabs]
 
     foreach i $pages {
-	if { [string match Link* $i] } {
-	    $notebook delete $i
+	set txt [$notebook tab $i -text]
+	if { [string match Link* $txt] } {
+	    destroy $i
 	}
     }
+    set ipos 1
     foreach i $links {
 	regsub -all {\W} $i {X} page
-	set f [$notebook insert end-1 $page -text $i]
+	set f [ttk::frame $notebook.lf$ipos]
+	$notebook insert $ipos $f -text $i
 	AddLinkTab $f $i
+	incr ipos
     }
 }
 
@@ -933,86 +925,86 @@ proc cproject::AddGroupInLinkGroups { but entry } {
 
 proc cproject::AddLinkTab { f link } {
 
-    TitleFrame $f.f0 -text "link groups"
-    set f0 [$f.f0 getframe]
-    entry $f0.e -grid 0 -textvariable cproject::thisdataL($link,linkgroups)
+    set f0 [ttk::labelframe $f.f0 -text [_ "link groups"]]
+    ttk::entry $f0.e -textvariable cproject::thisdataL($link,linkgroups)
+    ttk::label $f0.l -image acttick16
+    tooltip::tooltip $f0.l [_ "Add group"]
+    bind $f0.l <ButtonPress-1> [list cproject::AddGroupInLinkGroups $f0.l $f0.e]
 
-    Label $f0.b1 -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief flat -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add group"] -grid 1
-    bind $f0.b1 <ButtonPress-1> "cproject::AddGroupInLinkGroups $f0.b1 $f0.e" 
+    grid $f0.e $f0.l -sticky ew -padx 2 -pady 2
+    grid columnconfigure $f0 0 -weight 1
+    
+    set f1 [ttk::labelframe $f.f1 -text [_  "libraries directories"]]
+    listbox $f1.lb -listvariable cproject::thisdataL($link,librariesdirs) -yscrollcommand [list $f1.sb set]
+    ttk::scrollbar $f1.sb -orient vertical -command [list $f1.lb yview]
 
-    TitleFrame $f.f1 -text "libraries directories"
-    set f1 [$f.f1 getframe]
+    set idx 1
+    foreach "img cmd help" [list \
+	    folderopen16 [list cproject::AddDelDirectories $f1.lb add] [_ "Add link directories"] \
+	    actcross16 [list cproject::AddDelDirectories $f1.lb delete] [_ "Delete link directories"] \
+	    ] {
+	ttk::button $f1.b$idx -image $img -command $cmd -style Toolbutton
+	tooltip::tooltip $f1.b$idx $help
+	incr idx
+    }
 
-    set sw [ScrolledWindow $f1.lf -relief sunken -borderwidth 0]
-    listbox $sw.lb -listvariable cproject::thisdataL($link,librariesdirs)
-    $sw setwidget $sw.lb
-
-    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
-    $bbox add -image folderopen16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Add link directories"] \
-	 -command "cproject::AddDelDirectories $sw.lb add"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete link directories"] \
-	 -command "cproject::AddDelDirectories $sw.lb delete"
-
-    grid $f1.lf -sticky nsew
-    grid $bbox -sticky nw
+    grid $f1.lb - - $f1.sb -sticky nsew -padx 2 -pady 2
+    grid $f1.b1 $f1.b2 -sticky w -padx 1
+    
     grid rowconfigure $f1 0 -weight 1
-    grid columnconfigure $f1 0 -weight 1
+    grid columnconfigure $f1 2 -weight 1
+    
+    set f2 [ttk::labelframe $f.f2 -text [_  "libraries"]]
 
-    TitleFrame $f.f2 -text "libraries"
-    set f2 [$f.f2 getframe]
-
-    set values [list gcc g++ ar]
+    set values [list "" gcc g++ ar]
     if { $::tcl_platform(platform) == "windows" } {
 	lappend values windres
     }
-    ComboBox $f2.cb -textvariable cproject::thisdataL($link,linker) -values $values \
-	-grid "0 w" -width 7
+    ttk::combobox $f2.cb1 -textvariable cproject::thisdataL($link,linker) -values $values \
+	-width 7
+    
+    entry $f2.e -textvariable cproject::thisdataL($link,libraries)
 
-    entry $f2.e -grid 1 -textvariable cproject::thisdataL($link,libraries)
+    grid $f2.cb1 -sticky ew -padx "2 20" -pady 2
+    grid $f2.e -sticky ew -padx "2 20" -pady 2
+    grid columnconfigure $f2 0 -weight 1
+    
+    set f3 [ttk::labelframe $f.f3 -text [_  "additional link flags"]]
 
-    TitleFrame $f.f3 -text "additional link flags"
-    set f3 [$f.f3 getframe]
-    entry $f3.e -grid 0 -textvariable cproject::thisdataL($link,linkflags)
+    entry $f3.e -textvariable cproject::thisdataL($link,linkflags)
 
-    TitleFrame $f.f4 -text "output name"
-    set f4 [$f.f4 getframe]
-    entry $f4.e -grid 0 -textvariable cproject::thisdataL($link,linkexe)
+    grid $f3.e -sticky ew -padx "2 20" -pady 2
+    grid columnconfigure $f3 0 -weight 1
 
-    set bbox [ButtonBox $f.bbox -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 nw"]
-    $bbox add -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Create new link tab"] \
-	 -command [list cproject::CreateDeleteLinkTab $link create]
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete link tab"] \
-	 -command [list cproject::CreateDeleteLinkTab $link delete]
-    $bbox add -image edit16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Rename link tab"] \
-	 -command [list cproject::CreateDeleteLinkTab $link rename]
+    set f4 [ttk::labelframe $f.f4 -text [_  "output name"]]
 
+    entry $f4.e -textvariable cproject::thisdataL($link,linkexe)
+
+    grid $f4.e -sticky ew -padx "2 20" -pady 2
+    grid columnconfigure $f4 0 -weight 1
+
+    set f5 [ttk::frame $f.f5]
+    set idx 1
+    foreach "img cmd help" [list \
+	    acttick16 [list cproject::CreateDeleteLinkTab $link create] [_ "Create new link tab"] \
+	    actcross16 [list cproject::CreateDeleteLinkTab $link delete] [_ "Delete link tab"] \
+	    edit16 [list cproject::CreateDeleteLinkTab $link rename] [_ "Rename link tab"] \
+	    ] {
+	ttk::button $f5.b$idx -image $img -command $cmd -style Toolbutton
+	tooltip::tooltip $f5.b$idx $help
+	incr idx
+    }
+    grid $f5.b1 $f5.b2 $f5.b3 -sticky w -padx 2 -pady 2
+    
     grid $f.f0 -sticky new
     grid $f.f1 -sticky nsew
     grid $f.f2 -sticky new
     grid $f.f3 -sticky new
     grid $f.f4 -sticky new
-    grid $f.bbox -sticky nw
+    grid $f.f5 -sticky nw
 
     grid rowconfigure $f 1 -weight 1
     grid columnconfigure $f 0 -weight 1
-
-
-    supergrid::go $f0
-    supergrid::go $f2
-    supergrid::go $f3
-    supergrid::go $f4
 }
 
 proc cproject::CreateDeleteLinkTab { currentlink what } {
@@ -1113,17 +1105,21 @@ proc cproject::UpdateScripttabs {} {
     if { ![info exists notebook] || ![winfo exists $notebook] } { return }
     if { ![info exists scripttabs] } { set scripttabs Script }
 
-    set pages [$notebook pages 1 end-1]
+    set pages [$notebook tabs]
 
     foreach i $pages {
-	if { [string match Script* $i] } {
-	    $notebook delete $i
+	set txt [$notebook tab $i -text]
+	if { [string match Script* $txt] } {
+	    destroy $i
 	}
     }
+    set ipos [expr {[llength [$notebook tabs]]-1}]
     foreach i $scripttabs {
 	regsub -all {\W} $i {X} page
-	set f [$notebook insert end-1 $page -text $i]
+	set f [ttk::frame $notebook.lf$ipos]
+	$notebook insert $ipos $f -text $i
 	AddScripttab $f $i
+	incr ipos
     }
 }
 
@@ -1138,8 +1134,7 @@ proc cproject::AddScripttab { f scripttab } {
     variable links
     variable debugrelease
 
-    TitleFrame $f.f0 -text "contents" -grid "0 news"
-    set f0 [$f.f0 getframe]
+    set f0 [ttk::labelframe $f.f0 -text [_ "contents"]]
 
     set helptext ""
     append helptext "# It is possible to include a TCL script here\n"
@@ -1150,13 +1145,13 @@ proc cproject::AddScripttab { f scripttab } {
     append helptext "# AVAILABLE VARIABLES\n"
     append helptext "# \$ProjectDir: the directory where the project is\n"
     append helptext "# \$ObjectsDir: the directory where the object files are\n"
+    
+    supertext::text $f0.text -wrap none -syncvar cproject::thisdataS($scripttab,script) \
+	-height 4 -bg white -postproc [list cproject::ScriptTabColorize $f0.text] \
+	-yscrollcommand [list $f0.sb set]
+    ttk::scrollbar $f0.sb -orient vertical -command [list $f0.text yview]
 
-    set sw [ScrolledWindow $f0.lf -relief sunken -borderwidth 0 -grid "0 nsew"]
-    supertext::text $sw.text -wrap none -syncvar cproject::thisdataS($scripttab,script) \
-	    -height 4 -bg white -postproc "cproject::ScriptTabColorize $sw.text"
-    $sw setwidget $sw.text
-
-    bind $sw.text <Return> "[bind Text <Return>] ;break"
+    bind $f0.text <Return> "[bind Text <Return>] ;break"
 
     foreach i [array names cproject::dataS *,script] {
 	if { $cproject::dataS($i) == "help" } {
@@ -1170,52 +1165,66 @@ proc cproject::AddScripttab { f scripttab } {
     if { $cproject::thisdataS($scripttab,script) == "help" } {
 	set cproject::thisdataS($scripttab,script) $helptext
     }
+    
+    set idx 1
+    foreach "img cmd help" [list \
+	    acttick16  "[list $f0.text del 1.0 end] ; [list $f0.text ins end $helptext]" [_ "Clear text and add help"] \
+	    actcross16 [list $f0.text del 1.0 end] [_ "Clear text"] \
+	    ] {
+	ttk::button $f0.b$idx -image $img -command $cmd -style Toolbutton
+	tooltip::tooltip $f0.b$idx $help
+	incr idx
+    }
 
-    set bbox [ButtonBox $f0.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 wn"]
-    $bbox add -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Clear text and add help"] \
-	 -command "[list $sw.text del 1.0 end] ; [list $sw.text ins end $helptext]"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Clear text"] \
-	 -command [list $sw.text del 1.0 end]
+    grid $f0.text - -sticky nsew -padx 2 -pady 2
+    grid $f0.b1 $f0.b2 -sticky w -padx 2 -pady 2
+    grid rowconfigure $f0 0 -weight 1
+    grid columnconfigure $f0 1 -weight 1
 
-    TitleFrame $f.f1 -text "execute when" -grid "0 n"
-    set f1 [$f.f1 getframe]
+    set f1 [ttk::labelframe $f.f1 -text [_ "execute when"]]
 
     set values [list "Before compile" "After compile"]
+    set dict [dict create \
+	    "Before compile" [_ "Before compile"] \
+	    "After compile" [_ "After compile"] \
+	    "No automatic" [_ "No automatic"] \
+	    ]
     foreach i $links {
 	lappend values "After $i"
+	dict set dict "After $i" [_ "After %s" $i]
     }
     lappend values --- "No automatic"
 
-    label $f1.l -text "Execute script:" -grid 0
-    ComboBox $f1.cb -editable 0 -textvariable cproject::thisdataS($scripttab,executetime) \
-	    -values $values -grid 1
-
-    button $f1.b -text "Execute now" -width 15 -grid "0 2 py3" -command \
-	    "cproject::syncfromUI; cproject::EvalScript $f \$cproject::debugrelease \
-	    [list $scripttab] 1"
+    ttk::label $f1.l -text [_ "Execute script"]:
+    cu::combobox $f1.cb -state readonly -textvariable cproject::thisdataS($scripttab,executetime) \
+	    -values $values -dict $dict
+    ttk::button $f1.b -text [_ "Execute now"] -width 15 -command \
+	"cproject::syncfromUI; cproject::EvalScript $f \$cproject::debugrelease \
+	[list $scripttab] 1"
     
-    set bbox [ButtonBox $f.bbox -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 nw"]
-    $bbox add -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Create new script tab"] \
-	 -command [list cproject::CreateDeleteScriptTab $scripttab create]
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete script tab"] \
-	 -command [list cproject::CreateDeleteScriptTab $scripttab delete]
-    $bbox add -image edit16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Rename script tab"] \
-	 -command [list cproject::CreateDeleteScriptTab $scripttab rename]
+    grid $f1.l $f1.cb -sticky ew  -padx 2 -pady 2
+    grid $f1.b  - -padx 2 -pady 2
+    grid columnconfigure $f1 1 -weight 1
 
+    set f2 [ttk::frame $f.f2]
+    set idx 1
+    foreach "img cmd help" [list \
+	    acttick16 [list cproject::CreateDeleteScriptTab $scripttab create] [_ "Create new script tab"] \
+	    actcross16 [list cproject::CreateDeleteScriptTab $scripttab delete] [_ "Delete script tab"] \
+	    edit16 [list cproject::CreateDeleteScriptTab $scripttab rename] [_ "Rename script tab"] \
+	    ] {
+	ttk::button $f2.b$idx -image $img -command $cmd -style Toolbutton
+	tooltip::tooltip $f2.b$idx $help
+	incr idx
+    }
+    grid $f2.b1 $f2.b2 $f2.b3 -sticky w -padx 2 -pady 2
+    
+    grid $f.f0 -sticky nsew
+    grid $f.f1 -sticky nsew
+    grid $f.f2 -sticky nw
 
-    supergrid::go $f0
-    supergrid::go $f1
-    supergrid::go $f
+    grid rowconfigure $f 0 -weight 1
+    grid columnconfigure $f 0 -weight 1
 }
 
 proc cproject::CreateDeleteScriptTab { currentscripttab what } {
