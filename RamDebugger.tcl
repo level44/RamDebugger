@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.134 2009/07/28 15:00:41 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.135 2009/07/31 18:01:51 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7649,16 +7649,25 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require textutil
     package require tooltip
     package require tile
-
+    
     if { ![catch { package vcompare [package provide Tk] 8.5 } ret] && $ret < 0} {
 	interp alias "" ttk::style "" style
     }
-    catch {
-	ttk::style theme settings winnative {
-	    ttk::style configure Toolbutton -padding 1
+    if { [ tk windowingsystem] eq "x11" || $ispocket } {
+	ttk::style theme use clam
+	ttk::style theme settings clam {
+	    ttk::style configure TButton -padding 1
+	    ttk::style configure TMenubutton -padding 1
+	    ttk::style map Toolbutton -background "focus grey [ttk::style map Toolbutton -background]"
+	}
+	
+    } else {
+	catch {
+	    ttk::style theme settings winnative {
+		ttk::style configure Toolbutton -padding 1
+	    }
 	}
     }
-    
     #needed a catch for wince
     catch { package require tkdnd } ;# only if it is compiled
     package require fulltktree
@@ -8434,6 +8443,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Control-Key-2> "[list tk::TextInsert $text {""}];$c"
     bind $text <Control-Key-9> "[list tk::TextInsert $text {()}];$c"
     bind $text <Control-plus> "[list tk::TextInsert $text {[]}];$c"
+    bind $text <Control-Shift-plus> [list RamDebugger::insert_translation_cmd]
     bind $text <Control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
 
     set cmd {
@@ -8671,6 +8681,48 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	if { $err } {
 	    wm geometry $w 240x268+-2+26
 	}   
+    }
+}
+
+proc RamDebugger::insert_translation_cmd {} {
+    variable text
+    
+    set oldSeparator [$text cget -autoseparators]
+    if {$oldSeparator} {
+	$text configure -autoseparators 0
+    }
+    $text edit separator
+ 
+    if {[llength [set range [$text tag ranges sel]]]} {
+	lassign $range s1 s2
+	if { [$text get "$s1-1c"] eq {"} } {
+	    set s1 [$text index "$s1-1c"]
+	}
+	if { [$text get "$s2"] eq {"} } {
+	    set s2 [$text index "$s2+1c"]
+	}
+    } else {
+	set i [$text index insert]
+	lassign [list $i $i] s1 s2
+    }
+    if { [$text get "$s1"] ne {"} } {
+	$text insert $s1 {"}
+	set s2 [$text index "$s2+1c"]
+    }
+    $text insert $s1 "\[_ "
+    set s2 [$text index "$s2+3c"]
+    
+    if { [$text get "$s2 -1c"] ne "\"" || [$text compare "$s1+4c" == $s2] } {
+	$text insert $s2 {"}
+	set s2 [$text index "$s2+1c"]
+    }
+    $text insert $s2 "\]"
+    $text mark set insert "$s2-1c"
+    
+    $text see insert
+    $text edit separator
+    if {$oldSeparator} {
+	$text configure -autoseparators 1
     }
 }
 

@@ -14,6 +14,8 @@ namespace eval cproject {
 
     variable thisdataC
     variable dataC
+    variable thisdataM
+    variable dataM
     variable thisdataL
     variable dataL
     variable thisdataE
@@ -47,6 +49,8 @@ proc cproject::Init { w } {
 proc cproject::synctoUI {} {
     variable thisdataC
     variable dataC
+    variable thisdataM
+    variable dataM
     variable thisdataL
     variable dataL
     variable thisdataE
@@ -59,6 +63,10 @@ proc cproject::synctoUI {} {
     foreach i [array names dataC $group,$debugrelease,*] {
 	regexp {^[^,]+,[^,]+,(.*)} $i {} prop
 	set thisdataC($prop) $dataC($i)
+    }
+    foreach i [array names dataM $group,$debugrelease,*] {
+	regexp {^[^,]+,([^,]+)} $i prop
+	set thisdataM($prop) $dataM($i)
     }
     foreach i [array names dataL $debugrelease,*] {
 	regexp {^[^,]+,(.*)} $i {} prop
@@ -77,6 +85,8 @@ proc cproject::synctoUI {} {
 proc cproject::syncfromUI {} {
     variable thisdataC
     variable dataC
+    variable thisdataM
+    variable dataM
     variable thisdataL
     variable dataL
     variable thisdataS
@@ -96,6 +106,15 @@ proc cproject::syncfromUI {} {
 		    $thisdataC($prop) dataC
 	}
 	set dataC($i) $thisdataC($prop)
+    }
+    foreach i [array names dataM $debugreleasebefore,*] {
+	regexp {^[^,]+,([^,]+)} $i prop
+
+	if { $debugreleasebefore == "both" } {
+	    TransferDataToLowerGroups "" $debugreleasebefore $prop $dataM($i) \
+		    $thisdataM($prop) dataM
+	}
+	set dataM($i) $thisdataM($prop)
     }
     foreach i [array names dataL $debugreleasebefore,*] {
 	regexp {^[^,]+,(.*)} $i {} prop
@@ -126,6 +145,7 @@ proc cproject::syncfromUI {} {
 
 proc cproject::TransferDataToLowerGroups { gr dr prop olddata newdata dataname } {
     variable dataC
+    variable dataM
     variable dataL
     variable dataS
     variable dataE
@@ -218,6 +238,8 @@ proc cproject::SaveProjectC { w } {
     variable files
     variable thisdataC
     variable dataC
+    variable thisdataM
+    variable dataM
     variable thisdataL
     variable dataL
     variable thisdataS
@@ -234,7 +256,8 @@ proc cproject::SaveProjectC { w } {
 	WarnWin "Could not open file '$project' to save ($fout)" $w
 	return
     }
-    foreach i [list groups group links scripttabs debugrelease files thisdataC dataC thisdataL \
+    foreach i [list groups group links scripttabs debugrelease files thisdataC dataC \
+	    thisdataM dataM thisdataL \
 	    dataL thisdataS dataS thisdataE dataE ] {
 	if { [array exists $i] } {
 	    puts $fout [list array set $i [array get $i]]
@@ -270,6 +293,8 @@ proc cproject::NewProject { w } {
     variable files
     variable thisdataC
     variable dataC
+    variable thisdataM
+    variable dataM
     variable thisdataL
     variable dataL
     variable thisdataE
@@ -294,7 +319,7 @@ proc cproject::NewProject { w } {
     set links Link
     set scripttabs Script
     set files ""
-
+    fill_files_list $w
     NewData
 
     set debugrelease debug
@@ -305,6 +330,8 @@ proc cproject::NewData {} {
     variable project
     variable thisdataC
     variable dataC
+    variable thisdataM
+    variable dataM
     variable thisdataL
     variable dataL
     variable thisdataS
@@ -336,6 +363,11 @@ proc cproject::NewData {} {
 		}
 	    }
 	}
+
+	set dataM($i,has_userdefined_makefile) 0
+	set dataM($i,makefile_file) Makefile
+	set dataM($i,makefile_arguments) ""
+	
 	foreach link $links {
 	    set dataL($i,$link,librariesdirs) .
 	    set dataL($i,$link,linkgroups) All
@@ -371,25 +403,20 @@ proc cproject::OpenProject { w { ask 1 } { raise_error 0 } } {
     variable debugrelease
     variable files
     variable dataC
+    variable dataM
     variable dataL
     variable dataE
     variable debugreleasebefore
 
     if { $ask } {
-#          set ret [DialogWin::messageBox -default ok -icon warning -message \
-#              "Are you sure to discard all project data?" -parent $w \
-#              -title "discard data" -type okcancel]
-#          if { $ret == "cancel" } { return }
-
 	set types {
 	    {{Project files}      {.prj}   }
 	    {{All Files}        *          }
-	}
-	
+	}        
 	set dir $RamDebugger::options(defaultdir)
 	
 	set file [tk_getOpenFile -filetypes $types -initialdir $dir -parent $w \
-	    -title "Open existing project" -defaultextension .prj]
+	    -title [_ "Open existing project"] -defaultextension .prj]
 	if { $file == "" } { return }
     } else { set file $project }
 
@@ -437,6 +464,9 @@ proc cproject::OpenProject { w { ask 1 } { raise_error 0 } } {
 	    } else { set dataC($i) $data($i) }
 	}
     }
+    
+    fill_files_list $w
+    
     # to activate the trace
     set groupbefore ""
     set debugreleasebefore ""
@@ -520,13 +550,13 @@ proc cproject::CreateModifyGroup { w what } {
 
     if { $what == "delete" } {
 	if { $group == "All" } {
-	    WarnWin "Group 'All' cannot be deleted" $w
+	    WarnWin [_ "Group 'All' cannot be deleted"] $w
 	    return
 	}
-	set ret [DialogWin::messageBox -default ok -icon warning -message \
-	    "Are you sure to delete group '$group'?" -parent $w \
-	    -title "delete group" -type okcancel]
-	if { $ret == "cancel" } { return }
+	set text [_ "Are you sure to delete group '%s'?" $group]
+	set retval [snit_messageBox -default ok -icon question -message $text \
+		-type okcancel -parent $w -title [_ "delete group"]]
+	if { $retval eq "cancel" } { return }
 	
 	for { set i 0 } { $i < [llength $files] } { incr i } {
 	    foreach "file type group_in path" [lindex $files $i] break
@@ -534,6 +564,7 @@ proc cproject::CreateModifyGroup { w what } {
 		set files [lreplace $files $i $i [list $file $type All $path]]
 	    }
 	}
+	fill_files_list $w
 	set ipos [lsearch $groups $group]
 	set groups [lreplace $groups $ipos $ipos]
 	foreach i [array names dataC $group,*] {
@@ -543,83 +574,64 @@ proc cproject::CreateModifyGroup { w what } {
 	set group All
 	return
     }
-
-    CopyNamespace ::DialogWin ::DialogWinCR
-
     switch $what {
 	create {
-	    set title "New group"
-	    set label "Enter new group name"
+	    set title [_ "New group"]
+	    set label [_ "Enter new group name"]
 	}
 	rename {
-	    set title "Rename group"
-	    set label "Enter new name for group '$group'"
+	    set title [_ "Rename group"]
+	    set label [_ "Enter new name for group '%s'" $group]
 	}
     }
-
-    set f [DialogWinCR::Init $w $title separator ""]
-    set w [winfo toplevel $f]
-
-    label $f.l -text $label -grid "0 px3 py3"
-    entry $f.e -textvariable DialogWinCR::user(name) -grid "0 px10 py3" -width 30
-
-    set DialogWinCR::user(name) $group
-    tkTabToWindow $f.e
-
-    supergrid::go $f
-
-    bind $w <Return> "DialogWinCR::InvokeOK"
-
-    set action [DialogWinCR::CreateWindow]
+    
+    set wd [dialogwin_snit $w._ask -title $title -entrylabel $label: -entryvalue $group]
+    set action [$wd createwindow]
     while 1 {
-	switch $action {
-	    0 {
-		DialogWinCR::DestroyWindow
-		namespace delete ::DialogWinCR
-		return
-	    }
-	    1 {
-		if { [string trim $DialogWinCR::user(name)] == "" } {
-		    WarnWin "Group name cannot be void" $w
-		} elseif { [lsearch $groups $DialogWinCR::user(name)] != -1 } {
-		    WarnWin "Group name already exists" $w
-		} elseif { ![string is wordchar $DialogWinCR::user(name)] } {
-		    WarnWin "Group name is not OK" $w
-		} else {
-		    set newname $DialogWinCR::user(name)
-		    DialogWinCR::DestroyWindow
-		    namespace delete ::DialogWinCR
-		    break
-		}
-	    }
+	if { $action <= 0 } { 
+	    destroy $wd
+	    return
 	}
-	set action [DialogWinCR::WaitForWindow]
+	set name [string trim [$wd giveentryvalue]]
+	
+	if { $name eq "" } {
+	    snit_messageBox -message [_ "Group name cannot be void"] -parent $w
+	} elseif { [lsearch -exact $groups $name] != -1 } {
+	    snit_messageBox -message [_ "Group name already exists"] -parent $w
+	} elseif { ![string is wordchar $name]  } {
+	    snit_messageBox -message [_ "Group name is not OK"] -parent $w
+	} else {
+	    break
+	}
+	set action [$wd waitforwindow]
     }
+    destroy $wd
+    if { $action <= 0 } {  return }
 
-    if { $what == "rename" } {
+    if { $what eq "rename" } {
 	for { set i 0 } { $i < [llength $files] } { incr i } {
-	    foreach "file type group_in path" [lindex $files $i] break
-	    if { $group == $group_in } {
-		set files [lreplace $files $i $i [list $file $type $newname $path]]
+	    lassign [lindex $files $i] file type group_in path
+	    if { $group eq $group_in } {
+		set files [lreplace $files $i $i [list $file $type $name $path]]
 	    }
 	}
+	fill_files_list $w
 	set ipos [lsearch $groups $group]
-	set groups [lreplace $groups $ipos $ipos $newname]
+	set groups [lreplace $groups $ipos $ipos $name]
 	foreach i [array names dataC $group,*] {
 	    regexp {,(.*)} $i {} rest
-	    set dataC($newname,$rest) $dataC($i)
+	    set dataC($name,$rest) $dataC($i)
 	    unset dataC($i)
 	}
     } else {
-	lappend groups $newname
+	lappend groups $name
 	foreach i [array names dataC All,*] {
 	    regexp {,(.*)} $i {} rest
-	    set dataC($newname,$rest) $dataC($i)
+	    set dataC($name,$rest) $dataC($i)
 	}
     }
     set groupbefore ""
-    set group $newname
-
+    set group $name
 }
 
 proc cproject::CreateDo { w } {
@@ -646,7 +658,7 @@ proc cproject::Create { par } {
 	set RamDebugger::options(recentprojects) ""
     }
     destroy $par.mpt
-    set w [dialogwin_snit $par.mpt -title [_ "C++ compilation project"] -grab 1 \
+    set w [dialogwin_snit $par.mpt -title [_ "C++ compilation project"] -grab 0 \
 	    -morebuttons [list [_ "Apply"]]  -callback [list cproject::CreateDo]]
     set f [$w giveframe]
 
@@ -699,7 +711,7 @@ proc cproject::Create { par } {
     set columns [list \
 	    [list 14 [_ "File"] left text 1] \
 	    [list 5 [_ "Type"] center text 1] \
-	    [list 11 [_ "Group"] right text 1] \
+	    [list 11 [_ "Group"] left text 1] \
 	    [list 15 [_ "Path"] left text 1] \
 	    ]
 
@@ -785,13 +797,52 @@ proc cproject::Create { par } {
     grid $nf13 -sticky nsew -padx 2 -pady 2
     grid $nf14 -sticky nsew -padx 2 -pady 2
     grid columnconfigure $nf1 0 -weight 1
+    
+    set nf2 [ttk::frame $nb.f2]
+    $nb add $nf2 -text [_ Makefile] -sticky nsew
 
+    ttk::checkbutton $nf2.cb1 -text [_ "User defined Makefile" ] -variable \
+	cproject::thisdataM(has_userdefined_makefile)
+    
+    set nf21 [ttk::labelframe $nf2.f1 -text [_  "makefile file"]]
+
+    ttk::label $nf21.l1 -text [_ "Makefile"]:
+    ttk::combobox $nf21.cb1 -textvariable cproject::thisdataM(makefile_file)
+    ttk::button $nf21.b -image [Bitmap::get file]  -style Toolbutton 
+    ttk::label $nf21.l2 -text [_ "Makefile arguments"]:
+    ttk::entry $nf21.e -textvariable cproject::thisdataM(makefile_arguments)
+
+    grid $nf21.l1 $nf21.cb1 $nf21.b -sticky nsew -padx 2 -pady 2
+    grid  $nf21.l2 $nf21.e -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $nf21 1 -weight 1
+
+    grid $nf2.cb1 -sticky nsew -padx 2 -pady 2
+    grid  $nf2.f1 -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $nf2 0 -weight 1
+
+    set comm {
+	set cproject::thisdataM(makefile_file) [tk_getOpenFile -filetypes {{{All Files} *}} \
+		-initialdir $RamDebugger::options(defaultdir) -initialfile \
+		[file tail $cproject::thisdataM(makefile_file)] -parent PARENT -title [_ "Makefile file"]]
+    }
+    set comm [string map [list PARENT $w] $comm]
+    $nf21.b configure -command $comm
+    
+    if { ![info exists cproject::thisdataM(has_userdefined_makefile)] } {
+	set cproject::thisdataM(has_userdefined_makefile) 0
+    }
+    set cmd [list cproject::update_active_inactive_makefile $w [list $nf21.l1 $nf21.cb1 $nf21.b $nf21.l2 $nf21.e]]
+    trace add variable cproject::thisdataM(has_userdefined_makefile) write "$cmd;#"
+    bind $nf2.cb1 <Delete> [list trace remove variable cproject::thisdataM(has_userdefined_makefile) \
+	    write "$cmd;#"]
+    eval $cmd
+    
     set nf3 [ttk::frame $nb.f3]
     $nb add $nf3 -text [_ Execute] -sticky nsew
     
     set nf31 [ttk::labelframe $nf3.f1 -text [_  "executable file"]]
 
-    ttk::entry $nf31.e -textvariable cproject::thisdataC(flags)
+    ttk::entry $nf31.e -textvariable cproject::thisdataE(exe)
     ttk::button $nf31.b -image [Bitmap::get file]  -style Toolbutton 
     
     grid $nf31.e $nf31.b -sticky ew -padx 2 -pady 2
@@ -840,7 +891,6 @@ proc cproject::Create { par } {
     trace vdelete ::cproject::links w "UpdateLinktabs ;#"
     trace var cproject::links w "UpdateLinktabs ;#"
 
-
     UpdateScripttabs
     # if it exists from before, it will be deleted
     trace vdelete ::cproject::scripttabs w "UpdateScripttabs ;#"
@@ -864,6 +914,30 @@ proc cproject::Create { par } {
     tk::TabToWindow $f1.cb1
     bind $w <Return> [list $w invokeok]
     $w createwindow
+}
+
+proc cproject::update_active_inactive_makefile { w wList } {
+    variable thisdataM
+    
+    if { $thisdataM(has_userdefined_makefile) } {
+	set state !disabled
+    } else {
+	set state disabled
+    }
+    foreach i $wList {
+	$i state $state
+    }
+}
+
+proc cproject::fill_files_list { w } {
+    variable files
+    
+    set list [$w give_uservar_value list]
+    
+    $list item delete all
+    foreach i $files {
+	$list insert end $i
+    }    
 }
 
 proc cproject::contextual_files_list { w - items x y } {
@@ -896,7 +970,7 @@ proc cproject::UpdateLinktabs {} {
     set ipos 1
     foreach i $links {
 	regsub -all {\W} $i {X} page
-	set f [ttk::frame $notebook.lf$ipos]
+	set f [ttk::frame $notebook.lflink$ipos]
 	$notebook insert $ipos $f -text $i
 	AddLinkTab $f $i
 	incr ipos
@@ -1023,7 +1097,7 @@ proc cproject::CreateDeleteLinkTab { currentlink what } {
 		set dataL($dr,$newlink,$v) $dataL($i)
 	    }
 	    lappend links $newlink
-	    $notebook raise $newlink
+	    $notebook select $newlink
 	}
 	delete {
 	    if { [llength $links] == 1 } {
@@ -1042,7 +1116,7 @@ proc cproject::CreateDeleteLinkTab { currentlink what } {
 	    }
 	    set links [lreplace $links $delpos $delpos]
 	    if { $delpos >= [llength $links] } { set delpos 0 }
-	    $notebook raise [lindex $links $delpos]
+	    $notebook select [lindex $links $delpos]
 	}
 	rename {
 	    CopyNamespace ::DialogWin ::DialogWinCR
@@ -1243,7 +1317,7 @@ proc cproject::CreateDeleteScriptTab { currentscripttab what } {
 		set dataS($dr,$newscripttab,$v) $dataS($i)
 	    }
 	    lappend scripttabs $newscripttab
-	    $notebook raise $newscripttab
+	    $notebook select $newscripttab
 	}
 	delete {
 	    if { [llength $scripttabs] == 1 } {
@@ -1262,7 +1336,7 @@ proc cproject::CreateDeleteScriptTab { currentscripttab what } {
 	    }
 	    set scripttabs [lreplace $scripttabs $delpos $delpos]
 	    if { $delpos >= [llength $scripttabs] } { set delpos 0 }
-	    $notebook raise [lindex $$scripttabsd $delpos]
+	    $notebook select [lindex $$scripttabsd $delpos]
 	}
 	rename {
 	    CopyNamespace ::DialogWin ::DialogWinCR
@@ -1405,6 +1479,7 @@ proc cproject::AddModFiles { listbox what } {
 	    }
 	    lappend files [list [file tail $file] [string trimleft [file ext $file] .] $group \
 		[file dirname $file]]
+	    fill_files_list $w
 	}
 	"dir" {
 	    set dir [RamDebugger::filenormalize [tk_chooseDirectory -initialdir $projectdir \
@@ -1425,7 +1500,8 @@ proc cproject::AddModFiles { listbox what } {
 		     [file dirname $file]]
 		incr num
 	    }
-	    WarnWin "Inserted $num new files" $listbox
+	    fill_files_list $w
+	    WarnWin [_ "Inserted %d new files" $num] $listbox
 	}
 	edit {
 	    set num 0
@@ -1436,7 +1512,8 @@ proc cproject::AddModFiles { listbox what } {
 		set files [lreplace $files $i $i [list $file_in $type $group $path]]
 		incr num
 	    }
-	    WarnWin "Replaced group to $num files ($numdiff new)"
+	    fill_files_list $w
+	    WarnWin [_ "Replaced group to %d files (%d new)" $num $numdiff]
 	}
 	delete {
 	    set num 0
@@ -1446,7 +1523,8 @@ proc cproject::AddModFiles { listbox what } {
 		incr num
 	    }
 	    $listbox selection clear 0 end
-	    WarnWin "Deleted from project $num files"
+	    fill_files_list $w
+	    WarnWin [_ "Deleted from project $num files" $num]
 	}
     }
 }
