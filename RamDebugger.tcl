@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.135 2009/07/31 18:01:51 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.136 2009/08/03 17:46:41 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3461,20 +3461,22 @@ proc RamDebugger::ColorizeLines { l1 l2 { what text } } {
 
 proc RamDebugger::ColorizeSlow { txt } {
     variable options
-
+    variable text
+    
     set ed [$txt cget -editable]
     $txt conf -editable 1
 
-#     $txt conf -foreground $options(colors,foreground) \
-#         -background $options(colors,background)
-#     $txt tag conf magenta -foreground $options(colors,commands)
-#     $txt tag conf magenta2 -foreground $options(colors,defines)
-#     $txt tag conf blue -foreground $options(colors,procnames)
-#     $txt tag conf grey -foreground $options(colors,quotestrings)
-#     $txt tag conf green -foreground $options(colors,set)
-#     $txt tag conf red -foreground $options(colors,comments)
-#     $txt tag conf cyan -foreground $options(colors,varnames)
-
+    if { $txt ne $text } {
+	$txt conf -foreground $options(colors,foreground) \
+	    -background $options(colors,background)
+	$txt tag conf magenta -foreground $options(colors,commands)
+	$txt tag conf magenta2 -foreground $options(colors,defines)
+	$txt tag conf blue -foreground $options(colors,procnames)
+	$txt tag conf grey -foreground $options(colors,quotestrings)
+	$txt tag conf green -foreground $options(colors,set)
+	$txt tag conf red -foreground $options(colors,comments)
+	$txt tag conf cyan -foreground $options(colors,varnames)
+    }
     set idx 1.0
     while 1 {
 	set idx2 [$txt search -count RamDebugger::count -regexp {proc\s+\S+} $idx end]
@@ -5145,12 +5147,14 @@ proc RamDebugger::ContNextGUI { what } {
 	    return
 	}
 	set filetype [GiveFileType $currentfile]
-	if { $filetype == "C/C++" } {
+	if { $filetype eq "C/C++" } {
 	    if { $options(ConfirmStartDebugging) && $remoteserver != "" } {
 		set ret [DialogWin::messageBox -default yes -icon question -message \
 		             [_ "Do you want to start to debug c++ program?"] -parent $text \
 		             -title [_ "start debugging"] -type yesnocancel]
-	    } else { set ret yes }
+	    } else {
+		set ret yes
+	    }
 	    if { $ret == "cancel" } { return }
 	    if { $ret == "yes" } {
 		DebugCplusPlusWindow 1
@@ -6210,7 +6214,7 @@ proc RamDebugger::ListboxMenu { listb x y item } {
 	$menu add command -label [_ "Reinstrument"] -command [list RamDebugger::OpenFileF \
 		                                            -force 2 $name]
 
-	set filetype [GiveFileType $currentfile]
+	set filetype [GiveFileType $name]
 	if { $filetype == "C/C++" } {
 	    $menu add separator
 	    set w [winfo toplevel $listb]
@@ -8444,6 +8448,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Control-Key-9> "[list tk::TextInsert $text {()}];$c"
     bind $text <Control-plus> "[list tk::TextInsert $text {[]}];$c"
     bind $text <Control-Shift-plus> [list RamDebugger::insert_translation_cmd]
+    bind $text <Control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <Control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
 
     set cmd {

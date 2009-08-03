@@ -35,7 +35,7 @@ proc cproject::Init { w } {
     if { [info exists RamDebugger::options(recentprojects)] && \
 	    [llength $RamDebugger::options(recentprojects)] > 0 } {
 	set project [lindex $RamDebugger::options(recentprojects) 0]
-	set err [catch { OpenProject $w 0 1 }]
+	set err [catch { OpenProject $w 0 1 } errstring]
 	if { $err } {
 	    set project ""
 	    set RamDebugger::options(recentprojects) [lreplace \
@@ -62,8 +62,8 @@ proc cproject::synctoUI {} {
 	regexp {^[^,]+,[^,]+,(.*)} $i {} prop
 	set thisdataC($prop) $dataC($i)
     }
-    foreach i [array names dataM $group,$debugrelease,*] {
-	regexp {^[^,]+,([^,]+)} $i prop
+    foreach i [array names dataM $debugrelease,*] {
+	regexp {^[^,]+,([^,]+)} $i {} prop
 	set thisdataM($prop) $dataM($i)
     }
     foreach i [array names dataL $debugrelease,*] {
@@ -106,7 +106,7 @@ proc cproject::syncfromUI {} {
 	set dataC($i) $thisdataC($prop)
     }
     foreach i [array names dataM $debugreleasebefore,*] {
-	regexp {^[^,]+,([^,]+)} $i prop
+	regexp {^[^,]+,([^,]+)} $i {} prop
 
 	if { $debugreleasebefore == "both" } {
 	    TransferDataToLowerGroups "" $debugreleasebefore $prop $dataM($i) \
@@ -172,7 +172,7 @@ proc cproject::TransferDataToLowerGroups { gr dr prop olddata newdata dataname }
     foreach i [array names data *,$prop] {
 	switch $dataname {
 	    dataC { regexp {^([^,]+),([^,]+),(.*)} $i {} gr_in dr_in prop_in }
-	    dataL - dataS - dataE {
+	    dataL - dataS - dataE - dataM {
 		set gr_in ""
 		regexp {^([^,]+),(.*)} $i {} dr_in prop_in
 	    }
@@ -319,7 +319,8 @@ proc cproject::NewProject { w } {
     set files ""
     fill_files_list $w
     NewData
-
+    synctoUI
+    
     set debugrelease debug
     set group All
 }
@@ -420,12 +421,24 @@ proc cproject::OpenProject { w { ask 1 } { raise_error 0 } } {
 	set file $project
     }
     set project $file
-    set RamDebugger::options(defaultdir) [file dirname $file]
+    if { $file ne "" } {
+	set RamDebugger::options(defaultdir) [file dirname $file]
+    }
+    set debugreleasebefore ""
+    set groups All
+    set links Link
+    set scripttabs Script
+    set files ""
+
+    NewData
+    synctoUI
+    
+    if { $file eq "" } { return }
 
     trace vdelete ::cproject::group w "cproject::SetGroupActive;#"
     trace vdelete ::cproject::debugrelease w "cproject::SetDebugReleaseActive;#"
     trace vdelete ::cproject::links w "UpdateLinktabs ;#"
-    trace vdelete ::cproject::scripttabs w "UpdateScripttabs ;#"
+    trace vdelete ::cproject::scripttabs w "UpdateScripttabs ;#"    
     
     set err [catch {
 	if { [interp exists cproject_tmp] } { interp delete cproject_tmp }
@@ -465,7 +478,7 @@ proc cproject::OpenProject { w { ask 1 } { raise_error 0 } } {
 	}
     }
     
-    fill_files_list $w
+   # fill_files_list $w
     
     # to activate the trace
     set groupbefore ""
@@ -664,9 +677,11 @@ proc cproject::Create { par } {
 
     set f1 [ttk::frame $f.f1]
     
+    set projects $RamDebugger::options(recentprojects) 
+    lappend projects ""
     ttk::label $f1.l1 -text [_ "Project"]:
     ttk::combobox $f1.cb1  -textvariable cproject::project -width 80 -state readonly \
-	-values $RamDebugger::options(recentprojects) 
+	-values $projects
     bind $f1.cb1 <<ComboboxSelected>> [list cproject::OpenProject $w 0]
     tooltip::tooltip $f1.cb1 [_ "A project includes all the compilation information. Create a project before entering data"]
 
@@ -755,8 +770,8 @@ proc cproject::Create { par } {
 
     set idx 1
     foreach "img cmd help" [list \
-	    folderopen16 [list cproject::AddDelDirectories $nf1.lb add] [_ "Add include directory"] \
-	    actcross16 [list cproject::AddDelDirectories $nf1.lb delete] [_ "Delete include directory"] \
+	    folderopen16 [list cproject::AddDelDirectories $nf11.lb add] [_ "Add include directory"] \
+	    actcross16 [list cproject::AddDelDirectories $nf11.lb delete] [_ "Delete include directory"] \
 	    ] {
 	ttk::button $nf11.b$idx -image $img -command $cmd -style Toolbutton
 	tooltip::tooltip $nf11.b$idx $help
@@ -808,7 +823,7 @@ proc cproject::Create { par } {
 
     ttk::label $nf21.l1 -text [_ "Makefile"]:
     ttk::combobox $nf21.cb1 -textvariable cproject::thisdataM(makefile_file)
-    ttk::button $nf21.b -image [Bitmap::get file]  -style Toolbutton 
+    ttk::button $nf21.b -image [Bitmap::get file]  -style Toolbutton -command [list cproject::select_makefile $w]
     ttk::label $nf21.l2 -text [_ "Makefile arguments"]:
     ttk::entry $nf21.e -textvariable cproject::thisdataM(makefile_arguments)
 
@@ -819,14 +834,6 @@ proc cproject::Create { par } {
     grid $nf2.cb1 -sticky nsew -padx 2 -pady 2
     grid  $nf2.f1 -sticky nsew -padx 2 -pady 2
     grid columnconfigure $nf2 0 -weight 1
-
-    set comm {
-	set cproject::thisdataM(makefile_file) [tk_getOpenFile -filetypes {{{All Files} *}} \
-		-initialdir $RamDebugger::options(defaultdir) -initialfile \
-		[file tail $cproject::thisdataM(makefile_file)] -parent PARENT -title [_ "Makefile file"]]
-    }
-    set comm [string map [list PARENT $w] $comm]
-    $nf21.b configure -command $comm
     
     foreach "n v" [list has_userdefined_makefile 0 makefile_file Makefile makefile_arguments ""] {
 	if { ![info exists cproject::thisdataM($n)] } {
@@ -845,7 +852,10 @@ proc cproject::Create { par } {
     set nf31 [ttk::labelframe $nf3.f1 -text [_  "executable file"]]
 
     ttk::entry $nf31.e -textvariable cproject::thisdataE(exe)
-    ttk::button $nf31.b -image [Bitmap::get file]  -style Toolbutton 
+    ttk::button $nf31.b -image [Bitmap::get file]  -style Toolbutton -command \
+	[list cproject::select_executable_file $w]
+    
+    tooltip::tooltip $nf31.e [_ "Name of the executable relative to project directory"]
     
     grid $nf31.e $nf31.b -sticky ew -padx 2 -pady 2
     grid columnconfigure $nf31 0 -weight 1
@@ -853,7 +863,8 @@ proc cproject::Create { par } {
     set nf32 [ttk::labelframe $nf3.f2 -text [_  "working directory"]]
 
     ttk::entry $nf32.e -textvariable cproject::thisdataE(execdir)
-    ttk::button $nf32.b -image [Bitmap::get file]  -style Toolbutton 
+    ttk::button $nf32.b -image [Bitmap::get file]  -style Toolbutton -command \
+	[list cproject::select_executable_dir $w]
     
     grid $nf32.e $nf32.b -sticky ew -padx 2 -pady 2
     grid columnconfigure $nf32 0 -weight 1
@@ -864,27 +875,6 @@ proc cproject::Create { par } {
     
     grid $nf33.e -sticky ew -padx "2 22" -pady 2
     grid columnconfigure $nf33 0 -weight 1
-
-    set comm {
-	set file [tk_getOpenFile -filetypes {{{All Files} *}} \
-		-initialdir $RamDebugger::options(defaultdir) -initialfile \
-		[file tail $cproject::thisdataE(exe)] -parent PARENT -title [_ "Executable file"]]
-	if { $file ne "" } {
-	    set cproject::thisdataE(exe) $file
-	}
-     }
-    set comm [string map [list PARENT $w] $comm]
-    $nf31.b configure -command $comm
-
-    set comm {
-	set initial $RamDebugger::options(defaultdir)
-	catch { set initial [file dirname $cproject::thisdataE(exe)] }
-	set cproject::thisdataE(execdir) [RamDebugger::filenormalize [tk_chooseDirectory   \
-	    -initialdir $initial -parent PARENT \
-	    -title [_ "Working directory"] -mustexist 1]]
-    }
-    set comm [string map [list PARENT $w] $comm]
-    $nf32.b configure -command $comm
 
     grid $nf31 -sticky nsew -padx 2 -pady 2
     grid $nf32 -sticky nsew -padx 2 -pady 2
@@ -919,6 +909,34 @@ proc cproject::Create { par } {
     tk::TabToWindow $f1.cb1
     bind $w <Return> [list $w invokeok]
     $w createwindow
+}
+
+proc cproject::select_executable_file { w } {
+    variable thisdataE
+    variable project
+    
+    set file [tk_getOpenFile -filetypes {{{All Files} *}} \
+	    -initialdir $RamDebugger::options(defaultdir) -initialfile \
+	    [file tail $thisdataE(exe)] -parent $w -title [_ "Executable file"]]
+    if { $file eq "" } { return }
+    set file [ConvertToRelative [file dirname $project] $file]
+    set thisdataE(exe) $file
+}
+
+proc cproject::select_executable_dir { w } {
+    variable thisdataE
+    variable project
+
+    if { [file isdirectory [file dirname $thisdataE(exe)]] } {
+	set initial [file dirname $thisdataE(exe)]
+    } else {
+	set initial $RamDebugger::options(defaultdir)
+    }
+    set dir [tk_chooseDirectory -initialdir $initial -parent $w -title [_ "Working directory"] \
+	    -mustexist 1]
+    if { $dir eq "" } { return }
+    set dir [ConvertToRelative [file dirname $project] $dir]
+    set thisdataE(execdir) $file
 }
 
 proc cproject::update_active_inactive_makefile { w wList } {
@@ -1458,6 +1476,20 @@ proc cproject::IsProjectNameOk {} {
     return [file dirname $project]
 }
 
+proc cproject::select_makefile { parent } {
+    variable thisdataM
+    
+    set projectdir [IsProjectNameOk]
+    
+    set file [tk_getOpenFile -filetypes {{{All Files} *}} \
+	    -initialdir $RamDebugger::options(defaultdir) -initialfile \
+	    [file tail $thisdataM(makefile_file)] -parent $parent -title [_ "Makefile file"]]
+    if { $file eq "" } { return }
+    set RamDebugger::options(defaultdir) [file dirname $file]
+    set file [ConvertToRelative $projectdir $file]
+    set thisdataM(makefile_file)  $file
+}
+
 proc cproject::AddModFiles { listbox what } {
     variable project
     variable files
@@ -1576,15 +1608,20 @@ proc cproject::AddDelDirectories { listbox what } {
 
 proc cproject::GiveDebugData {} {
     variable project
+    variable dataM
     variable dataE
 
     set dr $RamDebugger::options(debugrelease)
 
     if { [info exists dataE($dr,exe)] } {
-	set objdir [file root $project]_$dr
-	set exe [file join $objdir $dataE($dr,exe)]
-	return [list $exe $dataE($dr,execdir) \
-		$dataE($dr,exeargs)]
+	if { $dataM($dr,has_userdefined_makefile)  } {
+	    set base_dir [file dirname $project]
+	    set exe [file join $base_dir $dataE($dr,exe)]
+	} else {
+	    set objdir [file root $project]_$dr
+	    set exe [file join $objdir $dataE($dr,exe)]
+	}
+	return [list $exe $dataE($dr,execdir) $dataE($dr,exeargs)]
     }
     return ""
 }
@@ -1634,13 +1671,14 @@ proc cproject::CleanCompiledFiles { w } {
     variable project
     variable files
     variable dataC
+    variable dataM
     variable dataL
     variable dataE
 
-    RamDebugger::SetMessage "Cleaning compilation files..."
+    RamDebugger::SetMessage [_ "Cleaning compilation files..."]
     RamDebugger::WaitState 1
 
-    if { $project == "" } {
+    if { $project eq "" } {
 	if { [info exists RamDebugger::options(recentprojects)] && \
 		[llength $RamDebugger::options(recentprojects)] > 0 } {
 	    set project [lindex $RamDebugger::options(recentprojects) 0]
@@ -1652,25 +1690,33 @@ proc cproject::CleanCompiledFiles { w } {
 	    return
 	}
     }
-
     set dr $RamDebugger::options(debugrelease)
 
-    if { $dr == "both" } {
-	WarnWin "error: program must be in debug or in release mode"
+    if { $dr eq "both" } {
+	WarnWin [_ "error: program must be in debug or in release mode"]
 	RamDebugger::WaitState 0
 	return
     }
-    set objdir [file join [file dirname $project] [file root $project]_$dr]
-
-    foreach i [glob -nocomplain -dir $objdir *] {
-	file delete $i
+    if { $dataM($dr,has_userdefined_makefile)  } {
+	set make $dataM($debrel,makefile_file)
+	set make_args $dataM($debrel,makefile_arguments)
+	set err [catch { exec make -f $make {*}$make_args clean } ret]
+    } else { 
+	set objdir [file join [file dirname $project] [file root $project]_$dr]
+	
+	foreach i [glob -nocomplain -dir $objdir *] {
+	    file delete $i
+	}
+	set ret ""
     }
     RamDebugger::TextCompClear
     RamDebugger::TextCompRaise
-    RamDebugger::TextCompInsert "Compilation files deleted"
-
+    RamDebugger::TextCompInsert [_ "Compilation files deleted"]
+    if { $ret ne "" } {
+	RamDebugger::TextCompInsert $ret
+    }
     RamDebugger::WaitState 0
-    RamDebugger::SetMessage "Cleaning compilation files...done"
+    RamDebugger::SetMessage [_ "Cleaning compilation files...done"]
 }
 
 proc cproject::printfilename { filename } {
@@ -1682,12 +1728,13 @@ proc cproject::TouchFiles { w } {
     variable project
     variable files
     variable dataC
+    variable dataM
     variable dataL
     variable dataE
 
     set dr $RamDebugger::options(debugrelease)
 
-    RamDebugger::SetMessage "Actualizing date for compilation files..."
+    RamDebugger::SetMessage [_ "Actualizing date for compilation files..."]
     RamDebugger::WaitState 1
 
     if { $project == "" } {
@@ -1702,24 +1749,32 @@ proc cproject::TouchFiles { w } {
 	    return
 	}
     }
-    if { $dr == "both" } {
-	WarnWin "error: program must be in debug or in release mode"
+    if { $dr eq "both" } {
+	WarnWin [_ "error: program must be in debug or in release mode"]
 	RamDebugger::WaitState 0
 	return
     }
-    set objdir [file join [file dirname $project] [file root $project]_$dr]
-
-    set time [clock seconds]
-    foreach i [glob -nocomplain -dir $objdir *] {
-	file mtime $i $time
+    if { $dataM($dr,has_userdefined_makefile)  } {
+	set make $dataM($debrel,makefile_file)
+	set make_args $dataM($debrel,makefile_arguments)
+	set err [catch { exec make -f $make -t {*}$make_args } ret]
+    } else {    
+	set objdir [file join [file dirname $project] [file root $project]_$dr]
+	
+	set time [clock seconds]
+	foreach i [glob -nocomplain -dir $objdir *] {
+	    file mtime $i $time
+	}
+	set ret ""
     }
-
     RamDebugger::TextCompClear
     RamDebugger::TextCompRaise
-    RamDebugger::TextCompInsert "Actualized date for compilation files"
-
+    RamDebugger::TextCompRaise [_ "Actualizing date for compilation files..."]
+    if { $ret ne "" } {
+	RamDebugger::TextCompInsert $ret
+    }
     RamDebugger::WaitState 0
-    RamDebugger::SetMessage "Actualizing date for compilation files...done"
+    RamDebugger::SetMessage [_ "Actualizing date for compilation files...done"]
 }
 
 proc cproject::CompileAll { w } {
@@ -1747,16 +1802,178 @@ proc cproject::CompileNoStop { w } {
     CompileDo $w $dr 1 ""
 }
 
-proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
+proc cproject::create_auto_makefile { debrel unique_file } {
     variable project
     variable files
     variable dataC
     variable dataL
     variable dataE
     variable links
+
+    if { $unique_file ne "" } {
+	set found 0
+	set unique_file [RamDebugger::filenormalize $unique_file]
+	foreach i $files {
+	    lassign $i file_in type group_in path
+	    set file_in2 [RamDebugger::filenormalize [file join [file dirname $project] \
+		        $path $file_in]]
+	    if { [string equal $file_in2 $unique_file] } {
+		set compfiles [list $i]
+		set found 1
+		break
+	    }
+	}
+	if { !$found } {
+	    error [_ "error: file '%s' is not included in the compile project" $unique_file]
+	}
+	set forcecompile 1
+	set project_short "$file_in $debrel"
+    } else {
+	set compfiles $files
+	set forcecompile 0
+	set project_short "[file root [file tail $project]] $debrel"
+    }
+
+    set objdir [file tail [file root $project]]_$debrel
+    if { ![file exists $objdir] } { file mkdir $objdir }
+    
+    set make [file join $objdir Makefile.ramdebugger]
+    if { $unique_file ne "" } { append make 1 }
+
+    set fout [open $make w]
+    
+    puts -nonewline  $fout "\n# Makefile  -*- makefile -*- "
+    puts $fout "Created: [clock format [clock seconds] -format {%Y-%m-%d %H:%M:%S}]"
+    puts $fout "\n[string repeat # 80]"
+    puts $fout "# Makefile automatically made by RamDebugger"
+    puts $fout "#     execute it from the upper directory"
+    puts $fout "[string repeat # 80]\n"
+    
+    if { $unique_file == "" } {
+	puts -nonewline $fout "all: "
+	foreach link $links {
+	    puts -nonewline $fout "[file join $objdir $dataL($debrel,$link,linkexe)] "
+	}
+	puts $fout "\n"
+    }
+    foreach i $compfiles {
+	foreach "file_in type group_in path" $i break
+	
+	if { [string trim $dataC($group_in,$debrel,compiler)] == "" } { continue }
+	
+	set file [file join $path $file_in]
+	set objfile [file join $objdir [file root $file_in].o]
+	
+	if { $forcecompile && [file exists $objfile] } {
+	    file delete $objfile
+	}
+	set dependencies [ScanHeaders $file]
+	puts -nonewline $fout "[printfilename $objfile]: [printfilename $file]"
+	foreach i $dependencies {
+	    puts -nonewline $fout " [printfilename $i]"
+	}
+	puts -nonewline $fout "\n\t$dataC($group_in,$debrel,compiler) "
+	foreach j $dataC($group_in,$debrel,flags) {
+	    puts -nonewline $fout "$j "
+	}
+	foreach j $dataC($group_in,$debrel,includedirs) {
+	    if { [string first " " $j] == -1 } {
+		puts -nonewline $fout "-I$j "
+	    } else {
+		puts -nonewline $fout "-I\"$j\" "
+	    }
+	}
+	foreach j $dataC($group_in,$debrel,defines) {
+	    puts -nonewline $fout "-D$j "
+	}
+	puts -nonewline $fout "\\\n\t\t-o [printfilename $objfile] "
+	puts $fout "[printfilename $file]\n"
+    }
+    if { $unique_file eq "" } {
+	foreach link $links {
+	    set objfiles ""
+	    foreach i $files {
+		foreach "file_in type group_in path" $i break
+		if { [lsearch $dataL($debrel,$link,linkgroups) $group_in] != -1 || \
+		    [lsearch $dataL($debrel,$link,linkgroups) All] != -1 } {
+		    if { [file ext $file_in] == ".rc" } {
+		        lappend objfiles [file join $path $file_in]
+		    } else {
+		        lappend objfiles [file join $objdir [file root $file_in].o]
+		    }
+		}
+	    }
+	    if { [string trim $dataL($debrel,$link,linkexe)] == "" } {
+		set tt "WARNING: no output name for linking target '$link'. "
+		append tt "assuming 'program_$link.exe'\n"
+		RamDebugger::TextCompInsertRed $tt
+		set outputname [file join $objdir program_$link.exe]
+	    } else {
+		set outputname [file join $objdir $dataL($debrel,$link,linkexe)]
+	    }
+	    
+	    set target [string toupper OBJFILES_$link]
+	    set string "$target = "
+	    foreach i $objfiles {
+		append string "$i "
+		if { [string length $string] > 70 } {
+		    puts $fout "$string \\"
+		    set string ""
+		}
+	    }
+	    puts $fout "$string\n"
+	    
+	    puts $fout "$outputname: \$($target)"
+	    puts -nonewline $fout "\t$dataL($debrel,$link,linker) "
+	    foreach j $dataL($debrel,$link,linkflags) {
+		puts -nonewline $fout  "$j "
+	    }
+	    puts -nonewline $fout "-o $outputname \$($target) "
+	    foreach j $dataL($debrel,$link,librariesdirs) {
+		if { $dataL($debrel,$link,linker) != "windres" } {
+		    if { [string first " " $j] == -1 } {
+		        puts -nonewline $fout "-L$j "
+		    } else {
+		        puts -nonewline $fout "-L\"$j\" "
+		    }
+		} else {
+		    if { [string first " " $j] == -1 } {
+		        puts -nonewline $fout "--include $j "
+		    } else {
+		        puts -nonewline $fout "--include \"$j\" "
+		    }
+		}
+	    }
+	    if { $dataL($debrel,$link,linker) != "windres" } {
+		puts -nonewline $fout "-L$objdir "
+	    }
+	    foreach j $dataL($debrel,$link,libraries) {
+		if { [regexp {^lib(.*)(\.a|\.lib|\.so)$} $j {} j2] } {
+		    puts -nonewline $fout "-l$j2 "
+		} elseif { [regexp {^lib(.*)} $j {} j2] } {
+		    puts -nonewline $fout "-l$j2 "
+		} elseif { [file exists $j] } {
+		    puts -nonewline $fout "$j "
+		} elseif { [regexp {(?i)(.*)\.lib} $j {} j2] } {
+		    puts -nonewline $fout "-l$j2 "
+		} else {
+		    puts -nonewline $fout "[file join $objdir $j] "
+		}
+	    }
+	    puts $fout "\n"
+	}
+    }
+    close $fout
+    
+    return $make
+}
+
+proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
+    variable project
+    variable dataM
     variable compilationstatus
 
-    if { $project == "" } {
+    if { $project eq "" } {
 	if { [info exists RamDebugger::options(recentprojects)] && \
 		[llength $RamDebugger::options(recentprojects)] > 0 } {
 	    set project [lindex $RamDebugger::options(recentprojects) 0]
@@ -1770,14 +1987,14 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
     }
 
     if { $debrel != "debug" && $debrel != "release" } {
-	WarnWin "error: program must be in debug or in release mode"
+	WarnWin [_ "error: program must be in debug or in release mode"]
 	return -1
     }
     if { [auto_execok gcc] == "" } {
-	set ret [DialogWin::messageBox -default yes -icon question -message \
-	    "Could not find command 'gcc'. Do you want to see the help?" -parent $w \
-	    -title "Command not found" -type yesno]
-	if { $ret == "yes" } {
+	set ret [snit_messageBox -default yes -icon question -message \
+		[_ "Could not find command 'gcc'. Do you want to see the help?"] -parent $w \
+		-title [_ "Command not found"] -type yesno]
+	if { $ret eq "yes" } {
 	    RamDebugger::ViewHelpForWord "Debugging c++"
 	    #RamDebugger::ViewHelpFile "01RamDebugger/RamDebugger_12.html"
 	}
@@ -1789,220 +2006,82 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 
     set menu [$RamDebugger::mainframe getmenu c++]
     $menu add separator
-    $menu add command -label "Stop compiling" -command \
-       "set ::cproject::compilationstatus 2"
-
+    $menu add command -label [_ "Stop compiling"] -command \
+	"set ::cproject::compilationstatus 2"
+    
     set pwd [pwd]
     cd [file dirname $project]
-
-    set objdir [file tail [file root $project]]_$debrel
-    if { ![file exists $objdir] } { file mkdir $objdir }
 
     set cproject::compilationstatus -1
 
     set catch_err [catch {
-	if { $unique_file != "" } {
-	    set found 0
-	    set unique_file [RamDebugger::filenormalize $unique_file]
-	    foreach i $files {
-		foreach "file_in type group_in path" $i break
-		set file_in2 [RamDebugger::filenormalize [file join [file dirname $project] \
-		        $path $file_in]]
-		if { [string equal $file_in2 $unique_file] } {
-		    set compfiles [list $i]
-		    set found 1
-		    break
-		}
+	    if { $unique_file ne "" } {
+		set project_short "$unique_file $debrel"
+	    } else {
+		set project_short "[file root [file tail $project]] $debrel"
 	    }
-	    if { !$found } {
-		WarnWin "error: file '$unique_file' is not included in the compile project"
-		set cproject::compilationstatus 1
-		set compfiles ""
-	    }
-	    set forcecompile 1
-	    set project_short "$file_in $debrel"
-	} else {
-	    set compfiles $files
-	    set forcecompile 0
-	    set project_short "[file root [file tail $project]] $debrel"
-	}
-	
-	RamDebugger::TextCompRaise
-	RamDebugger::TextCompInsert "[string repeat - 20]Compiling $project_short"
-	RamDebugger::TextCompInsert "[string repeat - 20]\n"
-	update
-
-	set make [file join $objdir Makefile.ramdebugger]
-	if { $unique_file != "" } { append make 1 }
-
-	set fout [open $make w]
-	
-	puts -nonewline  $fout "\n# Makefile  -*- makefile -*- "
-	puts $fout "Created: [clock format [clock seconds] -format {%Y-%m-%d %H:%M:%S}]"
-	puts $fout "\n[string repeat # 80]"
-	puts $fout "# Makefile automatically made by RamDebugger"
-	puts $fout "#     execute it from the upper directory"
-	puts $fout "[string repeat # 80]\n"
-
-	if { $unique_file == "" } {
-	    puts -nonewline $fout "all: "
-	    foreach link $links {
-		puts -nonewline $fout "[file join $objdir $dataL($debrel,$link,linkexe)] "
-	    }
-	    puts $fout "\n"
-	}
-
-	foreach i $compfiles {
-	    foreach "file_in type group_in path" $i break
-
-	    if { [string trim $dataC($group_in,$debrel,compiler)] == "" } { continue }
-
-	    set file [file join $path $file_in]
-	    set objfile [file join $objdir [file root $file_in].o]
+	    RamDebugger::TextCompRaise
+	    RamDebugger::TextCompInsert "[string repeat - 20]Compiling $project_short"
+	    RamDebugger::TextCompInsert "[string repeat - 20]\n"
+	    update
 	    
-	    if { $forcecompile && [file exists $objfile] } {
-		file delete $objfile
-	    }
-	    set dependencies [ScanHeaders $file]
-	    puts -nonewline $fout "[printfilename $objfile]: [printfilename $file]"
-	    foreach i $dependencies {
-		puts -nonewline $fout " [printfilename $i]"
-	    }
-	    puts -nonewline $fout "\n\t$dataC($group_in,$debrel,compiler) "
-	    foreach j $dataC($group_in,$debrel,flags) {
-		puts -nonewline $fout "$j "
-	    }
-	    foreach j $dataC($group_in,$debrel,includedirs) {
-		if { [string first " " $j] == -1 } {
-		    puts -nonewline $fout "-I$j "
-		} else {
-		    puts -nonewline $fout "-I\"$j\" "
+	    if { $dataM($debrel,has_userdefined_makefile)  } {
+		set make $dataM($debrel,makefile_file)
+		set make_args $dataM($debrel,makefile_arguments)
+		if { $unique_file ne "" } {
+		    set rel_unique_file [ConvertToRelative [file dirname $project] $unique_file]
+		    set ret [exec make -W $rel_unique_file -n -p | grep [format {:[[:space:]]*%s} $rel_unique_file]]
+		    regexp {^\s*(.*\S)\s*:} $ret {} target
+		    lappend make_args -W $rel_unique_file $target
 		}
+	    } else {
+		set make [create_auto_makefile $debrel $unique_file]
+		set make_args ""
 	    }
-	    foreach j $dataC($group_in,$debrel,defines) {
-		puts -nonewline $fout "-D$j "
+	    if { $::tcl_platform(platform) eq "windows" } {
+		set comm ""
+		#set comm [auto_execok start]
+		#lappend comm  /w /m
+		#lappend comm  /WAIT /MIN
+	    } else {
+		set comm ""
 	    }
-	    puts -nonewline $fout "\\\n\t\t-o [printfilename $objfile] "
-	    puts $fout "[printfilename $file]\n"
-	}
-	if { $unique_file == "" } {
-	    foreach link $links {
-		set objfiles ""
-		foreach i $files {
-		    foreach "file_in type group_in path" $i break
-		    if { [lsearch $dataL($debrel,$link,linkgroups) $group_in] != -1 || \
-		            [lsearch $dataL($debrel,$link,linkgroups) All] != -1 } {
-		        if { [file ext $file_in] == ".rc" } {
-		            lappend objfiles [file join $path $file_in]
-		        } else {
-		            lappend objfiles [file join $objdir [file root $file_in].o]
+	    lappend comm make
+	    if { $nostop } {
+		lappend comm -k
+	    }
+	    lappend comm -f $make {*}$make_args
+	    
+	    if { $nostop } {
+		RamDebugger::TextCompInsert "make -k -f $make $make_args\n"
+	    } else {
+		RamDebugger::TextCompInsert "make -f $make $make_args\n"
+	    }
+	    set fin [open "|$comm |& cat" r]
+	    
+	    fconfigure $fin -blocking 0
+	    fileevent $fin readable [list cproject::CompileFeedback $fin]
+	    
+	    vwait cproject::compilationstatus
+	
+	    if { $compilationstatus == 2 } {
+		if { $::tcl_platform(platform) eq "windows" } {
+		    # maybe it kills also other compilations from other RamDebugger's or manual make's
+		    # but that's live and that's windows
+		    foreach i [split [exec tlist] \n] {
+		        if { [string match -nocase "*make.exe*" $i] } {
+		            catch { exec kill /f [scan $i %d] }
 		        }
 		    }
 		}
-		if { [string trim $dataL($debrel,$link,linkexe)] == "" } {
-		    set tt "WARNING: no output name for linking target '$link'. "
-		    append tt "assuming 'program_$link.exe'\n"
-		    RamDebugger::TextCompInsertRed $tt
-		    set outputname [file join $objdir program_$link.exe]
-		} else {
-		    set outputname [file join $objdir $dataL($debrel,$link,linkexe)]
-		}
-
-		set target [string toupper OBJFILES_$link]
-		set string "$target = "
-		foreach i $objfiles {
-		    append string "$i "
-		    if { [string length $string] > 70 } {
-		        puts $fout "$string \\"
-		        set string ""
-		    }
-		}
-		puts $fout "$string\n"
-
-		puts $fout "$outputname: \$($target)"
-		puts -nonewline $fout "\t$dataL($debrel,$link,linker) "
-		foreach j $dataL($debrel,$link,linkflags) {
-		    puts -nonewline $fout  "$j "
-		}
-		puts -nonewline $fout "-o $outputname \$($target) "
-		foreach j $dataL($debrel,$link,librariesdirs) {
-		    if { $dataL($debrel,$link,linker) != "windres" } {
-		        if { [string first " " $j] == -1 } {
-		            puts -nonewline $fout "-L$j "
-		        } else {
-		            puts -nonewline $fout "-L\"$j\" "
-		        }
-		    } else {
-		        if { [string first " " $j] == -1 } {
-		            puts -nonewline $fout "--include $j "
-		        } else {
-		            puts -nonewline $fout "--include \"$j\" "
-		        }
-		    }
-		}
-		if { $dataL($debrel,$link,linker) != "windres" } {
-		    puts -nonewline $fout "-L$objdir "
-		}
-		foreach j $dataL($debrel,$link,libraries) {
-		    if { [regexp {^lib(.*)(\.a|\.lib|\.so)$} $j {} j2] } {
-		        puts -nonewline $fout "-l$j2 "
-		    } elseif { [regexp {^lib(.*)} $j {} j2] } {
-		        puts -nonewline $fout "-l$j2 "
-		    } elseif { [file exists $j] } {
-		        puts -nonewline $fout "$j "
-		    } elseif { [regexp {(?i)(.*)\.lib} $j {} j2] } {
-		        puts -nonewline $fout "-l$j2 "
-		    } else {
-		        puts -nonewline $fout "[file join $objdir $j] "
-		    }
-		}
-		puts $fout "\n"
+		catch { close $fin }
 	    }
-	}
-	close $fout
-
-	if { $::tcl_platform(platform) == "windows" } {
-	    set comm ""
-	    #set comm [auto_execok start]
-	    #lappend comm  /w /m
-	    #lappend comm  /WAIT /MIN
-	} else { set comm "" }
-
-	lappend comm make
-	if { $nostop } { lappend comm -k }
-	lappend comm -f $make
-
-	if { $nostop } {
-	    RamDebugger::TextCompInsert "make -k -f $make\n"
-	} else {
-	    RamDebugger::TextCompInsert "make -f $make\n"
-	}
-	set fin [open "|$comm |& cat" r]
-	
-	fconfigure $fin -blocking 0
-	fileevent $fin readable [list cproject::CompileFeedback $fin]
-	
-	vwait cproject::compilationstatus
-	
-	if { $compilationstatus == 2 } {
-	    if { $::tcl_platform(platform) == "windows" } {
-		# maybe it kills also other compilations from other RamDebugger's or manual make's
-		# but that's live and that's windows
-		foreach i [split [exec tlist] \n] {
-		    if { [string match -nocase "*make.exe*" $i] } {
-		        catch { exec kill /f [scan $i %d] }
-		    }
-		}
-	    }
-	    catch { close $fin }
-	}
-    } catch_string]
+	} catch_string]
 	
     if { $catch_err } {
 	WarnWin $catch_string
 	set compilationstatus 1
     }
-
     switch -- $compilationstatus {
 	-1 {
 	    RamDebugger::TextCompInsert "Project '$project_short' is up to date"
@@ -2037,10 +2116,10 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
     } else { return 0 }
 }
 
-proc cproject::CompileFeedback { fin} {
+proc cproject::CompileFeedback { fin } {
     variable compilationstatus
 
-    if { [eof $fin] } {
+    if { [catch { eof $fin } ret] || $ret } {
 	set err [catch { close $fin } errstring]
 	if { $err } {
 	    RamDebugger::TextCompInsert $errstring\n
@@ -2050,7 +2129,7 @@ proc cproject::CompileFeedback { fin} {
 	}
 	return
     }
-    gets $fin aa
+    set ret [gets $fin aa]
 
     if { $aa != "" } {
 	RamDebugger::TextCompInsert $aa\n
@@ -2119,5 +2198,160 @@ proc cproject::EvalScript { w debrel scripttab { show 0 } } {
     }
     cd $pwd
 }
+
+################################################################################
+# DebugCplusPlus
+################################################################################
+
+proc RamDebugger::DebugCplusPlusWindow { { tryautomatic 0 } } {
+    variable text
+    variable options
+
+    if { ![info exists options(debugcplusplus)] } {
+	set options(debugcplusplus) ""
+    }
+
+    set exes ""
+    set dirs ""
+    set args ""
+    foreach "exe dir arg" $options(debugcplusplus) {
+	lappend exes $exe
+	lappend dirs $dir
+	lappend args $arg
+    }
+    lassign [cproject::GiveDebugData] exe dir arg
+
+    if { $tryautomatic && $exe != "" } {
+	set found 0
+	set ipos 0
+	foreach "exe_in dir_in arg_in" $options(debugcplusplus) {
+	    if { $exe == $exe_in && $dir == $dir_in && $arg == $arg_in } {
+		set found 1
+		break
+	    }
+	    incr ipos 3
+	}
+	if { $found && $ipos != 0 } {
+	    set options(debugcplusplus) [lreplace $options(debugcplusplus) $ipos \
+		    [expr $ipos+2]]
+	}
+	if { !$found || $ipos != 0 } {
+	    set options(debugcplusplus) [linsert $options(debugcplusplus) 0 \
+		    $exe $dir $arg]
+	}
+
+	rdebug -debugcplusplus [list $exe $dir $arg]
+	return
+    }
+    if { $tryautomatic && $options(debugcplusplus) != "" } {
+	rdebug -debugcplusplus [lrange $options(debugcplusplus) 0 2]
+	return
+    }
+    
+    destroy $text.cmp
+    set w [dialogwin_snit $text.cmp -title [_ "Debug c++"]]
+    set f [$w giveframe]
+    
+    ttk::label $f.l1 -text [_ "Program to debug"];
+    ttk::combobox $f.cb1 -textvariable [$w give_uservar executable ""] -width 40 -values \
+	$exes
+    ttk::button $f.b1 -image [Bitmap::get file] -style Toolbutton -command \
+	[list RamDebugger::DebugCplusPlusWindow_getexe $w]
+    
+    ttk::label $f.l2 -text [_ "Directory"];
+    ttk::combobox $f.cb2 -textvariable [$w give_uservar directory ""] -width 40 -values \
+	$dirs
+    ttk::button $f.b2 -image [Bitmap::get folder] -style Toolbutton -command \
+	[list RamDebugger::DebugCplusPlusWindow_getdir $w]
+  
+    ttk::label $f.l3 -text [_ "Arguments"];
+    ttk::combobox $f.cb3 -textvariable [$w give_uservar arguments ""] -width 40 -values \
+	$args
+
+    grid $f.l1 $f.cb1 $f.b1 -sticky w -padx 2 -pady 2
+    grid $f.l2 $f.cb2 $f.b2 -sticky w -padx 2 -pady 2
+    grid $f.l3 $f.cb3           -sticky w -padx 2 -pady 2
+    grid configure $f.cb1 $f.cb2 $f.cb3 -sticky ew
+    grid columnconfigure $f 1 -weight 1
+    
+    if { [info exists options(debugcplusplus)] } {
+	$w set_uservar_value executable [lindex $options(debugcplusplus) 0]
+	$w set_uservar_value directory [lindex $options(debugcplusplus) 1]
+	$w set_uservar_value arguments [lindex $options(debugcplusplus) 2]
+    }
+    tk::TabToWindow $f.cb1
+    bind $w <Return> [list $w invokeok]
+    set action [$w createwindow]
+    while 1 {
+	switch -- $action {
+	    -1 -- 0 {
+		destroy $w
+		return
+	    }
+	    1 {
+		set found 0
+		set ipos 0
+		foreach "exe dir args" $options(debugcplusplus) {
+		    if { $exe eq [$w give_uservar_value executable] && \
+		        $dir eq [$w give_uservar_value directory]  && \
+		            $args eq [$w give_uservar_value arguments]  } {
+		        set found 1
+		        break
+		    }
+		    incr ipos 3
+		}
+		if { $found && $ipos != 0 } {
+		    set options(debugcplusplus) [lreplace $options(debugcplusplus) $ipos \
+		            [expr $ipos+2]]
+		}
+		if { !$found || $ipos != 0 } {
+		    set options(debugcplusplus) [linsert $options(debugcplusplus) 0 \
+		            [$w give_uservar_value executable] [$w give_uservar_value directory] \
+		            [$w give_uservar_value arguments]]
+		}
+		rdebug -debugcplusplus [list  [$w give_uservar_value executable]  \
+		        [$w give_uservar_value directory]   [$w give_uservar_value arguments]]
+		destroy $w
+		return
+	    }
+	}
+	set action [$w waitforwindow]
+    }
+}
+
+proc RamDebugger::DebugCplusPlusWindow_getexe { w } {
+
+    set file [tk_getOpenFile -filetypes {{{All Files} *}} \
+	    -initialdir $RamDebugger::options(defaultdir) -initialfile \
+	    [$w give_uservar_value executable] -parent $w -title [_ "Debug executable"]]
+    if { $file eq "" } { return }
+    set RamDebugger::options(defaultdir) [file dirname $file]
+    $w set_uservar_value executable $file
+}
+
+proc RamDebugger::DebugCplusPlusWindow_getdir { w } {
+
+    if { [file isdirectory [file dirname [$w give_uservar_value executable]]] } {
+	set initial [file dirname [$w give_uservar_value executable]]
+    } else {
+	set initial $RamDebugger::options(defaultdir)
+    }
+    set dir [tk_chooseDirectory -initialdir $initial -parent $w -mustexist 1 -title [_ "Debug directory"]]
+    if { $dir eq "" } { return }
+    set RamDebugger::options(defaultdir) $dir
+    $w set_uservar_value directory $dir
+}
+
+
+
+
+
+
+
+
+
+
+
+
 
 
