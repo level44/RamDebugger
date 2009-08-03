@@ -1,6 +1,4 @@
 
-
-
 namespace eval cproject {
     variable project ""
     variable group All
@@ -418,9 +416,11 @@ proc cproject::OpenProject { w { ask 1 } { raise_error 0 } } {
 	set file [tk_getOpenFile -filetypes $types -initialdir $dir -parent $w \
 	    -title [_ "Open existing project"] -defaultextension .prj]
 	if { $file == "" } { return }
-    } else { set file $project }
-
+    } else {
+	set file $project
+    }
     set project $file
+    set RamDebugger::options(defaultdir) [file dirname $file]
 
     trace vdelete ::cproject::group w "cproject::SetGroupActive;#"
     trace vdelete ::cproject::debugrelease w "cproject::SetDebugReleaseActive;#"
@@ -828,8 +828,10 @@ proc cproject::Create { par } {
     set comm [string map [list PARENT $w] $comm]
     $nf21.b configure -command $comm
     
-    if { ![info exists cproject::thisdataM(has_userdefined_makefile)] } {
-	set cproject::thisdataM(has_userdefined_makefile) 0
+    foreach "n v" [list has_userdefined_makefile 0 makefile_file Makefile makefile_arguments ""] {
+	if { ![info exists cproject::thisdataM($n)] } {
+	    set cproject::thisdataM($n) $v
+	}
     }
     set cmd [list cproject::update_active_inactive_makefile $w [list $nf21.l1 $nf21.cb1 $nf21.b $nf21.l2 $nf21.e]]
     trace add variable cproject::thisdataM(has_userdefined_makefile) write "$cmd;#"
@@ -864,10 +866,13 @@ proc cproject::Create { par } {
     grid columnconfigure $nf33 0 -weight 1
 
     set comm {
-	set cproject::thisdataE(exe) [tk_getOpenFile -filetypes {{{All Files} *}} \
+	set file [tk_getOpenFile -filetypes {{{All Files} *}} \
 		-initialdir $RamDebugger::options(defaultdir) -initialfile \
 		[file tail $cproject::thisdataE(exe)] -parent PARENT -title [_ "Executable file"]]
-    }
+	if { $file ne "" } {
+	    set cproject::thisdataE(exe) $file
+	}
+     }
     set comm [string map [list PARENT $w] $comm]
     $nf31.b configure -command $comm
 
@@ -918,15 +923,25 @@ proc cproject::Create { par } {
 
 proc cproject::update_active_inactive_makefile { w wList } {
     variable thisdataM
+    variable notebook
     
     if { $thisdataM(has_userdefined_makefile) } {
 	set state !disabled
+	set nstate disabled
     } else {
 	set state disabled
+	set nstate normal
     }
     foreach i $wList {
 	$i state $state
     }
+    foreach i [$notebook tabs] {
+	set txt [$notebook tab $i -text]
+	if { [string match Link* $txt] || $txt eq [_ "Compilation"]  } {
+	    $notebook tab $i -state $nstate
+	}
+    }
+
 }
 
 proc cproject::fill_files_list { w } {
@@ -1430,7 +1445,7 @@ proc cproject::IsProjectNameOk {} {
     } else { set w . }
 
     if { [string trim $project] == "" } {
-	WarnWin "Define a project name before entering data" $w
+	WarnWin [_ "Define a project name before entering data"] $w
 	return -code return
     }
     if { [file pathtype $project] != "absolute" } {
