@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.136 2009/08/03 17:46:41 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.137 2009/08/06 17:07:17 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7656,6 +7656,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     
     if { ![catch { package vcompare [package provide Tk] 8.5 } ret] && $ret < 0} {
 	interp alias "" ttk::style "" style
+    }
+    if { [info exists ::ispocket] } {
+	set ispocket $::ispocket
+    } elseif { $::tcl_platform(os) eq "Windows CE" } {
+	set ispocket 1
+    } else {
+	set ispocket 0
     }
     if { [ tk windowingsystem] eq "x11" || $ispocket } {
 	ttk::style theme use clam
