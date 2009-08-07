@@ -544,9 +544,21 @@ proc RamDebugger::CVS::indicator_init { f } {
     
     foreach i [list 1 2 3] {
 	#bind $f.l$i <1> [list RamDebugger::OpenProgram tkcvs]
-	bind $f.l$i <1> [list RamDebugger::CVS::update_recursive $cvs_indicator_frame]
+	bind $f.l$i <1> [list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
+	bind $f.l$i <3> [list RamDebugger::CVS::indicator_menu $cvs_indicator_frame %X %Y]
     }
     grid $f.l1 $f.l2 $f.l3 -sticky w
+}
+
+proc RamDebugger::CVS::indicator_menu { cvs_indicator_frame x y } {
+
+    destroy $cvs_indicator_frame.menu
+    set menu [menu $cvs_indicator_frame.menu -tearoff 0]
+    $menu add command -label [_ "Open"] -command \
+	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
+    $menu add command -label [_ "Open - current directory"] -command \
+	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame current]
+    tk_popup $menu $x $y
 }
 
 proc RamDebugger::CVS::indicator_update {} {
@@ -638,7 +650,7 @@ proc RamDebugger::CVS::indicator_update_do {} {
 #    proc CVS update recursive
 ################################################################################
 
-proc RamDebugger::CVS::update_recursive { wp } {
+proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     
     if { [file isdirectory [file dirname $RamDebugger::currentfile]] } {
 	set directory [file dirname $RamDebugger::currentfile]
@@ -654,7 +666,7 @@ proc RamDebugger::CVS::update_recursive { wp } {
     append script "[list namespace eval RamDebugger ""]\n"
     append script "[list set RamDebugger::MainDir $RamDebugger::MainDir]\n"
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
-    append script "[list update_recursive_do0 $directory]\n"
+    append script "[list update_recursive_do0 $directory $current_or_last]\n"
     
     if { $::tcl_platform(threaded) } {
 	package require Thread
@@ -668,7 +680,7 @@ proc RamDebugger::CVS::update_recursive { wp } {
     }
 }
 
-proc RamDebugger::CVS::update_recursive_do0 { directory } {
+proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 
     package require dialogwin
     #package require compass_utils
@@ -686,7 +698,9 @@ proc RamDebugger::CVS::update_recursive_do0 { directory } {
     
     set directories [dict_getd $dict directories ""]
     set dir [lindex $directories 0]
-    if { $dir eq "" } { set dir $directory }
+    if { $dir eq "" || $current_or_last eq "current" } {
+	set dir $directory
+    }
     if { $directory ne "" } {
 	set directories [linsert0 $directories $directory]
     }
