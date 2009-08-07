@@ -153,7 +153,7 @@ void RamDebuggerInstrumenterInitState(InstrumenterState* is)
 	     "set ::RamDebugger::Instrumenter::colors($i) green\n"
 	     "}\n"
 	     "foreach i [list #include static const if else new delete for return sizeof while continue \
-                 break class typedef struct #else #endif #if] {\n"
+		 break class typedef struct #else #endif #if] {\n"
 	     "set ::RamDebugger::Instrumenter::colors_cpp($i) magenta\n"
 	     "}\n"
 	     "foreach i [list #ifdef #ifndef #define #undef] {\n"
@@ -1020,18 +1020,18 @@ Tcl_Obj* append_block_info(InstrumenterState* is,Tcl_Obj *blockinfocurrent,Tcl_O
 }
 
 Tcl_Obj* append_block_infoS(InstrumenterState* is,Tcl_Obj *blockinfocurrent,const char* color,
-			    int p1,int p2)
+		            int p1,int p2)
 {
   return append_block_info(is,blockinfocurrent,Tcl_NewStringObj(color,-1),p1,p2);
 }
 
 Tcl_Obj* check_word_color_cpp(InstrumenterState* is,Tcl_Obj *blockinfocurrent,int icharline,
-			      int also_magenta2)
+		              int also_magenta2)
 {
   Tcl_Obj *tmpObj;
   if(is->wordtype==W_WT){
     tmpObj=Tcl_GetVar2Ex(is->ip,"::RamDebugger::Instrumenter::colors_cpp",
-			 Tcl_GetStringFromObj(is->currentword,NULL),TCL_GLOBAL_ONLY);
+		         Tcl_GetStringFromObj(is->currentword,NULL),TCL_GLOBAL_ONLY);
     if(tmpObj){
       int icharlineold=icharline-Tcl_GetCharLength(is->currentword);
       blockinfocurrent=append_block_info(is,blockinfocurrent,tmpObj,icharlineold,icharline);
@@ -1209,9 +1209,9 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 	    blockinfocurrent=append_block_infoS(is,blockinfocurrent,"blue",is->wordtypepos,icharline);
 	  } else {
 	    blockinfocurrent=append_block_infoS(is,blockinfocurrent,"green",is->wordtypepos,
-						is->wordtypepos+cipos-cw+2);
+		                                is->wordtypepos+cipos-cw+2);
 	    blockinfocurrent=append_block_infoS(is,blockinfocurrent,"blue",
-						is->wordtypepos+cipos-cw+2,icharline);
+		                                is->wordtypepos+cipos-cw+2,icharline);
 	  }
 	  is->nextiscyan=0;
 	} else if(!commentlevel){
@@ -1353,8 +1353,8 @@ struct Xml_state
   int iline,icharline;
 
   Xml_state(Tcl_Interp *_ip,int _indentlevel): ip(_ip),indentlevel(_indentlevel),
-					       xml_state_tag_listNum(0),xml_states_names_listNum(0),
-					       iline(0),icharline(0) {}
+		                               xml_state_tag_listNum(0),xml_states_names_listNum(0),
+		                               iline(0),icharline(0) {}
   void enter_line_icharline(int _iline,int _icharline) { iline=_iline ; icharline=_icharline; }
 
   void push_state(Xml_states_names state);
