@@ -1050,17 +1050,19 @@ Tcl_Obj* check_word_color_cpp(InstrumenterState* is,Tcl_Obj *blockinfocurrent,in
   return blockinfocurrent;
 }
 
-int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* blockinfoname,int progress) {
+int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* blockinfoname,int progress,int indentlevel_ini) {
 
   int i,p1,length,
     line,ichar,icharline,simplechar_line,simplechar_pos,
     commentlevel,finishedline,result;
   Tcl_Obj *blockinfo,*blockinfocurrent,*tmpObj;
   char c,lastc,buf[1024];
-
+  
   length = ( int)strlen(block);
-  if(length>1000 && progress){
+  if(length>5000 && progress){
 /*     RamDebugger::ProgressVar 0 1 */
+  } else {
+    progress=0;
   }
 
   InstrumenterState instrumenterstate,*is;
@@ -1071,10 +1073,10 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
   Tcl_IncrRefCount(blockinfo);
   blockinfocurrent=Tcl_NewListObj(0,NULL);
   Tcl_IncrRefCount(blockinfocurrent);
-  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(0));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(indentlevel_ini));
   Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
   RamDebuggerInstrumenterInitState(is);
-
+  is->braceslevel=indentlevel_ini;
 
   commentlevel=0;
 //   braceslevelNoEval=0;
@@ -1095,7 +1097,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
   for(i=0;i<length;i++){
     c=block[i];
 
-    if(ichar%1000 == 0 && progress){
+    if(ichar%5000 == 0 && progress){
       /*       RamDebugger::ProgressVar [expr {$ichar*100/$length}] */
     }
     if(simplechar_line>0){
@@ -1241,12 +1243,12 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
       blockinfo=Tcl_CopyIfShared(blockinfo);
       Tcl_ListObjAppendElement(is->ip,blockinfo,blockinfocurrent);
       line++;
-      tmpObj=Tcl_NewIntObj(is->level);
+      tmpObj=Tcl_NewIntObj(is->braceslevel);
       Tcl_IncrRefCount(tmpObj);
       blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
       Tcl_SetListObj(blockinfocurrent,1,&tmpObj);
       Tcl_DecrRefCount(tmpObj);
-
+      
       blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
       if(finishedline){
 	Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
@@ -1290,11 +1292,15 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
   if(commentlevel>0){
     sprintf(buf,"error: There is a non-closed comment beginning at line %d",is->wordtypeline);
     Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
+    Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+    Tcl_SetVar2Ex(is->ip,"blockinfo",NULL,blockinfo,0);
     Tcl_DecrRefCount(blockinfo);
     Tcl_DecrRefCount(blockinfocurrent);
     return TCL_ERROR;
   }
   if(is->braceslevel){
+    Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+    Tcl_SetVar2Ex(is->ip,"blockinfo",NULL,blockinfo,0);
     return is->braces_history_error(line);
   }
   result=RamDebuggerInstrumenterEndState(is);
@@ -1305,7 +1311,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 #ifdef _DEBUG
   char* tmpblockinfo=Tcl_GetString(blockinfo);
 #endif
-  if(length>1000 && progress){
+  if(progress){
     /*     RamDebugger::ProgressVar 100 */
   }
   Tcl_DecrRefCount(blockinfo);
@@ -1820,7 +1826,7 @@ int RamDebuggerInstrumenterDoWorkForCpp(ClientData clientData, Tcl_Interp *ip, i
   int result,progress=1,indentlevel_ini=0,raiseerror=1;
   if (objc<3) {
     Tcl_WrongNumArgs(ip, 1, objv,
-		     "block blockinfoname ?progress?");
+		     "block blockinfoname ?progress? ?indent_level_ini?");
     return TCL_ERROR;
   }
   if (objc>=4){
@@ -1836,7 +1842,7 @@ int RamDebuggerInstrumenterDoWorkForCpp(ClientData clientData, Tcl_Interp *ip, i
     if(result) return TCL_ERROR;
   }
   result=RamDebuggerInstrumenterDoWorkForCpp_do(ip,Tcl_GetString(objv[1]),Tcl_GetString(objv[2]),
-		                                progress);
+    progress,indentlevel_ini);
   return result;
 }
 

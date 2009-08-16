@@ -845,7 +845,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" 
 
     if { [info commands RamDebuggerInstrumenterDoWorkForCpp] ne "" } {
 	RamDebuggerInstrumenterDoWorkForCpp $block $blockinfoname \
-	    $progress
+	    $progress $indentlevel_ini
     } else {
 	uplevel [list RamDebugger::Instrumenter::DoWorkForC++_do $block $blockinfoname \
 		$progress $indentlevel_ini]
@@ -858,8 +858,9 @@ proc RamDebugger::Instrumenter::DoWorkForC++_do { block blockinfoname "progress 
     set length [string length $block]
     if { $length >= 5000 && $progress } {
 	RamDebugger::ProgressVar 0 1
+    } else {
+	set progress 0
     }
-
     upvar $blockinfoname blockinfo
     set blockinfo ""
     set blockinfocurrent [list $braceslevelIni n]
@@ -1205,7 +1206,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++_do { block blockinfoname "progress 
 	}
 	error "error: There is a non-closed brace at the end of the file (see Output for details)"
     }
-    if { $length >= 1000  && $progress } {
+    if { $progress } {
 	RamDebugger::ProgressVar 100
     }
 }

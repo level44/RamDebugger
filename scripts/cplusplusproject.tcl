@@ -840,11 +840,10 @@ proc cproject::Create { par } {
 	    set cproject::thisdataM($n) $v
 	}
     }
-    set cmd [list cproject::update_active_inactive_makefile $w [list $nf21.l1 $nf21.cb1 $nf21.b $nf21.l2 $nf21.e]]
-    trace add variable cproject::thisdataM(has_userdefined_makefile) write "$cmd;#"
+    set cmdMake [list cproject::update_active_inactive_makefile $w [list $nf21.l1 $nf21.cb1 $nf21.b $nf21.l2 $nf21.e]]
+    trace add variable cproject::thisdataM(has_userdefined_makefile) write "$cmdMake;#"
     bind $nf2.cb1 <Delete> [list trace remove variable cproject::thisdataM(has_userdefined_makefile) \
-	    write "$cmd;#"]
-    eval $cmd
+	    write "$cmdMake;#"]
     
     set nf3 [ttk::frame $nb.f3]
     $nb add $nf3 -text [_ Execute] -sticky nsew
@@ -890,6 +889,8 @@ proc cproject::Create { par } {
     # if it exists from before, it will be deleted
     trace vdelete ::cproject::scripttabs w "UpdateScripttabs ;#"
     trace var cproject::scripttabs w "UpdateScripttabs ;#"
+    
+    eval $cmdMake
 
     grid $f1.l1 $f1.cb1     -           -           -       -       $f1.b1 $f1.b2 $f1.b3 -sticky w
     grid $f1.l2 $f1.cb2 $f1.b4 $f1.b5 $f1.b6 $f11 -       -          -   -   -sticky w
@@ -1677,6 +1678,7 @@ proc cproject::CleanCompiledFiles { w } {
 
     RamDebugger::SetMessage [_ "Cleaning compilation files..."]
     RamDebugger::WaitState 1
+    
 
     if { $project eq "" } {
 	if { [info exists RamDebugger::options(recentprojects)] && \
@@ -1690,25 +1692,30 @@ proc cproject::CleanCompiledFiles { w } {
 	    return
 	}
     }
-    set dr $RamDebugger::options(debugrelease)
+    set debrel $RamDebugger::options(debugrelease)
 
-    if { $dr eq "both" } {
+    if { $debrel eq "both" } {
 	WarnWin [_ "error: program must be in debug or in release mode"]
 	RamDebugger::WaitState 0
 	return
     }
-    if { $dataM($dr,has_userdefined_makefile)  } {
+    set pwd [pwd]
+    cd [file dirname $project]
+
+    if { $dataM($debrel,has_userdefined_makefile)  } {
 	set make $dataM($debrel,makefile_file)
 	set make_args $dataM($debrel,makefile_arguments)
 	set err [catch { exec make -f $make {*}$make_args clean } ret]
     } else { 
-	set objdir [file join [file dirname $project] [file root $project]_$dr]
+	set objdir [file join [file dirname $project] [file root $project]_$debrel]
 	
 	foreach i [glob -nocomplain -dir $objdir *] {
 	    file delete $i
 	}
 	set ret ""
     }
+    cd $pwd
+    
     RamDebugger::TextCompClear
     RamDebugger::TextCompRaise
     RamDebugger::TextCompInsert [_ "Compilation files deleted"]
@@ -1732,7 +1739,7 @@ proc cproject::TouchFiles { w } {
     variable dataL
     variable dataE
 
-    set dr $RamDebugger::options(debugrelease)
+    set debrel $RamDebugger::options(debugrelease)
 
     RamDebugger::SetMessage [_ "Actualizing date for compilation files..."]
     RamDebugger::WaitState 1
@@ -1749,17 +1756,20 @@ proc cproject::TouchFiles { w } {
 	    return
 	}
     }
-    if { $dr eq "both" } {
+    if { $debrel eq "both" } {
 	WarnWin [_ "error: program must be in debug or in release mode"]
 	RamDebugger::WaitState 0
 	return
     }
-    if { $dataM($dr,has_userdefined_makefile)  } {
+    set pwd [pwd]
+    cd [file dirname $project]
+
+    if { $dataM($debrel,has_userdefined_makefile)  } {
 	set make $dataM($debrel,makefile_file)
 	set make_args $dataM($debrel,makefile_arguments)
 	set err [catch { exec make -f $make -t {*}$make_args } ret]
     } else {    
-	set objdir [file join [file dirname $project] [file root $project]_$dr]
+	set objdir [file join [file dirname $project] [file root $project]_$debrel]
 	
 	set time [clock seconds]
 	foreach i [glob -nocomplain -dir $objdir *] {
@@ -1767,9 +1777,10 @@ proc cproject::TouchFiles { w } {
 	}
 	set ret ""
     }
+    cd $pwd
     RamDebugger::TextCompClear
     RamDebugger::TextCompRaise
-    RamDebugger::TextCompRaise [_ "Actualizing date for compilation files..."]
+    RamDebugger::SetMessage [_ "Actualizing date for compilation files..."]
     if { $ret ne "" } {
 	RamDebugger::TextCompInsert $ret
     }
