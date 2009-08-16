@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.137 2009/08/06 17:07:17 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.138 2009/08/16 14:53:09 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -6508,7 +6508,7 @@ proc RamDebugger::CheckText { command args } {
     set blockinfo2 ""
     for { set i 0 } { $i < [expr {$l2_new-$l1_new+1}] } { incr i } {
 	set bi [lindex $blockinfo $i]
-	if { $bi == "" } { set bi [list 0 n] }
+	if { $bi eq "" } { set bi [list 0 n] }
 	lappend blockinfo2 [concat [expr $oldlevel+[lindex $bi 0]] [lrange $bi 1 end]]
     }
 
@@ -6869,7 +6869,7 @@ proc RamDebugger::Indent {} {
     }
     
     switch -- [GiveFileType $currentfile] {
-	"TCL" { # nothing }
+	"TCL" - "C/C++" { # nothing }
 	default { set CheckTextInactive 1 } 
     }
     for { set i $line1 } { $i <= $line2 } { incr i } {
