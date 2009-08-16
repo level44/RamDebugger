@@ -27,7 +27,7 @@ else
 endif
 
 LDFLAGS += $(addprefix -L,$(LIB_DIRECTORIES))
-LIBS += -ltclstub8.5 -lz
+LIBS += -ltclstub8.5
 
 EXE = $(OBJDIR)/RamDebuggerInstrumenter6_x32.$(LIBEXT)
 
