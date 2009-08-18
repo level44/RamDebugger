@@ -86,10 +86,10 @@ proc RamDebugger::GetFile { what types title }  {
 	}
     }
     bind $f.l1 <1> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
-    bind $f.l1 <3> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
+    bind $f.l1 <<Contextual>> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
 
-    bind $f.e1 <3> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
-    #bind $f.e1.e <3> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
+    bind $f.e1 <<Contextual>> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
+    #bind $f.e1.e <<Contextual>> [list RamDebugger::GetFile_contextual $f $f.e1 $f.b1 %X %Y]
 
     bind $f.e1 <Control-Tab> "[list set RamDebugger::getFile_done 0] ; [bind $text <Control-KeyPress-Tab>]"
 

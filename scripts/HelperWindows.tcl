@@ -379,7 +379,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 		                       -exportselection 0 -font FixedFont -highlightthickness 0]
 
     bind $f.l1 <1> [list $w invokeok]
-    bind $sw.text <3> [list RamDebugger::DisplayVarWindow_contextual %W %X %Y]
+    bind $sw.text <<Contextual>> [list RamDebugger::DisplayVarWindow_contextual %W %X %Y]
 
 
     $sw setwidget $sw.text
@@ -495,10 +495,10 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	focus [$w give_uservar_value list]
 	RamDebugger::DisplayBreakpointsWindowSetCond $w
     }
-    bind [$sw.lb bodypath] <ButtonPress-3> \
-	    [bind TablelistBody <ButtonPress-1>]
+    bind [$sw.lb bodypath] <<ContextualPress>> \
+	[bind TablelistBody <ButtonPress-1>]
 
-    bind [$sw.lb bodypath] <ButtonRelease-3> {
+    bind [$sw.lb bodypath] <<Contextual>> {
 	set w [winfo toplevel %W]
 	catch { destroy %W.menu }
 	set menu [menu %W.menu]
@@ -807,7 +807,7 @@ proc RamDebugger::PreferencesWindow {} {
 
     set nb [ttk::notebook $f.nb]
     
-    set f1 [ttk::labelframe $nb.f1 -text [_ Debugging]]
+    set f1 [ttk::labelframe $nb.f1 -text [_ Main]]
     $nb add $f1 -text [_ Debugging] -sticky nsew
 
     ttk::checkbutton $f1.cb0 -text "Automatically check remote files" -variable \
@@ -913,10 +913,17 @@ proc RamDebugger::PreferencesWindow {} {
 
     ttk::checkbutton $f1.cb12 -text [_ "Compile fast instrumenter"] -variable \
 	[$w give_uservar CompileFastInstrumenter]
-    tooltip::tooltip $f1.cb1 [_ "\
+    tooltip::tooltip $f1.cb12 [_ "\
       If this option is set, RamDebugger tries to compile automatically the fast C++ instrumented code"]
 
     $w set_uservar_value CompileFastInstrumenter $options(CompileFastInstrumenter)
+    
+    ttk::checkbutton $f1.cb13 -text [_ "Spaces to tabs"] -variable \
+	[$w give_uservar spaces_to_tabs]
+    tooltip::tooltip $f1.cb13 [_ "\
+      If this option is set, RamDebugger will convert spaces to tabs at the beginning of lines when saving a file"]
+
+    $w set_uservar_value spaces_to_tabs $options(spaces_to_tabs)
 
     if { $::tcl_platform(platform) == "windows" } {
 	grid $f1.cb0 - -sticky w
@@ -930,7 +937,8 @@ proc RamDebugger::PreferencesWindow {} {
     grid $f1.l2 $f1.sb -sticky w
     grid $f1.l3 $f1.sb2 -sticky w
     grid $f1.cb12 - -sticky w
-    
+    grid $f1.cb13 - -sticky w
+
     grid configure $f1.l2 $f1.l3 -padx "20 0"
     
     grid rowconfigure $f1 10 -weight 1
@@ -1171,7 +1179,7 @@ proc RamDebugger::PreferencesWindow {} {
 		    foreach i [list indentsizeTCL indentsizeC++ ConfirmStartDebugging \
 		            ConfirmModifyVariable openfile_browser instrument_source instrument_proc_last_line \
 		            LocalDebuggingType AutoSaveRevisions AutoSaveRevisions_time \
-		            AutoSaveRevisions_idletime CompileFastInstrumenter \
+		            AutoSaveRevisions_idletime CompileFastInstrumenter spaces_to_tabs \
 		            nonInstrumentingProcs] {
 		        set options($i) [$w give_uservar_value $i]
 		    }
@@ -1532,7 +1540,7 @@ proc RamDebugger::DisplayTimesWindow {} {
     $w.popup add command -label "Delete" -command \
 	"RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
 
-    bind [$DialogWinTop::user($w,list) bodypath] <ButtonPress-3> "tk_popup $w.popup %X %Y"
+    bind [$DialogWinTop::user($w,list) bodypath] <<Contextual>> "tk_popup $w.popup %X %Y"
 
     set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
     $bbox add -image acttick16 \
@@ -2557,8 +2565,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     set ::RamDebugger::searchcase 0
     set ::RamDebugger::SearchType -forwards
 
-    bind $f.l1 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
-    bind $f.e1 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+    bind $f.l1 <<Contextual>> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+    bind $f.e1 <<Contextual>> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
 
     bind $f.e1 <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
     bind $f.e1 <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
@@ -2576,8 +2584,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	bind $f.e1 <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
 	bind $f.e11 <Return> "RamDebugger::SearchReplace $w replace ; break"
 	bind $f.e11 <Shift-Return> "RamDebugger::SearchReplace $w beginreplace ; break"
-	bind $f.l11 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
-	bind $f.e11 <3> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+	bind $f.l11 <<Contextual>> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
+	bind $f.e11 <<Contextual>> [list RamDebugger::SearchReplace $w contextual $replace %X %Y]
 	bind $f.e11 <Home> "[list set ::RamDebugger::searchFromBegin 1] ; break"
 	bind $f.e11 <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
 	bind $f.e11 <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
@@ -2897,7 +2905,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
 	    bind $w.search <1> "destroy $w.search"
-	    bind $w.search <3> "destroy $w.search"
+	    bind $w.search <<Contextual>> "destroy $w.search"
 	    foreach i [list F1 F2 F5 F6 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
 	    }
@@ -3402,14 +3410,14 @@ proc RamDebugger::DisplayPositionsStack { args } {
     bind [$DialogWinTop::user(list) bodypath] <Return> {
 	RamDebugger::DisplayPositionsStackDo go
     }
-    bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> \
+    bind [$DialogWinTop::user(list) bodypath] <<ContextualPress>> \
 	    [bind TablelistBody <ButtonPress-1>]
 
     bind [$DialogWinTop::user(list) bodypath] <KeyPress-Delete> {
 	RamDebugger::DisplayPositionsStackDo delete
     }
 
-    bind [$DialogWinTop::user(list) bodypath] <ButtonPress-3> {
+    bind [$DialogWinTop::user(list) bodypath] <<ContextualPress>> {
 	set tablelist::win [winfo parent %W]
 	set tablelist::x [expr {%x + [winfo x %W]}]
 	set tablelist::y [expr {%y + [winfo y %W]}]

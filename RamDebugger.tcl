@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.138 2009/08/16 14:53:09 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.139 2009/08/18 23:18:41 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -278,6 +278,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(showstatusbar) 1
     set options_def(showbuttonstoolbar) 1
     set options_def(CompileFastInstrumenter) -1
+    set options_def(spaces_to_tabs) 1
 
     set options_def(colors,foreground) black
     set options_def(colors,background) white
@@ -1574,7 +1575,11 @@ proc RamDebugger::rlist { args } {
     if { ($currentfile == "*New file*" || $currentfileIsModified ) && \
 	     ![info exists instrumentedfilesP($currentfile)] } {
 	variable text
-	set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
+	if { $options(spaces_to_tabs) } {
+	    set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
+	} else {
+	    set map ""
+	}
 	set files($currentfile) [string map $map [$text get 1.0 end-1c]]
 
 	if { [lsearchfile $fileslist $currentfile] == -1 } {
@@ -4126,7 +4131,11 @@ proc RamDebugger::SaveFileF { file } {
     WaitState 1
     SetMessage [_ "Saving file '%s'" $file]...
 
-    set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
+    if { $options(spaces_to_tabs) } {
+	set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
+    } else {
+	set map ""
+    }
     set files($file) [string map $map [$text get 1.0 end-1c]]
 
     set err [catch {_savefile_only $file $files($file)} errstring]
@@ -6309,10 +6318,10 @@ proc RamDebugger::ListBoxEvents { listb exec_callback menu_callback } {
 
     $listb bindImage <1> "focus $listb ; $listb selection set"
     $listb bindText <1> "focus $listb ; $listb selection set"
-    $listb bindImage <3> "focus $listb ; $listb selection set"
-    $listb bindText <3> "focus $listb ; $listb selection set"
-    $listb bindImage <ButtonRelease-3> "$menu_callback $listb %X %Y"
-    $listb bindText <ButtonRelease-3> "$menu_callback $listb %X %Y"
+    $listb bindImage <<ContextualPress>> "focus $listb ; $listb selection set"
+    $listb bindText <<ContextualPress>> "focus $listb ; $listb selection set"
+    $listb bindImage <<Contextual>> "$menu_callback $listb %X %Y"
+    $listb bindText <<Contextual>> "$menu_callback $listb %X %Y"
     $listb bindImage <Double-1> "$exec_callback $listb"
     $listb bindText <Double-1> "$exec_callback $listb"
     bind $listb <KeyPress> [list RamDebugger::SearchInListbox $listb %K %A \
@@ -7055,7 +7064,7 @@ proc RamDebugger::CreatePanedEntries { num pane1 pane2 suffix } {
 
 	} else { $EvalEntries($i,leftentry$suffix) configure -state disabled }
 
-	bind $pane1.e$i <3> {
+	bind $pane1.e$i <<Contextual>> {
 	    set menu %W.menu
 	    destroy $menu
 	    menu $menu -tearoff 0
@@ -7653,6 +7662,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require textutil
     package require tooltip
     package require tile
+    package require img::png
     
     if { ![catch { package vcompare [package provide Tk] 8.5 } ret] && $ret < 0} {
 	interp alias "" ttk::style "" style
@@ -8122,7 +8132,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $listboxlabel <Configure> "RamDebugger::ConfigureLabel $listboxlabel"
 
     bind $listboxlabel <ButtonPress-1> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
-    bind $listboxlabel <ButtonPress-3> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
+    bind $listboxlabel <<Contextual>> "RamDebugger::ListBoxLabelMenu $listboxlabel %X %Y"
 
     set sw [ScrolledWindow $listboxlabelframe.lf -relief sunken -borderwidth 0 -grid 0]
     set listbox [ListBox $sw.lb -background white -multicolumn 0 -selectmode single]
@@ -8155,12 +8165,18 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     set marker [canvas $fulltext.can -bg grey90 -grid "0 wns" -width 14 -bd 0 \
 	    -highlightthickness 0]
-
-    event add <<Contextual>> <ButtonRelease-3>
-    if { $::tcl_platform(platform) eq "windows" } {
-      event add <<Contextual>> <App>
-    }
     
+    if { $::tcl_platform(platform) eq "windows" } {
+	event add <<ContextualPress>> <ButtonPress-3>
+	event add <<Contextual>> <ButtonRelease-3>
+	event add <<Contextual>> <App>
+    } elseif { $::tcl_platform(os) eq "Darwin" } {
+	event add <<ContextualPress>> <ButtonPress-2>
+	event add <<Contextual>> <ButtonRelease-2>
+    } else {
+	event add <<ContextualPress>> <ButtonPress-3>
+	event add <<Contextual>> <ButtonRelease-3>
+    }
     bind $marker <<Contextual>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
     
     set text [supertext::text $fulltext.text -background white -foreground black \
@@ -8246,10 +8262,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	}
 	tk_popup $f.m $x $y
     }
-    $pane2in2.nb bindtabs <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y]
-    bind $textST <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y stacktrace]
-    bind $textOUT <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y output]
-    bind $textCOMP <ButtonPress-3> [list RamDebugger::NoteBookPopupMenu %W %X %Y compile]
+    $pane2in2.nb bindtabs <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y]
+    bind $textST <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y stacktrace]
+    bind $textOUT <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y output]
+    bind $textCOMP <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y compile]
 
 
     proc TextStackTraceRaise {} "catch { $pane2in2.nb raise stacktrace }"

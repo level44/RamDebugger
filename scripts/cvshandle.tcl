@@ -545,7 +545,7 @@ proc RamDebugger::CVS::indicator_init { f } {
     foreach i [list 1 2 3] {
 	#bind $f.l$i <1> [list RamDebugger::OpenProgram tkcvs]
 	bind $f.l$i <1> [list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
-	bind $f.l$i <3> [list RamDebugger::CVS::indicator_menu $cvs_indicator_frame %X %Y]
+	bind $f.l$i <<Contextual>> [list RamDebugger::CVS::indicator_menu $cvs_indicator_frame %X %Y]
     }
     grid $f.l1 $f.l2 $f.l3 -sticky w
 }
@@ -668,7 +668,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory $current_or_last]\n"
     
-    if { $::tcl_platform(threaded) } {
+    if { $::tcl_platform(threaded) && $::tcl_platform(os) ne "Darwin" } {
 	package require Thread
 	append script "thread::wait\n"
 	thread::create $script
