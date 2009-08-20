@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.139 2009/08/18 23:18:41 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.140 2009/08/21 00:37:08 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -6045,7 +6045,19 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     variable options
 
     set data [$textstack get "$idx linestart" "$idx lineend"]
-
+    set rex {^\#([0-9]+)}
+    if { ![regexp $rex $data] && [$textstack compare "$idx linestart" > 1.0] } {
+	set prevline [$textstack get "$idx -1 line linestart" "$idx -1 line lineend"]
+	if { ![regexp $rex $prevline] } {
+	    set data "$prevline $data"
+	}
+    }
+    if { [regexp $rex $data] && [$textstack compare "$idx lineend" < "end-1l"] } {
+	set nextline [$textstack get "$idx +1 line linestart" "$idx +1 line lineend"]
+	if { ![regexp $rex $nextline] } {
+	    set data "$data $nextline"
+	}
+    }
     foreach pattern [list {((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+)} \
 		         {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)}] {
 
