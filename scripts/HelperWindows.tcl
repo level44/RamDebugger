@@ -808,7 +808,7 @@ proc RamDebugger::PreferencesWindow {} {
     set nb [ttk::notebook $f.nb]
     
     set f1 [ttk::labelframe $nb.f1 -text [_ Main]]
-    $nb add $f1 -text [_ Debugging] -sticky nsew
+    $nb add $f1 -text [_ Main] -sticky nsew
 
     ttk::checkbutton $f1.cb0 -text "Automatically check remote files" -variable \
 	[$w give_uservar CheckRemotes]
@@ -2748,7 +2748,7 @@ proc RamDebugger::inline_replace { w search_entry } {
     grab $w.replace
     
     bind $w.replace <Return> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
-    bind $w.replace <Control-i> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
+    bind $w.replace <$::control-i> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
     bind $w.replace <Escape> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry end]
     bind $w.replace <1> "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry end];break"
     
@@ -2756,8 +2756,8 @@ proc RamDebugger::inline_replace { w search_entry } {
     append cmd1 "[list RamDebugger::textPaste_insert_after $text];"
     set cmd2 "RamDebugger::Search $w iforward"
     set cmd3 "RamDebugger::Search $w iforward_all"
-    bind $w.replace <Control-j> "$cmd1; $cmd2; break"
-    bind $w.replace <Control-J> "$cmd1; $cmd3; break"
+    bind $w.replace <$::control-j> "$cmd1; $cmd2; break"
+    bind $w.replace <$::control-J> "$cmd1; $cmd3; break"
 
     set msg [_ "Press <Return> or Ctrl+I to continue search and replace\nCtrl+J to replace\nCtrl+Shift+J to replace all"]
     tooltip::tooltip $w.replace $msg
@@ -2777,8 +2777,8 @@ proc RamDebugger::inline_replace_end { w focus grab search_entry what } {
 	
 	set cmd1 "[list RamDebugger::textPaste_insert_after $text];RamDebugger::Search $w iforward"
 	set cmd2 "[list RamDebugger::textPaste_insert_after $text];RamDebugger::Search $w iforward_all"
-	bind $search_entry <Control-j> "$cmd1; break"
-	bind $search_entry <Control-J> "$cmd2; break"
+	bind $search_entry <$::control-j> "$cmd1; break"
+	bind $search_entry <$::control-J> "$cmd2; break"
     }
     destroy $w.replace
     if { $focus ne "" } { focus -force $focus }
@@ -2910,14 +2910,14 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		bind $w.search <$i> "destroy $w.search"
 	    }
 	    bind $w.search <Return> "destroy $w.search ; break"
-	    bind $w.search <Control-i> "RamDebugger::Search $w iforward ; break"
-	    bind $w.search <Control-r> "RamDebugger::Search $w ibackward ; break"
-	    bind $w.search <Control-g> "RamDebugger::Search $w stop ; break"
-	    bind $w.search <Control-c> "RamDebugger::Search_get_selection $active_text; break"
+	    bind $w.search <$::control-i> "RamDebugger::Search $w iforward ; break"
+	    bind $w.search <$::control-r> "RamDebugger::Search $w ibackward ; break"
+	    bind $w.search <$::control-g> "RamDebugger::Search $w stop ; break"
+	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
 	    
 	    if { $active_text eq $text } {
-		bind $w.search <Control-j> "RamDebugger::inline_replace $w $w.search; break"
+		bind $w.search <$::control-j> "RamDebugger::inline_replace $w $w.search; break"
 		
 		label $w.searchl1 -text $msg1
 		set x1 [expr {2+[winfo reqwidth $w.search]+2}]

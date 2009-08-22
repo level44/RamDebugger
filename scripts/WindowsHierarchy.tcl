@@ -170,9 +170,9 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 
     set widgetname [lindex [split $res \n] 0]
     bind $w.l <Escape> "destroy $w"
-    bind $w.l <Control-a> [list RamDebugger::DisplayWindowsToggleLongShortText $w $w.l $res]
-    bind $w.l <Control-x> "clipboard clear; [list clipboard append $widgetname]"
-    bind $w.l <Control-c> "clipboard clear; [list clipboard append $res]"
+    bind $w.l <$::control-a> [list RamDebugger::DisplayWindowsToggleLongShortText $w $w.l $res]
+    bind $w.l <$::control-x> "clipboard clear; [list clipboard append $widgetname]"
+    bind $w.l <$::control-c> "clipboard clear; [list clipboard append $res]"
     
     if { [regexp {\mwidth=([-\d]+).*\mheight=([-\d]+).*rootX=([-\d]+).*rootY=([-\d]+)} $res {} \
 	width height rootX rootY]  } {

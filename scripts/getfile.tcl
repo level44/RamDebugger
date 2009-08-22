@@ -69,10 +69,11 @@ proc RamDebugger::GetFile { what types title }  {
     bind $f <Destroy> "[list unset ::RamDebugger::getFileToolbar]"
 
     bind $f.e1 <<ComboboxSelected>> [list set RamDebugger::getFile_done 1]
-    bind $f.e1 <Control-o> "[list $f.b1 invoke] ; break"
+    bind $f.e1 <$::control-o> "[list $f.b1 invoke] ; break"
     bind $f.e1 <Return> "[list set RamDebugger::getFile_done 1] ; break"
     bind $f.e1 <Escape> [list set RamDebugger::getFile_done 0]
     bind $f.e1 <Alt-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
+    bind $f.e1 <$::control-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
     bind $f.e1 <Home> [list RamDebugger::GetFile_Home home]
     bind $f.e1 <Shift-Home> [list RamDebugger::GetFile_Home desktop]
     bind $f <1> {

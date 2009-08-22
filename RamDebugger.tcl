@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.140 2009/08/21 00:37:08 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.141 2009/08/23 00:03:17 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -26,7 +26,6 @@ if { [info commands _] eq "" } {
 	return [uplevel 1 ::msgcat::mc $args]
     }
 }
-
 
 ################################################################################
 #  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
@@ -4319,7 +4318,12 @@ proc RamDebugger::ViewInstrumentedFile { what } {
 proc RamDebugger::ViewHelpFile { { file "" } } {
     variable MainDir
     variable AppDataDir
-
+    
+#     if { [ tk windowingsystem] eq "aqua" } {
+#         tk_messageBox -message [_ "Normal help is not active on MacOSX. You'll be redirected to a web browser"]
+#         exec open [file join $MainDir help 01RamDebugger RamDebugger_toc.html] &
+#         return
+#     }
     package require helpviewer
 
     HelpViewer::EnterDirForIndex $AppDataDir
@@ -7686,7 +7690,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } else {
 	set ispocket 0
     }
-    if { [ tk windowingsystem] eq "x11" || $ispocket } {
+    if { [tk windowingsystem] eq "x11" || $ispocket } {
 	ttk::style theme use clam
 	ttk::style theme settings clam {
 	    ttk::style configure TButton -padding 1
@@ -7738,7 +7742,22 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     wm title $w RamDebugger
     wm protocol $w WM_DELETE_WINDOW "RamDebugger::ExitGUI"
     # ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
-    set descmenu [list \
+    
+    set descmenu ""
+    if { [ tk windowingsystem] eq "aqua"} {
+	proc ::tk::mac::ShowPreferences {} {
+	    RamDebugger::PreferencesWindow
+	}
+#         proc ::tkAboutDialog {} {
+#             RamDebugger::AboutWindow
+#         }
+	lappend descmenu \
+	    Ramdebugger all apple 0 [list \
+		[list command [_ "About Ramdebugger"] {} [_ "About"] "" \
+		    -command "RamDebugger::AboutWindow"] \
+		]
+    }
+    lappend descmenu \
 		&[_ "File"] all file 0 [list \
 		[list command &[_ "New"] {} [_ "Begin new file"] "" \
 		-command "RamDebugger::NewFile"] \
@@ -7960,9 +7979,27 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		separator \
 		[list command &[_ "About"] {} [_ "Information about the program"] "" \
 		-command "RamDebugger::AboutWindow"] \
-		] \
 		]
-
+    
+    if { [ tk windowingsystem] eq "aqua"} {
+	set descmenu_old $descmenu
+	set descmenu ""
+	set bad [list &[_ "Preferences"] &[_ "About"] &[_ "Extract examples"] \
+		&[_ "Register cmd extension"]...]
+	foreach "menuname tags menuId tearoff menuentries" $descmenu_old {
+	    set menuentriesN ""
+	    foreach i $menuentries {
+		if { [lindex $i 1] in $bad } {
+		    if { [lindex $menuentriesN end] eq "separator" } {
+		        set menuentriesN [lrange $menuentriesN 0 end-1]
+		    }
+		    continue
+		}
+		lappend menuentriesN $i
+	    }
+	    lappend descmenu $menuname $tags $menuId $tearoff $menuentriesN
+	}
+    }
     if { $iswince } {
 	set descmenu_old $descmenu
 	set menuentriesG ""
@@ -8182,12 +8219,21 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	event add <<ContextualPress>> <ButtonPress-3>
 	event add <<Contextual>> <ButtonRelease-3>
 	event add <<Contextual>> <App>
-    } elseif { $::tcl_platform(os) eq "Darwin" } {
+	set ::control Control
+    } elseif { [tk windowingsystem] eq "aqua" } {
 	event add <<ContextualPress>> <ButtonPress-2>
 	event add <<Contextual>> <ButtonRelease-2>
+	set ::control Command
+	
+	foreach ev [bind Text] {
+	    if { [regsub {Control} $ev {Command} evC] } {
+		bind Text $evC [bind Text $ev]
+	    }
+	}
     } else {
 	event add <<ContextualPress>> <ButtonPress-3>
 	event add <<Contextual>> <ButtonRelease-3>
+	set ::control Control
     }
     bind $marker <<Contextual>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
     
@@ -8479,12 +8525,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Return> "[bind Text <Return>] ; RamDebugger::IndentLine {} ; break"
 
     set c [list $text mark set insert "insert-1c"]
-    bind $text <Control-Key-2> "[list tk::TextInsert $text {""}];$c"
-    bind $text <Control-Key-9> "[list tk::TextInsert $text {()}];$c"
-    bind $text <Control-plus> "[list tk::TextInsert $text {[]}];$c"
-    bind $text <Control-Shift-plus> [list RamDebugger::insert_translation_cmd]
-    bind $text <Control-asterisk> [list RamDebugger::insert_translation_cmd]
-    bind $text <Control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
+    bind $text <$::control-Key-2> "[list tk::TextInsert $text {""}];$c"
+    bind $text <$::control-Key-9> "[list tk::TextInsert $text {()}];$c"
+    bind $text <$::control-plus> "[list tk::TextInsert $text {[]}];$c"
+    bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
+    bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
+    bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
 
     set cmd {
 	if { "%A" eq "\}" } {
@@ -8495,13 +8541,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     bind $text <KeyPress> [string map [list %OLD_CMD% [bind Text <KeyPress>]] $cmd]
    
-    bind $text <Control-x> "RamDebugger::CutCopyPasteText cut   ; break"
-    bind $text <Control-c> "RamDebugger::CutCopyPasteText copy  ; break"
-    bind $text <Control-v> "RamDebugger::CutCopyPasteText paste ; break"
-    bind [winfo toplevel $text] <Control-v> ""
+    bind $text <$::control-x> "RamDebugger::CutCopyPasteText cut   ; break"
+    bind $text <$::control-c> "RamDebugger::CutCopyPasteText copy  ; break"
+    bind $text <$::control-v> "RamDebugger::CutCopyPasteText paste ; break"
+    bind [winfo toplevel $text] <$::control-v> ""
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
-    bind $text <Control-I> [list RamDebugger::Search $w iforward_get_insert]
+    bind $text <$::control-I> [list RamDebugger::Search $w iforward_get_insert]
 
     set menu [$mainframe getmenu edit]
     $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift-I"
@@ -8556,14 +8602,14 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	tk::CancelRepeat
     }
 
-    bind all <Control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"
+    bind all <$::control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"
 
     ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
 
     # BWidgets automatically sets these because they are in the main main
     # we only want them individually in every widget
-    bind $w <Control-c> ""
-    bind $w <Control-v> ""
+    bind $w <$::control-c> ""
+    bind $w <$::control-v> ""
 
     if { $::tcl_platform(platform) eq "windows" } {
 	event delete <<PasteSelection>>
@@ -8899,7 +8945,7 @@ if { ![info exists SkipRamDebuggerInit] } {
 	    source [info script]
 	    WarnWin [_ "Reload"]
 	}
-	bind all <Control-x><Control-l> ReloadScript
+	bind all <$::control-x><$::control-l> ReloadScript
 	
 	if { [info commands master] != "" } {
 	    #RamDebugger::rdebug -master

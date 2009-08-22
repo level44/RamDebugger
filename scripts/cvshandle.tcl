@@ -24,24 +24,23 @@ proc RamDebugger::CVS::Init {} {
     unset -nocomplain ::env(CVSROOT)
     unset -nocomplain ::env(CVS_RSH)
 
-    if { ![info exists cvsrootdir] } {
-	if { $::tcl_platform(platform) eq "windows" } {
-	    set null NUL:
-	} else {
-	    set null /dev/null
-	}
-	set cvsrootdir [file join $RamDebugger::AppDataDir cvsroot]
-	set cvsworkdir  [file join $RamDebugger::AppDataDir cvswork]
-
-	if { ![file exists $cvsrootdir] } {
-	    file mkdir $cvsrootdir
-	    file mkdir $cvsworkdir
-	    set pwd [pwd]
-	    cd $cvsworkdir
-	    exec cvs -d :local:$cvsrootdir init
-	    exec cvs -d :local:$cvsrootdir import -m "" cvswork RamDebugger start
-	    cd ..
-	    exec cvs -d :local:$cvsrootdir checkout cvswork 2> $null
+    set cvsrootdir [file join $RamDebugger::AppDataDir cvsroot]
+    set cvsworkdir  [file join $RamDebugger::AppDataDir cvswork]
+    if { $::tcl_platform(platform) eq "windows" } {
+	set null NUL:
+    } else {
+	set null /dev/null
+    }
+    if { ![file exists cvsworkdir] } {
+	file mkdir $cvsworkdir
+    }
+    if { ![file exists $cvsrootdir] } {
+	set pwd [pwd]
+	cd $cvsworkdir
+	exec cvs -d :local:$cvsrootdir init
+	exec cvs -d :local:$cvsrootdir import -m "" cvswork RamDebugger start
+	cd ..
+	exec cvs -d :local:$cvsrootdir checkout cvswork 2> $null
 	    
 #             cd cvswork
 #             exec cvs -d :local:$cvsrootdir checkout CVSROOT 2> $null
@@ -54,8 +53,7 @@ proc RamDebugger::CVS::Init {} {
 #             cd ..
 #             file delete -force CVSROOT
 
-	    cd $pwd
-	}
+	cd $pwd
     }
 }
 
