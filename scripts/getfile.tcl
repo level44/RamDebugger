@@ -106,12 +106,14 @@ proc RamDebugger::GetFile { what types title }  {
 	if { ![info exists options(defaultdir)] } { set options(defaultdir) [pwd] }
 	set getfilestring $options(defaultdir)/
     }
+    update idletasks
+    grab $f
     focus $f.e1
+
     $f.e1 xview moveto 1
     $f.e1 icursor end
 
     set getFileToolbar 1
-    grab $f
 
     while 1 {
 	set getFile_done 0

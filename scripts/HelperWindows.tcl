@@ -1603,54 +1603,59 @@ proc RamDebugger::AboutWindow {} {
     
     set par [winfo toplevel $text]
     set w $par.about
+    destroy $w
     toplevel $w
     wm protocol $w WM_DELETE_WINDOW {
 	  # nothing
     }
     
     label $w.l -text RamDebugger -font "-family {new century schoolbook} -size 24 -weight bold" \
-	    -fg \#d3513d -grid 0
+	    -fg \#d3513d
 
-    set tt "Author: Ramon Ribó (RAMSAN)\n"
+    set tt [_ "Author: %s\n" "Ramon Ribó (RAMSAN)"]
     append tt "ramsan@compassis.com\nhttp://www.gidhome.com/ramsan\n"
     append tt "http://www2.compassis.com/ramdebugger"
 
-    text $w.l2 -grid "0 px20 py10" -bd 0 -bg [$w cget -bg] -width 10 -height 4 \
+    text $w.l2 -bd 0 -bg [$w cget -bg] -width 10 -height 4 \
 	    -highlightthickness 0 
-    $w.l2 ins end $tt
-    $w.l2 conf -state disabled
-    bind $w.l2 <1> "focus $w.l2"
-    canvas $w.c -height 50 -grid 0 -bg white -highlightthickness 0
-    ScrolledWindow $w.lf -relief sunken -borderwidth 0 -grid 0
+    $w.l2 insert end $tt
+    $w.l2 configure -state disabled
+    bind $w.l2 <1> [list focus $w.l2]    
+    canvas $w.c -height 50 -bg white -highlightthickness 0
 
-    tablelist::tablelist $w.lf.lb -width 55\
-		  -exportselection 0 \
-		  -columns [list \
-		                10 Package        left \
-		                10 Author        left \
-		                10 License right\
-		                4  Mod left \
-		               ] \
-		  -labelcommand tablelist::sortByColumn \
-		  -background white \
-		  -stretch 1 -selectmode extended \
-		  -highlightthickness 0
+    set columns [list \
+	    [list 14 [_ "Package"] left item 0] \
+	    [list 12 [_ "Author"] left text 0] \
+	    [list 9 [_ "License"] left text 0] \
+	    [list  6 [_ "Mod"] left text 0] \
+	]
+    fulltktree $w.lf -width 400 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all]
 
+    frame $w.buts -height 35 -bg [CCColorActivo [$w  cget -bg]]
 
-    $w.lf setwidget $w.lf.lb
+    grid $w.l -sticky w -padx 2 -pady 2
+    grid $w.l2 -sticky ew -padx 20 -pady 10
+    grid $w.c -sticky ew -padx 2 -pady 2
+    grid $w.lf -sticky nsew -padx 2 -pady 2
+    grid $w.buts -sticky ew -padx 2 -pady 2
+    
+    grid columnconfigure $w 0 -weight 1
+    grid rowconfigure $w 3 -weight 1
 
-    frame $w.buts -height 35 -bg [CCColorActivo [$w  cget -bg]] -grid 0
-
-    supergrid::go $w
-
-    button $w.close -text Close -width 10
-    place $w.close -in $w.buts -anchor n -y 3
+    ttk::button $w.close -text [_ "Close"] -width 10
     
     wm withdraw $w
     update idletasks
+    
+    set x [expr {.5*([winfo reqwidth $w]-[winfo reqwidth $w.close])}]
+    place $w.close -in $w.buts -anchor nw -x $x -y 3
+    
     set x [expr [winfo x $par]+[winfo width $par]/2-[winfo reqwidth $w]/2]
     set y [expr [winfo y $par]+[winfo height $par]/2-[winfo reqheight $w]/2]
-    wm geom $w +$x+$y
+    wm geometry $w +$x+$y
     wm deiconify $w
     wm transient $w $par
 
@@ -1681,10 +1686,8 @@ proc RamDebugger::AboutWindow {} {
 	tkcvs  "DEL" GPL YES
     }
     foreach "pack author lic mod" $data {
-	$w.lf.lb insert end [list $pack $author $lic $mod]
+	$w.lf insert end [list $pack $author $lic $mod]
     }
-
-
 }
 
 proc RamDebugger::AboutMoveCanvas { c t } {
@@ -2302,8 +2305,8 @@ proc RamDebugger::SearchInFiles {} {
 	    [list  5 [_ "Line"] left text 0] \
 	    [list 50 [_ "Text"] left text 0] \
 	    [list 35 [_ "Path"] left text 0] \
-	]
-
+	    ]
+    
     $w set_uservar_value toctree [fulltktree $f.toctree \
 	    -selecthandler2 [list RamDebugger::SearchInFilesGo $w] \
 	    -columns $columns -expand 0 \
@@ -2573,7 +2576,7 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     bind $f.e1 <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
     bind $f.e1 <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
 
-    tkTabToWindow $f.e1
+    tk::TabToWindow $f.e1
     if { !$replace } {
 	bind $f.l1 <1> "RamDebugger::Search $w begin 0 $f"
 	bind $f.e1 <Return> "RamDebugger::Search $w begin 0 $f"

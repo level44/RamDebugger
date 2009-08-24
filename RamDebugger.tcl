@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.141 2009/08/23 00:03:17 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.142 2009/08/24 16:41:43 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -62,7 +62,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 6.4
+    set Version 7.0
 
     ################################################################################
     #    Non GUI commands
@@ -213,39 +213,56 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     } else {
 	set AppDataDir [file join $::env(HOME) .RamDebugger]
     }
-
-    if { [auto_execok cvs] eq "" && $::tcl_platform(platform) eq "windows" && \
-	     !$iswince} {
-	set exe [file join $AppDataDir exe]
-	if { ![file exists $exe] } {
-	    file mkdir $exe
-	    foreach i [list cat.exe cvs.exe diff.exe grep.exe kill.exe tlist.exe] {
-		file copy [file join $MainDir addons $i] $exe
-	    }
-	}
-    }
-    if { $::tcl_platform(platform) eq "windows" && !$iswince } {
-	set exe [file join $AppDataDir exe]
-	if { ![info exists ::env(PATH)] } {
-	    set list ""
+    set exe [file join $AppDataDir exe]
+    if { [auto_execok cvs] eq "" } {
+	if { $::tcl_platform(platform) eq "windows" && !$iswince } {
+	    set exeList [list cat.exe cvs.exe diff.exe grep.exe kill.exe tlist.exe]
+	} elseif { $tcl_platform(os) eq "Darwin" } {
+	    set exeList [list cvs]
 	} else {
-	    set list [split $::env(PATH) \;]
+	    set exeList ""
 	}
-	if { ![file exists $exe] } {
+	if { ![file exists $exe] && $exeList ne "" } {
 	    file mkdir $exe
-	}
-	set shortname [file native [file attributes $exe -shortname]]
-	if { [set ipos [lsearch -exact $list $shortname]] != 0 } {
-	    if { $ipos != -1 } {
-		set list [lreplace $list $ipos $ipos]
+	    foreach i $exeList {
+		file copy [file join $MainDir addons exe $i] $exe
 	    }
-	    set list [linsert $list 0 $shortname]
-	    set ::env(PATH) [join $list \;]
-	    # this is a variable from the TCL library
-	    array unset ::auto_execs
 	}
     }
-
+    if { [file exists $exe] } {
+	if { $::tcl_platform(platform) eq "windows" && !$iswince } {
+	    if { ![info exists ::env(PATH)] } {
+		set list ""
+	    } else {
+		set list [split $::env(PATH) \;]
+	    }
+	    set shortname [file native [file attributes $exe -shortname]]
+	    if { [set ipos [lsearch -exact $list $shortname]] != 0 } {
+		if { $ipos != -1 } {
+		    set list [lreplace $list $ipos $ipos]
+		}
+		set list [linsert $list 0 $shortname]
+		set ::env(PATH) [join $list \;]
+		# this is a variable from the TCL library
+		array unset ::auto_execs
+	    }
+	} elseif { $tcl_platform(os) eq "Darwin" } {
+	    if { ![info exists ::env(PATH)] } {
+		set list ""
+	    } else {
+		set list [split $::env(PATH) ":"]
+	    }
+	    if { [set ipos [lsearch -exact $list $shortname]] != 0 } {
+		if { $ipos != -1 } {
+		    set list [lreplace $list $ipos $ipos]
+		}
+		set list [linsert $list 0 $exe]
+		set ::env(PATH) [join $list ":"]
+		# this is a variable from the TCL library
+		array unset ::auto_execs
+	    }
+	}
+    }
     set dirs ""
     lappend dirs [file join $AppDataDir cache]
     lappend dirs [file join $MainDir cache]
@@ -311,7 +328,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 		                                  -slant roman -underline 0 -overstrike 0 }
 		set options_def(HelpFont)  { -family "Helvetica" -size 11 -weight normal \
 		                                 -slant roman -underline 0 -overstrike 0 }
-		set options_def(ViewOnlyTextOrAll) All
+		set options_def(ViewOnlyTextOrAll) OnlyText
 	    }
 	}
 	default {
@@ -321,7 +338,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 		                              -slant roman -underline 0 -overstrike 0 }
 	    set options_def(HelpFont)  { -family "Helvetica" -size 15 -weight normal \
 		                             -slant roman -underline 0 -overstrike 0 }
-	    set options_def(ViewOnlyTextOrAll) All
+	    set options_def(ViewOnlyTextOrAll) OnlyText
 	}
     }
 
@@ -1289,7 +1306,7 @@ proc RamDebugger::rtime { args } {
 	-stop:          stop time mode and go to debugging mode
 	-add:           Add a time block by giving name lineini and lineend
 	-delete:        Delete named time block
-	-list:          List previusly defined time blocks
+	-list:          List previously defined time blocks
 	-display units: Displays table of results. units can be: microsec, milisec, sec, min
 	-cleartimes:    Clear times table
 	--:             end of options
@@ -2107,7 +2124,7 @@ proc RamDebugger::rdel { args } {
 	-all:   delete all breakpoints 
 	--:     end of options
 
-	Delete one previusly defined breakpoints
+	Delete one previously defined breakpoints
     }
     ParseArgs $args $usagestring opts
 
@@ -2945,8 +2962,8 @@ proc RamDebugger::ViewSecondText {} {
 	bind $text_secondary <Enter> [list RamDebugger::SecondaryTextHelp begin]
 	grid $text_secondary $f.textpane.f.yscroll -sticky nsew
 
-	bind $text_secondary <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev ; break"
-	bind $text_secondary <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
+	bind $text_secondary <Alt-Left> "RamDebugger::GotoPreviousNextInWinList prev ; break"
+	bind $text_secondary <Alt-Right> "RamDebugger::GotoPreviousNextInWinList next ; break"
 	bind $text_secondary <Control-Tab> [bind $text <Control-KeyPress-Tab>]
 	bind $text_secondary <Tab> "RamDebugger::Indent ; break"
 
@@ -3013,7 +3030,7 @@ proc RamDebugger::CheckListFilesPane {} {
 
     if { $options(listfilespane) } {
 	if { [lsearch [$pw panes] $pane1] == -1 } {
-	    $pw add $pane1 -sticky nsew -before $pane2 -width 100
+	    $pw add $pane1 -sticky nsew -before $pane2 -width 100 -minsize 100
 	}
     } elseif { [lsearch [$pw panes] $pane1] != -1 } {
 	$pw forget $pane1
@@ -4504,7 +4521,7 @@ proc RamDebugger::DisconnectStop {} {
     }
 }
 
-proc RamDebugger::GotoPreviusNextInWinList { what } {
+proc RamDebugger::GotoPreviousNextInWinList { what } {
     variable WindowFilesList
     variable WindowFilesListLineNums
     variable text
@@ -4855,15 +4872,15 @@ proc RamDebugger::ActualizeViewMenu { menu } {
     variable text
     variable currentfile
 
-    if { [$menu index end] > 7 } {
-	$menu del 8 end
+    if { [$menu index end] > 9 } {
+	$menu del 10 end
     }
 
-    $menu add command -label [_ "Previus"] -acc "Alt-Left" -command \
-	"RamDebugger::GotoPreviusNextInWinList prev"
+    $menu add command -label [_ "Previous"] -acc "Alt-Left" -command \
+	"RamDebugger::GotoPreviousNextInWinList prev"
     $menu add command -label [_ "Next"] -acc "Alt-Right" -command \
-	"RamDebugger::GotoPreviusNextInWinList next"
-    $menu add command -label [_ "Select"]... -acc "Ctrl Tab" -command \
+	"RamDebugger::GotoPreviousNextInWinList next"
+    $menu add command -label [_ "Select"]... -acc "Ctrl-Tab" -command \
 	[list RamDebugger::ChooseViewFile start] -underline 1
 
     set needssep 1
@@ -7790,7 +7807,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command RamDebugger::ExitGUI] \
 		] \
 		&[_ "Edit"] all edit 0 [list \
-		[list command &[_ "Undo"] {} [_ "Undo previus insert/delete operation"] "Ctrl z" \
+		[list command &[_ "Undo"] {} [_ "Undo previous insert/delete operation"] "Ctrl z" \
 		-command "RamDebugger::CutCopyPasteText undo"] \
 		separator \
 		[list command &[_ "Cut"] {} [_ "Cut selected text to clipboard"] "Ctrl x" \
@@ -7799,7 +7816,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::CutCopyPasteText copy"] \
 		[list command &[_ "Paste"] {} [_ "Paste text from clipboard"] "Ctrl v" \
 		-command "RamDebugger::CutCopyPasteText paste"] \
-		[list command "&Paste stack" {} "Past text from previus pastes" "ShiftCtrl v" \
+		[list command "&Paste stack" {} "Past text from previous pastes" "ShiftCtrl v" \
 		-command "RamDebugger::CutCopyPasteText paste_stack"] \
 		separator \
 		[list cascad &[_ "Advanced"] {} editadvanced 0 [list \
@@ -7853,11 +7870,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command &[_ "View text/all"] {} \
 		[_ "Toggle between viewing all windows or only text window"] "Ctrl t" \
 		-command "RamDebugger::ViewOnlyTextOrAll"] \
-		separator \
 		[list checkbutton &[_ "View files pane"] {} \
 		[_ "Toggle between viewing the file list pane"] "" \
 		-command "RamDebugger::CheckListFilesPane" \
 		-variable RamDebugger::options(listfilespane)] \
+		separator \
 		[list command &[_ "Secondary view"] {} \
 		[_ "Toggle between activating a secondary view for files"] "Ctrl 3" \
 		-command "RamDebugger::ViewSecondText"] \
@@ -8082,7 +8099,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		fileopen16 [_ "Open source file"] "RamDebugger::OpenFile -force_browser 1" \
 		filesave16 [_ "Save file"] "RamDebugger::SaveFile save -force_browser 1" \
 		- - - \
-		undo-16 [_ "Undo previus insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
+		undo-16 [_ "Undo previous insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
 		editcut-16 [_ "Cut selected text to clipboard"] "RamDebugger::CutCopyPasteText cut" \
 		editcopy-16 [_ "Copy selected text to clipboard"] "RamDebugger::CutCopyPasteText copy" \
 		editpaste-16 [_ "Paste text from clipboard"] "RamDebugger::CutCopyPasteText paste" \
@@ -8100,7 +8117,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		fileopen22 [_ "Open source file"] "RamDebugger::OpenFile -force_browser 1" \
 		filesave22 [_ "Save file"] "RamDebugger::SaveFile save -force_browser 1" \
 		- - - \
-		actundo22 [_ "Undo previus insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
+		actundo22 [_ "Undo previous insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
 		editcut22 [_ "Cut selected text to clipboard"] "RamDebugger::CutCopyPasteText cut" \
 		editcopy-22 [_ "Copy selected text to clipboard"] "RamDebugger::CutCopyPasteText copy" \
 		editpaste22 [_ "Paste text from clipboard"] \
@@ -8169,7 +8186,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     if { $options(listfilespane) } {
 	set pane1 $listboxlabelframe
-	$pw add $f.lflf -sticky nsew -width $weight1
+	$pw add $f.lflf -sticky nsew -width $weight1 -minsize 100
     }
 
 #     grid $f.lflf -in $pane1 -row 0 -column 0 -sticky nsew
@@ -8515,12 +8532,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # in linux, F10 makes some stupid thing
     bind all <F10> ""
 
-    bind $text <Alt-Left> "RamDebugger::GotoPreviusNextInWinList prev ; break"
+    bind $text <Alt-Left> "RamDebugger::GotoPreviousNextInWinList prev ; break"
     bind $text <Control-Tab> "[list RamDebugger::ChooseViewFile start] ; break"
 
-#     bind $text <Control-Tab> "RamDebugger::GotoPreviusNextInWinList prev ; break"
-#     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviusNextInWinList next ; break"
-    bind $text <Alt-Right> "RamDebugger::GotoPreviusNextInWinList next ; break"
+#     bind $text <Control-Tab> "RamDebugger::GotoPreviousNextInWinList prev ; break"
+#     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviousNextInWinList next ; break"
+    bind $text <Alt-Right> "RamDebugger::GotoPreviousNextInWinList next ; break"
     bind $text <Tab> "RamDebugger::Indent ; break"
     bind $text <Return> "[bind Text <Return>] ; RamDebugger::IndentLine {} ; break"
 
@@ -8895,6 +8912,11 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set registerasremote 0
     } else { set registerasremote 1 }
     
+    if { $tcl_platform(os) eq "Darwin" } {
+	if {[string first "-psn" [lindex $argv 0]] == 0} {
+	    set argv [lrange $argv 1 end]
+	}
+    }
     set readwriteprefs yes
     if { [set ipos [lsearch $argv "-noprefs"]] != -1 } {
 	set readwriteprefs noreadwrite

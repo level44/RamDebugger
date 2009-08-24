@@ -206,14 +206,14 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     cd $pwd
     if { $err } {
 	RamDebugger::WaitState 0
-	WarnWin "File '$file' has no revisions"
+	WarnWin [_ "File '%s' has no revisions" $file]
 	return
     }
     RamDebugger::WaitState 0
 
     set w $RamDebugger::text._openrev
-    dialogwin_snit $w -title "Choose revision" -entrytext \
-	"Choose a revision for file '$file'" -morebuttons [list Diff]
+    dialogwin_snit $w -title [_ "Choose revision"] -entrytext \
+	[_ "Choose a revision for file '%s'" $file] -morebuttons [list [_ "Differences"]]
     set f [$w giveframe]
 
     set list ""
@@ -225,47 +225,42 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	regexp -line {lines:\s+([^;]+)} $i {} lines
 	lappend list [list $revision $date $author $lines]
     }
+    set columns [list \
+	    [list  6 [_ "Rev"] left text 0] \
+	    [list 20 [_ "Date"] left text 0] \
+	    [list  8 [_ "Author"] center text 0] \
+	    [list  5 [_ "Lines"] left text 0] \
+	]
+    fulltktree $f.lf -width 400 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list $w invokeok];#"
 
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
-    $w set_uservar_value tablelist [tablelist::tablelist $sw.lb -width 50\
-		  -exportselection 0 \
-		  -columns [list \
-		                4  Rev      left \
-		                20  date     left \
-		                8 author   center \
-		                5  lines    left \
-		               ] \
-		  -labelcommand tablelist::sortByColumn \
-		  -background white \
-		  -selectbackground navy -selectforeground white \
-		  -stretch all -selectmode extended \
-		  -highlightthickness 0]
-  
-    $sw setwidget $sw.lb
-    $sw.lb insertlist end $list
-    $sw.lb selection set 0
-    $sw.lb activate 0
-    focus $sw.lb
-    bind [$sw.lb bodypath] <Double-1> [list $w invokeok]
-    bind [$sw.lb bodypath] <Return> [list $w invokeok]
+    foreach i $list {
+	$f.lf insert end $i
+    }
+    $f.lf selection add 1
+    $f.lf activate 1
+    focus $f.lf
 
-    grid $sw -stick nsew
+    grid $f.lf -stick nsew
     grid rowconfigure $f 1 -weight 1
     grid columnconfigure $f 0 -weight 1
 
     set action [$w createwindow]
     while 1 {
-	set selecteditems ""
-	foreach i [$sw.lb curselection] {
-	    lappend selecteditems [$sw.lb get $i]
-	}
 	if { $action <= 0 } {
 	    destroy $w
 	    return
 	}
+	set selecteditems ""
+	foreach i [$f.lf selection get] {
+	    lappend selecteditems [$f.lf item text $i]
+	}
 	if { $action == 1 } {
 	    if { [llength $selecteditems] != 1  } {
-		WarnWin "Select one revision in order to visualize it" $w
+		WarnWin [_ "Select one revision in order to visualize it"] $w
 		destroy $w
 		return
 	    }
@@ -277,7 +272,7 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	    destroy $w
 	    return
 	} elseif { [llength $selecteditems] < 1 || [llength $selecteditems] > 2 } {
-	    WarnWin "Select one or two revisions in order to visualize the differences" $w
+	    WarnWin [_ "Select one or two revisions in order to visualize the differences"] $w
 	} else {
 	    cd $cvsworkdir
 	    set deletefiles ""
@@ -392,40 +387,36 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 
     set w $RamDebugger::text._openrev
     destroy $w
-    dialogwin_snit $w -title "Choose revision file" -entrytext \
-	"Choose a revision file to check its revisions or to remove revisions history" \
-	-morebuttons [list "Remove..." "Purge..."] -okname "Revisions"
+    dialogwin_snit $w -title [_ "Choose revision file"] -entrytext \
+	[_ "Choose a revision file to check its revisions or to remove revisions history"] \
+	-morebuttons [list [_ "Remove..."] [_ "Purge..."]] -okname [_ "Revisions"]
     set f [$w giveframe]
 
-    foreach "list totalsize_show retcvslog" [_showallfiles_update] break
+    lassign [_showallfiles_update] list totalsize_show retcvslog
 
-    label $f.lsize -text "Total size of revision storage: $totalsize_show"
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
-    $w set_uservar_value tablelist [tablelist::tablelist $sw.lb -width 85\
-		  -exportselection 0 \
-		  -columns [list \
-		                15  file      left \
-		                50  path     left \
-		                15  "storage size"     left \
-		                10  "file size" left \
-		               ] \
-		  -labelcommand tablelist::sortByColumn \
-		  -background white \
-		  -selectbackground navy -selectforeground white \
-		  -stretch all -selectmode extended \
-		  -highlightthickness 0]
-  
-    foreach i "0 1 2 3" { $sw.lb columnconfigure $i -sortmode dictionary }
-    $sw setwidget $sw.lb
-    $sw.lb insertlist end $list
-    $sw.lb selection set 0
-    $sw.lb activate 0
-    focus $sw.lb
-    bind [$sw.lb bodypath] <Double-1> [list $w invokeok]
-    bind [$sw.lb bodypath] <Return> [list $w invokeok]
+    ttk::label $f.lsize -text [_ "Total size of revision storage: %s" $totalsize_show]
+    
+    set columns [list \
+	    [list 15 [_ "File"] left text 0] \
+	    [list 50 [_ "Path"] left text 0] \
+	    [list 15 [_ "Storage size"] left text 0] \
+	    [list 10 [_ "File size"] left text 0] \
+	]
+    fulltktree $f.lf -width 400 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list $w invokeok];#"
+
+    foreach i $list {
+	$f.lf insert end $i
+    }
+    $f.lf selection add 1
+    $f.lf activate 1
+    focus $f.lf
 
     grid $f.lsize -sticky w
-    grid $sw -stick nsew
+    grid $f.lf -stick nsew
     grid rowconfigure $f 2 -weight 1
     grid columnconfigure $f 0 -weight 1
 
@@ -437,12 +428,12 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 	    return
 	}
 	set selecteditems ""
-	foreach i [$sw.lb curselection] {
-	    lappend selecteditems [$sw.lb get $i]
+	foreach i [$f.lf selection get] {
+	    lappend selecteditems [$f.lf item text $i]
 	}
 	if { $action == 1 } {
 	    if { [llength $selecteditems] != 1  } {
-		WarnWin "Select one file in order to visualize its revisions"
+		WarnWin [_ "Select one file in order to visualize its revisions"]
 	    } else {
 		destroy $w
 		OpenRevisions [file join [lindex $selecteditems 0 1] \
@@ -453,19 +444,19 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 	    set isgood 1
 	    if { [llength $selecteditems] == 0  } {
 		if { $action == 2 } {
-		    WarnWin "Select one or more files in order to remove the revisions"
+		    WarnWin [_ "Select one or more files in order to remove the revisions"]
 		} else {
-		    WarnWin "Select one or more files in order to purge the revisions"
+		    WarnWin [_ "Select one or more files in order to purge the revisions"]
 		}
 		set isgood 0
 	    } else {
 		set len [llength $selecteditems]
 		if { $action == 2 } {
-		    set title "Remove revisions"
-		    set txt "Are you user to remove revision history for the $len selected files?"
+		    set title [_ "Remove revisions"]
+		    set txt [_ "Are you user to remove revision history for the %s selected files?" $len]
 		} else {
-		    set title "Purge revisions"
-		    set txt "Are you user to purge revision history for the $len selected files?"
+		    set title [_ "Purge revisions"]
+		    set txt [_ "Are you user to purge revision history for the %s selected files?" $len]
 		}
 		set ret [snit_messageBox -icon question -title $title -type okcancel \
 		        -default ok -parent $w -message $txt]
@@ -515,8 +506,8 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 		    }
 		}
 		cd $pwd
-		foreach "list totalsize_show retcvslog" [_showallfiles_update] break
-		$f.lsize configure -text "Total size of revision storage: $totalsize_show"
+		lassign [_showallfiles_update] list totalsize_show retcvslog
+		$f.lsize configure -text [_ "Total size of revision storage: %s" $totalsize_show]
 		$sw.lb delete 0 end
 		$sw.lb insertlist end $list
 		RamDebugger::WaitState 0
@@ -666,7 +657,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory $current_or_last]\n"
     
-    if { $::tcl_platform(threaded) && $::tcl_platform(os) ne "Darwin" } {
+    if { $::tcl_platform(os) ne "Darwin" && $::tcl_platform(threaded) } {
 	package require Thread
 	append script "thread::wait\n"
 	thread::create $script
