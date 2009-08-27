@@ -218,7 +218,6 @@ proc RamDebugger::GetSelOrWordInIndex { args } {
     }
     set compulsory "idx"
     parse_args $optional $compulsory $args
-
     
     set range [$text tag ranges sel]
     if { $range != "" && [$text compare [lindex $range 0] <= $idx] && \
@@ -431,10 +430,14 @@ proc RamDebugger::DisplayVarWindowDo { w } {
 
 proc RamDebugger::DisplayBreakpointsWindowSetCond { w } {
 
-    set curr [[$w give_uservar_value list] curselection]
-    if { [llength $curr] != 1 } { return }
+    set list [$w give_uservar_value list]
+    set selecteditems ""
+    foreach i [$list selection get] {
+	lappend selecteditems [$list item text $i]
+    }
+    if { [llength $selecteditems] != 1 } { return }
 
-    $w set_uservar_value cond [lindex [[$w give_uservar_value list] get $curr] 4]
+    $w set_uservar_value cond [lindex $selecteditems 0 4]
 }
 
 proc RamDebugger::DisplayBreakpointsWindow {} {
@@ -455,71 +458,43 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     ttk::label $f.l1 -text [_ "Condition:"]
     tooltip::tooltip $f.l1 $help
     ttk::entry $f.e1 -textvariable [$w give_uservar cond ""] -width 80
-
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
-
-    $w set_uservar_value list [tablelist::tablelist $sw.lb -width 55\
-		  -exportselection 0 \
-		  -columns [list \
-		                4  [_ Num]        left \
-		                6  [_ En/dis]     center \
-		                20 [_ File]        right \
-		                5  [_ Line] left \
-		                12 [_ Condition] left \
-		                40 [_ Path] left \
-		               ] \
-		  -labelcommand tablelist::sortByColumn \
-		  -background white \
-		  -selectbackground navy -selectforeground white \
-		  -stretch all -selectmode extended \
-		  -highlightthickness 0]
     
-    $sw.lb columnconfigure 0 -sortmode integer
-    $sw.lb columnconfigure 2 -sortmode dictionary
-    $sw.lb columnconfigure 3 -sortmode integer
-    $sw.lb columnconfigure 5 -sortmode dictionary
+    set columns [list \
+	    [list 6 [_ "Num"] left text 0] \
+	    [list 6 [_ "En/dis"] left text 0] \
+	    [list 20 [_ "File"] left text 0] \
+	    [list  5 [_ "Line"] left text 0] \
+	    [list  12 [_ "Condition"] left text 0] \
+	    [list  40 [_ "Path"] left text 0] \
+	]
+    fulltktree $f.lf -width 400 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list RamDebugger::DisplayBreakpointsWindowSetCond $w];#" \
+	-contextualhandler_menu [list RamDebugger::DisplayBreakpointsWindowContextual $w]
+    set list $f.lf
+    $w set_uservar_value list  $f.lf
  
-
-    $sw setwidget $sw.lb
-    
     grid $f.l1 $f.e1 -sticky w -padx 2 -pady 2
-    grid $sw   -     -sticky nsew -padx 2 -pady 2
+    grid $f.lf   -     -sticky nsew -padx 2 -pady 2
     
     grid configure $f.e1 -sticky ew
     grid columnconfigure $f 1 -weight 1
     grid rowconfigure $f 1 -weight 1
 
-    focus $sw.lb
-    bind [$sw.lb bodypath] <Double-1> {
-	set w [winfo toplevel %W]
-	focus [$w give_uservar_value list]
-	RamDebugger::DisplayBreakpointsWindowSetCond $w
-    }
-    bind [$sw.lb bodypath] <<ContextualPress>> \
-	[bind TablelistBody <ButtonPress-1>]
-
-    bind [$sw.lb bodypath] <<Contextual>> {
-	set w [winfo toplevel %W]
-	catch { destroy %W.menu }
-	set menu [menu %W.menu]
-	$menu add command -label [_ "Apply condition"] -command [list $w invokeok]
-	$menu add command -label [_ "View"] -command [list $w invokebutton 4]
-	$menu add command -label [_ "Enable/disable"] -command [list $w invokebutton 5]
-	$menu add command -label [_ "Trace"] -command [list $w invokebutton 6]
-	$menu add separator
-	$menu add command -label [_ "Delete"] -command [list $w invokebutton 2]
-	tk_popup $menu %X %Y
-    }
+    focus $f.lf
 
     set nowline [scan [$text index insert] %d]
     foreach i $breakpoints {
-	foreach "num endis file line cond" $i break
+	lassign $i num endis file line cond
 	if { $file ne "" } {
 	    set tail [file tail $file]
 	    set dir [file dirname $file]
-	} else { foreach "tail dir" [list "" ""] break }
-	$sw.lb insert end [list $num $endis $tail $line $cond \
-		$dir]
+	} else {
+	    lassign "" tail dir
+	}
+	$f.lf insert end [list $num $endis $tail $line $cond $dir]
 	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
 	    $sw.lb selection set end
 	    $sw.lb see end
@@ -534,116 +509,168 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 		return
 	    }
 	    1 {
-		set curr [[$w give_uservar_value list] curselection]
-		if { [llength $curr] != 1 } {
-		    WarnWin [_ "Select just one breakpoint before applying condition"] $w
-		} else {
-		    set val [[$w give_uservar_value list] get $curr]
-		    rcond [lindex $val 0] [$w give_uservar_value cond]
-		    [$w give_uservar_value list] delete $curr
-		    [$w give_uservar_value list] insert $curr [lreplace $val 4 4 \
-		            [$w give_uservar_value cond]]
-		    set file [file join [lindex $val 5 ] [lindex $val 2]]
-		    set line [lindex $val 3]
-		    if { $file == $currentfile } {
-		        $text mark set insert $line.0
-		        $text see $line.0
-		    }
-		}
+		DisplayBreakpointsWindowCmd $w apply_cond
 	    }
 	    2 {
-		foreach i [[$w give_uservar_value list] curselection] {
-		    set ent [[$w give_uservar_value list] get $i]
-		    set num [lindex $ent 0]
-		    set file [file join [lindex $ent 5 ] [lindex $ent 2]]
-		    set line [lindex $ent 3]
-		    if { $file == $currentfile } {
-		        UpdateArrowAndBreak $line 0 ""
-		    }
-		    rdel $num
-		}
-		[$w give_uservar_value list] delete 0 end
-		foreach i $breakpoints {
-		    foreach "num endis file line cond" $i break
-		    [$w give_uservar_value list] insert end [list $num $endis [file tail $file] $line $cond \
-		            [file dirname $file]]
-		}
+		DisplayBreakpointsWindowCmd $w delete
 	    }
 	    3 {
-		set ret [snit_messageBox -default ok -icon warning -message \
-		        [_ "Are you sure to delete all breakpoints?"] -parent $w \
-		        -title [_ "delete all breakpoints"] -type okcancel]
-		if { $ret == "ok" } {
-		    [$w give_uservar_value list] delete 0 end
-		    foreach i $breakpoints {
-		        set num [lindex $i 0]
-		        set file [lindex $i 2]
-		        set line [lindex $i 3]
-		        if { $file == $currentfile } {
-		            UpdateArrowAndBreak $line 0 ""
-		        }
-		        rdel $num
-		    }
-		}
+		DisplayBreakpointsWindowCmd $w delete_all
 	    }
 	    4 {
-		set curr [[$w give_uservar_value list] curselection]
-		if { [llength $curr] != 1 } {
-		    WarnWin [_ "Select just one breakpoint in order to see the file"] $w
-		    return
-		}
-		set val [[$w give_uservar_value list] get $curr]
-		set file [file join [lindex $val 5] [lindex $val 2]]
-		set line [lindex $val 3]
-		if { $file != $currentfile } {
-		    OpenFileF $file
-		}
-		$text mark set insert $line.0
-		$text see $line.0
+		DisplayBreakpointsWindowCmd $w view
 	    }
 	    5 {
-		foreach i [[$w give_uservar_value list] curselection] {
-		    set val [[$w give_uservar_value list] get $i]
-		    renabledisable [lindex $val 0]
-		    [$w give_uservar_value list] delete $i
-		    if { [lindex $val 1] } {
-		        set enabledisable 0
-		    } else { set enabledisable 1 }
-		    [$w give_uservar_value list] insert $i [lreplace $val 1 1 $enabledisable]
-		    [$w give_uservar_value list] selection set $i
-		    set file [file join [lindex $val 5 ] [lindex $val 2]]
-		    set line [lindex $val 3]
-		    if { $file == $currentfile } {
-		        UpdateArrowAndBreak $line "" "" 0
-		        $text mark set insert $line.0
-		        $text see $line.0
-		    }
-		}
+		DisplayBreakpointsWindowCmd $w enable_disable
 	    }
 	    6 {
-		set txt [_ "A trace is a breakpoint that is applied to every line.\
-		           It should be used with a condition.\
-		           to trace changes in a variable, write as cond '%s'.\
-		           Proceed?" "variable varname"]
-		set ret [snit_messageBox -type okcancel -message $txt -parent $w]
-		if { $ret eq "ok" } {
-		    foreach i [[$w give_uservar_value list] curselection] {
-		        set val [[$w give_uservar_value list] get $i]
-		        set file [file join [lindex $val 5 ] [lindex $val 2]]
-		        set line [lindex $val 3]
-		        rbreaktotrace [lindex $val 0]
-		        set val [lreplace $val 2 3 "" ""]
-		        set val [lreplace $val 5 5 ""]
-		        [$w give_uservar_value list] insert $i $val
-		        if { $file == $currentfile } {
-		            UpdateArrowAndBreak $line "" "" 0
-		        }
-		    }
-		}
+		DisplayBreakpointsWindowCmd $w trace
 	    }
 	}
 	set action [$w waitforwindow]
     }
+}
+
+proc RamDebugger::DisplayBreakpointsWindowCmd { args } {
+    variable text
+    variable breakpoints
+    variable currentfile
+
+    set optional {
+	{ -itemList list "-" }
+    }
+    set compulsory "w what"
+    parse_args $optional $compulsory $args
+    
+    set list [$w give_uservar_value list]
+    if { $itemList eq "-" } {
+	set itemList [$list selection get]
+    }
+    switch $what {
+	apply_cond {
+	    if { [llength $itemList] != 1 } {
+		WarnWin [_ "Select just one breakpoint before applying condition"] $w
+	    } else {
+		set item [lindex $itemList 0]
+		set val [$list item text $item]
+		rcond [lindex $val 0] [$w give_uservar_value cond]
+		$list insert prev [lreplace $val 4 4 [$w give_uservar_value cond]] $item
+		$list item delete $item
+		set file [file join [lindex $val 5 ] [lindex $val 2]]
+		set line [lindex $val 3]
+		if { $file == $currentfile } {
+		    $text mark set insert $line.0
+		    $text see $line.0
+		}
+	    }
+	}
+	delete {
+	    foreach item $itemList {
+		set ent [$list item text $item]
+		set num [lindex $ent 0]
+		set file [file join [lindex $ent 5 ] [lindex $ent 2]]
+		set line [lindex $ent 3]
+		if { $file == $currentfile } {
+		    UpdateArrowAndBreak $line 0 ""
+		}
+		rdel $num
+	    }
+	    $list item delete all
+	    foreach i $breakpoints {
+		lassign $i num endis file line cond
+		$list insert end [list $num $endis [file tail $file] $line $cond [file dirname $file]]
+	    }
+	}
+	delete_all {
+	    set ret [snit_messageBox -default ok -icon warning -message \
+		    [_ "Are you sure to delete all breakpoints?"] -parent $w \
+		    -title [_ "delete all breakpoints"] -type okcancel]
+	    if { $ret == "ok" } {
+		$list item delete all
+		foreach i $breakpoints {
+		    set num [lindex $i 0]
+		    set file [lindex $i 2]
+		    set line [lindex $i 3]
+		    if { $file eq $currentfile } {
+		        UpdateArrowAndBreak $line 0 ""
+		    }
+		    rdel $num
+		}
+	    }
+	}
+	view {
+	    if { [llength $itemList] != 1 } {
+		WarnWin [_ "Select just one breakpoint in order to see the file"] $w
+		return
+	    }
+	    set val [$list item text [lindex $itemList 0]]
+	    set file [file join [lindex $val 5] [lindex $val 2]]
+	    set line [lindex $val 3]
+	    if { $file ne $currentfile } {
+		OpenFileF $file
+	    }
+	    $text mark set insert $line.0
+	    $text see $line.0
+	}
+	enable_disable {
+	    foreach item $itemList {
+		set val [$list item text $item]
+		renabledisable [lindex $val 0]
+		if { [lindex $val 1] } {
+		    set enabledisable 0
+		} else {
+		    set enabledisable 1
+		}
+		set n_item [$list insert prev [lreplace $val 1 1 $enabledisable] $item]
+		$list selection add $n_item
+		$list item delete $item
+		
+		set file [file join [lindex $val 5 ] [lindex $val 2]]
+		set line [lindex $val 3]
+		if { $file eq $currentfile } {
+		    UpdateArrowAndBreak $line "" "" 0
+		    $text mark set insert $line.0
+		    $text see $line.0
+		}
+	    }
+	}
+	trace {
+	    set txt [_ "A trace is a breakpoint that is applied to every line.\
+		    It should be used with a condition.\
+		    to trace changes in a variable, write as cond '%s'.\
+		    Proceed?" "variable varname"]
+	    set ret [snit_messageBox -type okcancel -message $txt -parent $w]
+	    if { $ret eq "ok" } {
+		foreach item $itemList {
+		    set val [$list item text $item]
+		    set file [file join [lindex $val 5 ] [lindex $val 2]]
+		    set line [lindex $val 3]
+		    rbreaktotrace [lindex $val 0]
+		    set val [lreplace $val 2 3 "" ""]
+		    set val [lreplace $val 5 5 ""]
+		    set n_item [$list insert prev $val $item]
+		    if { $file == $currentfile } {
+		        UpdateArrowAndBreak $line "" "" 0
+		    }
+		}
+	    }
+	}
+    }
+}
+
+proc RamDebugger::DisplayBreakpointsWindowContextual { w - menu id itemList } {
+
+    $menu add command -label [_ "Apply condition"] -command \
+	[list RamDebugger::DisplayBreakpointsWindowCmd -itemList $itemList $w apply_cond]
+    $menu add command -label [_ "View"] -command \
+	[list RamDebugger::DisplayBreakpointsWindowCmd -itemList $itemList $w view]
+    $menu add command -label [_ "Enable/disable"] -command \
+	[list RamDebugger::DisplayBreakpointsWindowCmd -itemList $itemList $w enable_disable]
+    $menu add command -label [_ "Trace"] -command \
+	[list RamDebugger::DisplayBreakpointsWindowCmd -itemList $itemList $w trace]
+    $menu add separator
+    $menu add command -label [_ "Delete"] -command \
+	[list RamDebugger::DisplayBreakpointsWindowCmd -itemList $itemList $w delete]
 }
 
 ################################################################################
@@ -1278,92 +1305,86 @@ proc RamDebugger::PreferencesWindow {} {
 # DisplayTimes
 ################################################################################
 
-
-proc RamDebugger::DisplayTimesWindowStart { { f "" } } {
-    rtime -start
-    #WarnWin "Starting to measure times. Use 'File->Debug on->currentfile' to proceed" $f
+proc RamDebugger::DisplayTimesWindowReportUpdate { w } {
+    set tw [$w give_uservar_value tw]
+    $tw delete 1.0 end
+    $tw insert end  [RamDebugger::rtime -display [$w give_uservar_value units]]
 }
 
-proc RamDebugger::DisplayTimesWindowReport { f } {
-    variable text
+proc RamDebugger::DisplayTimesWindowReportClear { w } {
+    set tw [$w give_uservar_value text]
+    $tw delete 1.0 end
+    RamDebugger::rtime -cleartimes
+}
 
-    set f [DialogWin::Init $text "Timing report" separator "" -]
-    set w [winfo toplevel $f]
-
-    ComboBox $f.cb1 -textvariable DialogWin::user(units) -editable 0 \
-       -modifycmd {
-	   $DialogWin::user(text) delete 1.0 end
-	   $DialogWin::user(text) ins end [RamDebugger::rtime -display $DialogWin::user(units)]
-       } -width 10 -values [list microsec  milisec  sec  min] -grid "0 w"
-    set DialogWin::user(units) sec
-    button $f.b1 -text "Clear time table" -command {
-	$DialogWin::user(text) delete 1.0 end
-	RamDebugger::rtime -cleartimes
-    } -grid "1 w"
-
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
-    text $sw.t
-    $sw setwidget $sw.t
-
-    set DialogWin::user(text) $sw.t
-
-    bind $sw.t <1> "focus $sw.t"
+proc RamDebugger::DisplayTimesWindowReport { wp } {
     
-    supergrid::go $f
+    set w $wp.report
+    destroy $w
+    dialogwin_snit $w -title [_ "Timing report"] -okname -]
+    set f [$w giveframe]
 
-    focus $sw.t
+    ttk::combobox $f.cb1 -textvariable [$w give_uservar units sec] -state readonly -width 10 \
+	-values [list microsec  milisec  sec  min]
+    bind $f.cb1 <<ComboboxSelected>> [list RamDebugger::DisplayTimesWindowReportUpdate $w]
+    
+    ttk::button $f.b1 -text [_ "Clear time table"] -command [list RamDebugger::DisplayTimesWindowReportClear $w]
+    
+    text $f.t -wrap word -yscrollcommand [list $f.sv set]
+    #bind $f.t <1> [list focus $f.t]
+    $w set_uservar_value tw $f.t
+    ttk::scrollbar $f.sv -orient vertical -command [list $f.t yview]
+    
+    $f.t insert end [rtime -display sec]
 
-    $sw.t ins end [rtime -display sec]
-
-    set action [DialogWin::CreateWindow]
-    DialogWin::DestroyWindow
-}
-
-proc RamDebugger::DisplayTimesWindowCancel { f } {
-
-    destroy [winfo toplevel $f]
-}
-
-proc RamDebugger::DisplayTimesWindowStop { { f "" } } {
-
-    rtime -stop
+    set action [$w createwindow]
+    destroy $w
 }
 
 proc RamDebugger::DisplayTimesPickSelection { w } {
     variable text
-
-    if { [catch {
-	set DialogWinTop::user($w,lineini) [scan [$text index sel.first] %d]
-	set DialogWinTop::user($w,lineend) [scan [$text index "sel.last-1c"] %d]
-    }]} {
-	set DialogWinTop::user($w,lineini) [scan [$text index insert] %d]
-	set DialogWinTop::user($w,lineend) [scan [$text index insert] %d]
-	#WarnWin "It is necessary to select some text in main window" $w
+    
+    lassign [$text tag ranges sel] i1 i2
+    if { $i1 eq "" } {
+	set i1 [$text index insert]
+	set i2 $i1
     }
+    $w set_uservar_value lineini [scan $i1 %d]
+    $w set_uservar_value lineend [scan $i2 %d]
 }
 
 proc RamDebugger::DisplayTimesDrawSelection { w } {
     variable text
 
+    set i1 [ $w give_uservar_value lineini]
+    set i2 [ $w give_uservar_value lineend]
     if { [catch {
 	$text tag remove sel 1.0 end
-	$text tag add sel "$DialogWinTop::user($w,lineini).0 linestart" \
-	   "$DialogWinTop::user($w,lineend).0 lineend"
-	$text see $DialogWinTop::user($w,lineini).0
+	$text tag add sel "$i1.0 linestart" "$i2.0 lineend"
+	$text see $i1.0
     }] } {
-	WarnWin "Lines are not correct" $w
+	WarnWin [_ "Lines are not correct"] $w
     }
 }
 
-proc RamDebugger::ModifyTimingBlock { w entry what } {
+proc RamDebugger::ModifyTimingBlock { args } {
     variable TimeMeasureData
+    
+    set optional {
+	{ -itemList list "-" }
+    }
+    set compulsory "w entry what"
+    parse_args $optional $compulsory $args
 
-    set idx [$DialogWinTop::user($w,list) curselection]
 
+    set list [$w give_uservar_value list]
+    if { $itemList eq "-" } {
+	set itemList [$list selection get]
+    }
     switch $what {
 	create {
-	    set err [catch [list rtime -add $DialogWinTop::user($w,name) \
-		$DialogWinTop::user($w,lineini) $DialogWinTop::user($w,lineend)] errstring]
+	    set err [catch [list rtime -add [$w give_uservar_value name] \
+		        [$w give_uservar_value lineini] [$w give_uservar_value lineend]] errstring]
 	    if { $err } {
 		WarnWin [lindex [split $errstring \n] 0]
 		return $err
@@ -1372,7 +1393,7 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
 		while 1 {
 		    set found 0
 		    foreach j $TimeMeasureData {
-		        if { [lindex $j 0] == "Block $i" } {
+		        if { [lindex $j 0] eq [_ "Block %d" $i] } {
 		            set found 1
 		            break
 		        }
@@ -1380,30 +1401,30 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
 		    if { !$found } { break }
 		    incr i
 		}
-		set DialogWinTop::user($w,name) "Block $i"
-		set DialogWinTop::user($w,lineini) ""
-		set DialogWinTop::user($w,lineend) ""
-		tkTabToWindow $entry
+		$w set_uservar_value name [_ "Block %d" $i]
+		$w set_uservar_value lineini ""
+		$w set_uservar_value lineend ""
+		tk::TabToWindow $entry
 		ModifyTimingBlock $w $entry update
 		return 0
 	    }
 	}
 	edit {
-	    if { [llength $idx] != 1 } {
-		WarnWin "Error: it is necessary to select just one block in list"
+	    if { [llength $itemList] != 1 } {
+		WarnWin [_ "Error: it is necessary to select just one block in list"]
 		return 1
 	    }
 	    set err [ModifyTimingBlock $w $entry delete]
 	    if { !$err } { ModifyTimingBlock $w $entry create }
 	}
 	delete {
-	    if { [llength $idx] == 0 } {
-		WarnWin "Error: it is necessary to select at least one block in list"
+	    if { [llength $itemList] == 0 } {
+		WarnWin [_ "Error: it is necessary to select at least one block in list"]
 		return 1
 	    }
 	    set selnames ""
-	    foreach i $idx {
-		lappend selnames [lindex [$DialogWinTop::user($w,list) get $i] 0]
+	    foreach item $itemList {
+		lappend selnames [lindex [$list item text $item] 0]
 	    }
 	    foreach selname $selnames {
 		set err [catch [list rtime -delete $selname] errstring]
@@ -1416,30 +1437,30 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
 	    return 0
 	}
 	updatecurrent {
-	    if { [llength $idx] == 0 } {
-		WarnWin "Error: it is necessary to select at least one block in list"
+	    if { [llength $itemList] == 0 } {
+		WarnWin [_ "Error: it is necessary to select at least one block in list"]
 		return 1
 	    }
 	    set init 1
-	    foreach i $idx {
-		set l1 [lindex [$DialogWinTop::user($w,list) get $i] 2]
-		set l2 [lindex [$DialogWinTop::user($w,list) get $i] 3]
-		if { $init || $l1 < $DialogWinTop::user($w,lineini) } {
-		    set DialogWinTop::user($w,lineini) $l1
+	    foreach item $itemList {
+		set i1 [lindex [$list item text $item] 2]
+		set i2 [lindex [$list item text $item] 3]
+		if { $init || $i1 < [$w give_uservar_value lineini] } {
+		    $w set_uservar_value lineini $i1
 		}
-		if { $init || $l2 > $DialogWinTop::user($w,lineend) } {
-		    set DialogWinTop::user($w,lineend) $l2
+		if { $init || $i2 > [$w give_uservar_value lineend] } {
+		    $w set_uservar_value lineend $i2
 		}
 		set init 0
 	    }
-	    if { [llength $idx] == 1 } {
-		set DialogWinTop::user($w,name) [lindex [$DialogWinTop::user($w,list) get $idx] 0]
+	    if { [llength $itemList] == 1 } {
+		$w set_uservar_value name [lindex [$list item text $item] 0]
 	    } else {
 		set i 1
 		while 1 {
 		    set found 0
 		    foreach j $TimeMeasureData {
-		        if { [lindex $j 0] == "Block group $i" } {
+		        if { [lindex $j 0] eq [_ "Block group %d" $i] } {
 		            set found 1
 		            break
 		        }
@@ -1447,14 +1468,14 @@ proc RamDebugger::ModifyTimingBlock { w entry what } {
 		    if { !$found } { break }
 		    incr i
 		}
-		set DialogWinTop::user($w,name) "Block group $i"
+		$w set_uservar_value name [_ "Block group %d" $i]
 	    }
-	    tkTabToWindow $entry
+	    tk::TabToWindow $entry
 	}
 	update {
-	    $DialogWinTop::user($w,list) delete 0 end
+	    $list item delete all
 	    foreach i $TimeMeasureData {
-		$DialogWinTop::user($w,list) insert end [lrange $i 0 3]
+		$list insert end [lrange $i 0 3]
 	    }
 	}
     }
@@ -1465,14 +1486,14 @@ proc RamDebugger::DisplayTimesWindowMenu { w x y } {
     catch { destroy $w.debugtime }
     menu $w.debugtime
 
-    $w.debugtime add radiobutton -label "Normal debug" \
+    $w.debugtime add radiobutton -label [_ "Normal debug"] \
 	-command "RamDebugger::DisplayTimesWindowStop" -variable RamDebugger::debuggerstate \
 	-value debug
-    $w.debugtime add radiobutton -label "Time debug" -command \
+    $w.debugtime add radiobutton -label [_ "Time debug"] -command \
 	"RamDebugger::DisplayTimesWindowStart" -variable RamDebugger::debuggerstate \
 	-value time
     $w.debugtime add separator
-    $w.debugtime add command -label "Time window..." -command RamDebugger::DisplayTimesWindow
+    $w.debugtime add command -label [_ "Time window"]... -command RamDebugger::DisplayTimesWindow
 
     tk_popup $w.debugtime $x $y
 }
@@ -1480,96 +1501,78 @@ proc RamDebugger::DisplayTimesWindowMenu { w x y } {
 proc RamDebugger::DisplayTimesWindow {} {
     variable text
     variable TimeMeasureData
-
-    set commands [list RamDebugger::DisplayTimesWindowStart RamDebugger::DisplayTimesWindowStop \
-	    RamDebugger::DisplayTimesWindowReport RamDebugger::DisplayTimesWindowCancel]
-    set f [DialogWinTop::Init $text "Timing control" separator $commands \
-	       [list Stop Report] Start]
-    set w [winfo toplevel $f]
-
-    TitleFrame $f.f1 -text [_ "current block"] -grid "0 new"
-    set f1 [$f.f1 getframe]
-
-    label $f1.l1 -text "Name:" -grid "0 e"
-    entry $f1.e1 -textvariable DialogWinTop::user($w,name) -grid "1 ew"
-    label $f1.l2 -text "Initial line:" -grid "0 e"
-    entry $f1.e2 -textvariable DialogWinTop::user($w,lineini) -grid "1 ew py2" -width 8
-    label $f1.l3 -text "End line:" -grid "0 e"
-    entry $f1.e3 -textvariable DialogWinTop::user($w,lineend) -grid "1 ew py2" -width 8
     
-    set bbox [ButtonBox $f1.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1 -grid "0 2 w"]
-    $bbox add -text "Pick selection" \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Gets the selection from the text window"] \
-	 -command "RamDebugger::DisplayTimesPickSelection $w"
-    $bbox add -text "Draw selection" \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Selects current block in text"] \
-	 -command "RamDebugger::DisplayTimesDrawSelection $w"
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Timing control"] -okname \
+	    [_ Start] -cancelname [_ Close] -morebuttons [list [_ "Stop"] [_ "Report"]] \
+	    -grab 0 -callback [list RamDebugger::DisplayTimesWindowDo]]
+    set f [$w giveframe]
 
-    TitleFrame $f.f2 -text [_ "blocks"] -grid "0 nsew"
-    set f2 [$f.f2 getframe]
+    set f1 [ttk::labelframe $f.f1 -text [_ "current block"]]
 
-    set sw [ScrolledWindow $f2.lf -relief sunken -borderwidth 0]
+    ttk::label $f1.l1 -text [_ "Name"]:
+    ttk::entry $f1.e1 -textvariable [$w give_uservar name]
+    ttk::label $f1.l2 -text [_ "Initial line"]:
+    ttk::entry $f1.e2 -textvariable [$w give_uservar lineini] -width 8
+    ttk::label $f1.l3 -text [_ "End line"]:
+    ttk::entry $f1.e3 -textvariable [$w give_uservar lineend] -width 8
     
-    set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 55 \
-	-exportselection 0 \
-	-columns [list \
-	    10 "Name"        left \
-	    10 "File"        right \
-	     7 "Initial line"        right \
-	     7 "End line"  right \
-	   ] \
-	-labelcommand tablelist::sortByColumn \
-	-background white \
-	-selectbackground navy -selectforeground white \
-	-stretch "0 1" -selectmode extended \
-	-highlightthickness 0]
+    ttk::frame $f1.buts
+    
+    ttk::button $f1.buts.b1 -text [_ "Pick selection"]  -command "RamDebugger::DisplayTimesPickSelection $w"
+    tooltip::tooltip $f1.buts.b1 [_ "Gets the selection from the text window"]
 
-    $sw setwidget $DialogWinTop::user($w,list)
+    ttk::button $f1.buts.b2 -text [_ "Draw selection"]  -command "RamDebugger::DisplayTimesDrawSelection $w"
+    tooltip::tooltip $f1.buts.b2 [_ "Selects current block in text"]
+    
+    grid $f1.buts.b1 $f1.buts.b2 -sticky w -padx 2 -pady 2
+    
+    grid $f1.l1 $f1.e1 -sticky w -padx 2 -pady 2
+    grid $f1.l2 $f1.e2 -sticky w -padx 2 -pady 2
+    grid $f1.l3 $f1.e3 -sticky w -padx 2 -pady 2
+    grid $f1.buts  -     -sticky w -padx 0 -pady 0
+    grid configure $f1.e1 $f1.e2 $f1.e3 -sticky ew
+    grid columnconfigure $f1 1 -weight 1
 
-    bind [$DialogWinTop::user($w,list) bodypath] <Double-1> \
-       "RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent"
+    set f2 [ttk::labelframe $f.f2 -text [_ "blocks"]]
 
-    menu $w.popup
-    $w.popup add command -label "View" -command \
-	"RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent"
-    $w.popup add separator
-    $w.popup add command -label "Update" -command \
-	"RamDebugger::ModifyTimingBlock $w $f1.e1 edit"
-    $w.popup add command -label "Delete" -command \
-	"RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
+    set columns [list \
+	    [list  14 [_ "Name"] left text 0] \
+	    [list 20 [_ "File"] left text 0] \
+	    [list  7 [_ "Initial line"] left text 0] \
+	    [list  7 [_ "End line"] left text 0] \
+	]
+    fulltktree $f2.lf -width 400 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list RamDebugger::ModifyTimingBlock $w $f1.e1 updatecurrent];#" \
+	-contextualhandler_menu [list RamDebugger::DisplayTimesWindowContextual $w $f1.e1]
 
-    bind [$DialogWinTop::user($w,list) bodypath] <<Contextual>> "tk_popup $w.popup %X %Y"
+    set list $f2.lf
+    $w set_uservar_value list $f2.lf
 
-    set bbox [ButtonBox $f2.bbox1 -spacing 0 -padx 1 -pady 1 -homogeneous 1]
-    $bbox add -image acttick16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Create new block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 create"
-    $bbox add -image edit16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Update selected block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 edit"
-    $bbox add -image actcross16 \
-	 -highlightthickness 0 -takefocus 0 -relief link -borderwidth 1 -padx 1 -pady 1 \
-	 -helptext [_ "Delete selected block"] \
-	 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
+    ttk::frame $f2.buts
+    
+    ttk::button $f2.buts.b1 -image acttick16  -command "RamDebugger::ModifyTimingBlock $w $f1.e1 create"
+    tooltip::tooltip $f2.buts.b1 [_ "Create new block"]
+
+    ttk::button $f2.buts.b2 -image edit16 -command "RamDebugger::ModifyTimingBlock $w $f1.e1 edit"
+    tooltip::tooltip $f2.buts.b2 [_ "Update selected block"]
+   
+    ttk::button $f2.buts.b3 -image actcross16  -command "RamDebugger::ModifyTimingBlock $w $f1.e1 delete"
+    tooltip::tooltip $f2.buts.b3 [_ "Delete selected block"]
+     
+    grid $f2.buts.b1 $f2.buts.b2 $f2.buts.b3 -sticky w -padx 2 -pady 2
 
     grid $f2.lf -sticky nsew
-    grid $f2.bbox1 -sticky w
+    grid $f2.buts -sticky w
     grid columnconfigure $f2 0 -weight 1
     grid rowconfigure $f2 0 -weight 1
-
-
-    supergrid::go $f1
-    supergrid::go $f
-
-    bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
-
-    foreach i "$f1.e1 $f1.e2 $f1.e3" {
-	bind $i <Return> "$bbox invoke 0; break"
-    }
+    
+    grid $f1 -sticky nsew -padx 2 -pady 2
+    grid $f2 -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 1 -weight 1
 
     ModifyTimingBlock $w $f1.e1 update
 
@@ -1577,7 +1580,7 @@ proc RamDebugger::DisplayTimesWindow {} {
     while 1 {
 	set found 0
 	foreach j $TimeMeasureData {
-	    if { [lindex $j 0] == "Block $i" } {
+	    if { [lindex $j 0] eq [_ "Block %d" $i] } {
 		set found 1
 		break
 	    }
@@ -1585,12 +1588,41 @@ proc RamDebugger::DisplayTimesWindow {} {
 	if { !$found } { break }
 	incr i
     }
-    set DialogWinTop::user($w,name) "Block $i"
+    $w set_uservar_value name [_ "Block %d" $i]
+    
+    tk::TabToWindow $f1.e1
+    bind $w <Return> [list $w invokeok]
+    $w createwindow
+}
 
-    tkTabToWindow $f1.e1
+proc RamDebugger::DisplayTimesWindowDo { w } {
+    set action [$w giveaction]
+    
+   switch -- $action {
+	-1 - 0 {
+	    destroy $w
+	    return
+	}
+	1 {
+	    rtime -start
+	}
+	2 {
+	    rtime -stop
+	}
+	3 {
+	    DisplayTimesWindowReport $w
+	}
+    }
+}
 
-    DialogWinTop::CreateWindow $f
-    #DialogWinTop::InvokeOK $f
+proc RamDebugger::DisplayTimesWindowContextual { w entry - menu id itemList } {
+    $menu add command -label [_ "View"] -command \
+	"RamDebugger::ModifyTimingBlock -itemList $itemList $w $entry updatecurrent"
+    $menu add separator
+    $menu add command -label [_ "Update"] -command \
+	"RamDebugger::ModifyTimingBlock -itemList $itemList $w $entry edit"
+    $menu add command -label [_ "Delete"] -command \
+	"RamDebugger::ModifyTimingBlock -itemList $itemList $w $entry delete"
 }
 
 ################################################################################
@@ -1676,7 +1708,7 @@ proc RamDebugger::AboutWindow {} {
 	helpviewer RAMSAN BSD NO
 	supergrid  RAMSAN BSD NO
 	supertext  "Bryan Oakley" "FREE SOFT" YES
-	tablelist  "Csaba Nemethi" "FREE SOFT" NO
+	tktreectrl  "Tim Baker" "BSD" NO
 	"visual regexp" "Laurent Riesterer" GPL NO
 	Tkhtml  "D. Richard Hipp" LGPL NO
 	tcllib Many BSD NO
@@ -3351,207 +3383,200 @@ proc RamDebugger::DisplayPositionsStack { args } {
     variable currentfile
     variable currentfile_secondary
 
-    if { [info exists DialogWinTop::user(list)] && [winfo exits $DialogWinTop::user(list)] } {
-	raise [winfo toplevel $DialogWinTop::user(list)]
-	DisplayPositionsStackDo refresh
-	return
+    set optional {
+	{ -curr_text textwidget "" }
+	{ -nowline line "" } 
     }
+    set compulsory ""
+    parse_args $optional $compulsory $args
 
-    if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
-	set curr_text $text_secondary
-    } else {
-	set curr_text $text
+    if { $curr_text eq "" } {
+	if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
+	    set curr_text $text_secondary
+	} else {
+	    set curr_text $text
+	}
     }
-    set nowline [scan [$curr_text index insert] %d]
-    foreach "curr_text nowline" $args break
-
+    if { $nowline eq "" } {
+	set nowline [scan [$curr_text index insert] %d]
+    }
     if { [info exists text_secondary] && $curr_text eq $text_secondary } {
 	set file $currentfile_secondary
     } else {
 	set curr_text $text
 	set file $currentfile
     }
-    set DialogWinTop::user(curr_text) $curr_text
-
-    set commands [list "RamDebugger::DisplayPositionsStackDo delete" \
-	    "RamDebugger::DisplayPositionsStackDo up" \
-	    "RamDebugger::DisplayPositionsStackDo down" \
-	    "RamDebugger::DisplayPositionsStackDo go" \
-	    "RamDebugger::DisplayPositionsStackDo cancel"]
-
-    set f [DialogWinTop::Init $curr_text "Positions stack window" separator $commands \
-	    [list Up Down View] Delete Close]
-    set w [winfo toplevel $f]
-
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     
-    set DialogWinTop::user(list) [tablelist::tablelist $sw.lb -width 55\
-		  -exportselection 0 \
-		  -columns [list \
-		                20 File        right \
-		                5  Line left \
-		                20 Context left \
-		                30 Directory left \
-		                ] \
-		  -labelcommand tablelist::sortByColumn \
-		  -background white \
-		  -selectbackground navy -selectforeground white \
-		  -stretch "2 3" -selectmode extended \
-		  -highlightthickness 0]
+    destroy $curr_text.dps
+    set w [dialogwin_snit $curr_text.dps -title [_ "Positions stack window"] -grab 0 \
+	    -morebuttons [list [_ "Up"] [_ "Down"] [_ "View"]] -okname [_ "Delete"] -cancelname [_ "Close"] \
+	    -callback [list RamDebugger::DisplayPositionsStackDo0]]
+    set f [$w giveframe]
 
-    $sw setwidget $DialogWinTop::user(list)
-    
-    supergrid::go $f
-    
-    focus $DialogWinTop::user(list)
-    bind [$DialogWinTop::user(list) bodypath] <Button-1> {
-	focus [$DialogWinTop::user(list) bodypath]
-    }
-    bind [$DialogWinTop::user(list) bodypath] <Double-1> {
-	RamDebugger::DisplayPositionsStackDo go
-    }
-    bind [$DialogWinTop::user(list) bodypath] <Return> {
-	RamDebugger::DisplayPositionsStackDo go
-    }
-    bind [$DialogWinTop::user(list) bodypath] <<ContextualPress>> \
-	    [bind TablelistBody <ButtonPress-1>]
+    $w set_uservar_value curr_text $curr_text
 
-    bind [$DialogWinTop::user(list) bodypath] <KeyPress-Delete> {
-	RamDebugger::DisplayPositionsStackDo delete
-    }
+    set columns [list \
+	    [list  6 [_ "id"] left text 0] \
+	    [list  20 [_ "File"] left text 0] \
+	    [list 6 [_ "Line"] left text 0] \
+	    [list  20 [_ "Context"] center text 0] \
+	    [list  30 [_ "Directory"] left text 0] \
+	]
+    fulltktree $f.lf -width 400 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list RamDebugger::DisplayPositionsStackDo $w go];#" \
+	-contextualhandler_menu [list RamDebugger::DisplayPositionsStackDo $w contextual] \
+	-deletehandler "[list RamDebugger::DisplayPositionsStackDo $w delete];#"
 
-    bind [$DialogWinTop::user(list) bodypath] <<ContextualPress>> {
-	set tablelist::win [winfo parent %W]
-	set tablelist::x [expr {%x + [winfo x %W]}]
-	set tablelist::y [expr {%y + [winfo y %W]}]
-	set cell [$tablelist::win nearestcell $tablelist::x $tablelist::y]
-	foreach {row col} [ split $cell ,] break
-	if { ![$tablelist::win selection includes $row] } {
-	    $tablelist::win selection clear 0 end
-	    $tablelist::win selection set $row
-	}
-	RamDebugger::DisplayPositionsStackDo contextual %X %Y
-    }
-    
+    $f.lf column configure 0 -visible 0
+
+    $w set_uservar_value list $f.lf
+    set list $f.lf
+
+    grid $f.lf -sticky nsew -padx 2 -pady 2
+    grid rowconfigure $f 0 -weight 1
+    grid columnconfigure $f 0 -weight 1
+
+    set ipos 0
     foreach i $options(saved_positions_stack) {
-	foreach "file_in line context" $i break
-	$DialogWinTop::user(list) insert end [list [file tail $file_in] $line \
-		$context [file dirname $file_in]]
+	lassign $i file_in line context
+	$list insert end [list $ipos [file tail $file_in] $line $context [file dirname $file_in]]
 	if { [AreFilesEqual $file $file_in] && $line == $nowline } {
-	    $DialogWinTop::user(list) selection set end
+	    $list selection add end
 	}
+	incr ipos
     }
-    $DialogWinTop::user(list) see end
-    DialogWinTop::CreateWindow $f
+    $list see end
+    focus $f.lf
+    $w createwindow
 }
 
-proc RamDebugger::DisplayPositionsStackDo { what args } {
+proc RamDebugger::DisplayPositionsStackDo0 { w } {
+    
+}
+
+proc RamDebugger::DisplayPositionsStackDo { args } {
     variable options
     variable text
     variable currentfile
     variable currentfile_secondary
     variable text_secondary
-
-    set w [winfo toplevel $DialogWinTop::user(list)]
-    set curr_text $DialogWinTop::user(curr_text)
     
+    set optional {
+	{ -itemList list "-" }
+    }
+    set compulsory "w what"
+    set args [parse_args -raise_compulsory_error 0  $optional $compulsory $args]
+    
+    set curr_text [$w give_uservar_value curr_text]
+    set list [$w give_uservar_value list]
+    if { $itemList eq "-" } {
+	set itemList [$list selection get]
+    }
     switch $what {
-	cancel {
-	    unset DialogWinTop::user(list) DialogWinTop::user(curr_text)
-	    destroy $w
-	    return
-	}
 	delete {
-	    set curr [$DialogWinTop::user(list) curselection]
-	    if { [llength $curr] == 0 } {
-		WarnWin "Select one or more positions to delete in the stack" $w
+	    if { [llength $itemList] == 0 } {
+		WarnWin [_ "Select one or more positions to delete in the stack"] $w
 	    } else {
-		set ns ""
-		set ipos 0
-		foreach i $options(saved_positions_stack) {
-		    if { [lsearch $curr $ipos] == -1 } {
-		        lappend ns $i
-		    }
-		    incr ipos
+		set ns $options(saved_positions_stack)
+		foreach item $itemList {
+		    lset ns [$list item text $item 0] ""
 		}
-		set options(saved_positions_stack) $ns
+		set options(saved_positions_stack) ""
+		foreach n $ns {
+		    if { $n ne "" } {
+		        lappend options(saved_positions_stack) $n
+		    }
+		}
 		ManagePositionsImages
 	    }
 	}
 	contextual {
-	    catch { destroy $w.menu }
-	    set menu [menu $w.menu]
-	    $menu add command -label "Up" -command "RamDebugger::DisplayPositionsStackDo up"
-	    $menu add command -label "Down" -command "RamDebugger::DisplayPositionsStackDo down"
-	    $menu add command -label "View" -command "RamDebugger::DisplayPositionsStackDo go"
+	    lassign $args - menu id itemList
+
+	    $menu add command -label [_ "Up"] -command "RamDebugger::DisplayPositionsStackDo \
+		-itemList $itemList $w up"
+	    $menu add command -label [_ "Down"] -command "RamDebugger::DisplayPositionsStackDo  \
+		-itemList $itemList $w down"
+	    $menu add command -label [_ "View"] -command "RamDebugger::DisplayPositionsStackDo  \
+		-itemList $itemList $w go"
 	    $menu add separator
-	    $menu add command -label "Delete" -command "RamDebugger::DisplayPositionsStackDo delete"
-	    foreach "x y" $args break
-	    tk_popup $menu $x $y
+	    $menu add command -label [_ "Delete"] -command "RamDebugger::DisplayPositionsStackDo  \
+		-itemList $itemList $w delete"
 	    return
 	}
 	up {
-	    set curr [$DialogWinTop::user(list) curselection]
-	    if { [llength $curr] == 0 } {
-		WarnWin "Select one or more positions to move up in the stack" $w
+	    if { [llength $itemList] == 0 } {
+		WarnWin [_ "Select one or more positions to move up in the stack"] $w
 	    } else {
-		if { [lindex $curr 0] > 0 } {
-		    set tomove [lrange $options(saved_positions_stack) [lindex $curr 0] [ lindex $curr end]]
-		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) [lindex $curr 0] \
-		                                 [lindex $curr end]]
-		    set options(saved_positions_stack) [eval linsert [list $options(saved_positions_stack)] \
-		                                 [expr {[lindex $curr 0]-1}] $tomove]
+		set idList ""
+		foreach item $itemList {
+		    lappend idList [$list item text $item 0]
+		}
+		if { [lindex $idList 0] > 0 } {
+		    set tomove [lrange $options(saved_positions_stack) [lindex $idList 0] [ lindex $idList end]]
+		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) [lindex $idList 0] \
+		            [lindex $idList end]]
+		    set options(saved_positions_stack) [linsert $options(saved_positions_stack) \
+		            [expr {[lindex $idList 0]-1}] {*}$tomove]
 		}
 	    }
 	}
 	down {
-	    set curr [$DialogWinTop::user(list) curselection]
-	    if { [llength $curr] == 0 } {
-		WarnWin "Select one or more positions to move down in the stack" $w
+	    if { [llength $itemList] == 0 } {
+		WarnWin [_ "Select one or more positions to move down in the stack"] $w
 	    } else {
-		if { [lindex $curr end] < [llength  $options(saved_positions_stack)]  } {
-		    set tomove [lrange $options(saved_positions_stack) [lindex $curr 0] [ lindex $curr end]]
-		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) [lindex $curr 0] \
-		                                 [lindex $curr end]]
-		    set options(saved_positions_stack) [eval linsert [list $options(saved_positions_stack)] \
-		                                 [expr {[lindex $curr 0]+1}] $tomove]
+		set idList ""
+		foreach item $itemList {
+		    lappend idList [$list item text $item 0]
+		}
+		if { [lindex $idList end] < [llength  $options(saved_positions_stack)]  } {
+		    set tomove [lrange $options(saved_positions_stack) [lindex $idList 0] [ lindex $idList end]]
+		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) [lindex $idList 0] \
+		            [lindex $idList end]]
+		    set options(saved_positions_stack) [linsert $options(saved_positions_stack) \
+		                                 [expr {[lindex $curr 0]+1}] {*}$tomove]
 		}
 	    }
 	}
 	go {
-	    set curr [$DialogWinTop::user(list) curselection]
-	    if { [llength $curr] != 1 } {
-		WarnWin "Select just one position in the stack to go to it" $w
+	    if { [llength $itemList] != 1 } {
+		WarnWin [_ "Select just one position in the stack to go to it"] $w
 	    } else {
-		foreach "file line -" [lindex $options(saved_positions_stack) $curr] break
+		set id [$list item text [lindex $itemList 0] 0]
+		lassign [lindex $options(saved_positions_stack) $id]  file line -
 
 		if { $curr_text eq $text || ![info exists text_secondary] } {
 		    set active_file $currentfile
-		} else { set active_file $currentfile_secondary }
-
+		} else {
+		    set active_file $currentfile_secondary
+		}
 		if { ![AreFilesEqual $file $active_file] } {
 		    if { $curr_text eq $text || ![info exists text_secondary] } {
-		        RamDebugger::OpenFileF $file
+		        OpenFileF $file
 		    } else {
 		        OpenFileSecondary $file
 		    }
 		}
 		$curr_text mark set insert $line.0
 		$curr_text see $line.0
-		SetMessage "Gone to position in line $line"
+		SetMessage [_ "Gone to position in line %s" $line]
 	    }
 	}
 	refresh {
 	    # nothing
 	}
     }
-    $DialogWinTop::user(list) delete 0 end
+    $list item delete all
+    set ipos 0
     foreach i $options(saved_positions_stack) {
-	foreach "file line context" $i break
-	$DialogWinTop::user(list) insert end [list [file tail $file] $line \
-		$context [file dirname $file]]
+	lassign $i file line context
+	$list insert end [list $ipos [file tail $file] $line $context [file dirname $file]]
+	incr ipos
     }
-    catch { $DialogWinTop::user(list) selection set [lindex $curr 0] }
+    catch { $list selection add [lindex $itemList 0] }
 }
 
 if { [info commands lreverse] eq "" } {
@@ -3687,80 +3712,73 @@ proc RamDebugger::PositionsStack { what args } {
 ################################################################################
 
 
-proc RamDebugger::MacrosDo { what { f "" } } {
+proc RamDebugger::MacrosDo { w what } {
     variable text
     variable options
 
     switch $what {
 	edit {
-	    if { $f != "" } { destroy [winfo toplevel $f] }
+	    destroy $w            
 	    OpenFileF *Macros*
 	}
 	execute {
-	    set w [winfo toplevel $f]
-	    set idx [$DialogWinTop::user($w,list) curselection]
-	    if { [llength $idx] != 1 } {
-		WarnWin "It is necessary to select one macro in order to execute it"
+	    set list [$w give_uservar_value list]
+	    set itemList [$list selection get]
+	    if { [llength $itemList] != 1 } {
+		WarnWin [_ "It is necessary to select one macro in order to execute it"]
 		return
 	    }
-	    set macro [lindex [$DialogWinTop::user($w,list) get $idx] 0]
-	    #tk_messageBox -message [array get ::env]
+	    set macro [$list item text [lindex $itemList 0] 0]
 	    RamDebugger::Macros::$macro $text
 	}
 	default {
-	    set ret [DialogWinTop::messageBox -default ok -icon warning -message \
-		         "Are you sure to delete all your macros and load default macros?" -parent $f \
-		         -title "delete all macros and update" -type okcancel]
-	    if { $ret == "ok" } {
+	    set ret [snit_messageBox -default ok -icon warning -message \
+		         [_ "Are you sure to delete all your macros and load default macros?"] -parent $w \
+		         -title [_ "delete all macros and update"] -type okcancel]
+	    if { $ret eq "ok" } {
 		catch { unset options(MacrosDocument) }
 		AddActiveMacrosToMenu $Macros::mainframe $Macros::menu
-		destroy [winfo toplevel $f]
+		destroy $w
 	    }
 	}
 	cancel {
-	    destroy [winfo toplevel $f]
+	    destroy $w
 	}
     }
 }
 
 proc RamDebugger::Macros { parent } {
-
-    set commands [list "RamDebugger::MacrosDo execute" "RamDebugger::MacrosDo edit" \
-		     "RamDebugger::MacrosDo default" "RamDebugger::MacrosDo cancel"]
-    set f [DialogWinTop::Init $parent "Macros" separator $commands \
-	       [list Edit Default] Execute]
-    set w [winfo toplevel $f]
-
-    TitleFrame $f.f2 -text "Defined macros" -grid 0
-    set f2 [$f.f2 getframe]
-
-    set sw [ScrolledWindow $f2.lf -relief sunken -borderwidth 0 -grid "0 ewns"]
     
-    set DialogWinTop::user($w,list) [tablelist::tablelist $sw.lb -width 70 \
-	-exportselection 0 \
-	-columns [list \
-	    16 "Name"        left \
-	    9 "Accelerator"        center \
-	    7 "In menu"         center \
-	    50 "Description"        left \
-	   ] \
-	-labelcommand tablelist::sortByColumn \
-	-background white \
-	-selectbackground navy -selectforeground white \
-	-stretch "0 1 3" -selectmode extended \
-	-highlightthickness 0]
+    destroy $parent.macros
+    set w [dialogwin_snit $parent.macros -title [_ "Macros"] -okname [_ "Execute"] \
+	    -morebuttons [list [_ "Edit"] [_ "Default"]] \
+	    -cancelname [_ Close] -grab 0 -callback [list RamDebugger::MacrosDo0]]
+    set f [$w giveframe]
+    
+    set f1 [ttk::labelframe $f.f1 -text [_ "Defined macros"]]
+    
+    set columns [list \
+	    [list  16 [_ "Name"] left text 0] \
+	    [list 9 [_ "Accelerator"] left text 0] \
+	    [list  7 [_ "In menu"] center text 0] \
+	    [list  50 [_ "Description"] left text 0] \
+	]
+    fulltktree $f1.lf -width 400 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list RamDebugger::MacrosDo $w execute];#"
+    $w set_uservar_value list $f1.lf
+    set list $f1.lf
 
-    $sw setwidget $DialogWinTop::user($w,list)
-
-    bind [$DialogWinTop::user($w,list) bodypath] <Double-1> \
-       "RamDebugger::MacrosDo execute $f"
-
-    supergrid::go $f2
-    supergrid::go $f
-
-    bind [winfo toplevel $f] <Return> "DialogWinTop::InvokeOK $f"
-
-
+    grid $f1.lf -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $f1 0 -weight 1
+    grid rowconfigure $f1 0 -weight 1
+    
+    grid $f1 -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1
+    
     foreach i [info commands Macros::*] {
 	set i [namespace tail $i]
 	if { [info exists Macros::macrodata($i,accelerator)] } {
@@ -3773,9 +3791,28 @@ proc RamDebugger::Macros { parent } {
 	    set help $Macros::macrodata($i,help)
 	} else { set help "" }
 
-	$DialogWinTop::user($w,list) insert end [list $i $acc $inmenu $help]
+	$list insert end [list $i $acc $inmenu $help]
     }
-    DialogWinTop::CreateWindow $f
+    tk::TabToWindow $f1.lf
+    bind $w <Return> [list $w invokeok]
+    $w createwindow
+}
+
+proc RamDebugger::MacrosDo0 { w } {
+    switch --  [$w giveaction] {
+	-1 - 0 {
+	    destroy $w
+	}
+	1 {
+	    MacrosDo $w execute
+	}
+	2 {
+	    MacrosDo $w edit
+	}
+	3 {
+	    MacrosDo $w default
+	}
+    }
 }
 
 proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {

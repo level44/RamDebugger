@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.142 2009/08/24 16:41:43 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.143 2009/08/27 12:02:59 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7477,7 +7477,7 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
 	"RamDebugger::PositionsStack go"
     $menu add separator
     $menu add command -label [_ "Positions window"] -command \
-	[list RamDebugger::DisplayPositionsStack $text $line]
+	[list RamDebugger::DisplayPositionsStack  -curr_text $text -nowline $line]
     $menu add command -label [_ "Breakpoints window"] -command \
 	[list RamDebugger::MarkerContextualSubmenuDo $line window]
 
@@ -7678,8 +7678,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # dirty trick to avoid conflicts with other bwidget packages
     # only necessary when working inside a master
     #auto_load ComboBox
-
-    package require tablelist
 
     #require BWidgetR, a BWidget with some modifications, marked with RAMSAN
     #inside the GiD scripts BWidget is really BWidgetR, to avoid duplicate it

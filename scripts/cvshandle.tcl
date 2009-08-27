@@ -726,7 +726,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     $w set_uservar_value message ""
     
     tk::TabToWindow $f.e1
-    bind [winfo toplevel $f] <Return> [list $w invokeok]
+    bind $w <Return> [list $w invokeok]
     $w createwindow
 }
 

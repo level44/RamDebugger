@@ -230,79 +230,73 @@ proc "Go to proc" { w } {
 
     set wg $w.g
     destroy $wg
-    dialogwin_snit $wg -title "Go to proc"
+    dialogwin_snit $wg -title [_ "Go to proc"]
     set f [$wg giveframe]
-    set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0 -grid "0 2"]
     
-    tablelist::tablelist $sw.lb -width 100 \
-	    -height 25 -exportselection 0 \
-	-columns [list \
-	    26  "Proc name"        left \
-	    6  "Proc namespace"   left \
-	    46  "Comments"   left \
-	    6  "Proc type"        center \
-	    5  "line"     right \
-	    ] \
-	    -labelcommand tablelist::sortByColumn \
-	    -background white \
-	    -selectbackground navy -selectforeground white \
-	    -stretch "" -selectmode browse \
-	-highlightthickness 0
-    
-    $sw setwidget $sw.lb
-    $sw.lb columnconfigure 0 -sortmode dictionary
-    $sw.lb columnconfigure 1 -sortmode dictionary
-    $sw.lb columnconfigure 2 -sortmode dictionary
-    $sw.lb columnconfigure 3 -sortmode dictionary
-    $sw.lb columnconfigure 4 -sortmode integer
+    set columns [list \
+	    [list 32 [_ "Proc name"] left text 0] \
+	    [list 12 [_ "Proc namespace"] left text 0] \
+	    [list 32 [_ "Comments"] left text 0] \
+	    [list  12 [_ "Proc type"] left text 0] \
+	    [list  6 [_ "line"] left text 0] \
+	]
+    fulltktree $f.lf -width 600 \
+	-columns $columns -expand 0 \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list $wg invokeok];#"
+    set list $f.lf
 
     foreach i $procs {
-	$sw.lb insert end $i
-	if { [string match *snit* [lindex $i 2]] } {
-	    $sw.lb rowconfigure end -background orange
+	$list insert end $i
+	if { [string match *snit* [lindex $i 3]] } {
+	    $f.lf item element configure end 0 e_text_sel -fill [list grey disabled \
+		    $fulltktree::SystemHighlightText {selected focus} orange ""]
 	}
     }
 
-    $sw.lb selection set 0
-    $sw.lb activate 0
-
-    bind [$sw.lb bodypath] <Double-1> [list $wg invokeok]
-    bind [$sw.lb bodypath] <Return> [list $wg invokeok]
-
-    bind [$sw.lb bodypath] <KeyPress> {
-	set w [winfo parent %W]
-	set idx [$w index active]
-	if { [string is wordchar -strict %A] } {
-	    if { ![info exists ::searchstring] } { set ::searchstring "" }
-	    if { ![string equal $::searchstring %A] } {
-		append ::searchstring %A
-	    }
-	    set found 0
-	    for { set i [expr {$idx+1}] } { $i < [$w index end] } { incr i } {
-		if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
-		    set found 1
-		    break
-		}
-	    }
-	    if { !$found } {
-		for { set i 0 } { $i < $idx } { incr i } {
-		    if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
-		        set found 1
-		        break
-		    }
-		}
-	    }
-	    if { $found } {
-		$w selection clear 0 end
-		$w selection set $i
-		$w activate $i
-		$w see $i
-	    }
-	    after 500 unset -nocomplain ::searchstring
-	}
+    catch {
+	$list selection add 1
+	$list activate 1
     }
-    supergrid::go $f
-    focus $sw.lb
+#     bind [$sw.lb bodypath] <KeyPress> {
+#         set w [winfo parent %W]
+#         set idx [$w index active]
+#         if { [string is wordchar -strict %A] } {
+#             if { ![info exists ::searchstring] } { set ::searchstring "" }
+#             if { ![string equal $::searchstring %A] } {
+#                 append ::searchstring %A
+#             }
+#             set found 0
+#             for { set i [expr {$idx+1}] } { $i < [$w index end] } { incr i } {
+#                 if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
+#                     set found 1
+#                     break
+#                 }
+#             }
+#             if { !$found } {
+#                 for { set i 0 } { $i < $idx } { incr i } {
+#                     if { [string match -nocase $::searchstring* [lindex [$w get $i] 0]] } {
+#                         set found 1
+#                         break
+#                     }
+#                 }
+#             }
+#             if { $found } {
+#                 $w selection clear 0 end
+#                 $w selection set $i
+#                 $w activate $i
+#                 $w see $i
+#             }
+#             after 500 unset -nocomplain ::searchstring
+#         }
+#     }
+   
+    
+    grid configure $f.lf -sticky ew
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1 
+    focus $list
 
     set action [$wg createwindow]
 
@@ -313,23 +307,22 @@ proc "Go to proc" { w } {
 		return
 	    }
 	    1 {
-		set curr [$sw.lb curselection]
-		if { [llength $curr] == 1 } {
-		    set line [lindex [$sw.lb get $curr] 4]
+		set itemList [$list selection get]
+		if { [llength $itemList] == 1 } {
+		    set line [$list item text [lindex $itemList 0] 4]
 		    $w mark set insert $line.0
 		    $w see $line.0
 		    focus $w
 		    destroy $wg
 		    return
 		} else {
-		    tk_messageBox -message "Select one function in order to go to it"
+		    tk_messageBox -message [_ "Select one function in order to go to it"]
 		}
 	    }
 	}
 	set action [$wg waitforwindow]
     }
 }
-
 
 ################################################################################
 #    proc Mark translation strings
