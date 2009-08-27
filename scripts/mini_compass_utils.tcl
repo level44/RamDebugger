@@ -99,3 +99,101 @@ snit::widgetadaptor cu::menubutton_button {
 	}
     }
 }
+
+################################################################################
+#    store preferences
+################################################################################
+
+proc cu::store_program_preferences { args } {
+
+    set optional {
+	{ -valueName name "" }
+    }
+    set compulsory "program_name data"
+
+    parse_args $optional $compulsory $args
+
+    if { $valueName eq "" } {
+	set valueNameF IniData
+    } else {
+	set valueNameF IniData_$valueName
+    }
+
+    if { $::tcl_platform(platform) eq "windows" && $::tcl_platform(os) ne "Windows CE" } {
+	set key "HKEY_CURRENT_USER\\Software\\Compass\\$program_name"
+	package require registry
+	registry set $key $valueNameF $data
+    } else {
+	package require tdom
+	if { $::tcl_platform(os) eq "Windows CE" } {
+	    set dir [file join / "Application Data" Compass $program_name]
+	    file mkdir $dir
+	    set file [file join $dir prefs]
+	} elseif { [info exists ::env(HOME)] } {
+	    set file [file normalize ~/.compass_${program_name}_prefs]
+	} else {
+	    set file [file normalize [file join /tmp compass_${program_name}_prefs]]
+	}
+	set err [catch { tDOM::xmlReadFile $file } xml]
+	if { $err } { set xml "<preferences/>" }
+	set doc [dom parse $xml]
+	set root [$doc documentElement]
+	set domNode [$root selectNodes "pref\[@n=[xpath_str $valueNameF]\]"]
+	if { $domNode ne "" } { $domNode delete }
+	set p [$root appendChildTag pref]
+	$p setAttribute n $valueNameF
+	$p appendChildText $data
+
+	set fout [open $file w]
+	fconfigure $fout -encoding utf-8
+	puts $fout [$doc asXML]
+	close $fout
+    }
+}
+proc cu::get_program_preferences { args } {
+
+    set optional {
+	{ -valueName name "" }
+	{ -default default_value "" }
+    }
+    set compulsory "program_name"
+
+    parse_args $optional $compulsory $args
+
+    if { $valueName eq "" } {
+	set valueNameF IniData
+    } else {
+	set valueNameF IniData_$valueName
+    }
+
+    set data $default
+    if { $::tcl_platform(platform) eq "windows" && $::tcl_platform(os) ne "Windows CE" } {
+	set key "HKEY_CURRENT_USER\\Software\\Compass\\$program_name"
+	package require registry
+	set err [catch { registry get $key $valueNameF } data]
+	if { $err } {
+	    set data $default
+	}
+    } else {
+	package require tdom
+	if { $::tcl_platform(os) eq "Windows CE" } {
+	    set dir [file join / "Application Data" Compass $program_name]
+	    file mkdir $dir
+	    set file [file join $dir prefs]
+	} elseif { [info exists ::env(HOME)] } {
+	    set file [file normalize ~/.compass_${program_name}_prefs]
+	} else {
+	    set file [file normalize [file join /tmp compass_${program_name}_prefs]]
+	}
+	set err [catch { tDOM::xmlReadFile $file } xml]
+	if { !$err } {
+	    set doc [dom parse $xml]
+	    set root [$doc documentElement]
+	    set domNode [$root selectNodes "pref\[@n=[xpath_str $valueNameF]\]"]
+	    if { $domNode ne "" } {
+		set data [$domNode text]
+	    }
+	}
+    }
+    return $data
+}

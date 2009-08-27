@@ -36,6 +36,7 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 
 set createdistribution::do_ask_packages 0
+set createdistribution::do_create_dmg 1
 
 set data [tDOM::xmlReadFile [file root [info script]].xml]
 set doc [dom parse $data]
@@ -64,7 +65,7 @@ set createdistribution::doencrypt 0
 
 set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom]
 lappend createdistribution::remove_packages trf bwidget \
-    vfs::ftp he_dialog wce
+    vfs::ftp he_dialog wce compass_utils
 
 regsubfiles [list \
 	{set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \

@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.143 2009/08/27 12:02:59 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.144 2009/08/27 15:12:46 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7692,7 +7692,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require dialogwin
     package require textutil
     package require tooltip
-    package require tile
     package require img::png
     
     if { ![catch { package vcompare [package provide Tk] 8.5 } ret] && $ret < 0} {
@@ -7761,7 +7760,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set descmenu ""
     if { [ tk windowingsystem] eq "aqua"} {
 	proc ::tk::mac::ShowPreferences {} {
-	    RamDebugger::PreferencesWindow
+	    after idle RamDebugger::PreferencesWindow
 	}
 #         proc ::tkAboutDialog {} {
 #             RamDebugger::AboutWindow
