@@ -4,7 +4,7 @@
 
 if { [lindex $argv 0] eq "clean" } {
     puts "deleting generated files"
-    file delete {*}[glob -dir [file dirname [info script]] *.deb *.tar.gz *.zip *.app *.dmg modulesinfo-*]
+    file delete -force {*}[glob -dir [file dirname [info script]] *.deb *.tar.gz *.zip *.app *.dmg modulesinfo-*]
     exit
 }
 
@@ -36,7 +36,7 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 
 set createdistribution::do_ask_packages 0
-set createdistribution::do_create_dmg 0
+set createdistribution::do_create_dmg 1
 
 set data [tDOM::xmlReadFile [file root [info script]].xml]
 set doc [dom parse $data]
