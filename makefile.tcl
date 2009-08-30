@@ -126,7 +126,7 @@ set createdistribution::libdir addons
 lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
     htmlparse img ncgi sha1 snit struct textutil tile vfs treectrl
 
-CreateDistribution zip $program_name-source  . RamDebugger.tcl \
+CreateDistribution zip $program_name-source-$dist  . RamDebugger.tcl \
     $files addons/ramdebugger.ico $version
 
 
