@@ -1,216 +1,40 @@
 
-
-License and copyright
-=====================
-
-This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
-(http://gid.cimne.upc.es/ramsan) The following terms apply to all files 
-associated with the software unless explicitly disclaimed in individual files.
-See license.terms for details.
-
-Introduction
-============
-
 RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.
-With RamDebugger, it is possible to make Local Debugging, where the debugger
-starts the program to be debugged. and Remote debugging, where the program to 
-debug is already started and RamDebugger connects to it.
 
-RamDebugger has additional capabilities like:
+DESCRIPTION
+===========
 
- * Editing the code. It is possible to edit the code inside its own editor and 
-resend the new code without closing the debugged program.
 
- * The TCL-TK source code is colorized and supports automatic indentation.
+	RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.
+	
+	With RamDebugger, it is possible to make Local Debugging, where the debugger starts
+	the program to be debugged. and Remote debugging, where the program to debug is already
+	started and RamDebugger connects to it.
 
- * When stopping the debugger is one source code line, it is possible to view all 
-the variables and expression values, as well as change them.
+	FEATURES
+	
+	* IDE for code edition of TCL and c/c++
+	* Full debugging of TCL and c/c++
+	* Works in Linux, Windows and MacOSX
+	* It supports editing XML code
+    
 
- * It has additional options to measure execution times in the debugged program.
-Works in Linux and Windows
+INSTALL
+========
 
- * Includes additional packages, like Tkcon and VisualRegexp, developed by third 
-party people, as a convenience for RamDebugger users.
+To install the program:
 
- * The same program is an IDE for compiling and debugging c and c++
+Copy 'RamDebugger.app' to the Applications folder
 
-Note: RamDebugger can also be an IDE for compiling and debugging c/c++
-code. It uses GDB as a backend. See *Note Compiling/Debugging c++::
-for details.
+EXECUTION
+========
 
-Changes
+To execute the program:
+
+To execute the program double-click 'RamDebugger.app'
+
+SUPPORT
 =======
 
-Changes From version 6.1 to version 6.2
-
-* Prepared for new TCL syntax {*}
-
-Changes From version 5.6 to version 6.1
-
- * Partly converted to tile
- * Prepared for working with TabletPC
- * Highy optimized XML parsing and colorize
-
-Changes From version 5.5 to version 5.6
-
- * Added trace command in the Breakpoints window (checking in every line if a variable 
-   changes)
- * New debug option: Continue out of loop
-
-Changes From version 5.4 to version 5.5
-
- * Added new option Open in new Window 
- * Added a new Return option to the debugger for returning from a proc without finishing it 
- * Edit->Paste stack 
- * New macro for changing background color to regions of file 
- * Possibility of non-instrumenting some procs, defined by name 
-
-Changes From version 5.3 to version 5.4
- 
- * Colorize XML files 
- * New open without browser
- * Permmits to open remote files by using ssh, ftp, plink
-
-
-Changes From version 4.4 to version 5.3
-
-   * Colors customization
-   * Fast instrumenter for TCL code, developed in C++
-   * Profile procedures
-   * Files list obtained with Ctrl-Tab has a new alternative list
-     based on current directory
-
-
-Changes From version 3.2 to version 4.1
-
-   * Implemented secondary view in the Editor
-   * Implemented auto save, based on file revisions
-   * New inline file chooser to fast change buffers
-   * RamDebugger can automatically manage revisions of files (based internally on CVS)
-   * Added program `tkdiff' for visualizing file differences
-   * New option in Help to associate RamDebugger as command in the .tcl extension in Windows
-   * When TCL raises and error, RamDebugger shows last visited line
-   * If files contain, in first lines something like `# -*- coding:
-     utf-8;-*-' they are considered as in utf-8 encoding
-   * RamDebugger works only for TCL version 8.4
-   * Open file and save file browser follow the preferences extensions for file types
-   * Added new macro for going to function names
-   * Corrections for when several pop-up windows appear at the same time
-     
-Changes From version 3.1 to version 3.2
-
-   * Added Snit support
-   * Added contextual menu in marker zone (left margin of text)
-   * Added Enable/disable to breakpoints
-   * Added command stop in the Debug menu
-   * Added command to break execution in any moment
-   * Added zoom option to Display Windows hierarchy
-   * The cache directory (used internally by RamDebugger) is now created in the user 
-     directories instead of inside the installation directory
-   * Option Pick window in Windows hierarchy
-   * It is necessary to stop debugging before start debugging again
-
-Changes From version 3.0 to version 3.1
-
-   * GiD customization files
-   * User can choose file extensions for every file type
-   * New macro for applying regsub to a region
-   * New option in Current file arguments: file type can be TCL or TK
-   * New option in Current file arguments: Another file can be started to begin local
-     debugging
-   * RamDebugger::OpenFileSaveHandler
-
-Changes From version 2.8 to version 3.0
-
-   * Count lines of code of a project (LOC)
-   * It is possible to create and use macros defined in TCL
-   * Values in User defined var & Local vars display content in balloon
-   * Autodisplay variables now displays also array variables
-   * Better interactive indentation and colors
-   * Menu close
-   * Drawing dynamically closing braces when editing
-   * better stack position
-   * search & replace
-   * comment lines are indented in normal column
-   * Added reinstrument to menu Debug
-   * If tkcon is open, output goes also to tkcon
-   * New menu options in Tkcon to send commands to debugged program
-
-Changes From version 2.6 to version 2.8
-
-   * Option to instrument last line in proc (to avoid error when not using return)
-   * corrected error when brackets are not paired in comments
-   * Script of command bind is now instrumented
-
-Changes From version 2 to version 2.6
-
-   * RamDebugger can now be used as a package
-   * When editing one file, breakpoints are modified in position accordingly
-   * Command console works correctly now in local mode
-   * It is possible to save possitions in the editor to return later
-   * Activated drag and drop (works for Windows and for platforms that
-     have package tkdnd compiled).
-
-Changes From version 1 to version 2
-
-   * Tested for Tcl/Tk 8.4
-   * When Tkhtml is not compiled for the given platform, gives message and continues
-   * Added contextual help for programming commands. If there are
-     manual pages (UNIX), it also uses them if man2html is found in
-     the system.
-   * When debugging local, possibility to choose debug TCL or TK
-   * Improved the build process and the debugging for C/C++
-   * Improved several windows, like the Breakpoints window and Goto line
-   * Added option to search in files
-   * Several speed problems in linux were related to the TCL bug with
-     raise command. Implemented one workaround.
-   * Fixed many bugs related to parsing files and other.
-
-web page
-========
-
-RamDebugger web page is at: http://www.compassis.com/ramdebugger
-
-
-Download
-========
-
-RamDebugger can be download from
-
-* ftp://ftp.compassis.com/pub/ramdebugger
-
-
-Installation and prerequisites
-==============================
-
-The only prerequisite before executing RamDebugger is to have Tcl-Tk
-installed. The tested version is Tcl-Tk8.4 and 8.5 They can be obtained from
-http://www.tcl.tk.
-
-RamDebugger has been tested on Windows and on Linux. For other UNIXes
-and MAC, it is necessary to obtain, separately, the package Tkhtml
-compiled for the platform. Without it, the help cannot be visualized.
-
-All the additional packages that RamDebugger uses, are already
-contained in the distribution.
-
-The distribution comes in a ZIP file. Once it is unpacked in one
-directory, RamDebugger is ready to begin to work.
-
-*Note:* Text files inside ZIP files have Windows line-ends. UNIX and
-Linux users may want to unzip using something like `unzip -a ...' in
-order to change the line-ends to Unix ones. After doing this and after
-changing the program to executable with `chmod +x RamDebugger.tcl', it
-is possible to start the program by just writing `RamDebugger.tcl'
-
-Starting RamDebugger
-====================
-
-To start RamDebugger on Windows, double-click over RamDebugger.tcl.
-
-To start Ramdebugger on UNIX, in the command line use something
-similar to: wish RamDebugger.tcl
-
-or just: RamDebugger.tcl if you followed the instructions in *Note
-Installation and prerequisites::.
-
+Compass Engineering <info@compassis.com>
+http://www.compassis.com

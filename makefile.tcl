@@ -76,6 +76,7 @@ auto_mkindex scripts *.tcl
 
 set createdistribution::libdir ""
 
+create_README $pNode Readme
 set files [list license.terms Readme addons scripts Examples help]
 
 # cannot contain file pkgIndex.tcl
