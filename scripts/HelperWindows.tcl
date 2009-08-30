@@ -3146,9 +3146,10 @@ proc RamDebugger::OpenProgram { what args } {
 	}
 	tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
     }
-    if { ![interp exists $what] } {
-	interp create $what
+    if { [interp exists $what] } {
+	interp delete $what
     }
+    interp create $what
     interp alias $what exit_interp "" interp delete $what
     $what eval [list proc exit { args } "destroy . ; exit_interp"]
     interp alias $what puts "" RamDebugger::_OpenProgram_puts

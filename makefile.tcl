@@ -36,7 +36,7 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 
 set createdistribution::do_ask_packages 0
-set createdistribution::do_create_dmg 1
+set createdistribution::do_create_dmg 0
 
 set data [tDOM::xmlReadFile [file root [info script]].xml]
 set doc [dom parse $data]
