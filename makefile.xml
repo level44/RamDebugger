@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?><!-- -*- coding: utf-8;-*- -->
+<Infoproblemtype version="1.0">
+  <Program n="ramdebugger">
+    <Name>RamDebugger</Name>
+    <Version>7.0</Version>
+    <Section>contrib/devel</Section>
+    <Categories>Development;Debugger;IDE;Application</Categories>
+    <Dependencies>libc6 (&gt;= 2.3.6-6), 
+      libx11-6, libxext6</Dependencies>
+    <Maintainer>Compass Engineering &lt;info@compassis.com&gt;</Maintainer>
+    <Homepage>http://www.compassis.com</Homepage>
+    <Languages>
+      <Language n="en">English</Language>
+    </Languages>
+      <ShortDescription>RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.</ShortDescription>
+    <Description>
+	RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.
+	
+	With RamDebugger, it is possible to make Local Debugging, where the debugger starts
+	the program to be debugged. and Remote debugging, where the program to debug is already
+	started and RamDebugger connects to it.
+
+	FEATURES
+	
+	* IDE for code edition of TCL and c/c++
+	* Full debugging of TCL and c/c++
+	* Works in Linux, Windows and MacOSX
+	* It supports editing XML code
+    </Description>
+    <NewsInVersion version="7.0" date="2009-08-23">
+	  * Interative search and replace with Ctrl-i and Ctrl-j
+	  * Add some functions for CVS management of the files being edited
+	  * Fast instrumentation of c/c++ code
+	  * Create a c/c++ project based on an existing Makefile
+	  * First version for MacOSX
+	  * There is a new option to be added to the debugged program that permits it to wait for the debugger to connect. Check example "example2b.tcl"
+	  * There is a new option to decide if saving with Tabs or with spaces at the beginning of the lines of the edited files
+    </NewsInVersion>
+  </Program>
+</Infoproblemtype>
