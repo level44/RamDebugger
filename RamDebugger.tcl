@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.144 2009/08/27 15:12:46 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.145 2009/09/02 18:03:48 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -308,6 +308,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 
     set options_def(listfilespane) 0
     set options_def(auto_raise_stack_trace) 1
+    
+    set options_def(filetype) auto
+    set options_def(filetype_only_this_file) 1
     
     switch $::tcl_platform(platform) {
 	windows {
@@ -1003,6 +1006,7 @@ proc RamDebugger::rdebug { args } {
     } elseif {  $remoteserverType == "gdb" } {
 	set remotecomm "set confirm off\n"
 	append remotecomm "set breakpoint pending on\n"
+	append remotecomm "set print elements 2000\n"
 	append remotecomm "file \"[lindex $opts(program) 0]\"\n"
 	if { [lindex $opts(program) 1] != "" } {
 	    append remotecomm "set args [lindex $opts(program) 2]"
@@ -2194,6 +2198,10 @@ proc RamDebugger::GiveFileTypeForFileBrowser {} {
 proc RamDebugger::GiveFileType { filename } {
     variable options
     variable options_def
+    
+    if { $options(filetype) ne "auto" } {
+	return $options(filetype)
+    }
 
     if { [array names options extensions,*] == "" } {
 	foreach i [array names options_def extensions,*] {
@@ -3676,7 +3684,10 @@ proc RamDebugger::OpenFileF { args } {
     }
 
     WaitState 1
-
+    
+    if { $options(filetype) ne "auto" && $options(filetype_only_this_file) } {
+	set options(filetype) auto
+    }
     if { [set pos [lsearch -exact $WindowFilesList $currentfile]] != -1 } {
 	set line [scan [$text index insert] %d]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos $line]
@@ -7960,6 +7971,33 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::OpenProgram tkdiff"] \
 		[list command [_ "Open Tkcvs"] {} [_ "Open Tkcvs"] "" \
 		    -command "RamDebugger::OpenProgram tkcvs"] \
+		separator \
+	    [list cascad [_ "File type"] {} filetype 0 [list \
+		    [list radiobutton [_ "Automatic"] filetype [_ "Selection is made based on extension"] "" \
+		        -variable RamDebugger::options(filetype) -value auto -selectcolor black] \
+		    separator \
+		    [list radiobutton [_ "TCL"] filetype "" "" \
+		        -variable RamDebugger::options(filetype) -value TCL \
+		        -command [list RamDebugger::ReinstrumentCurrentFile] \
+		        -selectcolor black] \
+		    [list radiobutton [_ "C/C++"] filetype "" "" \
+		        -variable RamDebugger::options(filetype) -value C/C++ \
+		        -selectcolor black] \
+		    [list radiobutton [_ "XML"] filetype "" "" \
+		        -variable RamDebugger::options(filetype) -value XML \
+		        -selectcolor black] \
+		    [list radiobutton [_ "GiD BAS file"] filetype "" "" \
+		        -variable RamDebugger::options(filetype) -value "GiD BAS file" \
+		        -selectcolor black] \
+		    [list radiobutton [_ "GiD data files"] filetype "" "" \
+		        -variable RamDebugger::options(filetype) -value "GiD data files" \
+		        -selectcolor black] \
+		    separator \
+		    [list checkbutton [_ "Only for this file"] filetype "" "" \
+		        -variable RamDebugger::options(filetype_only_this_file) \
+		        -selectcolor black] \
+		    ] \
+		] \
 		separator \
 		[list command &[_ "View instrumented file P"] {} [_ "View instrumented file P"] "" \
 		-command "RamDebugger::ViewInstrumentedFile instrumentedP"] \

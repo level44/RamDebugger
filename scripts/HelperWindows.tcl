@@ -104,32 +104,37 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 
 	[$w give_uservar_value combo] configure -values $options(old_expressions)
 
-	if { $remoteserverType == "gdb" } {
-	    if { ![regexp {\[([0-9]+):([0-9]+)\]} $var {} ini1 end1] } {
-		set ini1 1
-		set end1 1
-	    }
-	    if { ![regexp {\[([0-9]+)::([0-9]+)\]} $var {} ini2 end2] } {
-		set ini2 1
-		set end2 1
-	    }
+	if { $remoteserverType eq "gdb" } {
 	    set remoteserver [lreplace $remoteserver 2 2 [list getdata \
-		[list RamDebugger::DisplayVarWindowEval res $w]]]
-
-	    set comm ""
-	    set isinit 0
-	    for { set i1 $ini1 } { $i1 <= $end1 } { incr i1 } {
-		regsub {\[([0-9]+):([0-9]+)\]} $var \[$i1\] varn
-		for { set i2 $ini2 } { $i2 <= $end2 } { incr i2 } {
-		    regsub {\[([0-9]+)::([0-9]+)\]} $varn \[$i2\] varn
-		    if { !$isinit } {
-		        if { $ini1 != $end1 || $ini2 != $end2 } {
-		            append comm "printf \"MULTIPLE RESULT\\n\"\n"
+		        [list RamDebugger::DisplayVarWindowEval res $w]]]
+	    
+	    if { [regexp {^\s*gdb\s+(.*)} $var] } {
+		regexp {^\s*gdb\s+(.*)} $var {} comm
+		append comm "\nprintf \"\\n\"\n"
+	    } else {
+		if { ![regexp {\[([0-9]+):([0-9]+)\]} $var {} ini1 end1] } {
+		    set ini1 1
+		    set end1 1
+		}
+		if { ![regexp {\[([0-9]+)::([0-9]+)\]} $var {} ini2 end2] } {
+		    set ini2 1
+		    set end2 1
+		}
+		set comm ""
+		set isinit 0
+		for { set i1 $ini1 } { $i1 <= $end1 } { incr i1 } {
+		    regsub {\[([0-9]+):([0-9]+)\]} $var \[$i1\] varn
+		    for { set i2 $ini2 } { $i2 <= $end2 } { incr i2 } {
+		        regsub {\[([0-9]+)::([0-9]+)\]} $varn \[$i2\] varn
+		        if { !$isinit } {
+		            if { $ini1 != $end1 || $ini2 != $end2 } {
+		                append comm "printf \"MULTIPLE RESULT\\n\"\n"
+		            }
+		            append comm "whatis $varn\n"
+		            set isinit 1
 		        }
-		        append comm "whatis $varn\n"
-		        set isinit 1
+		        append comm "printf \"\\n$varn=\"\noutput $varn\nprintf \"\\n\"\n"
 		    }
-		    append comm "printf \"\\n$varn=\"\noutput $varn\nprintf \"\\n\"\n"
 		}
 	    }
 	    append comm "printf \"FINISHED GETDATA\\n\""
@@ -362,6 +367,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	*  $variablename+4: Enter any expression that gdb accepts
 	*  $variablename[4:2][6::8]: One extension to the gdb expressions. Permmits to
 	   print part of a string or vector
+	*  gdb set print elements 1000 (to send a literal gdb command to debugger, prefix it with "gdb ...")
     }]
 
     if { ![info exists options(old_expressions)] } {
