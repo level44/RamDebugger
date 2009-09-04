@@ -14,7 +14,7 @@
     </Languages>
       <ShortDescription>RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.</ShortDescription>
     <Description>
-	RamDebugger is a graphical debugger for the scripting lenguage Tcl-TK.
+       Graphical debugger for the scripting language Tcl-TK.
 	
 	With RamDebugger, it is possible to make Local Debugging, where the debugger starts
 	the program to be debugged. and Remote debugging, where the program to debug is already
