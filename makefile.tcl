@@ -68,7 +68,7 @@ lappend createdistribution::remove_packages trf bwidget \
     vfs::ftp he_dialog wce compass_utils \
     textutil::adjust textutil::repeat \
     textutil::split textutil::tabify  textutil::trim  textutil::string tile \
-    tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri
+    tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread
 
 regsubfiles [list \
 	{set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \
@@ -80,7 +80,7 @@ auto_mkindex scripts *.tcl
 set createdistribution::libdir ""
 
 create_README $pNode Readme
-set files [list license.terms Readme addons scripts Examples help]
+set files [list addons scripts Examples help]
 
 # cannot contain file pkgIndex.tcl
 CreateDistribution $dist_type $program_name . RamDebugger.tcl \
@@ -100,15 +100,16 @@ if { $tcl_platform(platform) eq "windows" } {
     
 } elseif { $tcl_platform(os) ne "Darwin" } {
     set exe [string tolower $program_name]
-    set tarfile ${exe}_$version-linux_i386.tar.gz
+    set tarfile ${exe}$version-linux_i386.tar.gz
 
     set dir $program_name$version
+    file delete -force $dir
     file mkdir $dir
     file copy {*}$files $dir
     create_README $pNode $dir/README
-    cp license.terms $dir/License.txt
+    file copy license.terms $dir/License.txt
     CreateTarGzDist $tarfile $dir
-    set deb [create_gid_debian_package $pNode $dir ".RamDebugger .ramdebugger_prefs" \
+    set deb [create_debian_package $pNode $dir ".RamDebugger .ramdebugger_prefs" \
 	    addons/ramdebugger.png]
     #exec alien --to-rpm --scripts $deb
     
@@ -122,14 +123,15 @@ if { $tcl_platform(platform) eq "windows" } {
     file delete Readme.txt License.txt
 }
 
-set files [lrange $files 0 end-1]
-lappend files pkgIndex.tcl
+create_README -tcl_source_dist RamDebugger.tcl $pNode README
+set files [list license.terms README addons scripts Examples help pkgIndex.tcl]
 set createdistribution::libdir addons
 
 lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
-    htmlparse img ncgi sha1 snit struct textutil tile vfs treectrl tcltklib
+    htmlparse img img::gid img::png img::jpeg img::gif img::base jpegtcl pngtcl \
+    ncgi sha1 snit struct textutil tile vfs treectrl tcltklib tdom zlibtcl Tkhtml
 
-CreateDistribution zip $program_name-source-$dist  . RamDebugger.tcl \
+CreateDistribution zip $program_name-source  . RamDebugger.tcl \
     $files addons/ramdebugger.ico $version
 
 
