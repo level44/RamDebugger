@@ -131,8 +131,18 @@ lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
     htmlparse img img::gid img::png img::jpeg img::gif img::base jpegtcl pngtcl \
     ncgi sha1 snit struct textutil tile vfs treectrl tcltklib tdom zlibtcl Tkhtml
 
+set exts [list .dll .so .dylib]
+set ipos [lsearch $exts [info sharedlibextension]]
+set exts [lreplace $exts $ipos $ipos]
+foreach ext $exts {
+    file copy libs/RamDebuggerInstrumenter6_x32$ext scripts
+}
+
 CreateDistribution zip $program_name-source  . RamDebugger.tcl \
     $files addons/ramdebugger.ico $version
 
+foreach ext $exts {
+    file copy libs/RamDebuggerInstrumenter6_x32$ext scripts
+}
 
 DeiconifyConsole
