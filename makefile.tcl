@@ -63,9 +63,12 @@ IconifiedConsole
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
-set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom]
+set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib]
 lappend createdistribution::remove_packages trf bwidget \
-    vfs::ftp he_dialog wce compass_utils
+    vfs::ftp he_dialog wce compass_utils \
+    textutil::adjust textutil::repeat \
+    textutil::split textutil::tabify  textutil::trim  textutil::string tile \
+    tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri
 
 regsubfiles [list \
 	{set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \
@@ -124,7 +127,7 @@ lappend files pkgIndex.tcl
 set createdistribution::libdir addons
 
 lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
-    htmlparse img ncgi sha1 snit struct textutil tile vfs treectrl
+    htmlparse img ncgi sha1 snit struct textutil tile vfs treectrl tcltklib
 
 CreateDistribution zip $program_name-source-$dist  . RamDebugger.tcl \
     $files addons/ramdebugger.ico $version
