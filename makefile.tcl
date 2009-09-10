@@ -79,7 +79,6 @@ auto_mkindex scripts *.tcl
 
 set createdistribution::libdir ""
 
-create_README $pNode Readme
 set files [list addons scripts Examples help]
 
 # cannot contain file pkgIndex.tcl
@@ -102,7 +101,7 @@ if { $tcl_platform(platform) eq "windows" } {
     set exe [string tolower $program_name]
     set tarfile ${exe}$version-linux_i386.tar.gz
 
-    set dir $program_name$version
+    set dir $exe$version
     file delete -force $dir
     file mkdir $dir
     file copy {*}$files $dir
@@ -111,7 +110,7 @@ if { $tcl_platform(platform) eq "windows" } {
     CreateTarGzDist $tarfile $dir
     set deb [create_debian_package $pNode $dir ".RamDebugger .ramdebugger_prefs" \
 	    addons/ramdebugger.png]
-    #exec alien --to-rpm --scripts $deb
+    #exec sudo alien --to-rpm --scripts $deb
     
     file delete -force $dir
 } else {
@@ -122,6 +121,8 @@ if { $tcl_platform(platform) eq "windows" } {
     create_macosx_app $pNode $filesM ramdebugger.icns
     file delete Readme.txt License.txt
 }
+file delete $exe
+
 
 create_README -tcl_source_dist RamDebugger.tcl $pNode README
 set files [list license.terms README addons scripts Examples help pkgIndex.tcl]
@@ -142,7 +143,12 @@ CreateDistribution zip $program_name-source  . RamDebugger.tcl \
     $files addons/ramdebugger.ico $version
 
 foreach ext $exts {
-    file copy libs/RamDebuggerInstrumenter6_x32$ext scripts
+    file delete scripts/RamDebuggerInstrumenter6_x32$ext
 }
+file delete README
 
-DeiconifyConsole
+if { $tcl_platform(platform) eq "windows" } {
+    DeiconifyConsole
+} else {
+    exit
+}
