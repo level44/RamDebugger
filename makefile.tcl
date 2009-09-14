@@ -68,7 +68,8 @@ lappend createdistribution::remove_packages trf bwidget \
     vfs::ftp he_dialog wce compass_utils \
     textutil::adjust textutil::repeat \
     textutil::split textutil::tabify  textutil::trim  textutil::string tile \
-    tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread
+    tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread \
+    ncgi sha1
 
 regsubfiles [list \
 	{set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \
@@ -123,29 +124,31 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 file delete $exe
 
+if { $tcl_platform(platform) eq "linux" } {
 
-create_README -tcl_source_dist RamDebugger.tcl $pNode README
-set files [list license.terms README addons scripts Examples help pkgIndex.tcl]
-set createdistribution::libdir addons
-
-lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
-    htmlparse img img::gid img::png img::jpeg img::gif img::base jpegtcl pngtcl \
-    ncgi sha1 snit struct textutil tile vfs treectrl tcltklib tdom zlibtcl Tkhtml
-
-set exts [list .dll .so .dylib]
-set ipos [lsearch $exts [info sharedlibextension]]
-set exts [lreplace $exts $ipos $ipos]
-foreach ext $exts {
-    file copy libs/RamDebuggerInstrumenter6_x32$ext scripts
+    create_README -tcl_source_dist RamDebugger.tcl $pNode README
+    set files [list license.terms README addons scripts Examples help pkgIndex.tcl]
+    set createdistribution::libdir addons
+    
+    lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
+	htmlparse img img::gid img::png img::jpeg img::gif img::base jpegtcl pngtcl \
+	ncgi sha1 snit struct textutil tile vfs treectrl tcltklib tdom zlibtcl Tkhtml
+    
+    set exts [list .dll .so .dylib]
+    set ipos [lsearch $exts [info sharedlibextension]]
+    set exts [lreplace $exts $ipos $ipos]
+    foreach ext $exts {
+	file copy libs/RamDebuggerInstrumenter6_x32$ext scripts
+    }
+    
+    CreateDistribution zip $program_name-source  . RamDebugger.tcl \
+	$files addons/ramdebugger.ico $version
+    
+    foreach ext $exts {
+	file delete scripts/RamDebuggerInstrumenter6_x32$ext
+    }
+    file delete README
 }
-
-CreateDistribution zip $program_name-source  . RamDebugger.tcl \
-    $files addons/ramdebugger.ico $version
-
-foreach ext $exts {
-    file delete scripts/RamDebuggerInstrumenter6_x32$ext
-}
-file delete README
 
 if { $tcl_platform(platform) eq "windows" } {
     DeiconifyConsole
