@@ -31,9 +31,9 @@ if { $tcl_platform(platform) eq "windows" } {
     #lappend filesList [list setup-$program_name$version-$dist.exe setup-$program_name-$dist.exe]
 } elseif { $tcl_platform(os) ne "Darwin" } {
     set exe [string tolower $program_name]
+    lappend filesList [list  ${exe}_$version-1_i386.deb ${exe}_i386.deb]
     lappend filesList [list  ${exe}$version-linux_i386.tar.gz ${exe}-linux_i386.tar.gz]
-    lappend filesList [list  ${exe}$version-linux_i386.tar.gz ${exe}-linux_i386.tar.gz]
-    lappend filesList [list  ${exe}-source$version.zip ${exe}-source.zip]
+    lappend filesList [list  ${program_name}-source$version.zip ${program_name}-source.zip]
     ## RPM ???
 } else {
     lappend filesList [list  $program_name$version-macosx.dmg $program_name-macosx.dmg]

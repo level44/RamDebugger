@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.145 2009/09/02 18:03:48 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.146 2009/09/14 09:06:02 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -7611,6 +7611,20 @@ proc RamDebugger::ShowButtonsToolBar {} {
     }
 }
 
+proc RamDebugger::ToogleToolbarsStatusbar {} {
+    variable options
+
+    if {$options(showbuttonstoolbar) } {
+	set options(showbuttonstoolbar) 0
+	set options(showstatusbar) 0
+    } else {
+	set options(showbuttonstoolbar) 1
+	set options(showstatusbar) 1
+    }
+    ShowStatusBar
+    ShowButtonsToolBar
+}
+
 proc RamDebugger::Splash {} {
     
     set w [toplevel .splash]
@@ -7899,6 +7913,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list checkbutton [_ "Buttons toolbar"] {} \
 		 [_ "View/hide buttons toolbar"] "" \
 		-variable RamDebugger::options(showbuttonstoolbar) -command RamDebugger::ShowButtonsToolBar] \
+		[list command &[_ "Toggle toobars and statusbar"] {} \
+		[_ "Toggle the view of the toolbar and the statusbar"] "Ctrl 6" \
+		-command "RamDebugger::ToogleToolbarsStatusbar"] \
 		separator \
 		] \
 		&[_ "Debug"] all debug 0 [list \
