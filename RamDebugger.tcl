@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.146 2009/09/14 09:06:02 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.147 2009/09/14 10:02:24 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -4883,8 +4883,8 @@ proc RamDebugger::ActualizeViewMenu { menu } {
     variable text
     variable currentfile
 
-    if { [$menu index end] > 9 } {
-	$menu del 10 end
+    if { [$menu index end] > 10 } {
+	$menu del 11 end
     }
 
     $menu add command -label [_ "Previous"] -acc "Alt-Left" -command \
@@ -7988,6 +7988,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::OpenProgram tkdiff"] \
 		[list command [_ "Open Tkcvs"] {} [_ "Open Tkcvs"] "" \
 		    -command "RamDebugger::OpenProgram tkcvs"] \
+	       [list command [_ "Open cvs"]... {} [_ "Open cvs window"] "" \
+		   -command "RamDebugger::CVS::update_recursive . last"] \
 		separator \
 	    [list cascad [_ "File type"] {} filetype 0 [list \
 		    [list radiobutton [_ "Automatic"] filetype [_ "Selection is made based on extension"] "" \
