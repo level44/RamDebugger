@@ -17,13 +17,15 @@ package require createdistribution
 namespace import createdistribution::*
 
 if { $tcl_platform(platform) eq "windows" } {
+    unset env(TCL8_5_TM_PATH)
     foreach dir [list "C:/TclTk/tclkit" "e:/TclTk/tclkit"] {
 	if { [file isdirectory $dir] } {
 	    set createdistribution::tclkitdir $dir
 	    break
 	}
     }
-    set createdistribution::tclkitsh_b tclkitsh85.exe
+    #set createdistribution::tclkitsh_b tclkitsh85.exe
+    set createdistribution::tclkitsh_b {c:\TclTk\ActiveTcl8.5\bin\tclsh85.exe}
     set createdistribution::tclkit_b tclkit85.exe
 } elseif { $tcl_platform(os) eq "Darwin" } {
     set createdistribution::tclkitdir /Users/ramsan/bin
@@ -63,7 +65,7 @@ IconifiedConsole
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
-set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib]
+set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit]
 lappend createdistribution::remove_packages trf bwidget \
     vfs::ftp he_dialog wce compass_utils \
     textutil::adjust textutil::repeat \
@@ -95,9 +97,10 @@ if { $tcl_platform(platform) eq "windows" } {
 lappend files $exe
 
 if { $tcl_platform(platform) eq "windows" } {
-    
+    create_README $pNode README.txt
+    lappend files README.txt license.terms
     CopyAndCreateZipDist $program_name$version-$dist.zip ramdebugger $files
-    
+    file delete README.txt
 } elseif { $tcl_platform(os) ne "Darwin" } {
     set exe [string tolower $program_name]
     set tarfile ${exe}$version-linux_i386.tar.gz

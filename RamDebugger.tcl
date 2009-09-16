@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.147 2009/09/14 10:02:24 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.148 2009/09/16 11:18:55 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -62,7 +62,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 7.0
+    set Version 7.0.1
 
     ################################################################################
     #    Non GUI commands
