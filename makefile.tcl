@@ -65,7 +65,7 @@ IconifiedConsole
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
-set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit]
+set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd]
 lappend createdistribution::remove_packages trf bwidget \
     vfs::ftp he_dialog wce compass_utils \
     textutil::adjust textutil::repeat \

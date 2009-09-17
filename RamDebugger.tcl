@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.148 2009/09/16 11:18:55 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.149 2009/09/17 17:39:51 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -217,7 +217,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     if { [auto_execok cvs] eq "" } {
 	if { $::tcl_platform(platform) eq "windows" && !$iswince } {
 	    set exeList [list cat.exe cvs.exe diff.exe grep.exe kill.exe tlist.exe]
-	} elseif { $tcl_platform(os) eq "Darwin" } {
+	} elseif { $::tcl_platform(os) eq "Darwin" } {
 	    set exeList [list cvs]
 	} else {
 	    set exeList ""
@@ -246,7 +246,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 		# this is a variable from the TCL library
 		array unset ::auto_execs
 	    }
-	} elseif { $tcl_platform(os) eq "Darwin" } {
+	} elseif { $::tcl_platform(os) eq "Darwin" } {
 	    if { ![info exists ::env(PATH)] } {
 		set list ""
 	    } else {
@@ -8966,7 +8966,7 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set registerasremote 0
     } else { set registerasremote 1 }
     
-    if { $tcl_platform(os) eq "Darwin" } {
+    if { $::tcl_platform(os) eq "Darwin" } {
 	if {[string first "-psn" [lindex $argv 0]] == 0} {
 	    set argv [lrange $argv 1 end]
 	}
