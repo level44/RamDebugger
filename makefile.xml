@@ -27,6 +27,11 @@
 	* Works in Linux, Windows and MacOSX
 	* It supports editing XML code
     </Description>
+    <NewsInVersion version="" date="">
+	 * Double click in one #ifdef in c/++ code selects the block
+	 * It is possible to define the type of the file with one special line at the beginning of the file, emacs style
+	 * New menu command to define the type of the file manually
+    </NewsInVersion>
     <NewsInVersion version="7.0" date="2009-08-23">
 	  * Interative search and replace with Ctrl-i and Ctrl-j
 	  * Add some functions for CVS management of the files being edited

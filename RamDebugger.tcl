@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.149 2009/09/17 17:39:51 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.150 2009/09/21 17:53:21 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -1648,7 +1648,16 @@ proc RamDebugger::rlist { args } {
 	    close $fin
 	}
     }
-
+    if { [regexp -- {-\*-(.*?)-\*-} [string range $files($currentfile) 0 256] {} emacs_mode] } {
+	if { ![regexp {mode:\s*(\w+)} $emacs_mode {} emacs_mode] } {
+	    set emacs_mode [string trim $emacs_mode]
+	}
+	switch -nocase -- $emacs_mode {
+	    tcl { set filetype TCL }
+	    xml { set filetype XML }
+	    c++ - c { set filetype "C/C++" }
+	}
+    }
     if { $filetype == "TCL" && ![info exists instrumentedfilesP($currentfile)] \
 	     && !$force && !$reinstrument && !$currentfileIsModified } {
 	set filenum [lsearchfile $fileslist $currentfile]
@@ -6680,6 +6689,93 @@ proc RamDebugger::SearchBraces_xml { x y } {
     $text see $idx_see
 }
 
+proc RamDebugger::SearchBraces_cpp_defines { x y } {
+    variable text
+    
+    set l [$text get "insert linestart" "insert lineend"]
+    if { ![regexp {^#(if|else|endif)} $l {} what] } {
+	return 0
+    }
+    switch $what {
+	if - else {
+	    set lini [scan [$text index "insert+1l"] %d]
+	    set lend [scan [$text index "end-1c"] %d]
+	    set delta 1
+	    set cmp {$iline <= $lend}
+	}
+	endif {
+	    set lini [scan [$text index "insert-1l"] %d]
+	    set lend 1
+	    set delta -1
+	    set cmp {$iline >= $lend}
+	}
+    }
+    set level 1
+    for { set iline $lini } $cmp { incr iline $delta } {
+	set l [$text get "$iline.0 linestart" "$iline.0 lineend"]
+	if { [regexp {^#(if|else|endif)} $l {} what_in] } {
+	    switch $what_in {
+		if {
+		    if { $what in "if else" } {
+		        incr level
+		    } else {
+		        incr level -1
+		        if { $level == 0 } { break }
+		    }
+		}
+		else {
+		    if { $what in "if else" && $level == 1 } {
+		        incr level -1
+		        break
+		    }
+		}
+		endif {
+		    if { $what in "if else" } {
+		        incr level -1
+		        if { $level == 0 } { break }
+		    } else {
+		        incr level
+		    }
+		}
+	    }
+	}
+    }
+    switch $what {
+	if - else {
+	    set idxA "insert linestart"
+	    set idxB "$iline.0 lineend"
+	    set idx1 $idxA
+	    set idx2 $idxB
+	}
+	endif {
+	    set idxA "$iline.0"
+	    set idxB "insert lineend"
+	    set idx1 $idxB
+	    set idx2 $idxA
+	}
+    }
+    set error 0
+    if { $level != 0 } { set error 1 }
+    
+    # when not doing it by mouse, use x=-1
+    if { $x >= 0 } {
+	$text tag add sel $idxA $idxB
+	catch { $text mark set insert $idx2 }
+	catch { $text mark set anchor $idx1 }
+	$text see $idx2
+    } else {
+	$text tag add tempmarker $idxA $idxB
+	$text tag configure tempmarker -background [$text tag cget sel -background] \
+	    -foreground [$text tag cget sel -foreground]
+	if { $error } { $text tag conf tempmarker -background red }
+	after 1000 $text tag remove tempmarker 1.0 end
+    }
+    if { $error } {
+	bell
+    }
+    return 1
+}
+
 proc RamDebugger::SearchBraces { x y } {
     variable text
     variable currentfile
@@ -6694,6 +6790,10 @@ proc RamDebugger::SearchBraces { x y } {
     if { [GiveFileType $currentfile] eq "XML" } {
 	SearchBraces_xml $x $y
 	return
+    }
+    if { [GiveFileType $currentfile] eq "C/C++" } {
+	set found [SearchBraces_cpp_defines $x $y]
+	if { $found } { return }
     }
 
     set sel [$text get insert-1c]
@@ -6803,9 +6903,10 @@ proc RamDebugger::SearchBraces { x y } {
 	
 	if { $error } { SetMessage [_ "Error: braces not OK"] }
 	
-	# when not doing it by mouse, use x=-1
+	  # when not doing it by mouse, use x=-1
 	if { $x >= 0 } {
 	    $text tag add sel $idxA $idxB
+	    catch { $text mark set insert $idx2 }
 	    $text see $idx2
 	} else {
 	    $text tag add tempmarker $idxA $idxB
