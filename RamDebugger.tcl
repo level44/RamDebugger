@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.150 2009/09/21 17:53:21 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.151 2009/10/02 17:15:00 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3078,10 +3078,23 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     set delta_ext [expr {2*[$f.pw cget -borderwidth]+4}]
 
     set geomkey maingeometry_$options(ViewOnlyTextOrAll)
-    if { [wm state $w] eq "zoomed" } {
+    if { $::tcl_platform(platform) eq "windows" && [wm state $w] eq "zoomed" } {
+	set zoomed 1
+    } elseif { ![catch { wm attributes $w -zoomed } ret] && $ret } {
+	set zoomed 1
+    } else {
+	set zoomed 0
+    }
+    if { $zoomed } {
 	set options($geomkey) zoomed
     } elseif { [wm state $w] eq "normal" && [winfo width $w] > 1 } {
-	set options($geomkey) [wm geometry $w]
+	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [wm geometry $w] \
+	    {} width height x y
+	if { $x < -20 } { set x -20 }
+	if { $y < -20 } { set y -20 }
+	if { $x > [winfo screenwidth $text]-20 } { set x [expr {[winfo screenwidth $text]-20}] }
+	if { $y > [winfo screenheight $text]-20 } { set y [expr {[winfo screenheight $text]-20}] }
+	set options($geomkey) ${width}x$height+$x+$y
     }
 
     if { [lindex [grid info $fulltext] 1] != $f } {
@@ -3148,12 +3161,20 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     }
     set geomkey maingeometry_$options(ViewOnlyTextOrAll)
     if { [info exists options($geomkey)] } {
-	if { $options($geomkey) == "zoomed" } {
+	if { $options($geomkey) eq "zoomed" } {
 	    wm geom $w 800x600+0+0
-	    wm state $w zoomed
+	    if { $::tcl_platform(platform) eq "windows" } {
+		wm state $win zoomed
+	    } else {
+		catch { wm attributes $win -zoomed 1 }
+	    }
 	} else {
 	    wm geom $w $options($geomkey)
-	    wm state $w normal
+	    if { $::tcl_platform(platform) eq "windows" } {
+		wm state $win normal
+	    } else {
+		catch { wm attributes $win -zoomed 0 }
+	    }
 	}
     }
 #     if { [[winfo toplevel $t] cget -use] == "" } {
@@ -3308,10 +3329,18 @@ proc RamDebugger::ExitGUI {} {
     set options(remoteserver) $remoteserver
 
     set geomkey maingeometry_$options(ViewOnlyTextOrAll)
-    if { [wm state [winfo toplevel $text]] == "zoomed" } {
+    set w  [winfo toplevel $text]
+    if { $::tcl_platform(platform) eq "windows" && [wm state $w] eq "zoomed" } {
+	set zoomed 1
+    } elseif { ![catch { wm attributes $w -zoomed } ret] && $ret } {
+	set zoomed 1
+    } else {
+	set zoomed 0
+    }
+    if { $zoomed } {
 	set options($geomkey) zoomed
     } else {
-	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [wm geometry [winfo toplevel $text]] \
+	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [wm geometry $w] \
 	    {} width height x y
 	if { $x < -20 } { set x -20 }
 	if { $y < -20 } { set y -20 }
@@ -8829,11 +8858,15 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    }
 	}
     } else {
-	if { $options($geomkey) == "zoomed" } {
-	    wm geom $w 800x600+0+0
-	    wm state $w zoomed
+	if { $options($geomkey) eq "zoomed" } {
+	    if { $::tcl_platform(platform) eq "windows" } {
+		wm state $w zoomed
+	    } else {
+		catch { wm attributes $w -zoomed 1 }
+	    }
+	    wm geometry $w 800x600+0+0
 	} else {
-	    wm geom $w $options($geomkey)
+	    wm geometry $w $options($geomkey)
 	}
     }
 
@@ -8873,6 +8906,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	SearchWindow [lindex $options(SearchToolbar) 1]
     }
     ShowStatusBar
+    ShowButtonsToolBar
+
     
 #     if { [info exists options(remoteserverType)] && $options(remoteserverType) == "remote" && \
 #          [info exists options(remoteserver)] } {
@@ -9035,10 +9070,18 @@ proc RamDebugger::OpenFileInNewWindow_exit { ip } {
 
     set geomkey maingeometry_newwin_[$ip eval [list set options(ViewOnlyTextOrAll)]]
     set options($geomkey) [$ip eval {
-	    if { [wm state [winfo toplevel $text]] == "zoomed" } {
+	    set w [winfo toplevel $text]
+	    if { $::tcl_platform(platform) eq "windows" && [wm state $w] eq "zoomed" } {
+		set zoomed 1
+	    } elseif { ![catch { wm attributes $w -zoomed } ret] && $ret } {
+		set zoomed 1
+	    } else {
+		set zoomed 0
+	    }
+	    if { $zoomed } {
 		set ret zoomed
 	    } else {
-		set ret [wm geometry [winfo toplevel $text]]
+		set ret [wm geometry $w]
 	    }
 	}] 
     interp delete $ip
