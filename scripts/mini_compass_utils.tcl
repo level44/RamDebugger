@@ -311,6 +311,128 @@ snit::widgetadaptor cu::combobox {
 }
 
 ################################################################################
+# cu::multiline_entry
+################################################################################
+
+snit::widget cu::multiline_entry {
+    option -textvariable ""
+    option -takefocus 0 ;# option used by the tab standard bindings
+    option -values ""
+    option -valuesvariable ""
+
+    hulltype frame
+
+    variable text
+
+    delegate method * to text
+    delegate option * to text
+
+    constructor args {
+
+	$hull configure -background #a4b97f -bd 0
+	install text using text $win.t -wrap word -bd 0 -width 40 -height 3
+	
+	cu::add_contextual_menu_to_entry $text init
+
+	grid $text -padx 1 -pady 1 -sticky nsew
+	grid columnconfigure $win 0 -weight 1
+	grid rowconfigure $win 0 -weight 1
+
+	bind $text <Tab> "[bind all <Tab>] ; break"
+	bind $text <<PrevWindow>> "[bind all <<PrevWindow>>] ; break"
+	bindtags $text [list $win $text [winfo class $win] [winfo class $text] [winfo toplevel $text] all]
+
+	$self configurelist $args
+    }
+    destructor {
+	$self _clean_traces
+    }
+    onconfigure -textvariable {value} {
+	$self _clean_traces
+	set options(-textvariable) $value
+
+	set cmd "[mymethod _check_textvariable_read] ;#"
+	trace add variable $options(-textvariable) read $cmd
+	set cmd "[mymethod _check_textvariable_write] ;#"
+	trace add variable $options(-textvariable) write $cmd
+    }
+    onconfigure -values {value} {
+	set options(-values) $value
+	
+	if { $value ne "" } {
+	    if { ![winfo exists $win.b] } {
+		image create photo cu::multiline_entry::nav1downarrow16 -data {
+		    R0lGODlhEAAQAIAAAPwCBAQCBCH5BAEAAAAALAAAAAAQABAAAAIYhI+py+0PUZi0zmTtypflV0Vd
+		    RJbm6fgFACH+aENyZWF0ZWQgYnkgQk1QVG9HSUYgUHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29y
+		    IDE5OTcsMTk5OC4gQWxsIHJpZ2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2ZWxjb3IuY29t
+		    ADs=
+		}
+		ttk::menubutton $win.b -image cu::multiline_entry::nav1downarrow16 -style Toolbutton -menu $win.b.m
+		menu $win.b.m -tearoff 0
+		grid $win.b -row 0 -column 1 -padx "0 1" -pady 1 -sticky wns
+	    } else {
+		$win.b.m delete 0 end
+	    }
+	    $win.b.m add command -label [_ "(Clear)"] -command [mymethod set_text ""]
+	    $win.b.m add separator
+	    foreach v $value {
+		if { [string length $v] > 60 } {
+		    set l [string range $v 0 56]...
+		} else {
+		    set l $v
+		}
+		$win.b.m add command -label $l -command [mymethod set_text $v]
+	    }
+	} elseif { ![winfo exists $win.b] } {
+	    destroy $win.b
+	}
+    }
+    onconfigure -valuesvariable {value} {
+	set options(-valuesvariable) $value
+
+	upvar #0 $options(-valuesvariable) v
+
+	if { [info exists v] } {
+	    $self configure -values $v
+	}
+	trace add variable v write "[mymethod _changed_values_var];#"
+    }
+    method set_text { txt } {
+	$text delete 1.0 end
+	$text insert end $txt
+	$text tag add sel 1.0 end-1c
+	focus $text
+    }
+    method _clean_traces {} {
+	if { $options(-textvariable) ne "" } {
+	    set cmd "[mymethod _check_textvariable_read] ;#"
+	    trace remove variable $options(-textvariable) read $cmd
+	    set cmd "[mymethod _check_textvariable_write] ;#"
+	    trace remove variable $options(-textvariable) write $cmd
+	}
+	if { $options(-valuesvariable) ne "" } {
+	    upvar #0 $options(-valuesvariable) v
+	    trace remove variable v write "[mymethod _changed_values_var];#"
+	}
+    }
+    method _check_textvariable_read {} {
+	upvar #0 $options(-textvariable) v
+	set v [$text get 1.0 end-1c]
+    }
+    method _check_textvariable_write {} {
+	upvar #0 $options(-textvariable) v
+	$text delete 1.0 end
+	$text insert end $v
+    }
+    method _changed_values_var {} {
+	if { $options(-valuesvariable) ne "" } {
+	    upvar #0 $options(-valuesvariable) v
+	    $self configure -values $v
+	}
+    }
+}
+
+################################################################################
 #    add_contextual_menu_to_entry
 ################################################################################
 

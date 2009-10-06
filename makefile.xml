@@ -28,6 +28,7 @@
 	* It supports editing XML code
     </Description>
     <NewsInVersion version="" date="">
+	 * The source version control system has been moved from cvs to fossil
 	 * Double click in one #ifdef in c/++ code selects the block
 	 * It is possible to define the type of the file with one special line at the beginning of the file, emacs style
 	 * New menu command to define the type of the file manually

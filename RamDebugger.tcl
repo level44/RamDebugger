@@ -1,14 +1,14 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.151 2009/10/02 17:15:00 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.152 2009/10/06 10:35:32 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
 package require Tk 8.5
 
-# package require compass_utils
-# mylog::init -view_binding <Control-L> debug
+#package require compass_utils
+#mylog::init -view_binding <Control-L> debug
 
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
@@ -4161,7 +4161,7 @@ proc RamDebugger::_savefile_only { file data } {
 	if { $err } { error [_ "Error saving file '%s'" $file] }
 
 	set header [string range $data 0 255]
-	set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+	set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
 	if { [regexp -nocase -line -- $rex $header] } {
 	    fconfigure $fout -encoding utf-8
 	}
@@ -8118,10 +8118,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::OpenProgram tkdiff"] \
 		[list command [_ "Open Tkcvs"] {} [_ "Open Tkcvs"] "" \
 		    -command "RamDebugger::OpenProgram tkcvs"] \
-	       [list command [_ "Open cvs"]... {} [_ "Open cvs window"] "" \
+	       [list command [_ "Version control system"]... {} [_ "Open Version control system window with cvs or fossil"] "" \
 		   -command "RamDebugger::CVS::update_recursive . last"] \
 		separator \
-	    [list cascad [_ "File type"] {} filetype 0 [list \
+	       [list cascad [_ "File type"] {} filetype 0 [list \
 		    [list radiobutton [_ "Automatic"] filetype [_ "Selection is made based on extension"] "" \
 		        -variable RamDebugger::options(filetype) -value auto -selectcolor black] \
 		    separator \
