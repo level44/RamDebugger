@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.152 2009/10/06 10:35:32 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.153 2009/10/07 11:51:39 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3164,16 +3164,16 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 	if { $options($geomkey) eq "zoomed" } {
 	    wm geom $w 800x600+0+0
 	    if { $::tcl_platform(platform) eq "windows" } {
-		wm state $win zoomed
+		wm state $w zoomed
 	    } else {
-		catch { wm attributes $win -zoomed 1 }
+		catch { wm attributes $w -zoomed 1 }
 	    }
 	} else {
 	    wm geom $w $options($geomkey)
 	    if { $::tcl_platform(platform) eq "windows" } {
-		wm state $win normal
+		wm state $w normal
 	    } else {
-		catch { wm attributes $win -zoomed 0 }
+		catch { wm attributes $w -zoomed 0 }
 	    }
 	}
     }
