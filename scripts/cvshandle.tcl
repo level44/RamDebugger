@@ -851,9 +851,11 @@ proc RamDebugger::CVS::update_recursive_accept { what dir tree itemP { item "" }
     }
     if { [auto_execok fossil] ne "" && [catch { exec fossil info }] == 0 } {
 	set err [catch { exec fossil ls 2>@1 } ret]
-	set err [catch { exec fossil extras 2>@1 } ret2]
-	foreach line [split $ret2 \n] {
-	    append ret "\n? $line"
+	if { !$err } {
+	    set err [catch { exec fossil extras 2>@1 } ret2]
+	    foreach line [split $ret2 \n] {
+		append ret "\n? $line"
+	    }
 	}
 	if { $what ne "view" } {
 	    set err [catch { exec fossil update 2>@1 } ret3]
@@ -912,10 +914,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    [list "update_recursive_cmd" $w commit cvs $tree $sel_ids]
 	    }
 	    if { $has_fossil } {
-		$menu add command -label [_ "Commit fossil all"] -command \
-		    [list "update_recursive_cmd" $w commit fossilall $tree $sel_ids]
 		$menu add command -label [_ "Commit fossil selected"] -command \
 		    [list "update_recursive_cmd" $w commit fossil $tree $sel_ids]
+		$menu add command -label [_ "Commit fossil all"] -command \
+		    [list "update_recursive_cmd" $w commit fossilall $tree $sel_ids]
 	    }
 	    $menu add command -label [_ "Refresh view"] -command \
 		[list "update_recursive_cmd" $w update view $tree $sel_ids]
@@ -996,16 +998,16 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    set dir [$tree item text [$tree item parent $item] 0]
 		    dict lappend files $dir $file
 		}
-		dict for "dir fs" {
+		dict for "dir fs" $files {
 		    set pwd [pwd]
 		    cd $dir
-		    set err [catch { exec fossil commit --nosign -m $message  2 {*}$fs >@1 } ret]
+		    set err [catch { exec fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
 		    cd $pwd
 		    if { $err } { break }
 		}
 		if { !$err } {
 		    foreach item $sel_ids {
-		        if { ![regexp {(\w+)\s+(.*)} $line {} mode file] || $mode eq "UNCHANGED" } { continue }
+		        if { ![regexp {(\w+)\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
 		        $tree item element configure $item 0 e_text_sel -fill blue -text $ret
 		    }
 		} else {
