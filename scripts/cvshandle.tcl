@@ -974,7 +974,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		
 		set dir [$w give_uservar_value dir]
 		foreach item $sel_ids {
-		    if { ![regexp {(\w+)\s+(.*)} $line {} mode file] || $mode eq "UNCHANGED" } { continue }
+		    if { ![regexp {(\w+)\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
 		    set dir [$tree item text [$tree item parent $item] 0]
 		    break
 		}
@@ -992,7 +992,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    } else {
 		set files ""
 		foreach item $sel_ids {
-		    if { ![regexp {(\w+)\s+(.*)} $line {} mode file] || $mode eq "UNCHANGED" } { continue }
+		    if { ![regexp {(\w+)\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
 		    set dir [$tree item text [$tree item parent $item] 0]
 		    dict lappend files $dir $file
 		}
