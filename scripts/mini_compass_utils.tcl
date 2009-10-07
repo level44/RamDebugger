@@ -359,7 +359,7 @@ snit::widget cu::multiline_entry {
     onconfigure -values {value} {
 	set options(-values) $value
 	
-	if { $value ne "" } {
+	if { $options(-values) ne "" || $options(-valuesvariable) ne "" } {
 	    if { ![winfo exists $win.b] } {
 		image create photo cu::multiline_entry::nav1downarrow16 -data {
 		    R0lGODlhEAAQAIAAAPwCBAQCBCH5BAEAAAAALAAAAAAQABAAAAIYhI+py+0PUZi0zmTtypflV0Vd

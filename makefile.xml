@@ -26,6 +26,7 @@
 	* Full debugging of TCL and c/c++
 	* Works in Linux, Windows and MacOSX
 	* It supports editing XML code
+	* It contains a GUI for version control system (cvs or fossil)
     </Description>
     <NewsInVersion version="" date="">
 	 * The source version control system has been moved from cvs to fossil
