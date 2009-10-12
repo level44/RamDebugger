@@ -914,7 +914,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    [list "update_recursive_cmd" $w commit cvs $tree $sel_ids]
 	    }
 	    if { $has_fossil } {
-		$menu add command -label [_ "Commit fossil selected"] -command \
+		$menu add command -label [_ "Commit fossil"] -command \
 		    [list "update_recursive_cmd" $w commit fossil $tree $sel_ids]
 		$menu add command -label [_ "Commit fossil all"] -command \
 		    [list "update_recursive_cmd" $w commit fossilall $tree $sel_ids]
@@ -974,13 +974,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        -default ok -parent $w -message $txt]
 		if { $ret eq "cancel" } { return }
 		
-		set dir [$w give_uservar_value dir]
-		foreach item $sel_ids {
-		    if { ![regexp {(\w+)\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
-		    set dir [$tree item text [$tree item parent $item] 0]
-		    break
-		}
 		set pwd [pwd]
+		cd [$w give_uservar_value dir]
+		set info [exec fossil info]
+		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
 		cd $dir
 		set err [catch { exec fossil commit --nosign -m $message  2>@1 } ret]
 		cd $pwd
@@ -992,22 +989,24 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    update_recursive_accept view $dir $tree 0
 		}
 	    } else {
-		set files ""
+		set pwd [pwd]
+		set files_dict ""
 		foreach item $sel_ids {
 		    if { ![regexp {(\w+)\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
 		    set dir [$tree item text [$tree item parent $item] 0]
-		    dict lappend files $dir $file
+		    dict lappend files_dict $dir $file
 		}
-		dict for "dir fs" $files {
-		    set pwd [pwd]
+		dict for "dir fs" $files_dict {
+		    cd $dir
+		    set info [exec fossil info]
+		    regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
 		    cd $dir
 		    set err [catch { exec fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
-		    cd $pwd
 		    if { $err } { break }
 		}
+		cd $pwd
 		if { !$err } {
 		    foreach item $sel_ids {
-		        if { ![regexp {(\w+)\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
 		        $tree item element configure $item 0 e_text_sel -fill blue -text $ret
 		    }
 		} else {
@@ -1034,34 +1033,38 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    switch $what {
 		add {
-		    set txt [_ "Are you user to add to cvs as TEXT file %d files? (%s)" [llength $files] $filesT]
+		    set txt [_ "Are you sure to add to cvs as TEXT file %d files? (%s)" [llength $files] $filesT]
 		    set kopt ""
 		}
 		add_binary {
-		    set txt [_ "Are you user to add to cvs as BINARY file %d files? (%s)" [llength $files] $filesT]
+		    set txt [_ "Are you sure to add to cvs as BINARY file %d files? (%s)" [llength $files] $filesT]
 		    set kopt [list -kb]
 		}
 		add_fossil {
-		    set txt [_ "Are you user to add to fossil %d files? (%s)" [llength $files] $filesT]
+		    set txt [_ "Are you sure to add to fossil %d files? (%s)" [llength $files] $filesT]
 		}
 	    }
 	    set ret [snit_messageBox -icon question -title [_ "Add files"] -type okcancel \
 		    -default ok -parent $w -message $txt]
 	    if { $ret eq "cancel" } { return }
 
+	    set pwd [pwd]
 	    foreach item $sel_ids {
 		if { ![regexp {^\?\s(\S+)} [$tree item text $item 0] {} file] } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
-		set pwd [pwd]
 		cd $dir
 		if { $what in "add add_binary" } {
 		    set err [catch { exec cvs add -m $message {*}$kopt $file 2>@1 } ret]
 		} else {
+		    set info [exec fossil info]
+		    regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
+		    cd $dir
 		    set err [catch { exec fossil add $file 2>@1 } ret]
 		}
+		if { $err } { break }
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
-		cd $pwd
 	    }
+	    cd $pwd
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
 	    $w set_uservar_value messages [linsert0 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
