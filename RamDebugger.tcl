@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.153 2009/10/07 11:51:39 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.154 2009/10/12 19:47:25 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -2171,8 +2171,9 @@ proc RamDebugger::rdel { args } {
 proc RamDebugger::filenormalize { file } {
 
     if { [string index $file 0] == "*" } { return $file }
-    if { $file == "" } { return "" }
+    if { $file eq "" } { return "" }
     
+    set file [file normalize $file]
     set pwd [pwd]
     catch {
 	cd [file dirname $file]
@@ -2180,10 +2181,9 @@ proc RamDebugger::filenormalize { file } {
     }
     cd $pwd
 
-    if { $::tcl_platform(platform) == "windows" } {
+    if { $::tcl_platform(platform) eq "windows" } {
 	catch { set file [file attributes $file -longname] }
     }
-
     return $file
 }
 
@@ -2468,9 +2468,11 @@ proc RamDebugger::RecieveFromProgramSource { args } {
 
     if { [lindex $args 0] eq "-encoding" } {
 	set encoding [lindex $args 1]
-    } else { set encoding "" }
+    } else {
+	set encoding ""
+    }
     set file [lindex $args end]
-    set retval [RamDebugger::DoinstrumentThisfile $file]
+    set retval [DoinstrumentThisfile $file]
     if { $retval == 1 } {
 	TextOutRaise
 	TextOutInsertBlue [_ "Sending Instrumented file '%s'" $file]\n
