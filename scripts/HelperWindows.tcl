@@ -2256,6 +2256,7 @@ proc RamDebugger::SearchInFilesGo { w tree ids } {
 proc RamDebugger::SearchInFiles {} {
     variable options
     variable text
+    variable currentfile
 
     set txt [GetSelOrWordInIndex insert]
     
@@ -2276,7 +2277,9 @@ proc RamDebugger::SearchInFiles {} {
 
     if { [string trim $txt] != "" } {
 	set ::RamDebugger::searchstring $txt
-    } else { set ::RamDebugger::searchstring [lindex $options(SearchInFiles,texts) 0] }
+    } else {
+	set ::RamDebugger::searchstring [lindex $options(SearchInFiles,texts) 0]
+    }
 
     ttk::label $f.l2 -text [_ "File ext:"]
 
@@ -2291,7 +2294,12 @@ proc RamDebugger::SearchInFiles {} {
     ttk::combobox $f.e2 -textvariable ::RamDebugger::searchextensions \
 	    -values $values
 
-    set ::RamDebugger::searchextensions [lindex [$f.e2 cget -values] 0]
+    set ext [file extension $currentfile]
+    set ipos 0
+    if { $ext ne "" } {
+	set ipos [lsearch -glob -nocase $values "*$ext*"]
+    }
+    set ::RamDebugger::searchextensions [lindex $values $ipos]
     
     set dir $options(defaultdir)
     set ipos [lsearch -exact $options(SearchInFiles,dirs) $dir]
