@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.154 2009/10/12 19:47:25 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.155 2009/10/14 21:54:36 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -307,6 +307,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(colors,varnames) \#b8860b
 
     set options_def(listfilespane) 0
+    set options_def(viewvariablespane) 0
     set options_def(auto_raise_stack_trace) 1
     
     set options_def(filetype) auto
@@ -350,7 +351,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     set options_def(extensions,XML) ".xml .spd .xsl .xslt .svg (xml)*"
     set "options_def(extensions,GiD BAS file)" .bas
     set "options_def(extensions,GiD data files)" ".prb .mat .cnd"
-
+    set "options_def(extensions,Makefile)" "Makefile"
 
     # this variable is only used on windows. It can be:
     # 0: Only check remote programs on demand (useful if not making remote debugging, the
@@ -1656,6 +1657,7 @@ proc RamDebugger::rlist { args } {
 	    tcl { set filetype TCL }
 	    xml { set filetype XML }
 	    c++ - c { set filetype "C/C++" }
+	    Makefile { set filetype "Makefile" }
 	}
     }
     if { $filetype == "TCL" && ![info exists instrumentedfilesP($currentfile)] \
@@ -1748,6 +1750,22 @@ proc RamDebugger::rlist { args } {
 	if { $filetype == "GiD data files" } {
 	    if { [catch {
 		Instrumenter::DoWorkForGiDData $files($currentfile) instrumentedfilesInfo($currentfile)
+	    } errstring] } {
+		RamDebugger::ProgressVar 100
+		if { ![string match  "*user demand*" $errstring] } {
+		    RamDebugger::TextOutRaise
+		    RamDebugger::TextOutInsertRed $::errorInfo
+		}
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
+	    }
+	}
+	if { $filetype eq "Makefile" } {
+	    if { [catch {
+		    Instrumenter::DoWorkForMakefile $files($currentfile) instrumentedfilesInfo($currentfile)
 	    } errstring] } {
 		RamDebugger::ProgressVar 100
 		if { ![string match  "*user demand*" $errstring] } {
@@ -3056,7 +3074,24 @@ proc RamDebugger::CheckListFilesPane {} {
     }
 }
 
-proc RamDebugger::ViewOnlyTextOrAll {} {
+proc RamDebugger::CheckViewVariablesPane {} {
+    variable options
+    variable pane1
+    variable pane2
+    variable pane3
+
+    set pw [FindPanedWindowFromPane $pane3]
+
+    if { $options(viewvariablespane) } {
+	if { [lsearch [$pw panes] $pane3] == -1 } {
+	    $pw add $pane3 -sticky nsew -after $pane2 -width 100 -minsize 100
+	}
+    } elseif { [lsearch [$pw panes] $pane3] != -1 } {
+	$pw forget $pane3
+    }
+}
+
+proc RamDebugger::ViewOnlyTextOrAll { args } {
     variable mainframe
     variable text
     variable pane2in1
@@ -3066,16 +3101,25 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     variable pane3
     variable listboxlabelframe
     
+    set optional {
+	{ -force_all "" 0 }
+    }
+    set compulsory ""
+    parse_args $optional $compulsory $args
+
     set f [$mainframe getframe]
     set t [winfo toplevel $mainframe]
     set w [winfo toplevel $text]
-
+    
     if { [winfo exists $f.textpane] } {
 	set fulltext $f.textpane
     } else {
 	set fulltext $f.fulltext
     }
 
+    if { $force_all && [lindex [grid info $fulltext] 1] != $f } {
+	return
+    }
     set delta [expr {[$f.pw cget -sashwidth]+2*[$f.pw cget -sashpad]}]
     set delta_ext [expr {2*[$f.pw cget -borderwidth]+4}]
 
@@ -3090,7 +3134,7 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
     if { $zoomed } {
 	set options($geomkey) zoomed
     } elseif { [wm state $w] eq "normal" && [winfo width $w] > 1 } {
-	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [wm geometry $w] \
+	regexp {(\d+)x(\d+)\+([-\d][\d]*)\+?([-\d]+)} [cu::give_window_geometry $w] \
 	    {} width height x y
 	if { $x < -20 } { set x -20 }
 	if { $y < -20 } { set y -20 }
@@ -3171,7 +3215,7 @@ proc RamDebugger::ViewOnlyTextOrAll {} {
 		catch { wm attributes $w -zoomed 1 }
 	    }
 	} else {
-	    wm geom $w $options($geomkey)
+	    wm geometry $w $options($geomkey)
 	    if { $::tcl_platform(platform) eq "windows" } {
 		wm state $w normal
 	    } else {
@@ -3342,7 +3386,7 @@ proc RamDebugger::ExitGUI {} {
     if { $zoomed } {
 	set options($geomkey) zoomed
     } else {
-	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [wm geometry $w] \
+	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [cu::give_window_geometry $w] \
 	    {} width height x y
 	if { $x < -20 } { set x -20 }
 	if { $y < -20 } { set y -20 }
@@ -3593,7 +3637,7 @@ proc RamDebugger::SaveFile { what args } {
     set compulsory ""
     parse_args $optional $compulsory $args
 
-    if { $what == "ask" } {
+    if { $what eq "ask" } {
 	if { !$currentfileIsModified } { return 0 }
 
 	if { [string index $currentfile 0] != "*" } {
@@ -3611,13 +3655,13 @@ proc RamDebugger::SaveFile { what args } {
 	    return 0
 	}
     }
-
     set NeedsReinstrument 0
     if { $what ne "saveas" && ($currentfile == "*Macros*" || \
 		                   [info exists FileSaveHandlers($currentfile)]) } {
 	set file $currentfile
     } elseif { $what == "saveas" || $currentfile == "*New file*" || $currentfile == "" || \
 		   [regexp {^\*.*\*$} $currentfile] } {
+	if { $what eq "auto_save" } { return }
 	set NeedsReinstrument 1
 	set w [winfo toplevel $text]
 	set types [GiveFileTypeForFileBrowser]
@@ -4198,7 +4242,9 @@ proc RamDebugger::SaveFileF { file } {
     WaitState 1
     SetMessage [_ "Saving file '%s'" $file]...
 
-    if { $options(spaces_to_tabs) } {
+    set filetype [GiveFileType $currentfile]
+    
+    if { $options(spaces_to_tabs) || $filetype eq "Makefile" } {
 	set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
     } else {
 	set map ""
@@ -6169,6 +6215,19 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     }
 }
 
+proc RamDebugger::DeletePreviousWord {} {
+    variable text
+    
+    if {[$text tag nextrange sel 1.0 end] ne ""} {
+	$text delete sel.first sel.last
+    } elseif {[$text compare insert != 1.0]} {
+	set ipos [tk::TextPrevPos $text insert tcl_startOfPreviousWord]
+	$text delete $ipos insert-1c
+	$text see insert
+    }
+}
+
+
 proc RamDebugger::CutCopyPasteText { what args } {
     variable text
     variable oldPasteStack
@@ -6594,6 +6653,10 @@ proc RamDebugger::CheckText { command args } {
 	}
 	"GiD data files" {
 	    set err [catch { Instrumenter::DoWorkForGiDData $block blockinfo 0 $oldlevel } errstring]
+	    set oldlevel 0
+	}
+	"Makefile" {
+	    set err [catch { Instrumenter::DoWorkForMakefile $block blockinfo 0 } errstring]
 	    set oldlevel 0
 	}
     }
@@ -7076,15 +7139,15 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
 	set indent_val $options(indentsizeC++)
     } elseif { $filetype == "TCL" } {
 	set indent_val $options(indentsizeTCL)
+    } elseif { $filetype == "Makefile" } {
+	set indent_val $options(indentsizeTCL)
     } elseif { $filetype == "GiD BAS file" } {
 	set indent_val 0
     } else { return }
 
-
     if { $line eq "" } {
 	 scan [$text index insert] "%d.%d" line -
     }
-
     set level 0
     set type ""
     foreach "level type" [lindex $instrumentedfilesInfo($currentfile) [expr $line-1]] break
@@ -7108,6 +7171,10 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
 	set indent [expr $indent-$indent_val]
     } elseif { [regexp {TCL|C/C\+\+} $filetype] && $FirstChar == "\}" && $indent >= $indent_val } {
 	set indent [expr $indent-$indent_val]
+    } elseif { $filetype eq "Makefile" && $line > 1} {
+	if { [regexp {^([^:\s]+\s*:|\s{8}\w)} [$text get "$line.0-1l linestart" "$line.0-1l lineend" ]] } {
+	    set indent 8
+	}
     }
     if { $FirstPos == -1 } { set FirstPos $col }
     if { $FirstPos < $indent } {
@@ -8028,6 +8095,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[_ "Toggle between viewing the file list pane"] "" \
 		-command "RamDebugger::CheckListFilesPane" \
 		-variable RamDebugger::options(listfilespane)] \
+		[list checkbutton &[_ "View variables pane"] {} \
+		[_ "Toggle between viewing theview variables pane"] "" \
+		-command "RamDebugger::CheckViewVariablesPane" \
+		-variable RamDebugger::options(viewvariablespane)] \
 		separator \
 		[list command &[_ "Secondary view"] {} \
 		[_ "Toggle between activating a secondary view for files"] "Ctrl 3" \
@@ -8136,6 +8207,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		        -selectcolor black] \
 		    [list radiobutton [_ "XML"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value XML \
+		        -selectcolor black] \
+		    [list radiobutton [_ "Makefile"] filetype "" "" \
+		        -variable RamDebugger::options(filetype) -value Makefile \
 		        -selectcolor black] \
 		    [list radiobutton [_ "GiD BAS file"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value "GiD BAS file" \
@@ -8371,7 +8445,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set pane1 $listboxlabelframe
 
     if { $options(listfilespane) } {
-	set pane1 $listboxlabelframe
 	$pw add $f.lflf -sticky nsew -width $weight1 -minsize 100
     }
 
@@ -8536,8 +8609,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     #set pane3 [$pw add -weight $weight3]
     set pane3 [frame $pw.pane3]
-    $pw add $pane3 -sticky nsew -width $weight3
-
+    
+    if { $options(viewvariablespane) } {
+	$pw add $pane3 -sticky nsew -width $weight3
+    }
+    
     ################################################################################
     # the vertical user defined - local
     ################################################################################
@@ -8747,6 +8823,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-x> "RamDebugger::CutCopyPasteText cut   ; break"
     bind $text <$::control-c> "RamDebugger::CutCopyPasteText copy  ; break"
     bind $text <$::control-v> "RamDebugger::CutCopyPasteText paste ; break"
+    bind $text <Alt-BackSpace> [list RamDebugger::DeletePreviousWord]
     bind [winfo toplevel $text] <$::control-v> ""
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
@@ -9083,7 +9160,7 @@ proc RamDebugger::OpenFileInNewWindow_exit { ip } {
 	    if { $zoomed } {
 		set ret zoomed
 	    } else {
-		set ret [wm geometry $w]
+		set ret [cu::give_window_geometry $w]
 	    }
 	}] 
     interp delete $ip

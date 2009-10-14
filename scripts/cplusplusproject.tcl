@@ -2011,6 +2011,10 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	}
 	return -1
     }
+    
+    RamDebugger::SaveFile auto_save
+    RamDebugger::ViewOnlyTextOrAll -force_all
+    
     $RamDebugger::mainframe setmenustate debugentry disabled
     $RamDebugger::mainframe setmenustate c++entry disabled
     $RamDebugger::mainframe setmenustate activeconfiguration disabled

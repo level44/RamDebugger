@@ -887,7 +887,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++_do { block blockinfoname "progress 
     set line 1
     set ichar 0
     set icharline 0
-    set finishedline 0
+    set finishedline 1
     set nextiscyan 0
     set simplechar ""
     foreach c [split $block ""] {
@@ -1135,7 +1135,9 @@ proc RamDebugger::Instrumenter::DoWorkForC++_do { block blockinfoname "progress 
 
 		if { $finishedline } {
 		    lappend blockinfocurrent "n"
-		} else { lappend blockinfocurrent "c" }
+		} else {
+		    lappend blockinfocurrent "c"
+		}
 	    }
 	    default {
 		if { $commentlevel || $wordtype == "\"" } {
@@ -1780,7 +1782,59 @@ proc RamDebugger::Instrumenter::DoWorkForXML_do { block blockinfoname "progress 
     }
 }
 
+proc _incr_l2 { idx } {
+    lassign $idx idx1 idx2
+    return [list $idx1 [incr idx2]]
+}
 
+proc RamDebugger::Instrumenter::DoWorkForMakefile { block blockinfoname "progress 1" } {
+
+    set length [string length $block]
+    if { $length >= 5000 && $progress } {
+	RamDebugger::ProgressVar 0 1
+    }
+
+    upvar $blockinfoname blockinfo
+    set blockinfo ""
+    set continuation 0
+
+    set iline 1
+    set nlines [regexp {\n} $block]
+    foreach line [split $block \n] {
+	set line [string map [list "\t" "        "] $line]
+	if { $iline%50 == 0  && $progress } {
+	    RamDebugger::ProgressVar [expr $iline*100/$nlines]
+	}
+	if { !$continuation } {
+	    set blockinfocurrent [list 0 n]
+	} else {
+	    set blockinfocurrent [list 0 c]
+	}
+	if { [regexp -indices {^\s*#.*} $line idxs] } {
+	    lappend blockinfocurrent red {*}[_incr_l2 $idxs]
+	    set continuation 0
+	} else {
+	    if { [regexp -indices {^\s*(\w+)\s*=} $line {} idxs] } {
+		lappend blockinfocurrent green {*}[_incr_l2 $idxs]
+	    }
+	    foreach "- idxs"  [regexp -inline -indices {\$\((\w+)\)?} $line] {
+		lappend blockinfocurrent magenta {*}[_incr_l2 $idxs]
+	    }
+	    if { [regexp -indices {^\s*(ifeq|ifneq|else|endif)} $line {} idxs] } {
+		lappend blockinfocurrent blue {*}[_incr_l2 $idxs]
+	    }
+	    if { [regexp -indices {^\s*([^:]+):} $line {} idxs] } {
+		lappend blockinfocurrent blue {*}[_incr_l2 $idxs]
+	    }
+	    set continuation [regexp {\\$} $line]
+	}
+	incr iline
+	lappend blockinfo $blockinfocurrent
+    }
+    if { $length >= 1000  && $progress } {
+	RamDebugger::ProgressVar 100
+    }
+}
 
 
 

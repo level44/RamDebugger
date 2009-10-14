@@ -581,8 +581,22 @@ proc cu::get_program_preferences { args } {
 }
 
 ################################################################################
+#    cu::give_window_geometry
+################################################################################
+
+proc cu::give_window_geometry { w } {
+
+    regexp {(\d+)x(\d+)([-+])([-\d]\d*)([-+])([-\d]+)} [wm geometry $w] {} width height m1 x m2 y
+    if { $::tcl_platform(platform) eq "unix" } {
+	# note: this work in ubuntu 9.04
+	incr x -4
+	incr y -24
+    }
+    return ${width}x$height$m1$x$m2$y
+}
+
+################################################################################
 #    XML & xpath utilities
-#
 ################################################################################
 
 proc xpath_str { str } {

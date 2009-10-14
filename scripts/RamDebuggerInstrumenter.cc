@@ -1091,7 +1091,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
   icharline=0;
   simplechar_line=0;
   simplechar_pos=0;
-  finishedline=0;
+  finishedline=1;
   is->nextiscyan=0;
 
   for(i=0;i<length;i++){

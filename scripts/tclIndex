@@ -187,6 +187,8 @@ set auto_index(::RamDebugger::Instrumenter::range) [list source [file join $dir 
 set auto_index(::RamDebugger::Instrumenter::lappend_info) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(::RamDebugger::Instrumenter::DoWorkForXML) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(::RamDebugger::Instrumenter::DoWorkForXML_do) [list source [file join $dir Instrumenter.tcl]]
+set auto_index(_incr_l2) [list source [file join $dir Instrumenter.tcl]]
+set auto_index(::RamDebugger::Instrumenter::DoWorkForMakefile) [list source [file join $dir Instrumenter.tcl]]
 set auto_index(info_fullargs) [list source [file join $dir mini_compass_utils.tcl]]
 set auto_index(::cu::menubutton_button) [list source [file join $dir mini_compass_utils.tcl]]
 set auto_index(::cu::add_contextual_menu_to_entry) [list source [file join $dir mini_compass_utils.tcl]]

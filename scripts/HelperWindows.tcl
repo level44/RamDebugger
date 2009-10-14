@@ -1040,6 +1040,7 @@ proc RamDebugger::PreferencesWindow {} {
     foreach "type extsdefaultlist" [list TCL [list ".tcl" ".tcl .tk *"] \
 	    C/C++ [list ".c .cpp .cc .h"] \
 	    XML [list ".xml .html .htm"] \
+	    Makefile [list Makefile] \
 	    "GiD BAS file" .bas \
 	    "GiD data files" [list ".prb .mat .cnd"]] {
 	ttk::label $fde.l$ic -text $type:

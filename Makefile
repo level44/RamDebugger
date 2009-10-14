@@ -8,7 +8,7 @@ LINUX = $(shell if [ -e /usr/include/linux ]; then echo yes; else echo no; fi)
 
 ifeq ($(HOST),rrg7.local)
   LIBSDIR=/Users/ramsan/gidproject/libs
-else ifeq ($(USER),hoschi)
+else ifeq ($(HOST),hoschi)
   LIBSDIR=/Users/miguel
 else
   LIBSDIR=
@@ -22,6 +22,8 @@ CPPFLAGS=-DUSE_TCL_STUBS -DUSE_TK_STUBS -DTCLVERSION -Wunused-variable
 INCLUDE_DIRECTORIES = /usr/local/ActiveTcl-8.5/include $(LIBSDIR)/include
 CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRECTORIES))
 
+LDFLAGS=
+
 ifeq ($(LINUX),no)
   CPPFLAGS += -fast
   LDFLAGS += -dynamiclib
@@ -30,7 +32,7 @@ ifeq ($(LINUX),no)
   LIBEXT = dylib
   LD = g++
 else
-  CPPFLAGS += -fast
+  CPPFLAGS +=
   LDFLAGS += -shared -static-libgcc
   LIB_DIRECTORIES = /usr/local/ActiveTcl-8.5/lib
   LIBS =`g++ -print-file-name=libstdc++.a`
