@@ -1013,28 +1013,32 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set dir [$tree item text [$tree item parent $item] 0]
 		if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
 		    dict lappend cvs_files_dict $dir $file
-		    dict set items [list cvs $dir $file] $item
+		    dict set items cvs $dir $file $item
 		} elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
 		    dict lappend fossil_files_dict $dir $file
-		    dict set items [list fossil $dir $file] $item
+		    dict set items fossil $dir $file $item
 		}
 	    }
 	    dict for "dir fs" $cvs_files_dict {
 		cd $dir
 		set err [catch { exec cvs commit -m $message {*}$fs 2>@1 } ret]
 		if { $err } { set color red } else { set color blue }
-		set item [dict get $items [list cvs $dir $file]]
-		$tree item element configure $item 0 e_text_sel -fill $color -text $ret
+		foreach file $fs {
+		    set item [dict get $items cvs $dir $file]
+		    $tree item element configure $item 0 e_text_sel -fill $color -text $ret
+		}
 	    }
 	    dict for "dir fs" $fossil_files_dict {
 		cd $dir
 		set info [exec fossil info]
-		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
-		cd $dir
+		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dirF
+		cd $dirF
 		set err [catch { exec fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
 		if { $err } { set color red } else { set color blue }
-		set item [dict get $items [list fossil $dir $file]]
-		$tree item element configure $item 0 e_text_sel -fill $color -text $ret
+		foreach file $fs {
+		    set item [dict get $items fossil $dir $file]
+		    $tree item element configure $item 0 e_text_sel -fill $color -text $ret
+		}
 	    }
 	    cd $pwd
 	    if { $err } {
