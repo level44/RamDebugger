@@ -3106,7 +3106,12 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
     }
     set compulsory ""
     parse_args $optional $compulsory $args
-
+    
+    if { $options(listfilespane) || $options(viewvariablespane) } {
+	set view_all_simple 0
+    } else {
+	set view_all_simple 1
+    }
     set f [$mainframe getframe]
     set t [winfo toplevel $mainframe]
     set w [winfo toplevel $text]
@@ -3175,7 +3180,9 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
 	    set wpane1 0
 	    set x [winfo x $t]
 	}
-	wm geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
+	if { !$view_all_simple } {
+	    wm geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
+	}
 	set options(ViewOnlyTextOrAll) OnlyText
     } else {
 	set width [winfo width $fulltext]
@@ -3202,11 +3209,13 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
 	}
 	
 	incr width [expr {$delta+$delta_ext}]
-	wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
+	if { !$view_all_simple } {
+	    wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
+	}
 	set options(ViewOnlyTextOrAll) All
     }
     set geomkey maingeometry_$options(ViewOnlyTextOrAll)
-    if { [info exists options($geomkey)] } {
+    if { [info exists options($geomkey)] && !$view_all_simple } {
 	if { $options($geomkey) eq "zoomed" } {
 	    wm geom $w 800x600+0+0
 	    if { $::tcl_platform(platform) eq "windows" } {

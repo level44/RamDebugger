@@ -3146,11 +3146,17 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 # OpenProgram OpenConsole
 ################################################################################
 
-proc RamDebugger::OpenProgram { what args } {
+proc RamDebugger::OpenProgram { args } {
     variable MainDir
     variable currentfile
+    variable openprogram_uniqueid
     
-    set argv $args
+    set optional {
+	{ -new_interp boolean 0 }
+    }
+    set compulsory "what"
+    set argv [parse_args -raise_compulsory_error 0  $optional $compulsory $args]
+
     switch $what {
 	visualregexp { set file [file join $MainDir addons visualregexp visual_regexp.tcl] }
 	tkcvs {
@@ -3160,6 +3166,9 @@ proc RamDebugger::OpenProgram { what args } {
 	    }
 	}
 	tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
+    }
+    if { $new_interp } {
+	set what $what[incr openprogram_uniqueid]
     }
     if { [interp exists $what] } {
 	interp delete $what

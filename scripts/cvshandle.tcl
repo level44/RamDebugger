@@ -682,7 +682,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
 	set directory ""
     }
     set script ""
-    foreach cmd [list update_recursive_do0 select_directory update_recursive_do1 \
+    foreach cmd [list update_recursive_do0 select_directory clear_entry update_recursive_do1 \
 	    update_recursive_accept update_recursive_cmd] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
@@ -748,6 +748,19 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	    DTs04+TkMDnf1zozNDMyLy4tJiUkON89EDYjIiEgHx4cOmTAUOMbixgcNmjIcMFCBQoTJNx4QIDB
 	    tIvQFlDauDEQADs=
 	}
+	image create photo RamDebugger::CVS::edit-clear-16 -data {
+	    R0lGODlhEAAQAPZvAHhIAHlJAHtKAHxLAKsbDaEkAKA2ALg4HYBOAYRSAYZSA4dkAIppAJx/AK1C
+	    E7tKKKZpCqlrCqttC7BpF7JyDLJ2C7x6D8F9EMhtM5qFAJyIAJyLAJ2MAJ6NAJ6NAZ+NAJ+NAZ+O
+	    AJ+OAZ+OBJ+PBaGIAaCOAaCPAaCPBaGQCKKQCaWUEaubGq6eG7GgHbulKb6uMsCwL8W0Msa1MMa2
+	    M8W1Ns29Qcy9Q82+RdexYtrCA9vDBNzEB9zFENzGENzGFd/KJuPLEeXNFOfQGO7XI/PbKvbeL/vk
+	    N/zlPP3mPM/BSdLDT9jIT9bIVtzNWN3PXuTSSeTTTOXUTu3aRubWVuHTW+fXW+fYX+LUZ+fZbeja
+	    bOzcaOrccuvdd+ved/bYYfvlRP3pUv3qX/PjZf3rYf3qY/3rbP3sa/3sbf3uffvqhP3vhPjqiPvt
+	    i/3viv///8zMzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5
+	    BAEAAHAALAAAAAAQABAAAAexgAADAgBwhoeIhgIQEoSJjwIUFxECDBsbj4YBChYXCRmXmXAAAggV
+	    JTAumKJwCxo2XhMGJxyriBseTFsYBDlcNyoitnAbHS8PB19lZmlsOCQhocQFDmpna2hhYGNdSi0c
+	    hw0xbmJkYUlFQz5QWCCHGyttSEdGREI7OlQ0IYgmT1NDgvDQoSOKkxHDNrDQ0oPgDytNUAwzFKLG
+	    FSBSssjoMNFQsSVVZqT40PEdhw4cEwUCADs=
+	}
     }
     ttk::label $f.l1 -text [_ "Directory"]:
     cu::combobox $f.e1 -textvariable [$w give_uservar dir ""] -valuesvariable \
@@ -756,10 +769,18 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	-command [namespace code [list select_directory $w]] \
 	-style Toolbutton
     
+    tooltip::tooltip $f.b1 [_ "Select the directory under version control"]
+    
     ttk::label $f.l2 -text [_ "Commit messages"]:
     cu::multiline_entry $f.e2 -textvariable [$w give_uservar message ""] -valuesvariable \
 	[$w give_uservar messages] -width 60
     bind $f.e2 <Return> "[bind Text <Return>] ; break"
+    
+    ttk::button $f.b2 -image RamDebugger::CVS::edit-clear-16 \
+	-command [namespace code [list clear_entry $w $f.e2]] \
+	-style Toolbutton
+    
+    tooltip::tooltip $f.b2 [_ "Clear the messages entry"]
     
     package require fulltktree
     set columns [list [list 100 [_ "line"] left item 0]]
@@ -772,7 +793,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     
     grid $f.l0    -         -      -sticky w -padx 2 -pady 2
     grid $f.l1 $f.e1 $f.b1 -sticky w -padx 2 -pady 2
-    grid $f.l2 $f.e2 - -sticky w -padx 2 -pady 2
+    grid $f.l2 $f.e2 $f.b2 -sticky w -padx 2 -pady 2
     grid $f.toctree - - -sticky nsew
     grid configure $f.e1 $f.e2 -sticky ew
     grid columnconfigure $f 1 -weight 1
@@ -781,8 +802,10 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     $w set_uservar_value dir $dir
     $w set_uservar_value message ""
     
-    bind $f.toctree  <Control-d> [list "update_recursive_cmd" $w open_program tkdiff $f.toctree ""]
-    
+    bind $w <Control-d> [list "update_recursive_cmd" $w open_program tkdiff $f.toctree ""]
+    bind $w <Control-i> [list "update_recursive_cmd" $w commit $f.toctree ""]
+    bind $f.e2 <Control-i> "[bind $w <Control-i>];break"
+
     tk::TabToWindow $f.e1
     bind $w <Return> [list $w invokeok]
     $w createwindow
@@ -793,6 +816,11 @@ proc RamDebugger::CVS::select_directory { w } {
 	    -mustexist 1 -parent $w -title [_ "Select origin directory"]]
     if { $dir eq "" } { return }
     $w set_uservar_value dir $dir
+}
+
+proc RamDebugger::CVS::clear_entry { w entry } {
+    $entry delete 1.0 end
+    focus $entry
 }
 
 proc RamDebugger::CVS::update_recursive_do1 { w } {
@@ -909,15 +937,9 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    set has_fossil 1
 		}
 	    }
-	    if { $has_cvs } {
-		$menu add command -label [_ "Commit cvs"] -command \
-		    [list "update_recursive_cmd" $w commit cvs $tree $sel_ids]
-	    }
-	    if { $has_fossil } {
-		$menu add command -label [_ "Commit fossil"] -command \
-		    [list "update_recursive_cmd" $w commit fossil $tree $sel_ids]
-		$menu add command -label [_ "Commit fossil all"] -command \
-		    [list "update_recursive_cmd" $w commit fossilall $tree $sel_ids]
+	    if { $has_cvs || $has_fossil } {
+		$menu add command -label [_ "Commit"] -accelerator Ctrl-i -command \
+		    [list "update_recursive_cmd" $w commit $tree $sel_ids]
 	    }
 	    $menu add command -label [_ "Refresh view"] -command \
 		[list "update_recursive_cmd" $w update view $tree $sel_ids]
@@ -939,8 +961,14 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    $menu add command -label [_ "View diff"] -accelerator Ctrl-d -command \
 		[list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
-	    $menu add command -label [_ "Open tkcvs"] -command \
-		[list "update_recursive_cmd" $w open_program tkcvs $tree $sel_ids]
+	    if { $has_cvs } {
+		$menu add command -label [_ "Open tkcvs"] -command \
+		    [list "update_recursive_cmd" $w open_program tkcvs $tree $sel_ids]
+	    }
+	    if { $has_fossil } {
+		$menu add command -label [_ "Open browser"] -command \
+		    [list "update_recursive_cmd" $w open_program fossil_ui $tree $sel_ids]
+	    }
 	    $menu add separator
 	    foreach i [list all normal] t [list [_ All] [_ Normal]] {
 		$menu add command -label [_ "View %s" $t] -command \
@@ -948,7 +976,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	}
 	commit {
-	    lassign $args cvs_or_fossil_or_fossilall tree sel_ids
+	    lassign $args tree sel_ids
 	    set message [$w give_uservar_value message]
 	    if { [string trim $message] eq "" } { set message "" }
 	    
@@ -958,60 +986,55 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        -default cancel -parent $w -message $txt]
 		if { $ret eq "cancel" } { return }
 	    }
-	    if { $cvs_or_fossil_or_fossilall eq "cvs" } {
+	    if { [llength $sel_ids] == 0 } {
+		set sel_ids [$tree selection get]
+		if { [llength $sel_ids] == 0 } { return }
+		set files ""
 		foreach item $sel_ids {
-		    if { ![regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { continue }
-		    set dir [$tree item text [$tree item parent $item] 0]
-		    set pwd [pwd]
-		    cd $dir
-		    set err [catch { exec cvs commit -m $message $file 2>@1 } ret]
-		    $tree item element configure $item 0 e_text_sel -fill blue -text $ret
-		    cd $pwd
+		    if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
+		        lappend files $file
+		    } elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
+		        lappend files $file
+		    }
 		}
-	    } elseif { $cvs_or_fossil_or_fossilall eq "fossilall" } {
-		set txt [_ "Are you sure to commit the full fossil tree?"]
-		set ret [snit_messageBox -icon question -title [_ "Commit tree"] -type okcancel \
+		if { [llength $files] > 8 } {
+		    set files_p [join [lrange $files 0 7] ","]...
+		} else {
+		    set files_p [join $files ","]
+		}
+		set txt [_ "Are you sure to commit %d files? (%s)" [llength $files] $files_p]
+		set ret [snit_messageBox -icon question -title [_ "commit"] -type okcancel \
 		        -default ok -parent $w -message $txt]
 		if { $ret eq "cancel" } { return }
-		
-		set pwd [pwd]
-		cd [$w give_uservar_value dir]
+	    }
+	    set pwd [pwd]
+	    lassign "" cvs_files_dict fossil_files_dict
+	    foreach item $sel_ids {
+		set dir [$tree item text [$tree item parent $item] 0]
+		if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
+		    dict lappend cvs_files_dict $dir $file
+		} elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
+		    dict lappend fossil_files_dict $dir $file
+		}
+	    }
+	    dict for "dir fs" $cvs_files_dict {
+		cd $dir
+		set err [catch { exec cvs commit -m $message {*}$fs 2>@1 } ret]
+		if { $err } { set color red } else { set color blue }
+		$tree item element configure $item 0 e_text_sel -fill $color -text $ret
+	    }
+	    dict for "dir fs" $fossil_files_dict {
+		cd $dir
 		set info [exec fossil info]
 		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
 		cd $dir
-		set err [catch { exec fossil commit --nosign -m $message  2>@1 } ret]
-		cd $pwd
-		if { $err } {
-		    snit_messageBox -message $ret -parent $w
-		} else {
-		    $tree item delete all
-		    set dir [$w give_uservar_value dir]
-		    update_recursive_accept view $dir $tree 0
-		}
-	    } else {
-		set pwd [pwd]
-		set files_dict ""
-		foreach item $sel_ids {
-		    if { ![regexp {(\w+)\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
-		    set dir [$tree item text [$tree item parent $item] 0]
-		    dict lappend files_dict $dir $file
-		}
-		dict for "dir fs" $files_dict {
-		    cd $dir
-		    set info [exec fossil info]
-		    regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
-		    cd $dir
-		    set err [catch { exec fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
-		    if { $err } { break }
-		}
-		cd $pwd
-		if { !$err } {
-		    foreach item $sel_ids {
-		        $tree item element configure $item 0 e_text_sel -fill blue -text $ret
-		    }
-		} else {
-		    snit_messageBox -message $ret -parent $w
-		}
+		set err [catch { exec fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
+		if { $err } { set color red } else { set color blue }
+		$tree item element configure $item 0 e_text_sel -fill $color -text $ret
+	    }
+	    cd $pwd
+	    if { $err } {
+		snit_messageBox -message $ret -parent $w
 	    }
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
 	    $w set_uservar_value messages [linsert0 [dict_getd $dict messages ""] $message]
@@ -1108,28 +1131,29 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    if { $sel_ids eq "" } {
 		set sel_ids [$tree selection get]
 	    }
-	    foreach item $sel_ids {
-		if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
-		set pwd [pwd]
-		set dir [$tree item text [$tree item parent $item] 0]
-
-		if { [string length $mode] == 1 } {
-		    set fileF [file join $dir $file]
-		} else {
-		    cd $dir
-		    set err [catch {
-		            set info [exec fossil info]
-		            regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dirF
-		        } ret]
-		    if { $err } {
-		        snit_messageBox -message $ret -parent $w
-		        return
-		    }
-		    set fileF [file join $dirF $file]
-		}
-		if { [file exists $fileF] } {
-		    switch $what_in {
-		        tkdiff {
+	    switch $what_in {
+		tkdiff {
+		    set fileF ""
+		    set pwd [pwd]
+		    foreach item $sel_ids {
+		        if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
+		        set dir [$tree item text [$tree item parent $item] 0]
+		        
+		        if { [string length $mode] == 1 } {
+		            set fileF [file join $dir $file]
+		        } else {
+		            cd $dir
+		            set err [catch {
+		                    set info [exec fossil info]
+		                    regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dirF
+		                } ret]
+		            if { $err } {
+		                snit_messageBox -message $ret -parent $w
+		                return
+		            }
+		            set fileF [file join $dirF $file]
+		        }
+		        if { [file exists $fileF] } {
 		            if { [string length $mode] == 1 } {
 		                cd [file dirname $fileF]
 		                RamDebugger::OpenProgram tkdiff -r [file tail $fileF]
@@ -1137,23 +1161,26 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                file rename -force $fileF $fileF.current
 		                set err [catch {
 		                        exec fossil revert $file
-		                        RamDebugger::OpenProgram tkdiff $fileF.current $fileF
+		                        RamDebugger::OpenProgram -new_interp 1 tkdiff $fileF.current $fileF
 		                    } ret]
 		                file rename -force $fileF.current $fileF
 		                if { $err } {
 		                    snit_messageBox -message $ret -parent $w
+		                    break
 		                }
-		            }
-		            cd $pwd
-		        }
-		        tkcvs {
-		            if { [file isdirectory $file] } {
-		                RamDebugger::OpenProgram tkcvs -dir $file
-		            } else {
-		                RamDebugger::OpenProgram tkcvs -dir [file dirname $file]
 		            }
 		        }
 		    }
+		    cd $pwd
+		}
+		tkcvs {
+		    RamDebugger::OpenProgram tkcvs -dir [$w give_uservar_value dir]
+		}
+		fossil_ui {
+		    set pwd [pwd]
+		    cd [$w give_uservar_value dir]
+		    exec fossil ui &
+		    cd $pwd
 		}
 	    }
 	}

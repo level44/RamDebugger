@@ -341,7 +341,7 @@ snit::widget cu::multiline_entry {
 	bind $text <Tab> "[bind all <Tab>] ; break"
 	bind $text <<PrevWindow>> "[bind all <<PrevWindow>>] ; break"
 	bindtags $text [list $win $text [winfo class $win] [winfo class $text] [winfo toplevel $text] all]
-
+	bind $win <FocusIn> [list focus $text]
 	$self configurelist $args
     }
     destructor {
