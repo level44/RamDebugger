@@ -1164,14 +1164,19 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        if { [file exists $fileF] } {
 		            if { [string length $mode] == 1 } {
 		                cd [file dirname $fileF]
-		                RamDebugger::OpenProgram tkdiff -r [file tail $fileF]
+		                RamDebugger::OpenProgram -new_interp 1 tkdiff -r [file tail $fileF]
 		            } else {
 		                file rename -force $fileF $fileF.current
 		                set err [catch {
+		                        cd $dirF
 		                        exec fossil revert $file
-		                        RamDebugger::OpenProgram -new_interp 1 tkdiff $fileF.current $fileF
+		                        file rename -force $fileF $fileF.trunk
 		                    } ret]
 		                file rename -force $fileF.current $fileF
+		                if { !$err } {
+		                    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $fileF $fileF.trunk } ret]
+		                    file delete -force $fileF.trunk
+		                }
 		                if { $err } {
 		                    snit_messageBox -message $ret -parent $w
 		                    break

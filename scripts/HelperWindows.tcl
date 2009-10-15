@@ -2137,7 +2137,7 @@ proc RamDebugger::CompileFeedback { fin name } {
 
 proc RamDebugger::FindFilesWithPattern { dir patternlist recurse } {
 
-    set retval [eval glob -nocomplain -dir [list $dir] -types f -- $patternlist]
+    set retval [glob -nocomplain -dir $dir -types f -- {*}$patternlist]
     if { $recurse } {
 	foreach i [glob -nocomplain -dir $dir -type d *] {
 	    set retval [concat $retval [FindFilesWithPattern $i $patternlist $recurse]]
@@ -2172,7 +2172,11 @@ proc RamDebugger::SearchInFilesDo { w } {
     lappend comm $RamDebugger::searchstring
 
     set patternlist [regexp -inline -all {[^\s,;]+} $RamDebugger::searchextensions]
-
+    if { [llength $patternlist] == 0 } {
+	snit_messageBox -message [_ "File extensions list cannot be void"] \
+	    -parent $w
+	return
+    }
     WaitState 1
     set files [FindFilesWithPattern $RamDebugger::searchdir $patternlist \
 	    $RamDebugger::searchrecursedirs]
@@ -2300,6 +2304,7 @@ proc RamDebugger::SearchInFiles {} {
     if { $ext ne "" } {
 	set ipos [lsearch -glob -nocase $values "*$ext*"]
     }
+    if { $ipos == -1 } { set ipos 0 }
     set ::RamDebugger::searchextensions [lindex $values $ipos]
     
     set dir $options(defaultdir)
