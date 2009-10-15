@@ -931,7 +931,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign "0 0" has_cvs has_fossil
 	    foreach item $sel_ids {
 		set txt [$tree item text $item 0]
-		if { [regexp {^\s*\w\s+} $txt] } {
+		if { [regexp {^\s*(\w|\?)\s+} $txt] } {
 		    set has_cvs 1
 		} elseif  { [regexp {^\s*\w{2,}\s*} $txt] } {
 		    set has_fossil 1
