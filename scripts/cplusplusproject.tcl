@@ -2012,7 +2012,7 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	return -1
     }
     
-    RamDebugger::SaveFile auto_save
+    RamDebugger::SaveFile -only_if_modified 1 auto_save
     RamDebugger::ViewOnlyTextOrAll -force_all
     
     $RamDebugger::mainframe setmenustate debugentry disabled

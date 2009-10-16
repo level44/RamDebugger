@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.156 2009/10/15 11:34:14 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.157 2009/10/16 18:17:52 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -3642,10 +3642,14 @@ proc RamDebugger::SaveFile { what args } {
     
     set optional {
 	{ -force_browser boolean 0 }
+	{ -only_if_modified boolean 0 }
     }
     set compulsory ""
     parse_args $optional $compulsory $args
-
+    
+    if { $only_if_modified && !$currentfileIsModified } {
+	return
+    }
     if { $what eq "ask" } {
 	if { !$currentfileIsModified } { return 0 }
 
