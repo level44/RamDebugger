@@ -3139,7 +3139,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    $active_text see $RamDebugger::SearchPos
 	    
 	    if { $what eq "iforward_all" } {
-		tk_textPaste $text
+		textPaste_insert_after $text
 		after idle [list RamDebugger::Search $w iforward_all]
 	    }
 	}
