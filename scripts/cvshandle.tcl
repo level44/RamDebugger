@@ -928,7 +928,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
     switch $what {
 	contextual {
 	    lassign $args tree menu id sel_ids
-	    lassign "0 0" has_cvs has_fossil
+	    lassign "0 0 0 0" has_cvs has_fossil cvs_active fossil_active
 	    foreach item $sel_ids {
 		set txt [$tree item text $item 0]
 		if { [regexp {^\s*(\w|\?)\s+} $txt] } {
@@ -937,6 +937,15 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    set has_fossil 1
 		}
 	    }
+	    set pwd [pwd]
+	    cd [$w give_uservar_value dir]
+	    if { [auto_execok cvs] ne "" && [file isdirectory CVS] } {
+		set cvs_active 1
+	    }
+	    if { [auto_execok fossil] ne "" && [catch { exec fossil info }] == 0 } {
+		set fossil_active 1
+	    }
+	    cd $pwd
 	    if { $has_cvs || $has_fossil } {
 		$menu add command -label [_ "Commit"] -accelerator Ctrl-i -command \
 		    [list "update_recursive_cmd" $w commit $tree $sel_ids]
@@ -961,19 +970,62 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    $menu add command -label [_ "View diff"] -accelerator Ctrl-d -command \
 		[list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
-	    if { $has_cvs } {
+	    if { $cvs_active } {
 		$menu add command -label [_ "Open tkcvs"] -command \
 		    [list "update_recursive_cmd" $w open_program tkcvs $tree $sel_ids]
 	    }
-	    if { $has_fossil } {
-		$menu add command -label [_ "Open browser"] -command \
+	    if { $fossil_active } {
+		$menu add command -label [_ "Open fossil browser"] -command \
 		    [list "update_recursive_cmd" $w open_program fossil_ui $tree $sel_ids]
+		$menu add checkbutton -label [_ "Fossil autosync"] -variable \
+		    [$w give_uservar fossil_autosync] -command \
+		    [list "update_recursive_cmd" $w fossil_toggle_autosync]
+		$menu add command -label [_ "Fossil syncronize"] -command \
+		    [list "update_recursive_cmd" $w fossil_syncronize $tree $sel_ids]
+		$w set_uservar_value fossil_autosync [update_recursive_cmd $w give_fossil_sync]
 	    }
 	    $menu add separator
 	    foreach i [list all normal] t [list [_ All] [_ Normal]] {
 		$menu add command -label [_ "View %s" $t] -command \
 		    [list "update_recursive_cmd" $w view $tree 0 $i]
 	    }
+	}
+	give_fossil_sync {
+	    set autosync 0
+	    set pwd [pwd]
+	    cd [$w give_uservar_value dir]
+	    set err [catch { exec fossil settings autosync } ret]
+	    if { !$err } {
+		regexp {(\d)\s*$} $ret {} autosync
+	    }
+	    cd $pwd
+	    return $autosync
+	}
+	set_fossil_sync {
+	    lassign $args autosync
+	    set pwd [pwd]
+	    cd [$w give_uservar_value dir]
+	    set err [catch { exec fossil settings autosync $autosync } ret]
+	    if { !$err } {
+		snit_messageBox -message $ret -parent $w
+	    }
+	    cd $pwd
+	}
+	fossil_toggle_autosync {
+	    switch -- [update_recursive_cmd $w give_fossil_sync] {
+		0 { update_recursive_cmd $w set_fossil_sync 1 }
+		default { update_recursive_cmd $w set_fossil_sync 0 }
+	    }
+	    $w set_uservar_value fossil_autosync [update_recursive_cmd $w give_fossil_sync]
+	}
+	fossil_syncronize {
+	    set pwd [pwd]
+	    cd [$w give_uservar_value dir]
+	    set err [catch { exec fossil sync } ret]
+	    if { $ret ne "" } {
+		snit_messageBox -message $ret -parent $w
+	    }
+	    cd $pwd
 	}
 	commit {
 	    lassign $args tree sel_ids
