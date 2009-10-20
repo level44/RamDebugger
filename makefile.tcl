@@ -84,6 +84,8 @@ set createdistribution::libdir ""
 
 set files [list addons scripts Examples help]
 
+fossil_tag_add . release_$version
+
 # cannot contain file pkgIndex.tcl
 CreateDistribution $dist_type $program_name . RamDebugger.tcl \
     $files addons/ramdebugger.ico $version
