@@ -17,7 +17,7 @@ package require createdistribution
 namespace import createdistribution::*
 
 if { $tcl_platform(platform) eq "windows" } {
-    unset env(TCL8_5_TM_PATH)
+    unset -nocomplain env(TCL8_5_TM_PATH)
     foreach dir [list "C:/TclTk/tclkit" "e:/TclTk/tclkit"] {
 	if { [file isdirectory $dir] } {
 	    set createdistribution::tclkitdir $dir
