@@ -67,7 +67,7 @@ set createdistribution::doencrypt 0
 
 set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd]
 lappend createdistribution::remove_packages trf bwidget \
-    vfs::ftp he_dialog wce compass_utils \
+    vfs::ftp he_dialog wce compass_utils compass_utils::c \
     textutil::adjust textutil::repeat \
     textutil::split textutil::tabify  textutil::trim  textutil::string tile \
     tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread \
@@ -129,7 +129,7 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 file delete $exe
 
-if { $tcl_platform(platform) eq "linux" } {
+if { $tcl_platform(platform) eq "unix" } {
 
     create_README -tcl_source_dist RamDebugger.tcl $pNode README
     set files [list license.terms README addons scripts Examples help pkgIndex.tcl]
@@ -145,7 +145,6 @@ if { $tcl_platform(platform) eq "linux" } {
     foreach ext $exts {
 	file copy libs/RamDebuggerInstrumenter6_x32$ext scripts
     }
-    
     CreateDistribution zip $program_name-source  . RamDebugger.tcl \
 	$files addons/ramdebugger.ico $version
     
