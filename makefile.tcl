@@ -82,7 +82,7 @@ auto_mkindex scripts *.tcl
 
 set createdistribution::libdir ""
 
-set files [list addons scripts Examples help]
+set files [list addons Examples help]
 
 fossil_tag_add . release_$version
 
@@ -130,7 +130,6 @@ if { $tcl_platform(platform) eq "windows" } {
 file delete $exe
 
 if { $tcl_platform(platform) eq "unix" } {
-
     create_README -tcl_source_dist RamDebugger.tcl $pNode README
     set files [list license.terms README addons scripts Examples help pkgIndex.tcl]
     set createdistribution::libdir addons
