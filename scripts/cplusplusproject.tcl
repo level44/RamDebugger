@@ -2357,6 +2357,96 @@ proc RamDebugger::DebugCplusPlusWindow_getdir { w } {
     $w set_uservar_value directory $dir
 }
 
+proc RamDebugger::DebugCplusPlusWindowAttach {} {
+    variable text
+    
+    set w $text.debugatt
+    destroy $w
+    dialogwin_snit $w -title [_ "Select program to attach the debugger"]
+    set f [$w giveframe]
+    
+    set f1 [ttk::labelframe $f.f1 -text [_ "programs"]]
+	
+    set columns [list \
+	    [list 25 [_ "Program"] left text 1] \
+	    [list 10 [_ "PID"] right text 1] \
+	    [list 8 [_ "Create time"] left text 1] \
+	    [list 8 [_ "CPU time"] left text 1] \
+	    [list 10 [_ "Memory (KB)"] right text 1] \
+	    ]
+    
+    package require fulltktree
+    fulltktree $f1.tree -selecthandler2 \
+	"[list $w invokeok];#" \
+	-columns $columns -expand 1 \
+	-selectmode browse -showlines 0 -indent 0 -width 650
+    $w set_uservar_value tree $f1.tree
+    
+    ttk::entry $f1.e1 -textvariable [$w give_uservar search ""] -width 12
+    
+    $w add_trace_to_uservar search [list RamDebugger::DebugCplusPlusWindowAttach_search $w]
+    
+    ttk::button $f1.b1 -image actcross16 -style Toolbutton \
+	-command "[list $w set_uservar_value search ""] ; [list focus $f1.e1]"
+    
+    tooltip::tooltip $f1.e1 [_ "Search in list"]
+    tooltip::tooltip $f1.b1 [_ "Clear search entry"]
+    
+    grid $f1.tree  -      -     -   -sticky nsew -padx 2 
+    grid   x     x    $f1.e1 $f1.b1 -sticky e -padx 2 -pady "1 1"
+    
+    grid columnconfigure $f1 1 -weight 1
+    grid rowconfigure $f1 0 -weight 1
+    
+    grid $f1 -sticky nsew
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1
+    
+    DebugCplusPlusWindowAttach_update $w
+    
+    tk::TabToWindow $f1.tree
+    bind [winfo toplevel $f1] <Return> [list $w invokeok]
+    set action [$w createwindow]
+    
+    while 1 {
+	if { $action <= 0 } { 
+	    destroy $w
+	    return
+	}
+	set item [$f1.tree selection get]
+	if { [llength $item] == 1 } {
+	    lassign [$f1.tree item text $item] cmd pid
+	    rdebug -debugcplusplus [list  $pid "" $cmd]
+	    break
+	}
+	set action [$w waitforwindow]
+    }
+    destroy $w
+}
+
+proc RamDebugger::DebugCplusPlusWindowAttach_update { w } {
+    variable DebugCplusPlusWindowAttach_search_id
+    
+    unset -nocomplain DebugCplusPlusWindowAttach_search_id
+    
+    set tree [$w give_uservar_value tree]
+    set search [string trim [$w give_uservar_value search]]
+    
+    $tree item delete all
+    foreach i [cu::ps $search] {
+	$tree insert end $i
+    }
+}
+
+proc RamDebugger::DebugCplusPlusWindowAttach_search { w } {
+    variable DebugCplusPlusWindowAttach_search_id
+
+    if { [info exists DebugCplusPlusWindowAttach_search_id] } {
+	after cancel $DebugCplusPlusWindowAttach_search_id
+    }
+    set DebugCplusPlusWindowAttach_search_id [after 500 \
+	    [list RamDebugger::DebugCplusPlusWindowAttach_update $w]]
+}
 
 
 

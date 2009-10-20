@@ -717,3 +717,45 @@ proc linsert0 { args } {
     }
     return $list
 }
+
+################################################################################
+#    cu::kill and cu::ps
+################################################################################
+
+proc cu::kill { pid } {
+
+    if { $::tcl_platform(platform) eq "windows" } {
+	package require compass_utils::c
+	return [cu::_kill_win $pid]
+    } else {
+	exec kill $pid 
+    }
+}
+
+proc cu::ps { args } {
+
+    if { $::tcl_platform(platform) eq "windows" } {
+	package require compass_utils::c
+	return [cu::_ps_win {*}$args]
+    } else {
+	# does not do exactly the same than in Windows
+	#set err [catch { exec pgrep -l -f [lindex $args 0] } ret]
+	#set retList  [split $ret \n]
+	lassign $args pattern
+	if { $pattern eq "" } {
+	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,size,cmd } ret]
+	} else {
+	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,size,cmd | grep -i $pattern } ret]
+	}        
+	if { $err } {
+	    return ""
+	} else {
+	    set retList ""
+	    foreach line [split $ret \n] {
+		regexp {(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)} $line {} pid stime cputime size cmd
+		lappend retList [list $cmd $pid $stime $cputime $size]
+	    }
+	    return $retList
+	}
+    }
+}

@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.157 2009/10/16 18:17:52 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.158 2009/10/20 15:36:49 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -716,7 +716,9 @@ proc RamDebugger::rdebug { args } {
 	#          } else { set cat cat }
 	set dir [lindex $opts(program) 1]
 	set pwd [pwd]
-	cd $dir        
+	if { $dir ne "" } {
+	    cd $dir        
+	}
 	set fid [open "|gdb -q |& cat" r+]
 	cd $pwd
 	set remoteserver [list $fid $opts(program) start]
@@ -1008,9 +1010,14 @@ proc RamDebugger::rdebug { args } {
 	set remotecomm "set confirm off\n"
 	append remotecomm "set breakpoint pending on\n"
 	append remotecomm "set print elements 2000\n"
-	append remotecomm "file \"[lindex $opts(program) 0]\"\n"
-	if { [lindex $opts(program) 1] != "" } {
-	    append remotecomm "set args [lindex $opts(program) 2]"
+	lassign $opts(program) cmd dir args
+	if { [string is integer $cmd] } {
+	    append remotecomm "attach $cmd\n"
+	} else {
+	    append remotecomm "file \"$cmd\"\n"
+	    if { [lindex $opts(program) 1] != "" } {
+		append remotecomm "set args $args"
+	    }
 	}
     } elseif { $usecommR } {
 	set remotecomm [string map [list SENDDEVBODY "commR::comm send $debuggerserverNum \$comm"] \
@@ -1042,7 +1049,12 @@ proc RamDebugger::rdebug { args } {
 	    EvalRemote [list set ::RDC::finished_loading_debugger 1]
 	}
 	gdb {
-	    EvalRemote "run"
+	    lassign $opts(program) cmd dir args
+	    if { [string is integer $cmd] } {
+		EvalRemote "continue"
+	    } else {
+		EvalRemote "run"
+	    }
 	}
     }
     return [_ "Begin debugging of program '%s'" $remoteserver]
@@ -3659,15 +3671,16 @@ proc RamDebugger::SaveFile { what args } {
 	    set message [_ "Do you want to save '%s'?" $currentfile]
 	}
 
-	set ret [DialogWin::messageBox -default yes -icon question -message \
+	set ret [snit_messageBox -default yes -icon question -message \
 		     $message -parent $text \
 		     -title [_ "Save"] -type yesnocancel]
-	if { $ret == "cancel" } { return -1 }
-	if { $ret == "no" } {
+	if { $ret eq "cancel" } { return -1 }
+	if { $ret eq "no" } {
 	    set currentfileIsModified 0
 	    return 0
 	}
     }
+    set file_has_been_read 1
     set NeedsReinstrument 0
     if { $what ne "saveas" && ($currentfile == "*Macros*" || \
 		                   [info exists FileSaveHandlers($currentfile)]) } {
@@ -3688,6 +3701,7 @@ proc RamDebugger::SaveFile { what args } {
 	}
 	if { $file == "" } { return }
 	set options(defaultdir) [file dirname $file]
+	set file_has_been_read 0
     } elseif { $currentfile == "*Macros*" || [info exists FileSaveHandlers($currentfile)] } {
 	set file $currentfile
     } else {
@@ -3700,7 +3714,7 @@ proc RamDebugger::SaveFile { what args } {
 	    if { $ret == "cancel" } { return -1 }
 	}
     }
-    SaveFileF $file
+    SaveFileF -file_has_been_read $file_has_been_read $file
 
     if { $NeedsReinstrument } { rlist -quiet }
     return 0
@@ -4196,8 +4210,14 @@ proc RamDebugger::NewFile {} {
     return 0
 }
 
-proc RamDebugger::_savefile_only { file data } {
+proc RamDebugger::_savefile_only { args } {
     variable FileSaveHandlers
+
+    set optional {
+	{ -file_has_been_read boolean 0 }
+    }
+    set compulsory "file data"
+    parse_args $optional $compulsory $args
 
     if { $file eq "*Macros*" } {
 	SaveMacrosDocument $data
@@ -4207,18 +4227,25 @@ proc RamDebugger::_savefile_only { file data } {
     } else {
 	set perm ""
 	if { [file exists $file] } {
-	    if { $::tcl_platform(platform) eq "unix" } {
-		set perm [file attributes $file -permissions]
+	    if { $file_has_been_read } {
+		set err [catch { open $file r+ } fout]
+		if { $err } { error [_ "Error saving file '%s'" $file] }
+		chan truncate $fout 0
+	    } else {
+		if { $::tcl_platform(platform) eq "unix" } {
+		    set perm [file attributes $file -permissions]
+		}
+		set ic 0
+		while { [file exists $file.~$ic~] } { incr ic }     
+		set renfile $file.~$ic~
+		set err [catch { file rename -force $file $renfile } errstring]
+		if { $err } { error [_ "Error saving file '%s' (%s)" $file $errstring] }
 	    }
-	    set ic 0
-	    while { [file exists $file.~$ic~] } { incr ic }     
-	    set renfile $file.~$ic~
-	    set err [catch { file rename -force $file $renfile } errstring]
-	    if { $err } { error [_ "Error saving file '%s' (%s)" $file $errstring] }
 	}
-	set err [catch { open $file w } fout]
-	if { $err } { error [_ "Error saving file '%s'" $file] }
-
+	if { ![info exists fout] } {
+	    set err [catch { open $file w } fout]
+	    if { $err } { error [_ "Error saving file '%s'" $file] }
+	}
 	set header [string range $data 0 255]
 	set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
 	if { [regexp -nocase -line -- $rex $header] } {
@@ -4235,7 +4262,7 @@ proc RamDebugger::_savefile_only { file data } {
     }
 }
 
-proc RamDebugger::SaveFileF { file } {
+proc RamDebugger::SaveFileF { args } {
     variable text
     variable currentfile
     variable currentfileIsModified
@@ -4252,6 +4279,12 @@ proc RamDebugger::SaveFileF { file } {
     variable currentfile_secondary
     variable text_secondary
 
+    set optional {
+	{ -file_has_been_read boolean 0 }
+    }
+    set compulsory "file"
+    parse_args $optional $compulsory $args
+
     WaitState 1
     SetMessage [_ "Saving file '%s'" $file]...
 
@@ -4264,7 +4297,8 @@ proc RamDebugger::SaveFileF { file } {
     }
     set files($file) [string map $map [$text get 1.0 end-1c]]
 
-    set err [catch {_savefile_only $file $files($file)} errstring]
+    set err [catch { _savefile_only -file_has_been_read $file_has_been_read \
+	$file $files($file)} errstring]
 
     if { $err } {
 	WaitState 0
@@ -4615,6 +4649,7 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
 	$menu add command -label [_ "Debug c++"] -command "RamDebugger::DebugCplusPlusWindow"
     }
     $menu add command -label [_ "Debug c++ (no ask)"] -command "RamDebugger::DebugCplusPlusWindow 1"
+    $menu add command -label [_ "Debug c++ attach process"] -command "RamDebugger::DebugCplusPlusWindowAttach"
     $menu add separator
     $menu add command -label [_ "Disconnect/Stop"] -command RamDebugger::DisconnectStop -acc "Shift+F5"
 
