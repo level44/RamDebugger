@@ -25,8 +25,7 @@ if { $tcl_platform(platform) eq "windows" } {
 	    break
 	}
     }
-    #set createdistribution::tclkitsh_b tclkitsh85.exe
-    set createdistribution::tclkitsh_b {c:\TclTk\ActiveTcl8.5\bin\tclsh85.exe}
+    set createdistribution::tclkitsh_b tclkitsh85.exe
     set createdistribution::tclkit_b tclkit85.exe
 } elseif { $tcl_platform(os) eq "Darwin" } {
     set createdistribution::tclkitdir /Users/ramsan/bin
@@ -68,7 +67,7 @@ set createdistribution::doencrypt 0
 
 set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd commR]
 lappend createdistribution::remove_packages trf bwidget \
-    vfs::ftp he_dialog wce compass_utils compass_utils::c \
+    vfs vfs::ftp he_dialog wce compass_utils compass_utils::c \
     textutil::adjust textutil::repeat \
     textutil::split textutil::tabify  textutil::trim  textutil::string tile \
     tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread \
