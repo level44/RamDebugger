@@ -708,6 +708,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
 proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 
     package require dialogwin
+    package require tooltip
     #package require compass_utils
 
     wm withdraw .
