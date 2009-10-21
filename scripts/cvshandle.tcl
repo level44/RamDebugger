@@ -929,13 +929,15 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
     switch $what {
 	contextual {
 	    lassign $args tree menu id sel_ids
-	    lassign "0 0 0 0" has_cvs has_fossil cvs_active fossil_active
+	    lassign "0 0 0 0 0" has_cvs has_fossil cvs_active fossil_active can_be_added
 	    foreach item $sel_ids {
 		set txt [$tree item text $item 0]
-		if { [regexp {^\s*(\w|\?)\s+} $txt] } {
+		if { [regexp {^\s*(\w)\s+} $txt] } {
 		    set has_cvs 1
 		} elseif  { [regexp {^\s*\w{2,}\s*} $txt] } {
 		    set has_fossil 1
+		} elseif { [regexp {^\s*\?\s+} $txt] } {
+		    set can_be_added 1
 		}
 	    }
 	    set pwd [pwd]
@@ -956,18 +958,20 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    $menu add command -label [_ "Update VCS"] -command \
 		[list "update_recursive_cmd" $w update update $tree $sel_ids]
 	    $menu add separator
-	    if { $has_cvs } {
-		$menu add command -label [_ "CVS add"] -command \
-		    [list "update_recursive_cmd" $w add $tree $sel_ids]
-		$menu add command -label [_ "CVS add binary"] -command \
-		    [list "update_recursive_cmd" $w add_binary $tree $sel_ids]
-	    }
-	    if { $has_fossil } {
-		$menu add command -label [_ "Fossil add"] -command \
-		    [list "update_recursive_cmd" $w add_fossil $tree $sel_ids]
-	    }
-	    if { $has_cvs || $has_fossil } {
-		$menu add separator
+	    if { $can_be_added } {
+		if { $cvs_active } {
+		    $menu add command -label [_ "CVS add"] -command \
+		        [list "update_recursive_cmd" $w add $tree $sel_ids]
+		    $menu add command -label [_ "CVS add binary"] -command \
+		        [list "update_recursive_cmd" $w add_binary $tree $sel_ids]
+		}
+		if { $fossil_active } {
+		    $menu add command -label [_ "Fossil add"] -command \
+		        [list "update_recursive_cmd" $w add_fossil $tree $sel_ids]
+		}
+		if { $cvs_active || $fossil_active } {
+		    $menu add separator
+		}
 	    }
 	    $menu add command -label [_ "View diff"] -accelerator Ctrl-d -command \
 		[list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
