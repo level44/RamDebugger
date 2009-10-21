@@ -12,6 +12,7 @@ if { $tcl_platform(platform) eq "unix" } {
     # necessary when using directly "tclkit"
     lappend auto_path {*}$env(TCLLIBPATH)
 }
+set topdir [file normalize [file dirname [info script]]]
 
 package require createdistribution
 namespace import createdistribution::*
@@ -65,7 +66,7 @@ IconifiedConsole
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
-set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd]
+set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd commR]
 lappend createdistribution::remove_packages trf bwidget \
     vfs::ftp he_dialog wce compass_utils compass_utils::c \
     textutil::adjust textutil::repeat \
@@ -82,7 +83,7 @@ auto_mkindex scripts *.tcl
 
 set createdistribution::libdir ""
 
-set files [list addons Examples help]
+set files [list addons scripts help]
 
 fossil_tag_add . release_$version
 
@@ -96,6 +97,7 @@ if { $tcl_platform(platform) eq "windows" } {
     file rename -force RamDebugger.exe ramdebugger
     set exe ramdebugger
 }
+set files [list Examples]
 lappend files $exe
 
 if { $tcl_platform(platform) eq "windows" } {
@@ -115,7 +117,7 @@ if { $tcl_platform(platform) eq "windows" } {
     file copy license.terms $dir/License.txt
     CreateTarGzDist $tarfile $dir
     set deb [create_debian_package $pNode $dir ".RamDebugger .ramdebugger_prefs" \
-	    addons/ramdebugger.png]
+	    $topdir/addons/ramdebugger.png]
     #exec sudo alien --to-rpm --scripts $deb
     
     file delete -force $dir

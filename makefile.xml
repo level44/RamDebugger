@@ -2,7 +2,7 @@
 <Infoproblemtype version="1.0">
   <Program n="ramdebugger">
     <Name>RamDebugger</Name>
-    <Version>7.1</Version>
+    <Version>7.1.1</Version>
     <Section>contrib/devel</Section>
     <Categories>Development;Debugger;IDE;Application</Categories>
     <Dependencies>libc6 (&gt;= 2.3.6-6), 
