@@ -28,7 +28,9 @@
 	* It supports editing XML code
 	* It contains a GUI for version control system (cvs or fossil)
     </Description>
-    <NewsInVersion version="7.1" date="2009-10-20"> 
+    <NewsInVersion version="7.1" date="2009-10-23"> 
+	 *  Added text files line end control. It is possible to select auto, Unix or Windows
+	 *  When saving, Open previously read files with r+ and truncate to avoid problems with links
 	 *  It is possible to debug c/c++ code attaching to a running process
 	 * When saving, file is not deleted and recreated, but open an truncated. In this way, symbolic links work ok
 	 *  New keyboard accelerator: Alt-Backspace
