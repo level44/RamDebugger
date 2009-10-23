@@ -20,7 +20,7 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 
 IconifiedConsole
-if { $tcl_platform(platform) eq "windows" } {
+if { $tcl_platform(platform) eq "windows" && [info command console] ne "" } {
     DeiconifyConsole
 }
 

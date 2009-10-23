@@ -1200,6 +1200,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		tkdiff {
 		    set fileF ""
 		    set pwd [pwd]
+		    set errList ""
 		    foreach item $sel_ids {
 		        if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
 		        set dir [$tree item text [$tree item parent $item] 0]
@@ -1235,11 +1236,18 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                    file delete -force $fileF.trunk
 		                }
 		                if { $err } {
-		                    snit_messageBox -message $ret -parent $w
-		                    break
+		                    lappend errList $ret
 		                }
 		            }
 		        }
+		    }
+		    if { [llength $errList] } {
+		        if { [llength $errList] > 5 } {
+		            set errstr "[join [range $errList 0 4] ,]...[_ {More errors}]"
+		        } else {
+		            set errstr "[join $errList ,]"
+		        }
+		        snit_messageBox -message $errstr -parent $w
 		    }
 		    cd $pwd
 		}

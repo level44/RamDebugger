@@ -65,7 +65,7 @@ IconifiedConsole
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
-set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd commR]
+set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd]
 lappend createdistribution::remove_packages trf bwidget \
     vfs vfs::ftp he_dialog wce compass_utils compass_utils::c \
     textutil::adjust textutil::repeat \
@@ -98,11 +98,12 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 set files [list Examples]
 lappend files $exe
+set filesFT [list [list addons/commR addons/commR]]
 
 if { $tcl_platform(platform) eq "windows" } {
     create_README $pNode README.txt
     lappend files README.txt license.terms
-    CopyAndCreateZipDist $program_name$version-$dist.zip ramdebugger $files
+    CopyAndCreateZipDist $program_name$version-$dist.zip ramdebugger $files $filesFT
     file delete README.txt
 } elseif { $tcl_platform(os) ne "Darwin" } {
     set exe [string tolower $program_name]
@@ -112,8 +113,14 @@ if { $tcl_platform(platform) eq "windows" } {
     file delete -force $dir
     file mkdir $dir
     file copy {*}$files $dir
+    foreach i $filesFT {
+	lassign $i from to
+	file mkdir [file dirname [file join $dir $to]]
+	file copy $from [file join $dir $to]
+    }
     create_README $pNode $dir/README
     file copy license.terms $dir/License.txt
+    clean_cvs_dirs $dir
     CreateTarGzDist $tarfile $dir
     set deb [create_debian_package $pNode $dir ".RamDebugger .ramdebugger_prefs" \
 	    $topdir/addons/ramdebugger.png]
@@ -125,7 +132,7 @@ if { $tcl_platform(platform) eq "windows" } {
     file copy -force license.terms License.txt
     set filesM $files
     lappend filesM Readme.txt License.txt
-    create_macosx_app $pNode $filesM ramdebugger.icns
+    create_macosx_app $pNode $filesM $filesFT ramdebugger.icns
     file delete Readme.txt License.txt
 }
 file delete $exe
@@ -143,7 +150,7 @@ if { $tcl_platform(platform) eq "unix" } {
     set ipos [lsearch $exts [info sharedlibextension]]
     set exts [lreplace $exts $ipos $ipos]
     foreach ext $exts {
-	file copy libs/RamDebuggerInstrumenter6_x32$ext scripts
+	file copy -force libs/RamDebuggerInstrumenter6_x32$ext scripts
     }
     CreateDistribution zip $program_name-source  . RamDebugger.tcl \
 	$files addons/ramdebugger.ico $version

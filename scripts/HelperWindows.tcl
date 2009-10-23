@@ -502,8 +502,9 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	}
 	$f.lf insert end [list $num $endis $tail $line $cond $dir]
 	if { [AreFilesEqual $file $currentfile] && $line == $nowline } {
-	    $sw.lb selection set end
-	    $sw.lb see end
+	    $f.lf selection clear
+	    $f.lf selection add end
+	    $f.lf see end
 	}
     }
 

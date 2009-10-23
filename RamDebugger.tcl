@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-#         $Id: RamDebugger.tcl,v 1.160 2009/10/21 13:03:26 ramsan Exp $        
+#         $Id: RamDebugger.tcl,v 1.161 2009/10/23 07:11:40 ramsan Exp $        
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
 
 package require Tcl 8.5
@@ -28,7 +28,7 @@ if { [info commands _] eq "" } {
 }
 
 ################################################################################
-#  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@compassis.com
+#  This software is copyrighted by Ramon Ribo (RAMSAN) ramsan@compassis.com
 #  (http://www.gidhome.com/ramsan) The following terms apply to all files 
 #  associated with the software unless explicitly disclaimed in individual files.
 
@@ -62,7 +62,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 7.1.1
+    set Version 7.1.2
 
     ################################################################################
     #    Non GUI commands
@@ -91,9 +91,11 @@ namespace eval RamDebugger {
 
     variable debuggerstate "" ;# can be: "" or debug or time
     variable currentfile ""
+    variable currentfile_endline auto
     variable currentline 1
     variable currentfileIsModified 0
     variable files
+    variable files_endline
     variable instrumentedfilesP
     variable instrumentedfilesR
     variable instrumentedfilesTime
@@ -1315,6 +1317,7 @@ proc RamDebugger::rtime { args } {
     variable remoteserverType
     variable TimeMeasureData
     variable currentfile
+    variable currentfile_endline
     variable instrumentedfilesTime
 
     set usagestring {usage: rtime ?switches? ?name? ?lineini? ?lineend?
@@ -1352,6 +1355,7 @@ proc RamDebugger::rtime { args } {
 	set TimeMeasureDataNew ""
 	set files ""
 	set currentfile_save $currentfile
+	set currentfile_endline_save $currentfile_endline
 	set err [catch {
 	    foreach i $TimeMeasureData {
 		foreach "name file lineini lineend lasttime" $i {
@@ -1366,6 +1370,7 @@ proc RamDebugger::rtime { args } {
 	    }
 	} errorstring]
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	if { $err } {
 	    error $errorstring
 	}
@@ -1543,9 +1548,11 @@ proc RamDebugger::rtime { args } {
 
 proc RamDebugger::rlist { args } {
     variable currentfile
+    variable currentfile_endline
     variable currentline
     variable currentfileIsModified
     variable files
+    variable files_endline
     variable filesmtime
     variable fileslist
     variable instrumentedfilesP
@@ -1580,10 +1587,12 @@ proc RamDebugger::rlist { args } {
     }
 
     set currentfile_save $currentfile
+    set currentfile_endline_save $currentfile_endline
     if { $opts(file) != "" } { set currentfile [filenormalize $opts(file)] }
 
     if { $currentfile == "" } {
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	error [_ "it is necessary to enter a file name\n%s" $usagestring]
     }
 
@@ -1596,6 +1605,7 @@ proc RamDebugger::rlist { args } {
     if { $currentfile == "*Macros*" && !$currentfileIsModified && \
 	     ![info exists instrumentedfilesP($currentfile)] } {
 	set files($currentfile) [GiveMacrosDocument]
+	set files_endline($currentfile) auto
 
 	if { [lsearchfile $fileslist $currentfile] == -1 } {
 	    lappend fileslist $currentfile
@@ -1614,6 +1624,7 @@ proc RamDebugger::rlist { args } {
 	    set map ""
 	}
 	set files($currentfile) [string map $map [$text get 1.0 end-1c]]
+	set files_endline($currentfile) $currentfile_endline
 
 	if { [lsearchfile $fileslist $currentfile] == -1 } {
 	    lappend fileslist $currentfile
@@ -1632,25 +1643,41 @@ proc RamDebugger::rlist { args } {
 	if { $err } {
 	    set filetry $currentfile
 	    set currentfile $currentfile_save
+	    set currentfile_endline $currentfile_endline_save
 	    error [_ "file '%s' does not exist\n%s" $filetry $usagestring]
 	}
+	set fconf [fconfigure $fin]
+	fconfigure $fin -translation binary
+	set header [read $fin 1024]
+	seek $fin 0
+	fconfigure $fin {*}$fconf
 	if { $opts(-encoding) != 0 && $opts(-encoding) != "" } {
 	    fconfigure $fin -encoding $opts(-encoding)
 	} else {
-	    set header [read $fin 256]
-	    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+	    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
 	    append rex {|<\?xml\s+version=\S+\s*\?>}
 	    if { [regexp -nocase -line -- $rex $header] } {
 		fconfigure $fin -encoding utf-8
 	    }
-	    seek $fin 0
+	}
+	set currentfile_endline auto
+	set len [string length $header]
+	if { $len > 0 } {
+	    if { [regexp -all {\r\n} $header]*1.0/$len >= 0.005 } {
+		set currentfile_endline crlf
+	    } elseif { [regexp -all {\n} $header]*1.0/$len >= 0.005 } {
+		set currentfile_endline lf
+	    }
 	}
 	set files($currentfile) [read $fin]
+	set files_endline($currentfile) $currentfile_endline
 	close $fin
 	if { [lsearchfile $fileslist $currentfile] == -1 } {
 	    lappend fileslist $currentfile
 	}
 	set filesmtime($currentfile) [file mtime $currentfile]
+    } else {
+	set currentfile_endline $files_endline($currentfile)
     }
 
     if { ![info exists instrumentedfilesInfo($currentfile)] && !$force && !$reinstrument } {
@@ -1685,7 +1712,7 @@ proc RamDebugger::rlist { args } {
 		    fconfigure $fin -encoding $opts(-encoding)
 		} else {
 		    set header [read $fin 256]
-		    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+		    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
 		    if { [regexp -nocase -line -- $rex $header] } {
 		        fconfigure $fin -encoding utf-8
 		    }
@@ -1824,7 +1851,7 @@ proc RamDebugger::rlist { args } {
 		    fconfigure $fout -encoding $opts(-encoding)
 		} else {
 		    set header [string range [set instrumentedfiles${i}($currentfile)] 0 255]
-		    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['"]utf-8['"]}
+		    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
 		    if { [regexp -nocase -line -- $rex $header] } {
 		        fconfigure $fout -encoding utf-8
 		    }
@@ -2046,6 +2073,7 @@ proc RamDebugger::rbreaktotrace { args } {
 proc RamDebugger::rbreak { args } {
     variable remoteserver
     variable currentfile
+    variable currentfile_endline
     variable currentline
     variable files
     variable fileslist
@@ -2073,10 +2101,12 @@ proc RamDebugger::rbreak { args } {
 	error [_ "It is necessary to enter a line number\n%s" $usagestring]
     }
     set currentfile_save $currentfile
+    set currentfile_endline_save $currentfile_endline
     if { [catch {
 	rlist -quiet $opts(file) $opts(line)
     } errcatch] } {
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	error "[lindex [split $errcatch \n] 0]\n$usagestring"
     }
 
@@ -2094,6 +2124,7 @@ proc RamDebugger::rbreak { args } {
 		    append errormessage [_ ". Consider option 'Instrument proc last line' in Preferences"]
 		}
 		set currentfile $currentfile_save
+		set currentfile_endline $currentfile_endline_save
 		error $errormessage
 	    }
 	}
@@ -2102,6 +2133,7 @@ proc RamDebugger::rbreak { args } {
     } else {
 	set errormessage [_ "Error: this type of file does not permmit debugging"]
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	error $errormessage
     }
     
@@ -2115,6 +2147,7 @@ proc RamDebugger::rbreak { args } {
     UpdateRemoteBreaks
 
     set currentfile $currentfile_save
+    set currentfile_endline $currentfile_endline_save
     if { !$opts(-quiet) } {
 	return [_ "set breakpoint %s at %s %s" $NumBreakPoint $opts(file) $currentline]
     }
@@ -2495,6 +2528,7 @@ proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
 
 proc RamDebugger::RecieveFromProgramSource { args } {
     variable currentfile
+    variable currentfile_endline
 
     if { [lindex $args 0] eq "-encoding" } {
 	set encoding [lindex $args 1]
@@ -2508,10 +2542,12 @@ proc RamDebugger::RecieveFromProgramSource { args } {
 	TextOutInsertBlue [_ "Sending Instrumented file '%s'" $file]\n
 
 	set currentfile_save $currentfile
+	set currentfile_endline_save $currentfile_endline
 	set err [catch {
 	    set retval [rlist -returndata -encoding $encoding -asmainfile $file]
 	} errstring]
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	if { $err } {
 	    error $errstring
 	}
@@ -2911,7 +2947,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	rstack -handler RamDebugger::UpdateGUIStack
 	return
     }
-    if { [string match "*No executable specified, use `target exec'.*" $aa] } {
+    if { [string match "*No executable specified, use 'target exec'.*" $aa] } {
 	WarnWin [_ "Error defining the debugged executable. Use 'Utilities->gdb log' for details"]
     }
     TextOutInsert $aa
@@ -3648,6 +3684,7 @@ proc RamDebugger::SaveFile { what args } {
     variable text
     variable options
     variable currentfile
+    variable currentfile_endline
     variable currentfileIsModified
     variable filesmtime
     variable FileSaveHandlers
@@ -3714,7 +3751,8 @@ proc RamDebugger::SaveFile { what args } {
 	    if { $ret == "cancel" } { return -1 }
 	}
     }
-    SaveFileF -file_has_been_read $file_has_been_read $file
+    SaveFileF -file_has_been_read $file_has_been_read \
+	-file_endline $currentfile_endline $file
 
     if { $NeedsReinstrument } { rlist -quiet }
     return 0
@@ -3766,6 +3804,7 @@ proc RamDebugger::OpenFileF { args } {
     variable files
     variable breakpoints
     variable currentfile
+    variable currentfile_endline
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListLineNums
@@ -3814,6 +3853,7 @@ proc RamDebugger::OpenFileF { args } {
     if { $user_num_line != -1 } { set idx $user_num_line.0 }
 
     set currentfile_save $currentfile
+    set currentfile_endline_save $currentfile_endline
     if { !$force } {
 	set comm [list rlist -quiet $file {}]
     } elseif { $force == 2 } { 
@@ -3824,6 +3864,7 @@ proc RamDebugger::OpenFileF { args } {
 
     if { [catch $comm errstring] } {
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	WaitState 0
 	WarnWin [lindex [split $errstring \n] 0]
 	return 1
@@ -3916,6 +3957,7 @@ proc RamDebugger::OpenFileSecondary { args } {
     variable text_secondary
     variable files
     variable currentfile
+    variable currentfile_endline
     variable currentfile_secondary
     variable currentfileIsModified
     variable WindowFilesList
@@ -3939,15 +3981,18 @@ proc RamDebugger::OpenFileSecondary { args } {
     set idx $linenum.0
 
     set currentfile_save $currentfile
+    set currentfile_endline_save $currentfile_endline
     set comm [list rlist -quiet $file {}]
 
     if { [catch $comm errstring] } {
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	WaitState 0
 	WarnWin [lindex [split $errstring \n] 0]
 	return 1
     }
     set currentfile $currentfile_save
+    set currentfile_endline $currentfile_endline_save
 
     $text_secondary configure -state normal
     $text_secondary delete 1.0 end
@@ -3994,8 +4039,10 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     variable marker
     variable text
     variable files
+    variable files_endline
     variable breakpoints
     variable currentfile
+    variable currentfile_endline
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListLineNums
@@ -4019,12 +4066,16 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     } else { set idx $linenum.0 }
 
     set currentfile_save $currentfile
+    set currentfile_endline_save $currentfile_endline
     set files($file) $data
+    set files_endline($file) auto
     set comm [list rlist -quiet $file {}]
 
     if { [catch $comm errstring] } {
 	set currentfile $currentfile_save
+	set currentfile_endline $currentfile_endline_save
 	unset files($file)
+	unset files_endline($file)
 	WaitState 0
 	WarnWin [lindex [split $errstring \n] 0]
 	return 1
@@ -4087,7 +4138,7 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
     ManagePositionsImages
 
     set filetype [GiveFileType $currentfile]
-    RamDebugger::AddFileTypeMenu $filetype
+    AddFileTypeMenu $filetype
 
     WaitState 0
     return 0
@@ -4155,6 +4206,7 @@ proc RamDebugger::NewFile {} {
     variable instrumentedfilesInfo
     variable breakpoints
     variable currentfile
+    variable currentfile_endline
     variable currentfileIsModified
     variable WindowFilesList
     variable WindowFilesListLineNums
@@ -4171,6 +4223,7 @@ proc RamDebugger::NewFile {} {
     }
 
     set currentfile "*New file*"
+    set currentfile_endline auto
     set currentfileIsModified 0
 
     $marker delete arrow
@@ -4215,6 +4268,7 @@ proc RamDebugger::_savefile_only { args } {
 
     set optional {
 	{ -file_has_been_read boolean 0 }
+	{ -file_endline crlf|lf|auto auto}
     }
     set compulsory "file data"
     parse_args $optional $compulsory $args
@@ -4246,6 +4300,8 @@ proc RamDebugger::_savefile_only { args } {
 	    set err [catch { open $file w } fout]
 	    if { $err } { error [_ "Error saving file '%s'" $file] }
 	}
+	fconfigure $fout -translation $file_endline
+
 	set header [string range $data 0 255]
 	set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
 	if { [regexp -nocase -line -- $rex $header] } {
@@ -4265,8 +4321,10 @@ proc RamDebugger::_savefile_only { args } {
 proc RamDebugger::SaveFileF { args } {
     variable text
     variable currentfile
+    variable currentfile_endline
     variable currentfileIsModified
     variable files
+    variable files_endline
     variable instrumentedfilesP
     variable instrumentedfilesR
     variable instrumentedfilesTime
@@ -4281,6 +4339,7 @@ proc RamDebugger::SaveFileF { args } {
 
     set optional {
 	{ -file_has_been_read boolean 0 }
+	{ -file_endline crlf|lf|auto auto}
     }
     set compulsory "file"
     parse_args $optional $compulsory $args
@@ -4296,9 +4355,11 @@ proc RamDebugger::SaveFileF { args } {
 	set map ""
     }
     set files($file) [string map $map [$text get 1.0 end-1c]]
+    set files_endline($file) $file_endline
 
-    set err [catch { _savefile_only -file_has_been_read $file_has_been_read \
-	$file $files($file)} errstring]
+    set err [catch { _savefile_only -file_endline $file_endline \
+		-file_has_been_read $file_has_been_read \
+		$file $files($file)} errstring]
 
     if { $err } {
 	WaitState 0
@@ -4335,6 +4396,7 @@ proc RamDebugger::SaveFileF { args } {
     
     if { $file ne $currentfile } {
 	set currentfile $file
+	set currentfile_endline $file_endline
 	set changed_name 1
     } else {
 	set changed_name 0
@@ -4375,7 +4437,7 @@ proc RamDebugger::SaveFileF { args } {
     }
     if { $changed_name } {
 	set filetype [GiveFileType $file]
-	RamDebugger::AddFileTypeMenu $filetype
+	AddFileTypeMenu $filetype
     }
     if { [info exists currentfile_secondary] } {
 	if { $currentfile eq $currentfile_secondary } {
@@ -4394,6 +4456,7 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     variable marker
     variable text
     variable currentfile
+    variable currentfile_endline
     variable WindowFilesList
     variable WindowFilesListLineNums
     variable instrumentedfilesP
@@ -4474,6 +4537,7 @@ proc RamDebugger::ViewInstrumentedFile { what } {
 
     $text conf -editable 0
     set currentfile ""
+    set currentfile_endline auto
 }
 
 proc RamDebugger::ViewHelpFile { { file "" } } {
@@ -8268,6 +8332,18 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		    separator \
 		    [list checkbutton [_ "Only for this file"] filetype "" "" \
 		        -variable RamDebugger::options(filetype_only_this_file) \
+		        -selectcolor black] \
+		    ] \
+		] \
+	    [list cascad [_ "File lines end"] {} filelineend 0 [list \
+		    [list radiobutton [_ "Automatic"] filelineend [_ "Native line ends for the active operating system"] "" \
+		        -variable RamDebugger::currentfile_endline -value auto -selectcolor black] \
+		    separator \
+		    [list radiobutton [_ "Unix"] filelineend "" "" \
+		        -variable RamDebugger::currentfile_endline -value lf \
+		        -selectcolor black] \
+		    [list radiobutton [_ "Windows"] filelineend "" "" \
+		        -variable RamDebugger::currentfile_endline -value crlf \
 		        -selectcolor black] \
 		    ] \
 		] \
