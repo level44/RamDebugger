@@ -96,13 +96,13 @@ if { $tcl_platform(platform) eq "windows" } {
     file rename -force RamDebugger.exe ramdebugger
     set exe ramdebugger
 }
-set files [list Examples]
-lappend files $exe
-set filesFT [list [list addons/commR addons/commR]]
+set files [list $exe]
+set filesFT [list [list addons/commR/*.tcl addons/commR/. ascii] \
+	[list Examples/*.tcl Examples/. ascii]]
 
 if { $tcl_platform(platform) eq "windows" } {
     create_README $pNode README.txt
-    lappend files README.txt license.terms
+    lappend filesFT [list README.txt . ascii] [list license.terms ./License.txt ascii]
     CopyAndCreateZipDist $program_name$version-$dist.zip ramdebugger $files $filesFT
     file delete README.txt
 } elseif { $tcl_platform(os) ne "Darwin" } {
@@ -113,11 +113,8 @@ if { $tcl_platform(platform) eq "windows" } {
     file delete -force $dir
     file mkdir $dir
     file copy {*}$files $dir
-    foreach i $filesFT {
-	lassign $i from to
-	file mkdir [file dirname [file join $dir $to]]
-	file copy $from [file join $dir $to]
-    }
+    copy_filesFT $dir $filesFT
+
     create_README $pNode $dir/README
     file copy license.terms $dir/License.txt
     clean_cvs_dirs $dir
