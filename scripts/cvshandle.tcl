@@ -898,7 +898,7 @@ proc RamDebugger::CVS::update_recursive_accept { what dir tree itemP { item "" }
 		set item [$tree insert end [list $dir] $itemP]
 	    }
 	    set i [$tree insert end [list "$line"] $item]
-	    if { ![regexp {(\w+)\s+(.*)} $line {} mode file] || $mode eq "UNCHANGED" } {
+	    if { ![regexp {^(\w+)\s+(.*)} $line {} mode file] || $mode eq "UNCHANGED" } {
 		$tree item configure $i -visible 0
 	    }
 	    update
