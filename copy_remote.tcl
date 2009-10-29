@@ -1,3 +1,6 @@
+#!/bin/sh
+# use -*-Tcl-*- \
+    exec tclsh "$0" "$@"
 
 package require createdistribution
 namespace import createdistribution::*
@@ -42,6 +45,7 @@ if { $tcl_platform(platform) eq "windows" } {
 set remote_dir "/home/ftp/pub/ramdebugger"
 set host ramsan@ftp.compassis.com
 
+puts "starting copy remote..."
 copy_remote $filesList $remote_dir $host
 
 puts "done"
