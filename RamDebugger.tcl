@@ -9081,7 +9081,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
 
     set menu [$mainframe getmenu activeprograms]
-    ActualizeActivePrograms $menu
+    $menu configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu 1]
+    #ActualizeActivePrograms $menu
 
     set menu [$mainframe getmenu macros]
     AddActiveMacrosToMenu $mainframe $menu

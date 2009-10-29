@@ -2430,19 +2430,21 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
 	    #nothing
 	} elseif { [lindex $SearchToolbar 0] && $options(SearchToolbar_autoclose) } {
 	    $mainframe showtoolbar 1 0
+	    update
 	    focus $text
 	    set SearchToolbar [list 0 $replace]
 	    return
 	} else {
 	    tkTabToWindow $f.e1
 	    $mainframe showtoolbar 1 1
+	    update
 	    set SearchToolbar [list 1 $replace]
 	    return
 	}
     } else {
 	$mainframe showtoolbar 1 1
+	update
     }
-
     if { !$replace && [info exists text_secondary] && [focus -lastfor $text] eq \
 	$text_secondary } {
 	set active_text $text_secondary
