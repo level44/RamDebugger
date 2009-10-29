@@ -18,7 +18,6 @@ package require createdistribution
 namespace import createdistribution::*
 
 if { $tcl_platform(platform) eq "windows" } {
-    unset -nocomplain env(TCL8_5_TM_PATH)
     foreach dir [list "C:/TclTk/tclkit" "e:/TclTk/tclkit"] {
 	if { [file isdirectory $dir] } {
 	    set createdistribution::tclkitdir $dir
@@ -62,6 +61,11 @@ if { $tcl_platform(os) eq "Darwin" } {
 
 IconifiedConsole
 
+regsubfiles [list \
+	{set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \
+	{set Version ([0-9.]+)} pkgIndex.tcl "set Version $version" \
+	]
+
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
@@ -73,12 +77,7 @@ lappend createdistribution::remove_packages trf bwidget \
     tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread \
     ncgi sha1
 
-regsubfiles [list \
-	{set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \
-	{set Version ([0-9.]+)} pkgIndex.tcl "set Version $version" \
-	]
-
-auto_mkindex scripts *.tcl
+#auto_mkindex scripts *.tcl
 
 set createdistribution::libdir ""
 
@@ -97,12 +96,12 @@ if { $tcl_platform(platform) eq "windows" } {
     set exe ramdebugger
 }
 set files [list $exe]
-set filesFT [list [list addons/commR/*.tcl addons/commR/. ascii] \
-	[list Examples/*.tcl Examples/. ascii]]
+set filesFT [list [list addons/commR addons/commR .tcl] \
+	[list Examples Examples .tcl]]
 
 if { $tcl_platform(platform) eq "windows" } {
     create_README $pNode README.txt
-    lappend filesFT [list README.txt . ascii] [list license.terms ./License.txt ascii]
+    lappend filesFT [list README.txt . .txt] [list license.terms ./License.txt .txt]
     CopyAndCreateZipDist $program_name$version-$dist.zip ramdebugger $files $filesFT
     file delete README.txt
 } elseif { $tcl_platform(os) ne "Darwin" } {
