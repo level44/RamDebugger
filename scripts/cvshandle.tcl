@@ -524,7 +524,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 proc RamDebugger::CVS::indicator_init { f } {
     variable cvs_indicator_frame
 
-    if { [auto_execok cvs] eq "" } { return }
+    if { [auto_execok cvs] eq "" && [auto_execok fossil] eq "" } { return }
 
     set cvs_indicator_frame $f
     ttk::label $f.l1 -text VCS:
@@ -561,7 +561,7 @@ proc RamDebugger::CVS::indicator_update {} {
     
     set currentfile $RamDebugger::currentfile
     
-    if { [auto_execok cvs] eq "" && [auto_execok fossil] eq "" } { return }
+    if { ![info exists cvs_indicator_frame] } { return }
     
     set f $cvs_indicator_frame
     if { [regexp {^\*.*\*$} $currentfile] } {
