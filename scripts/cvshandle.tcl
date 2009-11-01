@@ -934,8 +934,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set txt [$tree item text $item 0]
 		if { [regexp {^\s*(\w)\s+} $txt] } {
 		    set has_cvs 1
+		    set cvs_active 1
 		} elseif  { [regexp {^\s*\w{2,}\s*} $txt] } {
 		    set has_fossil 1
+		    set fossil_active 1
 		} elseif { [regexp {^\s*\?\s+} $txt] } {
 		    set can_be_added 1
 		}
@@ -1255,9 +1257,17 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    RamDebugger::OpenProgram tkcvs -dir [$w give_uservar_value dir]
 		}
 		fossil_ui {
+		    set dirs ""
+		    foreach item $sel_ids {
+		        lappend dirs [$tree item text [$tree item parent $item] 0]
+		    }
 		    set pwd [pwd]
-		    cd [$w give_uservar_value dir]
-		    exec fossil ui &
+		    foreach dir $dirs {
+		        cd $dir
+		        if { [catch { exec fossil info }] } { continue }
+		        exec fossil ui &
+		        break
+		    }
 		    cd $pwd
 		}
 	    }

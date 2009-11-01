@@ -140,7 +140,7 @@ if { $tcl_platform(platform) eq "unix" } {
     
     lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
 	htmlparse img img::gid img::png img::jpeg img::gif img::base jpegtcl pngtcl \
-	ncgi sha1 snit struct textutil tile vfs treectrl tcltklib tdom zlibtcl Tkhtml
+	ncgi sha1 snit struct textutil tile vfs treectrl tcltklib tdom zlibtcl Tkhtml tcl8
     
     set exts [list .dll .so .dylib]
     set ipos [lsearch $exts [info sharedlibextension]]
