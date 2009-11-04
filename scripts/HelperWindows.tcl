@@ -3488,6 +3488,23 @@ proc RamDebugger::DisplayPositionsStack { args } {
 
 proc RamDebugger::DisplayPositionsStackDo0 { w } {
     
+    switch --  [$w giveaction] {
+	-1 - 0 {
+	    destroy $w
+	}
+	1 {
+	    DisplayPositionsStackDo $w delete
+	}
+	2 {
+	    DisplayPositionsStackDo $w up
+	}
+	3 {
+	    DisplayPositionsStackDo $w down
+	}
+	4 {
+	    DisplayPositionsStackDo $w go
+	}
+    }    
 }
 
 proc RamDebugger::DisplayPositionsStackDo { args } {
@@ -3556,6 +3573,11 @@ proc RamDebugger::DisplayPositionsStackDo { args } {
 		            [expr {[lindex $idList 0]-1}] {*}$tomove]
 		}
 	    }
+	    set idListold $idList
+	    set idList ""
+	    foreach i $idListold {
+		lappend idList [expr {$i-1}]
+	    }
 	}
 	down {
 	    if { [llength $itemList] == 0 } {
@@ -3565,13 +3587,18 @@ proc RamDebugger::DisplayPositionsStackDo { args } {
 		foreach item $itemList {
 		    lappend idList [$list item text $item 0]
 		}
-		if { [lindex $idList end] < [llength  $options(saved_positions_stack)]  } {
+		if { [lindex $idList end] < [llength  $options(saved_positions_stack)] -1 } {
 		    set tomove [lrange $options(saved_positions_stack) [lindex $idList 0] [ lindex $idList end]]
 		    set options(saved_positions_stack) [lreplace $options(saved_positions_stack) [lindex $idList 0] \
 		            [lindex $idList end]]
 		    set options(saved_positions_stack) [linsert $options(saved_positions_stack) \
-		                                 [expr {[lindex $curr 0]+1}] {*}$tomove]
+		                                 [expr {[lindex $idList 0]+1}] {*}$tomove]
 		}
+	    }
+	    set idListold $idList
+	    set idList ""
+	    foreach i $idListold {
+		lappend idList [expr {$i+1}]
 	    }
 	}
 	go {
@@ -3606,10 +3633,12 @@ proc RamDebugger::DisplayPositionsStackDo { args } {
     set ipos 0
     foreach i $options(saved_positions_stack) {
 	lassign $i file line context
-	$list insert end [list $ipos [file tail $file] $line $context [file dirname $file]]
+	set item [$list insert end [list $ipos [file tail $file] $line $context [file dirname $file]]]
+	if { $ipos in $idList } {
+	    $list selection add $item
+	}
 	incr ipos
     }
-    catch { $list selection add [lindex $itemList 0] }
 }
 
 if { [info commands lreverse] eq "" } {

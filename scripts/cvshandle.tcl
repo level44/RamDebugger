@@ -1104,7 +1104,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		snit_messageBox -message $ret -parent $w
 	    }
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
-	    $w set_uservar_value messages [linsert0 [dict_getd $dict messages ""] $message]
+	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
 	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
 	}
@@ -1156,7 +1156,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    cd $pwd
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
-	    $w set_uservar_value messages [linsert0 [dict_getd $dict messages ""] $message]
+	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
 	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
 	}
