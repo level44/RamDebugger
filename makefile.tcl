@@ -84,6 +84,7 @@ set createdistribution::libdir ""
 set files [list addons scripts help]
 
 fossil_tag_add . release_$version
+update_lognoter_changes_page $pNode docs/RamDebugger.wnl Changes 
 
 # cannot contain file pkgIndex.tcl
 CreateDistribution $dist_type $program_name . RamDebugger.tcl \

@@ -682,8 +682,8 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
 	set directory ""
     }
     set script ""
-    foreach cmd [list update_recursive_do0 select_directory clear_entry update_recursive_do1 \
-	    update_recursive_accept update_recursive_cmd] {
+    foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
+	    update_recursive_do1 update_recursive_accept update_recursive_cmd] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
@@ -762,6 +762,12 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	    hw0xbmJkYUlFQz5QWCCHGyttSEdGREI7OlQ0IYgmT1NDgvDQoSOKkxHDNrDQ0oPgDytNUAwzFKLG
 	    FSBSssjoMNFQsSVVZqT40PEdhw4cEwUCADs=
 	}
+	image create photo RamDebugger::CVS::list-add-16 -data {
+	    R0lGODlhEAAQAPQAAAAAADRlpH2m13+o14Oq2Iat2ZCz2pK02pS225W325++4LTM5bXM5rbM5rbN
+	    5rfO5rvR57zR58DT6MzMzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEA
+	    ABMALAAAAAAQABAAAAU94CSOZGmeqBisQToGz9O6EyzTdTyb7Kr3pIAEEonFHIzGrrZIIA6GAmEg
+	    UCx7gUIBi4Jtcd5lVwdm4c7nEAA7
+	}
     }
     ttk::label $f.l1 -text [_ "Directory"]:
     cu::combobox $f.e1 -textvariable [$w give_uservar dir ""] -valuesvariable \
@@ -783,6 +789,10 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     
     tooltip::tooltip $f.b2 [_ "Clear the messages entry"]
     
+    ttk::menubutton $f.b3 -image RamDebugger::CVS::list-add-16 \
+	-menu $f.b3.m -style Toolbutton
+    menu $f.b3.m -tearoff 0 -postcommand [namespace code [list messages_menu $w $f.b3.m  $f.e2]] 
+    
     package require fulltktree
     set columns [list [list 100 [_ "line"] left item 0]]
     fulltktree $f.toctree -height 350 \
@@ -795,10 +805,11 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     grid $f.l0    -         -      -sticky w -padx 2 -pady 2
     grid $f.l1 $f.e1 $f.b1 -sticky w -padx 2 -pady 2
     grid $f.l2 $f.e2 $f.b2 -sticky w -padx 2 -pady 2
+    grid   ^         ^   $f.b3 -sticky w -padx 2 -pady 2
     grid $f.toctree - - -sticky nsew
     grid configure $f.e1 $f.e2 -sticky ew
     grid columnconfigure $f 1 -weight 1
-    grid rowconfigure $f 3 -weight 1
+    grid rowconfigure $f 4 -weight 1
     
     $w set_uservar_value dir $dir
     $w set_uservar_value message ""
@@ -812,6 +823,66 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     $w createwindow
 }
 
+proc RamDebugger::CVS::messages_menu { w menu entry } {
+    
+    $menu delete 0 end
+    $menu add command -label [_ "Clear message"] -image RamDebugger::CVS::edit-clear-16 \
+	-compound left -command [namespace code [list clear_entry $w $entry]] 
+
+    set tree [$w give_uservar_value tree]
+    set files ""
+    foreach item [$tree selection get] {
+	if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
+	    lappend files $file
+	} elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
+	    lappend files $file
+	}
+    }
+    if { [llength $files] } {
+	$menu add separator
+	foreach file $files {
+	    set txt "[file tail $file]: "
+	    $menu add command -label [_ "Insert '%s'" $txt] -command  \
+		[namespace code [list insert_in_entry $w $entry $txt]] 
+	}
+    }
+    set pwd [pwd]
+    cd [$w give_uservar_value dir]
+    set err [catch { exec fossil timeline -n 2000 -t t } data]
+    cd $pwd
+    if { $err } { set data "" }
+    lassign "" date full_line lineList
+    foreach line [split $data \n] {
+	if { [regexp {^===\s*(\S+)\s*===} $line {} date] } {
+	    # nothing
+	} elseif { [regexp {^\S+\s+(.*)} $line {} l] } {
+	    if { $full_line ne "" } {
+		lappend lineList [list $date $full_line]
+	    }
+	    set full_line $l
+	} else {
+	    append full_line " [string trim $line]"
+	}
+    }
+    if { $full_line ne "" } {
+	lappend lineList [list $date $full_line]
+    }
+    set has_sep 0
+    foreach i $lineList {
+	lassign $i date txt
+	if { [regexp {New ticket\s*(\[\w+\])\s+<i>(.*)</i>} $txt {} ticket message] } {
+	    if { !$has_sep } {
+		$menu add separator
+		set has_sep 1
+	    }
+	    set txt1 [string range "$ticket $message" 0 100]...
+	    set txt2 "$ticket $message"
+	    $menu add command -label [_ "Insert ticket '%s'" $txt1] -command  \
+		[namespace code [list insert_in_entry $w $entry $txt2]]
+	}
+    }    
+}
+
 proc RamDebugger::CVS::select_directory { w } {
     set dir [tk_chooseDirectory -initialdir [$w give_uservar_value dir] \
 	    -mustexist 1 -parent $w -title [_ "Select origin directory"]]
@@ -821,6 +892,11 @@ proc RamDebugger::CVS::select_directory { w } {
 
 proc RamDebugger::CVS::clear_entry { w entry } {
     $entry delete 1.0 end
+    focus $entry
+}
+
+proc RamDebugger::CVS::insert_in_entry { w entry txt } {
+    tk::TextInsert $entry $txt
     focus $entry
 }
 

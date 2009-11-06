@@ -36,7 +36,7 @@
 	 *  Added text files line end control. It is possible to select auto, Unix or Windows
 	 *  When saving, Open previously read files with r+ and truncate to avoid problems with links
 	 *  It is possible to debug c/c++ code attaching to a running process
-	 * When saving, file is not deleted and recreated, but open an truncated. In this way, symbolic links work ok
+	 *  When saving, file is not deleted and recreated, but open an truncated. In this way, symbolic links work ok
 	 *  New keyboard accelerator: Alt-Backspace
 	 *  Possibility to hide view variables pane
 	 *  Instrumentation and coloring of Makefile files
@@ -54,6 +54,107 @@
 	  * First version for MacOSX
 	  * There is a new option to be added to the debugged program that permits it to wait for the debugger to connect. Check example "example2b.tcl"
 	  * There is a new option to decide if saving with Tabs or with spaces at the beginning of the lines of the edited files
+    </NewsInVersion>
+    <NewsInVersion version="6.2">
+	  *  Prepared for new TCL syntax {*}
+	  *  Changes From version 5.6 to version 6.1
+	  *  Partly converted to tile
+	  *  Prepared for working with TabletPC
+	  *  Highly optimized XML parsing and colorize
+    </NewsInVersion>
+    <NewsInVersion version="5.6">
+	  *  Added trace command in the Breakpoints window (checking in every line if a variable changes)
+	  *  New debug option: Continue out of loop
+    </NewsInVersion>
+    <NewsInVersion version="5.5">
+	  *  Added new option Open in new Window
+	  *  Added a new Return option to the debugger for returning from a proc without finishing it
+	  *  Edit--Paste stack
+	  *  New macro for changing background color to regions of file
+	  *  Possibility of non-instrumenting some procs, defined by name
+    </NewsInVersion>
+    <NewsInVersion version="5.4">
+	  *  Colorize XML files
+	  *  New open without browser
+	  *  Permmits to open remote files by using ssh, ftp, plink.
+    </NewsInVersion>
+    <NewsInVersion version="5.3">
+	  *  Colors customization
+	  *  Fast instrumenter for TCL code, developed in C++
+	  *  Profile procedures
+	  *  Files list obtained with Ctrl-Tab has a new alternative list based on current directory
+    </NewsInVersion>
+    <NewsInVersion version="4.4">
+	  *  Implemented secondary view in the Editor
+	  *  Implemented auto save, based on file revisions
+	  *  New inline file chooser to fast change buffers
+	  *  The search controls are now integrated inside the main GUI
+	  *  RamDebugger can automatically manage revisions of files (based internally on CVS)
+	  *  Added program  for visualizing file differences
+	  *  New option in Help to associate RamDebugger as command in the .tcl extension in Windows
+	  *  When TCL raises and error, RamDebugger shows last visited line
+	  *  If files contain, in first lines something like  they are considered as in utf-8 encoding
+	  *  RamDebugger works only for TCL version 8.4
+	  *  Open file and save file browser follow the preferences extensions for file types
+	  *  Added new macro for going to function names
+	  *  Corrections for when several pop-up windows appear at the same time
+    </NewsInVersion>
+    <NewsInVersion version="3.2">
+	  *  Added Snit support
+	  *  Added contextual menu in marker zone (left margin of text)
+	  *  Added Enable/disable to breakpoints
+	  *  Added command stop in the Debug menu
+	  *  Added command to break execution in any moment
+	  *  Added zoom option to Display Windows hierarchy
+	  *  The cache directory (used internally by RamDebugger) is now created in the user directories instead of inside the installation directory
+	  *  Option Pick window in Windows hierarchy
+	  *  It is necessary to stop debugging before start debugging again
+    </NewsInVersion>
+    <NewsInVersion version="3.1">
+	  *  GiD customization files
+	  *  User can choose file extensions for every file type
+	  *  New macro for applying regsub to a region
+	  *  New option in Current file arguments: file type can be TCL or TK
+	  *  New option in Current file arguments: Another file can be started to begin local debugging
+	  *  RamDebugger::OpenFileSaveHandler
+    </NewsInVersion>
+    <NewsInVersion version="3.0">
+	  *  Count lines of code of a project (LOC)
+	  *  It is possible to create and use macros defined in TCL
+	  *  Values in User defined var and Local vars display content in balloon
+	  *  Autodisplay variables now displays also array variables
+	  *  Better interactive indentation and colors
+	  *  Menu close
+	  *  Drawing dynamically closing braces when editing
+	  *  better stack position
+	  *  search and replace
+	  *  comment lines are indented in normal column
+	  *  Added reinstrument to menu Debug
+	  *  If tkcon is open, output goes also to tkcon
+	  *  New menu options in Tkcon to send commands to debugged program
+    </NewsInVersion>
+    <NewsInVersion version="2.8">
+	  *  Option to instrument last line in proc (to avoid error when not using return)
+	  *  corrected error when brackets are not paired in comments
+	  *  Script of command bind is now instrumented
+    </NewsInVersion>
+    <NewsInVersion version="2.6">
+	  *  RamDebugger can now be used as a package
+	  *  When editing one file, breakpoints are modified in position accordingly
+	  *  Command console works correctly now in local mode
+	  *  It is possible to save possitions in the editor to return later
+	  *  Activated drag and drop (works for Windows and for platforms that have package tkdnd compiled).
+    </NewsInVersion>
+    <NewsInVersion version="2.0">
+	  *  Tested for Tcl/Tk 8.4
+	  *  When Tkhtml is not compiled for the given platform, gives message and continues
+	  *  Added contextual help for programming commands. If there are manual pages (UNIX), it also uses them if man2html is found in the system.
+	  *  When debugging local, possibility to choose debug TCL or TK
+	  *  Improved the build process and the debugging for C/C++
+	  *  Improved several windows, like the Breakpoints window and Goto line
+	  *  Added option to search in files
+	  *  Several speed problems in linux were related to the TCL bug with raise command. Implemented one workaround.
+	  *  Fixed many bugs related to parsing files and other.
     </NewsInVersion>
   </Program>
 </Infoproblemtype>
