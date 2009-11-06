@@ -1058,6 +1058,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    [list "update_recursive_cmd" $w open_program tkcvs $tree $sel_ids]
 	    }
 	    if { $fossil_active } {
+		$menu add command -label [_ "View diff window"]... -command \
+		    [list "update_recursive_cmd" $w diff_window $tree $sel_ids]
 		$menu add command -label [_ "Open fossil browser"] -command \
 		    [list "update_recursive_cmd" $w open_program fossil_ui $tree $sel_ids]
 		$menu add checkbutton -label [_ "Fossil autosync"] -variable \
@@ -1346,6 +1348,101 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    }
 		    cd $pwd
 		}
+	    }
+	}
+	diff_window {
+	    lassign $args tree sel_ids
+	    if { $sel_ids eq "" } {
+		set sel_ids [$tree selection get]
+	    }
+	    if { [llength $sel_ids] > 1 } {
+		snit_messageBox -message [_ "Differences window can only be used with one file"] -parent $w
+		return
+	    }
+	    foreach item $sel_ids {
+		if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { return }
+		set dir [$tree item text [$tree item parent $item] 0]
+		break
+	    }
+	    set pwd [pwd]
+	    cd $dir
+	    set err [catch { exec fossil finfo $file } data]
+	    if { $err } {
+		snit_messageBox -message [_ "Fossil version is too old. It needs subcommand 'finfo'. Please, upgrade"] \
+		    -parent $w
+		return
+	    }
+	    cd $pwd
+	    
+	   lassign "" lines line
+	    foreach l [split $data \n] {
+		if { [regexp {^\d} $l] } {
+		    if { $line ne "" } {
+		        lappend lines $line
+		    }
+		    set line $l
+		} elseif { [regexp {^\s} $l] } {
+		    append line " [string trim $l]"
+		}
+	    }
+	    if { $line ne "" } {
+		lappend lines $line
+	    }
+	    set wD $w.diffs
+	    dialogwin_snit $wD -title [_ "Choose checkin"] -entrytext \
+		[_ "Choose a checkin for file '%s'" $file] -okname [_ View] -cancelname [_ Close]
+	    set f [$wD giveframe]
+	    
+	set columns [list \
+		[list  12 [_ "Date"] left text 0] \
+		[list 12 [_ "Checkin"] left text 0] \
+		[list  45 [_ "Text"] center text 0] \
+		[list  9 [_ "User"] left text 0] \
+		[list  12 [_ "Artifact"] left text 0] \
+	    ]
+	    fulltktree $f.lf -width 750 \
+		-columns $columns -expand 0 \
+		-selectmode browse -showheader 1 -showlines 0  \
+		-indent 0 -sensitive_cols all \
+		-selecthandler2 "[list $wD invokeok];#"
+	    
+	foreach i $lines {
+	    regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*(\S+),\s*artifact:\s*\[(\w+)\]\s*\)} $i {} date checkin txt user artifact
+	    $f.lf insert end [list $date $checkin $txt $user $artifact]
+	    }
+	    $f.lf selection add 1
+	    $f.lf activate 1
+	    focus $f.lf
+	    
+	    grid $f.lf -stick nsew
+	    grid rowconfigure $f 1 -weight 1
+	    grid columnconfigure $f 0 -weight 1
+	    
+	    set action [$wD createwindow]
+	    while 1 {
+		if { $action <= 0 } {
+		    destroy $wD
+		    return
+		}
+		set selecteditems ""
+		foreach i [$f.lf selection get] {
+		    lappend selecteditems [$f.lf item text $i]
+		}
+		if { [llength $selecteditems] != 1  } {
+		    snit_messageBox -message [_ "Select only one version"] \
+		        -parent $w
+		} else {
+		    lassign [lindex $selecteditems 0] date - - - artifact                    
+		    cd $dir
+		    exec fossil artifact $artifact $file.$date
+		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file $file.$date } ret]
+		    if { $err } {
+		        snit_messageBox -message $ret -parent $w
+		    }
+		    file delete -force $file.$date
+		    cd $pwd
+		}
+		set action [$wD waitforwindow]
 	    }
 	}
 	default {
