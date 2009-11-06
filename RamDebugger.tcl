@@ -61,7 +61,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 7.1.2
+    set Version 7.2.1
 
     ################################################################################
     #    Non GUI commands
@@ -337,11 +337,11 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    }
 	}
 	default {
-	    set options_def(NormalFont) { -family "new century schoolbook" -size 12 \
+	    set options_def(NormalFont) { -family "FreeSans" -size 10 \
 		                              -weight normal -slant roman -underline 0 -overstrike 0 }
-	    set options_def(FixedFont)  { -family "Courier" -size 12 -weight normal \
+	    set options_def(FixedFont)  { -family "FreeSans" -size 10 -weight normal \
 		                              -slant roman -underline 0 -overstrike 0 }
-	    set options_def(HelpFont)  { -family "Helvetica" -size 15 -weight normal \
+	    set options_def(HelpFont)  { -family "Helvetica" -size 12 -weight normal \
 		                             -slant roman -underline 0 -overstrike 0 }
 	    set options_def(ViewOnlyTextOrAll) OnlyText
 	}
@@ -3115,6 +3115,7 @@ proc RamDebugger::CheckListFilesPane {} {
     if { $options(listfilespane) } {
 	if { [lsearch [$pw panes] $pane1] == -1 } {
 	    $pw add $pane1 -sticky nsew -before $pane2 -width 100 -minsize 100
+	    ViewOnlyTextOrAll -force_all
 	}
     } elseif { [lsearch [$pw panes] $pane1] != -1 } {
 	$pw forget $pane1
@@ -3132,6 +3133,7 @@ proc RamDebugger::CheckViewVariablesPane {} {
     if { $options(viewvariablespane) } {
 	if { [lsearch [$pw panes] $pane3] == -1 } {
 	    $pw add $pane3 -sticky nsew -after $pane2 -width 100 -minsize 100
+	    ViewOnlyTextOrAll -force_all
 	}
     } elseif { [lsearch [$pw panes] $pane3] != -1 } {
 	$pw forget $pane3
@@ -3679,7 +3681,7 @@ proc RamDebugger::ColorizeSlow { txt } {
     $txt conf -editable $ed
 }
 
-proc RamDebugger::SaveFile { what args } {
+proc RamDebugger::SaveFile { args } {
     variable text
     variable options
     variable currentfile
@@ -3692,7 +3694,7 @@ proc RamDebugger::SaveFile { what args } {
 	{ -force_browser boolean 0 }
 	{ -only_if_modified boolean 0 }
     }
-    set compulsory ""
+    set compulsory "what"
     parse_args $optional $compulsory $args
     
     if { $only_if_modified && !$currentfileIsModified } {
@@ -4169,6 +4171,13 @@ proc RamDebugger::ReinstrumentCurrentFile {} {
     }
 }
 
+proc RamDebugger::ChangeFileType {} {
+    variable currentfile
+    
+    set filetype [GiveFileType $currentfile]
+    AddFileTypeMenu $filetype
+    ReinstrumentCurrentFile
+}
 
 proc RamDebugger::CloseFile {} {
     variable currentfile
@@ -8311,22 +8320,27 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		    separator \
 		    [list radiobutton [_ "TCL"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value TCL \
-		        -command [list RamDebugger::ReinstrumentCurrentFile] \
+		        -command [list RamDebugger::ChangeFileType] \
 		        -selectcolor black] \
 		    [list radiobutton [_ "C/C++"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value C/C++ \
+		        -command [list RamDebugger::ChangeFileType] \
 		        -selectcolor black] \
 		    [list radiobutton [_ "XML"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value XML \
+		        -command [list RamDebugger::ChangeFileType] \
 		        -selectcolor black] \
 		    [list radiobutton [_ "Makefile"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value Makefile \
+		        -command [list RamDebugger::ChangeFileType] \
 		        -selectcolor black] \
 		    [list radiobutton [_ "GiD BAS file"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value "GiD BAS file" \
+		        -command [list RamDebugger::ChangeFileType] \
 		        -selectcolor black] \
 		    [list radiobutton [_ "GiD data files"] filetype "" "" \
 		        -variable RamDebugger::options(filetype) -value "GiD data files" \
+		        -command [list RamDebugger::ChangeFileType] \
 		        -selectcolor black] \
 		    separator \
 		    [list checkbutton [_ "Only for this file"] filetype "" "" \
@@ -8480,7 +8494,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set data [list \
 		filenew16 [_ "Begin new file"] "RamDebugger::NewFile" \
 		fileopen16 [_ "Open source file"] "RamDebugger::OpenFile -force_browser 1" \
-		filesave16 [_ "Save file"] "RamDebugger::SaveFile save -force_browser 1" \
+		filesave16 [_ "Save file"] "RamDebugger::SaveFile -force_browser 1 save" \
 		- - - \
 		undo-16 [_ "Undo previous insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
 		editcut-16 [_ "Cut selected text to clipboard"] "RamDebugger::CutCopyPasteText cut" \
@@ -8498,7 +8512,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set data [list \
 		filenew22 [_ "Begin new file"] "RamDebugger::NewFile" \
 		fileopen22 [_ "Open source file"] "RamDebugger::OpenFile -force_browser 1" \
-		filesave22 [_ "Save file"] "RamDebugger::SaveFile save -force_browser 1" \
+		filesave22 [_ "Save file"] "RamDebugger::SaveFile -force_browser 1 save" \
 		- - - \
 		actundo22 [_ "Undo previous insert/delete operation"] "RamDebugger::CutCopyPasteText undo" \
 		editcut22 [_ "Cut selected text to clipboard"] "RamDebugger::CutCopyPasteText cut" \
