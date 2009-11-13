@@ -967,6 +967,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
     }
     if { [auto_execok fossil] ne "" && [catch { exec fossil info } info] == 0 } {
 	regexp -line {^local-root:\s*(.*)} $info {} dirLocal
+	set dirLocal [string trimright $dirLocal /]
 	
 	cd $dirLocal
 	if { $item eq "" || [$tree item text $item 0] ne $dirLocal } {
@@ -1463,6 +1464,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		fossil_ui {
 		    set dirs ""
 		    foreach item $sel_ids {
+		        if { [$tree item text [$tree item parent $item] 0] eq [_ "Timeline"] } { continue }
 		        lappend dirs [$tree item text [$tree item parent $item] 0]
 		    }
 		    lappend dirs [$w give_uservar_value dir]
@@ -1516,8 +1518,9 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    set wD $w.diffs
 	    destroy $wD
-	    dialogwin_snit $wD -title [_ "Choose checkin"] -entrytext \
-		[_ "Choose one or two versions for file '%s'" $file] -okname [_ View] -cancelname [_ Close]
+	    dialogwin_snit $wD -title [_ "Choose version"] -entrytext \
+		[_ "Choose one or two versions for file '%s'" $file] -okname [_ View] -cancelname [_ Close] \
+		-grab 0 -callback [list "update_recursive_cmd" $w diff_window_accept $dir $file]
 	    set f [$wD giveframe]
 	    
 	    set columns [list \
@@ -1529,9 +1532,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    ]
 	    fulltktree $f.lf -width 750 \
 		-columns $columns -expand 0 \
-		-selectmode browse -showheader 1 -showlines 0  \
+		-selectmode multiple -showheader 1 -showlines 0  \
 		-indent 0 -sensitive_cols all \
 		-selecthandler2 "[list $wD invokeok];#"
+	    $wD set_uservar_value tree $f.lf
 	    
 	    set num 0
 	    foreach i $lines {
@@ -1548,44 +1552,48 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    grid $f.lf -stick nsew
 	    grid rowconfigure $f 1 -weight 1
 	    grid columnconfigure $f 0 -weight 1
-	    
+
 	    set action [$wD createwindow]
-	    while 1 {
-		if { $action <= 0 } {
-		    destroy $wD
-		    return
-		}
-		set selecteditems ""
-		foreach i [$f.lf selection get] {
-		    lappend selecteditems [$f.lf item text $i]
-		}
-		if { [llength $selecteditems] == 0 } {
-		    snit_messageBox -message [_ "Select one version to view the differences with current file"] \
-		        -parent $wD
-		} elseif { [llength $selecteditems] > 2  } {
-		    snit_messageBox -message [_ "Select only one or two versions"] \
-		        -parent $wD
+	}
+	diff_window_accept {
+	    lassign $args dir file wD
+	    set action [$wD giveaction] 
+	    set tree [$wD give_uservar_value tree]
+	    
+	    if { $action <= 0 } {
+		destroy $wD
+		return
+	    }
+	    set selecteditems ""
+	    foreach i [$tree selection get] {
+		lappend selecteditems [$tree item text $i]
+	    }
+	    if { [llength $selecteditems] == 0 } {
+		snit_messageBox -message [_ "Select one version to view the differences with current file"] \
+		    -parent $wD
+	    } elseif { [llength $selecteditems] > 2  } {
+		snit_messageBox -message [_ "Select only one or two versions"] \
+		    -parent $wD
+	    } else {
+		lassign [lindex $selecteditems 0] date1 - - - artifact1
+		set pwd [pwd]
+		cd $dir
+		exec fossil artifact $artifact1 $file.$date1
+		if { [llength $selecteditems] == 1 } {
+		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file $file.$date1 } ret]
 		} else {
-		    lassign [lindex $selecteditems 0] date1 - - - artifact1
-		    cd $dir
-		    exec fossil artifact $artifact1 $file.$date1
-		    if { [llength $selecteditems] == 1 } {
-		        set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file $file.$date1 } ret]
-		    } else {
-		        lassign [lindex $selecteditems 1] date2 - - - artifact2
-		        exec fossil artifact $artifact2 $file.$date2
-		        set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file.$date1 $file.$date2 } ret]
-		    }
-		    if { $err } {
-		        snit_messageBox -message $ret -parent $wD
-		    }
-		    file delete -force $file.$date1
-		    if { [llength $selecteditems] == 2 } {
-		        file delete -force $file.$date2
-		    }
-		    cd $pwd
+		    lassign [lindex $selecteditems 1] date2 - - - artifact2
+		    exec fossil artifact $artifact2 $file.$date2
+		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file.$date1 $file.$date2 } ret]
 		}
-		set action [$wD waitforwindow]
+		if { $err } {
+		    snit_messageBox -message $ret -parent $wD
+		}
+		file delete -force $file.$date1
+		if { [llength $selecteditems] == 2 } {
+		    file delete -force $file.$date2
+		}
+		cd $pwd
 	    }
 	}
 	default {
