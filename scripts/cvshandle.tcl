@@ -1034,6 +1034,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    if { $line_full ne "" } {
 		$tree insert end [list $line_full] $itemT
 	    }
+	    $tree item collapse $itemT
 	}
 	foreach line [split $list_files \n] {
 	    # this is to avoid problems with update
@@ -1041,7 +1042,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 		cd $olddir    
 		return
 	    }
-	    if { [regexp {^Total network trafic:} $line] } {  continue }
+	    if { [regexp {^Total network traffic:} $line] } {  continue }
 	    if { $item eq "" } {
 		set item [$tree insert end [list $dir] $itemP]
 	    }
