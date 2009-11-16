@@ -2,12 +2,6 @@
 # use -*-Tcl-*- \
     exec tclsh "$0" "$@"
 
-if { [lindex $argv 0] eq "clean" } {
-    puts "deleting generated files"
-    file delete -force {*}[glob -dir [file dirname [info script]] *.deb *.tar.gz *.zip *.app *.dmg modulesinfo-*]
-    exit
-}
-
 if { $tcl_platform(platform) eq "unix" } {
     # necessary when using directly "tclkit"
     lappend auto_path {*}$env(TCLLIBPATH)
@@ -57,6 +51,17 @@ if { $tcl_platform(os) eq "Darwin" } {
 } else {
     set dist_type starpack
     set dist windows
+}
+
+if { [lindex $argv 0] eq "clean" } {
+    set files [glob -nocomplain -dir [file dirname [info script]] *.deb *.tar.gz *.zip \
+	    *.app *.dmg *.exe modulesinfo-* \
+	    [string tolower $program_name]\[0-9\]* *~]
+    puts "deleting generated files '$files'"
+    if { [llength $files] } {
+	file delete -force {*}$files
+    }
+    exit
 }
 
 IconifiedConsole
@@ -117,7 +122,7 @@ if { $tcl_platform(platform) eq "windows" } {
 
     create_README $pNode $dir/README
     file copy license.terms $dir/License.txt
-    clean_cvs_dirs $dir
+    clean_vcs_dirs $dir
     CreateTarGzDist $tarfile $dir
     set deb [create_debian_package $pNode $dir ".RamDebugger .ramdebugger_prefs" \
 	    $topdir/addons/ramdebugger.png]
