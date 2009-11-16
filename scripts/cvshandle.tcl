@@ -1520,7 +1520,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    destroy $wD
 	    dialogwin_snit $wD -title [_ "Choose version"] -entrytext \
 		[_ "Choose one or two versions for file '%s'" $file] -okname [_ View] -cancelname [_ Close] \
-		-grab 0 -callback [list "update_recursive_cmd" $w diff_window_accept $dir $file]
+		-grab 1 -transient 1 -callback [list "update_recursive_cmd" $w diff_window_accept $dir $file]
 	    set f [$wD giveframe]
 	    
 	    set columns [list \
@@ -1532,7 +1532,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    ]
 	    fulltktree $f.lf -width 750 \
 		-columns $columns -expand 0 \
-		-selectmode multiple -showheader 1 -showlines 0  \
+		-selectmode extended -showheader 1 -showlines 0  \
 		-indent 0 -sensitive_cols all \
 		-selecthandler2 "[list $wD invokeok];#"
 	    $wD set_uservar_value tree $f.lf
