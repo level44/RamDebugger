@@ -851,10 +851,16 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
     }
     if { [llength $files] } {
 	$menu add separator
+	set insertedList ""
 	foreach file $files {
-	    set txt "$file: "
-	    $menu add command -label [_ "Insert '%s'" $txt] -command  \
-		[namespace code [list insert_in_entry $w $entry $txt]] 
+	    for { set i 0 } { $i < [llength [file split $file]] } { incr i } {
+		set f [file join {*}[lrange [file split $file] 0 $i]]
+		if { $f in $insertedList } { continue }
+		set txt "$f: "
+		$menu add command -label [_ "Insert '%s'" $txt] -command  \
+		    [namespace code [list insert_in_entry $w $entry $txt]] 
+		lappend insertedList $f
+	    }
 	}
     }
     set pwd [pwd]
