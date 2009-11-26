@@ -1259,6 +1259,10 @@ proc RamDebugger::rnext { args } {
 	EvalRemote ::RDC::Continue
     } else {
 	set remoteserver [lreplace $remoteserver 2 2 next]
+	lassign $remoteserver fid
+	if { $::tcl_platform(platform) eq "unix" } {
+	    exec kill -s INT [lindex [pid $fid] 0]
+	}
 	#EvalRemote \003
 	EvalRemote next
     }
@@ -6390,8 +6394,12 @@ proc RamDebugger::CutCopyPasteText { what args } {
 		        $text configure -autoseparators 0
 		        $text edit separator
 		    }
-		    catch { $text delete sel.first sel.last }
-
+		    # only delete selection if it is in the same line than insertion
+		    catch {
+		        if { [$text compare "insert linestart" == "sel.first linestart"] } {
+		            $text delete sel.first sel.last
+		        }
+		    }
 		    $text insert insert $sel
 		    if { $oldSeparator } {
 		        $text edit separator
