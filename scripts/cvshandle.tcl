@@ -1112,6 +1112,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		$menu add command -label [_ "Commit"] -accelerator Ctrl-i -command \
 		    [list "update_recursive_cmd" $w commit $tree $sel_ids]
 	    }
+	    if { !$is_timeline && $has_fossil } {
+		$menu add command -label [_ "Revert"]... -command \
+		    [list "update_recursive_cmd" $w revert $tree $sel_ids]
+	    }
 	    $menu add command -label [_ "Refresh view"] -command \
 		[list "update_recursive_cmd" $w update view $tree $sel_ids]
 	    $menu add command -label [_ "Update to last"] -command \
@@ -1357,6 +1361,38 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    dict set dict messages [$w give_uservar_value messages]
 	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
 	}
+	revert {
+	    lassign $args tree sel_ids
+	    set files ""
+	    foreach item $sel_ids {
+		if { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
+		    lappend files $file
+		}
+	    }
+	    if { [string length $files] < 100 } {
+		set filesT $files
+	    } else {
+		set filesT "[lindex $files 0] ... [lindex $files end]"
+	    }
+	    set txt [_ "Are you sure to revert %d files to repository contents and loose local changes? (%s)" [llength $files] $filesT]
+	    set ret [snit_messageBox -icon question -title [_ "Revert files"] -type okcancel \
+		    -default ok -parent $w -message $txt]
+	    if { $ret eq "cancel" } { return }
+
+	    set pwd [pwd]
+	    foreach item $sel_ids {
+		if { ![regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
+		set dir [$tree item text [$tree item parent $item] 0]
+		cd $dir
+		set info [exec fossil info]
+		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
+		cd $dir
+		set err [catch { exec fossil revert --yes $file 2>@1 } ret]
+		if { $err } { break }
+		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
+	    }
+	    cd $pwd
+	}
 	update {
 	    lassign $args what_in tree sel_ids
 	    set ids ""
@@ -1544,6 +1580,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		-selecthandler2 "[list $wD invokeok];#"
 	    $wD set_uservar_value tree $f.lf
 	    
+	    ttk::checkbutton $f.cb1 -text [_ "Ignore white space"] -variable [$wD give_uservar ignore_blanks 0]
+	    
 	    set num 0
 	    foreach i $lines {
 		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*(\S+),\s*artifact:\s*\[(\w+)\]\s*\)} $i {} date checkin txt user artifact
@@ -1556,7 +1594,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    focus $f.lf
 	    
-	    grid $f.lf -stick nsew
+	    grid $f.lf -stick nsew -padx 2 -pady 2
+	    grid $f.cb1 -sticky w -padx 2 -pady 2
 	    grid rowconfigure $f 1 -weight 1
 	    grid columnconfigure $f 0 -weight 1
 
@@ -1566,7 +1605,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign $args dir file wD
 	    set action [$wD giveaction] 
 	    set tree [$wD give_uservar_value tree]
-	    
+	    if { [$wD give_uservar_value ignore_blanks] } {
+		set ignore_blanks -b
+	    } else {
+		set ignore_blanks ""
+	    }
 	    if { $action <= 0 } {
 		destroy $wD
 		return
@@ -1587,11 +1630,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		cd $dir
 		exec fossil artifact $artifact1 $file.$date1
 		if { [llength $selecteditems] == 1 } {
-		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file $file.$date1 } ret]
+		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file $file.$date1 } ret]
 		} else {
 		    lassign [lindex $selecteditems 1] date2 - - - artifact2
 		    exec fossil artifact $artifact2 $file.$date2
-		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file.$date1 $file.$date2 } ret]
+		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file.$date1 $file.$date2 } ret]
 		}
 		if { $err } {
 		    snit_messageBox -message $ret -parent $wD
