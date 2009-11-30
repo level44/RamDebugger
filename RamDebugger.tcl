@@ -556,9 +556,13 @@ proc RamDebugger::rdebug { args } {
 	    catch { interp delete local }
 	} elseif { $remoteserverType == "gdb" } {
 	    catch {
+		lassign $remoteserver fid
 		#puts -nonewline [lindex $remoteserver 0] {\x03}
-		puts [lindex $remoteserver 0] quit
-		close [lindex $remoteserver 0]
+		if { $::tcl_platform(platform) eq "unix" } {
+		    exec kill -s INT [lindex [pid $fid] 0]
+		}
+		puts $fid quit
+		close $fid
 	    }
 	}
 	set remoteserver ""
@@ -1248,7 +1252,7 @@ proc RamDebugger::rnext { args } {
     rlist -quiet
     StopAtGUI "" ""
 
-    if { $remoteserverType != "gdb" } {
+    if { $remoteserverType ne "gdb" } {
 	if { $opts(-return) } {
 	    EvalRemote [list set ::RDC::stopnext 4]
 	} elseif { $opts(-full) } {
@@ -2665,14 +2669,19 @@ proc RamDebugger::UpdateRemoteBreaks {} {
 	set remoteserver [lreplace $remoteserver 2 2 setbreakpoints]
 	EvalRemote "delete"
 	foreach i $breakpoints {
-	    if { ![lindex $i 1] } { continue }
-	    set line [lindex $i 3]
-	    set filenum [lsearchfile $fileslist [lindex $i 2]]
+	    lassign $i num enable_disable file line cond
+	    if { !$enable_disable } { continue }
+	    set filenum [lsearchfile $fileslist $file]
 	    if { $filenum == -1 } { continue }
 	    set file [file tail [lindex $fileslist $filenum]]
 	    set filetype [GiveFileType $currentfile]
-	    if { $filetype == "C/C++" } {
-		EvalRemote "break $file:$line"
+	    if { $cond ne "" } {
+		set cndList " if $cond"
+	    } else {
+		set cndList ""
+	    }
+	    if { $filetype eq "C/C++" } {
+		EvalRemote "break $file:$line$cndList"
 	    }
 	    # CONDITION is forgotten by now
 	    # TRACES are forgotten by now
