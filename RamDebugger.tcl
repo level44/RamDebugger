@@ -253,7 +253,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    } else {
 		set list [split $::env(PATH) ":"]
 	    }
-	    if { [set ipos [lsearch -exact $list $shortname]] != 0 } {
+	    if { [set ipos [lsearch -exact $list $exe]] != 0 } {
 		if { $ipos != -1 } {
 		    set list [lreplace $list $ipos $ipos]
 		}
@@ -452,7 +452,7 @@ proc RamDebugger::UpdateExecDirs {} {
     }
     set haschanged 0
     foreach i $options(executable_dirs) {
-	if { $::tcl_platform(platform) == "windows" } {
+	if { $::tcl_platform(platform) eq "windows" } {
 	    set err [catch { set shortname [file native [file attributes $i -shortname]] }]
 	    if { !$err } { set i $shortname }
 	}
