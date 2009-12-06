@@ -1891,3 +1891,23 @@ extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
   return TCL_OK;
 }
 
+extern "C" DLLEXPORT int Ramdebuggerinstrumenter_SafeInit(Tcl_Interp *interp)
+{
+  return Ramdebuggerinstrumenter_Init(interp);
+}
+
+extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Unload(Tcl_Interp *interp,int flags)
+{
+  return TCL_ERROR;
+}
+
+extern "C" DLLEXPORT int Ramdebuggerinstrumenter_SafeUnload(Tcl_Interp *interp,int flags)
+{
+  return TCL_ERROR;
+}
+
+
+
+
+
+

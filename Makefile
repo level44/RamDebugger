@@ -25,8 +25,8 @@ CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRECTORIES))
 LDFLAGS=
 
 ifeq ($(LINUX),no)
-  CPPFLAGS += -fast
-  LDFLAGS += -dynamiclib
+  CPPFLAGS += -fast -arch i386
+  LDFLAGS += -dynamiclib -arch i386
   LIB_DIRECTORIES = $(LIBSDIR)/lib
   LIBS =
   LIBEXT = dylib
