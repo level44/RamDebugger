@@ -56,6 +56,7 @@ OBJS = $(addprefix $(OBJDIR)/,$(SRCS:.cc=.o))
 all: compile $(EXE_INSTALL)
 compile: $(OBJDIR) $(EXE)
 
+-include $(addprefix $(OBJDIR)/,$(SRCS:.cc=.o.depend))
 
 ifeq ($(OBJDIR),debug)
 CPPFLAGS += -g -D_DEBUG -DDEBUG
@@ -73,7 +74,8 @@ $(OBJDIR):
 	mkdir $(OBJDIR)
 
 $(OBJDIR)/%.o: %.cc
-	$(COMPILE.cc) $(OUTPUT_OPTION) $<
+	$(CC) -MM $(CPPFLAGS) -MQ $@ $< > $@.depend
+	$(CC) -c $(CPPFLAGS) $< -o $@
 
 $(EXE_INSTALL): $(EXE)
 ifneq ($(OBJDIR),debug)
