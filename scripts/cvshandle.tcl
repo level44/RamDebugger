@@ -780,6 +780,106 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	    ABMALAAAAAAQABAAAAU94CSOZGmeqBisQToGz9O6EyzTdTyb7Kr3pIAEEonFHIzGrrZIIA6GAmEg
 	    UCx7gUIBi4Jtcd5lVwdm4c7nEAA7
 	}
+	image create photo RamDebugger::CVS::::semaphore_green -data {
+	    R0lGODlhNgAjAOf/AAEEAAUBBwAFCAkCAAMDEAAGEAQHAxEBARkCAAENBwgL
+	    ByACASQDAAYSBCsGARUQDDEEAwUbBhEZAxMVExYUFzcJABkXGggjDj8KAjMR
+	    AgUqBhscGgwnCysbAB4gHTcYBCUeHk0PBgwxDj4aCSMiKAwyGBsqGyQmI1YT
+	    CAo6Ewg+Dl4WB1gfBywvLGwWBRRDDAlKER8+IQlRERhNDjo7ExlNHj06OzBI
+	    FYYeDX0jEBJZFWgxDj4/PZ4bCw9iGRhfGxxcIi5XE3E4ChVmFaYjAEtGRWNF
+	    ExhpIBNtG0hKSDhVOqApDxByHw90GbQlCwZ8IDZgNMInBCZxJFVSU1NUUht6
+	    IBZ+GrEyE5FEC39NFFZXVSZ6KA6IIxyDHwaPIeMpABqLHkB3KNcuFV1fXBKS
+	    JTKCKCGKLd8wCtY2BP8gC1FtU1RsWQ+bI1x0JNc4Gh6WH090Uf8rAP4qCfcv
+	    BDaJOfIyDqVXG/oyADKRJWhqZ0iASu07APU3ABGlJPE1ICKhISmbMlCCVVl/
+	    V29xbkaOSmV6YjyVQmKGLB2qKBWxJoB6OE+OUzmdP3h1dneCNXR4dFOOWkyW
+	    URO7KVKbMjykRbxsGzqoQUmeU31+fEqmURXILCTBLVijXoWHhGKiZb6AI4KO
+	    gUy0V4qMiR7TNHSmQBfWQJKMiyPXLW2mbbKON2S0QeB9F3ihemOwZ+t/DZOV
+	    kmuwcV65aVu9YGK8Y1DHYxznRh7pO5mcmoGxhfmNEw3+P3W/eSLyUaOhpXzH
+	    RSf0QH6+fHDKcJ+5UGbRbaWnpPiYFSL7UOuiICv9SZbFUzL8P43WSZ3Ana61
+	    qnrZgLK0sYzPktm1Tcm8Y/qsOIXaiIrXkZbQmsLHYrq8ufS8JqrcRabaW7TD
+	    tqrbUX7niZHbmbfYR7vUU8XSTK3Mr8LVRm34ecfWPtDQTtXRRtvNT+jKQPLH
+	    OfHFSNDSXt7PSdzLZOfLSeLNUefLVr7QvKTiq6LspbDkss7QzarssNXR0tja
+	    18vrzd/i3enr6O3r7////yH+FUNyZWF0ZWQgd2l0aCBUaGUgR0lNUAAh+QQB
+	    CgD/ACwAAAAANgAjAAAI/gD/CRxIsKDBgwgTKlxocB4ohvkwQczDUCE+VkrU
+	    LLxVhMdCYkU8VERoLRAuQXAS5stzq5FHhPoadTK1YeRAfNCgeQKCyhqkQAX5
+	    YcMmigQmbC6DDr1FohE2UyJH1ov0w4ePqrC+LdIzcF8hEw0CCJhgCunLf/4a
+	    UaAwIAAFTM+g2qSDpG7dI62qRVo0EI6GCA0MAChQNqnAQQYUDEhMAK7citS2
+	    MKnSpEqVJ7KoXbok0F6NFBwAA9hQ+KW/EwEApBYQ4GinmgupBQvVxQoYMFy4
+	    dKEkyxCdXbt2ptBwQUICBVMaJSHRq5cpBanFqqbSSIuF5vwSZrLC5Q0ZPIC+
+	    /pMh0+VJFSQ+dMBQUeLChQYCCCxWQED+gLZiA+g3oH+AgGYJWdIFGYAA8scf
+	    ffzBxhu4PcHEED4AAUMKIrwHXWqqBdCWAAYkAABrAGQIgAEAHuSNJXgciAgi
+	    m2ySCCIKkgGGFUwcocMML9xwAw0dIBBAAfeJRUAACixQAQYLtNXWh6KYWKCK
+	    m5TCCy+11KIJIm+80UUVR/wAxCHCXCNNKllkoN8BACSQAAIrOCGGG0S4AIGP
+	    AgjQQiMGhYLHG3+wWIsxgCLDyymjJMKgFVVIQUo45KQTjzzHVDKChnU+kIMY
+	    csQRhx9R5FCBWAKMYYM//+BTDTXOWEKgn4Eigwyg/qds8oeWZUyyDTjmoOOO
+	    OtnkYscC+iGQgxuZ3rHHHXI4kUOSBViQxDP/ANNKLLJ890cimvBijDLIcNtt
+	    LadgaUYXvnQDDjnopAMPO8WswoJ/DkRRxx3G7jFHHGcsgYF+AbTQJDCXZBJK
+	    d32OYky3yiTs6qCSsMEFHsuYK0476cgjzzSuYGGAARWgMce99N4RxxxOrLAh
+	    BY9EOwQS3B0YpasIu2rML6ck8h3E2oAjzjkVX5yxfwygwYemmWoaRxQoHKCf
+	    ACnD4gMST4BhIIuAJpzwwbbU/AYeXER8Ls/ysLvKDm0x4IYfcszBxx5Df3FF
+	    CEqnJhE0hBjCiNR9bvIn/syu/mKLJn18V4Uq5ua6azbFVJJBWwj0gLYca/Mh
+	    RxQ4ONAWf70UREmWiCQyiravHgxuImx4sWUZyTCaLjzHjK30AAdgcEUdctzB
+	    Bx/5ooAAawIMkE9Bw3Bh4LVSGqNtLaNsEjgXViAxRBipt/NONJ8IoTSa/IVw
+	    xR51fHEGESgAyyEANhxECyB8rhhlKaW4OKtuNf4AQxBtOKKIER8EMCSa8R3A
+	    wAo5wMEKHHCAywkgCb87iCW6A4gErQgRfVgQGZ7wBPTIQAYU4oAEHvAjDQ1A
+	    NUNKzQEKKAAALCkAJToII7oAhjewAX1sWBDXzPMgH8gABjFojwQEUIDe6Y8A
+	    /nHT0IfqlADWLCaFBslEGczAtds40QxmqAITtiAFIMyAPRcAjAAosIEHPIAE
+	    JACBYO7jH7dsgAIBAMEJsLEQZ1DQCtwpgxVk4YxMcOYf0PgMcRqQgLeYRSD5
+	    2IBgerfFRsQFNgwpxxaQ0IQm1IUJsaAGJwjRGSi0pwHwIcwfBVKE3qnGAI3B
+	    BiaiUpFdHGEIpzwCXrTCF4EwIwZa5GFpBoIN1ICoMXEhZUW+4Ym9eAkW1lgE
+	    UAbikDFo4QQWmOVAIjKGMbTgLbm0SUHooQdIlEQQCPHHGPLwDMMYJC1jiKY0
+	    C8IKlKQkIb0w5lkO8ozk6HKcApmHEtawkHx0ZCH6FJjCO+H5j31woyJsZAi0
+	    +ElQggYEADs=   
+	}
+	image create photo RamDebugger::CVS::::semaphore_red -data {
+	    R0lGODlhNgAjAOf/AAQBBwEEAAgBAAAFCA4BCQwFAwALBAYJBQENABQDBBYF
+	    AB8FAxwHAgwOCx4GCwMWAQAZAyUHAREOEiQLACoHCCsJAAEfCjEKAwMiAjgK
+	    AgAlDhgXHBgZFwQoAz8MADYSBkwMAAstF0gSBAIzGDYcBjYaEyAjICUhIFUP
+	    AD4ZEAk2CgA9BF0QBF8RAFEZAFgVCmYQA0kfE1AeCQY/JVEeEglEDGYYBUEo
+	    IU4jHEYqEnQVB24ZA3YXAQVKL30VBX8XAFIqFjI1NF8lFIcWBGkkFIMcA3Ui
+	    DDg6NwZaFIsbAJMYBHQlEwBhDnAqEmExGhNUN4khCJYcAJ4aA4EnE4YmDz9B
+	    QJIiCJshAqMfAI8nFKodAmI6LwFyG10/N4IxH64hALUeAEdJRnU5K209MXI8
+	    K384J5gxEgh6FcEgALokABltS1JRUJc4H8YmAbgvBINHGtAlAB51SaM5IrE5
+	    B1haV9snBgCQKoVKPHxSKpBHNBOFQ3hRR688I6dAJt8rAGZaWItTI15gXekq
+	    BM85AO0sAJ9KOXNdViSFXHhcVmNlYv0pAPYtAwChQPkxALhLMmtraNRICaRc
+	    JbFWJ7JVPaVbSJ1fUI5mXAmxQJhlWMFYQLNeSrtdReZTBrFjU9hcFKltPJ90
+	    PXl8evNVCD2gdALFUattXqVwYxu5VZh2bdRmKMJoVaJ1aPZhA75uWpN+ezmw
+	    e81sVSO/boaJhvxlDNluVIyOi/xsHNN4XdJ4Y/pzFtt3X6aNh/97C9SJQNCM
+	    R5ialzvNh8OTTtSEcsWKfP6AHN2CbPyCKtGKeUHOmPaFNuiJSB/ne6Cin+eI
+	    bfuLKv6MIs2ThfSGaqOlov2MNbuclseaj+qWT0Pcpf2UMNyeXNejUPeVRQD/
+	    sDXsiv6VOe+TfBf9mBH+qfydPSH7oPafS/2hLjvtq+ubiP6hN+KsT/GmTTX2
+	    rSf9rzL6p8GwrvyoOuiikre4tvGuX/uwP/iwS/WwVL/BvsTGw9W/u+a5r9DT
+	    0OLSzdnb1+Hk4Onr6P///yH+FUNyZWF0ZWQgd2l0aCBUaGUgR0lNUAAh+QQB
+	    CgD/ACwAAAAANgAjAAAI/gD/CRxIsKDBgwgTKlxo0F4thvhQMcxniaFCf7KC
+	    0Fm4q0uXhcPuxLCI8N6fX4E2IsSHaJelLQnhVSpVigbJgfzixQu1wVW8RCoH
+	    9rPnztUNVNUwjSkI75iwVkQoHStF5Ga/QA0KHJAgQdbPoP0ecUjAYEGKVUnF
+	    DPxGyYiRHTZ2aBLWqSrJKhICANDb9R7QgYEKBEgwocJZaJXKDJxkhIdjHj42
+	    4VK1hOS9BgEOCBgwgIDXRyr1cShQgEGFCjRMHaOk+N83Kj9iJ/kBZZOuTVMY
+	    xmP26ACAAgL2SqATqkoQZtJCDSiQIEKFDyLuUMrjRRWsTEWSJImiPQofR32o
+	    /sBqdS7hGsEGAhAAICBAAM57CwA4wNwBhQseRLxoYUOHj+xWRHHFgFdEEYUV
+	    SRRRBA+4mAfAXg/uJQBwA0TI3mAR4CcCCiywsAMPP2x3BRZYfFEiiQVq98Mt
+	    COlTxYQENGBACDOEgEAAAmxWIQDNXeBCE004BgOIBo6IBRhptNEGGF+YKEUS
+	    Q2xykD4m+FaABBaogYw5wOhRgwX0RejABYD4Yo0yqcwx2w8CXuFGGnD4sQgh
+	    fviBxhdPJmHGJAYpp9cBFoxiDjvhtNMNI0xg8GcBH3xSzzvieDNNLpAUOOIX
+	    adTRiCKbNkJnGiZa4Ygc0fzjjz332BPEbwAgcMig/ty00844y9hRAwIAGKAA
+	    HvK8g0452DxDDCuQYHHFF2D4QYginHZKCBxgYKGEFWw0yEwosoTSwG8FYHDN
+	    OuO0s8467YBzCRcYDBBACcHQ80453mBjjDGsiOLGsWgQ0mmzjTRiJxZSWGGG
+	    lL8kksgfviVQQA/mxNoOOxCDQwoXKlSYQzrziCPONtNMk0wuogxSIhqL7Nsv
+	    p4S08cUVVkDB5y8D6ChAAgE8Yc7DD0M8DilnVCzBxe5G2nEytoRsYhsln7wp
+	    yipLoUQRLwMQ83vyjXANobKyU+4pXHSwHAnaBO2NN/MW7UaJbejLbL9sp/wF
+	    dz/wGU8YVYSxLc0PvELu/sPrhNONHUxAMICuoDxaDjrYYDMsJCZ+gYYfbEdO
+	    SB1oSAslLAWtwd4AB/SADDvchBMu1yocMLgCQGTjLuLG5MKJGwIemfYizSoy
+	    Jxwrw/1NQdKoO6EBT2zJzjqxcLECAvLhuIATvqhDzjbJeKLmEFGQCCfki2Tv
+	    h8pvWzEEGwfJYsKEAsyoxiFxqKBBegIQoBcBFLjwRiSSmLEgD0UUqYXjcfoB
+	    Rxpg0MKBkiCHYiBkDROSmnsMYICYkcZCBZjAfUCAgha0wEM+GEISriAFEn3B
+	    DU1CEdxYdMC9HEA9BAAOANbzoAoJ4AAJsM8HPOCCF7CAB/6BgoGqRyKASWGA
+	    /gsi4UEecQIOnPBCetnABiQwABOc4AT0sc8FMqAfIrxlCllA0HZ2qIQomAEK
+	    RaDCFAyokHio6zd88UpKBBKP0SRgARW4QGpW4wWBNIMKCtIOghxBi0xQ4SYn
+	    EMx7ANCXv5gqCINRgHNSg5jW/IMNIPqBD/C3iVtoIjckYQYHHvSersRjjWw0
+	    AWkYEIGzJMWRwpjCh1Y5l05U5ib6CEUgAqFEV/glKP/Qhyz+8IcblAAplVjK
+	    QM7RiUIUwgs26ARd7HKTgehjDY/4SSAQsg9D7IEalhCmQb5RiTxMRQjNNEgt
+	    HrEGXBpkF4hABEwSEhJM2CScBYlHFcxpEHx4ZCH5E9gDDuBpkFNZxB0WoQY/
+	    B0rQgAAAOw==
+	}
     }
     ttk::label $f.l1 -text [_ "Directory"]:
     cu::combobox $f.e1 -textvariable [$w give_uservar dir ""] -valuesvariable \
@@ -795,10 +895,9 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	[$w give_uservar messages] -width 60
     bind $f.e2 <Return> "[bind Text <Return>] ; break"
     
-    canvas $f.canvas -background [$w giveframe_background] -bd 0 -width 120 -height 22
-    $f.canvas create oval 1 1 20 20 -fill green -outline yellow -width 2  -tags circle
-    $f.canvas create text 22 1 -anchor nw -tags text
-    $w set_uservar_value canvas $f.canvas
+    label $f.sem -image RamDebugger::CVS::::semaphore_green -compound left -height 35 \
+	-text " "
+    $w set_uservar_value semaphore_label $f.sem
     
     ttk::button $f.b2 -image RamDebugger::CVS::edit-clear-16 \
 	-command [namespace code [list clear_entry $w $f.e2]] \
@@ -822,8 +921,10 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     grid $f.l0    -         -      -sticky w -padx 2 -pady 2
     grid $f.l1 $f.e1 $f.b1 -sticky w -padx 2 -pady 2
     grid $f.l2 $f.e2 $f.b2 -sticky w -padx 2 -pady 2
-    grid $f.canvas         ^   $f.b3 -sticky w -padx 2 -pady 2
+    grid $f.sem         ^   $f.b3 -sticky w -padx 2 -pady 2
     grid $f.toctree - - -sticky nsew
+    grid configure $f.l2 -pady "2 0"
+    grid configure $f.sem -pady 0
     grid configure $f.e1 $f.e2 -sticky ew
     grid columnconfigure $f 1 -weight 1
     grid rowconfigure $f 4 -weight 1
@@ -855,17 +956,20 @@ proc RamDebugger::CVS::waitstate { w on_off { txt "" } } {
 	}
     }
     if { [llength $waitstate_stack] } {
-	set color red
+	set img RamDebugger::CVS::::semaphore_red
     } else {
-	set color green
+	set img RamDebugger::CVS::::semaphore_green
     }
     set txt [lindex $waitstate_stack end]
-    set canvas [$w give_uservar_value canvas]
-    if { [$canvas itemcget circle -fill] ne $color } {
-	$canvas itemconfigure circle -fill $color
+    if { $txt eq "" } { set txt " " }
+    
+    if { ![winfo exists $w] } { return }
+    set l [$w give_uservar_value semaphore_label]
+    if { [$l cget -image] ne $img } {
+	$l configure -image $img
     }
-    if { [$canvas itemcget text -text] ne $txt } {
-	$canvas itemconfigure text -text $txt
+    if { [$l cget -text] ne $txt } {
+       $l configure -text $txt
     }
     update
 }
