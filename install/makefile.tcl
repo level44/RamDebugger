@@ -172,7 +172,7 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 file delete $exe
 
-if { $tcl_platform(platform) eq "windows" } {
+if { $tcl_platform(platform) eq "unix" } {
     create_README -tcl_source_dist RamDebugger.tcl $pNode README
     set files [list addons scripts Examples help pkgIndex.tcl]
     #lappend files [file normalize README]
