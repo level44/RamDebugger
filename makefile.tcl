@@ -2,14 +2,22 @@
 # use -*-Tcl-*- \
     exec tclsh "$0" "$@"
 
+package require createdistribution
+namespace import createdistribution::*
+
+set optional {
+    { -clean "" 0 }
+    { -install "" 0 }
+    { -fossil "" 0 }
+    { -copy_remote "" 0 }
+}
+parse_args $optional "" $argv
+
 if { $tcl_platform(platform) eq "unix" } {
     # necessary when using directly "tclkit"
     lappend auto_path {*}$env(TCLLIBPATH)
 }
 set topdir [file normalize [file dirname [info script]]]
-
-package require createdistribution
-namespace import createdistribution::*
 
 if { $tcl_platform(platform) eq "windows" } {
     foreach dir [list "C:/TclTk/tclkit" "e:/TclTk/tclkit"] {
@@ -53,8 +61,10 @@ if { $tcl_platform(os) eq "Darwin" } {
     set dist windows
 }
 
-if { [lindex $argv 0] eq "clean" } {
-    set files [glob -nocomplain -dir [file dirname [info script]] *.deb *.tar.gz *.zip \
+IconifiedConsole
+
+if { $clean } {
+    set files [glob -nocomplain -dir [file dirname [info script]] *.deb *.rpm *.tar.gz *.zip \
 	    *.app *.dmg *.exe modulesinfo-* \
 	    [string tolower $program_name]\[0-9\]* *~]
     puts "deleting generated files '$files'"
@@ -63,13 +73,28 @@ if { [lindex $argv 0] eq "clean" } {
     }
     exit
 }
+if { $copy_remote } {
+    set filesList ""
+    if { $tcl_platform(platform) eq "windows" } {
+	lappend filesList [list $program_name$version-$dist.zip $program_name-$dist.zip]
+	#lappend filesList [list setup-$program_name$version-$dist.exe setup-$program_name-$dist.exe]
+    } elseif { $tcl_platform(os) ne "Darwin" } {
+	set exe [string tolower $program_name]
+	lappend filesList [list ${exe}_$version-1_i386.deb ${exe}_i386.deb]
+	lappend filesList [list ${exe}$version-linux_i386.tar.gz ${exe}-linux_i386.tar.gz]
+	lappend filesList [list ${program_name}-source$version.zip ${program_name}-source.zip]
+	## RPM ???
+    } else {
+	lappend filesList [list  $program_name$version-macosx.dmg $program_name-macosx.dmg]
+    }
+    set remote_dir "/home/ftp/pub/ramdebugger"
+    set host ramsan@www.compassis.com
 
-IconifiedConsole
-
-regsubfiles [list \
-	{set Version ([0-9.]+)} RamDebugger.tcl "set Version $version" \
-	{set Version ([0-9.]+)} pkgIndex.tcl "set Version $version" \
-	]
+    puts "starting copy remote..."
+    copy_remote $filesList $remote_dir $host
+    puts "done"
+    exit
+}
 
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
@@ -88,7 +113,10 @@ set createdistribution::libdir ""
 
 set files [list addons scripts help]
 
-fossil_tag_add . release_$version
+if { $fossil } {
+    fossil_tag_add . release_$version
+}
+
 update_lognoter_changes_page $pNode docs/RamDebugger.wnl Changes 
 
 # cannot contain file pkgIndex.tcl
@@ -163,8 +191,29 @@ if { $tcl_platform(platform) eq "unix" } {
     file delete README
 }
 
+if { $install } {
+    if { $tcl_platform(platform) ne "windows" } {
+	if 0 {
+	    puts "installing in /usr/local ..."
+	    set ret [exec sudo tar xvfz $tarfile --directory /usr/local]
+	}
+	puts "installing package $deb ..."
+	set ret [exec sudo dpkg -i $deb]
+	puts $ret
+    }
+}
+
 if { $tcl_platform(platform) eq "windows" } {
     DeiconifyConsole
 } else {
     exit
 }
+
+
+
+
+
+
+
+
+
