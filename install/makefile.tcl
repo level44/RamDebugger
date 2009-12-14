@@ -17,7 +17,7 @@ if { $tcl_platform(platform) eq "unix" } {
     # necessary when using directly "tclkit"
     lappend auto_path {*}$env(TCLLIBPATH)
 }
-set topdir [file normalize [file dirname [info script]]]
+set topdir [file normalize [file dirname [info script]]/..]
 
 if { $tcl_platform(platform) eq "windows" } {
     foreach dir [list "C:/TclTk/tclkit" "e:/TclTk/tclkit"] {
@@ -117,10 +117,10 @@ if { $fossil } {
     fossil_tag_add . release_$version
 }
 
-update_lognoter_changes_page $pNode docs/RamDebugger.wnl Changes 
+update_lognoter_changes_page $pNode ../docs/RamDebugger.wnl Changes 
 
 # cannot contain file pkgIndex.tcl
-CreateDistribution $dist_type $program_name . RamDebugger.tcl \
+CreateDistribution $dist_type $program_name $topdir RamDebugger.tcl \
     $files addons/ramdebugger.ico $version
 
 if { $tcl_platform(platform) eq "windows" } {
@@ -130,8 +130,8 @@ if { $tcl_platform(platform) eq "windows" } {
     set exe ramdebugger
 }
 set files [list $exe]
-set filesFT [list [list addons/commR addons/commR .tcl] \
-	[list Examples Examples .tcl]]
+set filesFT [list [list $topdir/addons/commR addons/commR .tcl] \
+	[list $topdir/Examples Examples .tcl]]
 
 if { $tcl_platform(platform) eq "windows" } {
     create_README $pNode README.txt
@@ -169,7 +169,9 @@ file delete $exe
 
 if { $tcl_platform(platform) eq "unix" } {
     create_README -tcl_source_dist RamDebugger.tcl $pNode README
-    set files [list license.terms README addons scripts Examples help pkgIndex.tcl]
+    set files [list addons scripts Examples help pkgIndex.tcl]
+    lappend files [file normalize README]
+    lappend files [file normalize license.terms]
     set createdistribution::libdir addons
     
     lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
@@ -180,13 +182,13 @@ if { $tcl_platform(platform) eq "unix" } {
     set ipos [lsearch $exts [info sharedlibextension]]
     set exts [lreplace $exts $ipos $ipos]
     foreach ext $exts {
-	file copy -force libs/RamDebuggerInstrumenter6_x32$ext scripts
+	file copy -force $topdir/libs/RamDebuggerInstrumenter6_x32$ext $topdir/scripts
     }
-    CreateDistribution zip $program_name-source  . RamDebugger.tcl \
-	$files addons/ramdebugger.ico $version
+    CreateDistribution zip $program_name-source  $topdir RamDebugger.tcl \
+	$files $topdir/addons/ramdebugger.ico $version
     
     foreach ext $exts {
-	file delete scripts/RamDebuggerInstrumenter6_x32$ext
+	file delete $topdir/scripts/RamDebuggerInstrumenter6_x32$ext
     }
     file delete README
 }

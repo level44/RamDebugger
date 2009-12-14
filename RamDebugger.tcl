@@ -193,7 +193,6 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     lappend ::auto_path [file join $MainDir scripts]
     lappend ::auto_path [file join $MainDir addons]
 
-
     if { $iswince } {
 	set AppDataDir $MainDir
     } elseif { $::tcl_platform(platform) eq "windows" } {
@@ -215,7 +214,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	set AppDataDir [file join $::env(HOME) .RamDebugger]
     }
     set exe [file join $AppDataDir exe]
-    if { [auto_execok cvs] eq "" } {
+    if { [auto_execok cvs] eq "" || [auto_execok diff] eq "" } {
 	if { $::tcl_platform(platform) eq "windows" && !$iswince } {
 	    set exeList [list cat.exe cvs.exe diff.exe grep.exe kill.exe tlist.exe]
 	} elseif { $::tcl_platform(os) eq "Darwin" } {
@@ -225,9 +224,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	}
 	if { ![file exists $exe] && $exeList ne "" } {
 	    file mkdir $exe
-	    foreach i $exeList {
-		file copy [file join $MainDir addons exe $i] $exe
-	    }
+	}
+	foreach i $exeList {
+	    file copy [file join $MainDir addons exe $i] $exe
 	}
     }
     if { [file exists $exe] } {
