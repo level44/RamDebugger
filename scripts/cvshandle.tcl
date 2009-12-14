@@ -691,7 +691,8 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     }
     set script ""
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
-	    update_recursive_do1 update_recursive_accept update_recursive_cmd] {
+	    update_recursive_do1 update_recursive_accept update_recursive_cmd \
+	    waitstate] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
@@ -794,6 +795,11 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	[$w give_uservar messages] -width 60
     bind $f.e2 <Return> "[bind Text <Return>] ; break"
     
+    canvas $f.canvas -background [$w giveframe_background] -bd 0 -width 120 -height 22
+    $f.canvas create oval 1 1 20 20 -fill green -outline yellow -width 2  -tags circle
+    $f.canvas create text 22 1 -anchor nw -tags text
+    $w set_uservar_value canvas $f.canvas
+    
     ttk::button $f.b2 -image RamDebugger::CVS::edit-clear-16 \
 	-command [namespace code [list clear_entry $w $f.e2]] \
 	-style Toolbutton
@@ -816,7 +822,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     grid $f.l0    -         -      -sticky w -padx 2 -pady 2
     grid $f.l1 $f.e1 $f.b1 -sticky w -padx 2 -pady 2
     grid $f.l2 $f.e2 $f.b2 -sticky w -padx 2 -pady 2
-    grid   ^         ^   $f.b3 -sticky w -padx 2 -pady 2
+    grid $f.canvas         ^   $f.b3 -sticky w -padx 2 -pady 2
     grid $f.toctree - - -sticky nsew
     grid configure $f.e1 $f.e2 -sticky ew
     grid columnconfigure $f 1 -weight 1
@@ -832,6 +838,36 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     tk::TabToWindow $f.e1
     bind $w <Return> [list $w invokeok]
     $w createwindow
+}
+
+proc RamDebugger::CVS::waitstate { w on_off { txt "" } } {
+    variable waitstate_stack
+
+    if { ![info exists waitstate_stack] } {
+	set waitstate_stack ""
+    }
+    switch $on_off {
+	on {
+	    lappend waitstate_stack $txt
+	}
+	off {
+	    set waitstate_stack [lrange $waitstate_stack 0 end-1]
+	}
+    }
+    if { [llength $waitstate_stack] } {
+	set color red
+    } else {
+	set color green
+    }
+    set txt [lindex $waitstate_stack end]
+    set canvas [$w give_uservar_value canvas]
+    if { [$canvas itemcget circle -fill] ne $color } {
+	$canvas itemconfigure circle -fill $color
+    }
+    if { [$canvas itemcget text -text] ne $txt } {
+	$canvas itemconfigure text -text $txt
+    }
+    update
 }
 
 proc RamDebugger::CVS::messages_menu { w menu entry } {
@@ -941,6 +977,7 @@ proc RamDebugger::CVS::update_recursive_do1 { w } {
 
 proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item "" } } {
     
+    waitstate $w on $what 
     if { $item ne "" } {
 	foreach i [$tree item children $item] { $tree item delete $i }
     }
@@ -957,6 +994,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	foreach line [split $ret \n] {
 	    if { ![winfo exists $tree] } {
 		cd $olddir
+		waitstate $w off
 		return
 	    }
 	    if { $line eq "cvs server: WARNING: global `-l' option ignored." } { continue }
@@ -1046,6 +1084,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    # this is to avoid problems with update
 	    if { ![winfo exists $tree] } {
 		cd $olddir    
+		waitstate $w off
 		return
 	    }
 	    if { [regexp {^Total network traffic:} $line] } {  continue }
@@ -1077,6 +1116,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    $tree item configure $item -visible 0
 	}
     }
+    waitstate $w off
 }
 
 proc RamDebugger::CVS::update_recursive_cmd { w what args } {
@@ -1224,10 +1264,12 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign $args sync_type
 	    set pwd [pwd]
 	    cd [$w give_uservar_value dir]
+	    waitstate $w on sync
 	    set err [catch { exec fossil $sync_type } ret]
 	    if { $ret ne "" } {
 		snit_messageBox -message $ret -parent $w
 	    }
+	    waitstate $w off
 	    cd $pwd
 	    
 	    set dir [$w give_uservar_value dir]
@@ -1279,6 +1321,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    dict set items fossil $dir $file $item
 		}
 	    }
+	    waitstate $w on commit
 	    dict for "dir fs" $cvs_files_dict {
 		cd $dir
 		set err [catch { exec cvs commit -m $message {*}$fs 2>@1 } ret]
@@ -1304,6 +1347,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    if { $err } {
 		snit_messageBox -message $ret -parent $w
 	    }
+	    waitstate $w off
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
 	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
@@ -1339,6 +1383,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    -default ok -parent $w -message $txt]
 	    if { $ret eq "cancel" } { return }
 
+	    waitstate $w on Add
 	    set pwd [pwd]
 	    foreach item $sel_ids {
 		if { ![regexp {^\?\s(\S+)} [$tree item text $item 0] {} file] } { continue }
@@ -1356,6 +1401,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
 	    }
 	    cd $pwd
+	    waitstate $w off
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
 	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
@@ -1379,6 +1425,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    -default ok -parent $w -message $txt]
 	    if { $ret eq "cancel" } { return }
 
+	    waitstate $w on Revert
 	    set pwd [pwd]
 	    foreach item $sel_ids {
 		if { ![regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
@@ -1392,6 +1439,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
 	    }
 	    cd $pwd
+	    waitstate $w off
 	}
 	update {
 	    lassign $args what_in tree sel_ids
@@ -1652,9 +1700,13 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
     } 
 }
 
-
-
-
+if { $argv0 eq [info script] } {
+    wm withdraw .
+    package require compass_utils
+    set RamDebugger::currentfile ""
+    set RamDebugger::MainDir [file dirname [info script]]
+    RamDebugger::CVS::update_recursive "" last
+}
 
 
 
