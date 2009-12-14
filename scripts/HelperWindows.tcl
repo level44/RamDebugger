@@ -2038,7 +2038,6 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
 proc RamDebugger::Compile { name } {
     variable text
     variable mainframe
-    variable MainDir
 
     $mainframe setmenustate debugentry disabled
 
@@ -2149,7 +2148,6 @@ proc RamDebugger::FindFilesWithPattern { dir patternlist recurse } {
 
 proc RamDebugger::SearchInFilesDo { w } {
     variable options
-    variable MainDir
     variable searchstring
     
     if { [$w giveaction] < 1 || $searchstring eq "" } {
@@ -3155,7 +3153,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 ################################################################################
 
 proc RamDebugger::OpenProgram { args } {
-    variable MainDir
+    variable topdir
     variable currentfile
     variable openprogram_uniqueid
     
@@ -3166,14 +3164,14 @@ proc RamDebugger::OpenProgram { args } {
     set argv [parse_args -raise_compulsory_error 0  $optional $compulsory $args]
 
     switch $what {
-	visualregexp { set file [file join $MainDir addons visualregexp visual_regexp.tcl] }
+	visualregexp { set file [file join $topdir addons visualregexp visual_regexp.tcl] }
 	tkcvs {
-	    set file [file join $MainDir addons tkcvs bin tkcvs.tcl]
+	    set file [file join $topdir addons tkcvs bin tkcvs.tcl]
 	    if {  [llength $args] == 0 && [file isdirectory [file dirname $currentfile]] } {
 		lappend argv -dir [file dirname $currentfile]
 	    }
 	}
-	tkdiff { set file [file join $MainDir addons tkcvs bin tkdiff.tcl] }
+	tkdiff { set file [file join $topdir addons tkcvs bin tkdiff.tcl] }
     }
     if { $new_interp } {
 	set what $what[incr openprogram_uniqueid]
@@ -3225,10 +3223,10 @@ proc RamDebugger::revalforTkcon { comm } {
 }
 
 proc RamDebugger::OpenConsole {} {
-    variable MainDir
+    variable topdir
     variable textOUT
 
-    set tkcon [file join $MainDir addons tkcon tkcon.tcl]
+    set tkcon [file join $topdir addons tkcon tkcon.tcl]
 
     if { $tkcon == "" } {
 	WarnWin "Could not find tkcon"
@@ -3924,11 +3922,11 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
 
 proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
     variable options
-    variable MainDir
+    variable topdir
     variable text
 
     if { ![info exists options(MacrosDocument)] } {
-	set file [file join $MainDir scripts Macros_default.tcl]
+	set file [file join $topdir scripts Macros_default.tcl]
 	set fin [open $file r]
 	set header [read $fin 256]
 	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
@@ -3951,10 +3949,10 @@ proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
 
 proc RamDebugger::GiveMacrosDocument {} {
     variable options
-    variable MainDir
+    variable topdir
 
     if { ![info exists options(MacrosDocument)] } {
-	set file [file join $MainDir scripts Macros_default.tcl]
+	set file [file join $topdir scripts Macros_default.tcl]
 	set fin [open $file r]
 	set header [read $fin 256]
 	if { [regexp -- {-\*-\s*coding:\s*utf-8\s*;\s*-\*-} $header] } {
@@ -3994,9 +3992,9 @@ proc RamDebugger::UpdateProgramNameInLOC { f } {
 }
 
 proc RamDebugger::AddDirToLOC {} {
-    variable MainDir
+    variable topdir_external
 
-    set dir [tk_chooseDirectory -initialdir $MainDir -parent $DialogWin::user(listbox) \
+    set dir [tk_chooseDirectory -initialdir $topdir_external -parent $DialogWin::user(listbox) \
 	    -title [_ "Select directory"] -mustexist 1]
     if { $dir == "" } { return }
     $DialogWin::user(listbox) insert end $dir

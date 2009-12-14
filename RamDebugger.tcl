@@ -105,7 +105,6 @@ namespace eval RamDebugger {
     variable gdblog ""
     variable CheckExternalFileModification 1
 
-    variable MainDir
     variable CacheDir
     variable AppDataDir
     variable info_script
@@ -147,7 +146,17 @@ namespace eval RamDebugger {
     variable readwriteprefs
     variable options
     variable options_def
-
+    
+    variable topdir [file dirname [info script]]
+    if { [info exists starkit::topdir] } {
+	if { [file exists [file dirname $starkit::topdir]/../share/ramdebugger] } {
+	    variable topdir_external [file normalize  [file dirname $starkit::topdir]/../share/ramdebugger]
+	} else {
+	    variable topdir_external [file normalize [file dirname $starkit::topdir]]
+	}
+    } else {
+	variable topdir_external $topdir
+    }
 }
 
 ################################################################################
@@ -157,7 +166,8 @@ namespace eval RamDebugger {
 proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     variable debuggerserver
     variable debuggerserverNum
-    variable MainDir
+    variable topdir
+    variable topdir_external
     variable CacheDir
     variable AppDataDir
     variable options_def
@@ -167,20 +177,8 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     variable info_script
     variable usecommR
 
-    set info_script [info script]
-    if { [info exists ::freewrap::scriptFile] } {
-	set dir $::argv0
-    } else {
-	set dir [info script]
-    }
-    if {[file type $dir] eq "link"} {
-	set dir [file readlink $dir]
-    }
-    set dir [file join [pwd] [file dirname $dir]]
-    set MainDir $dir
-
-    if { ![file isdir [file join $MainDir addons]] } {
-	set text [_ "Error: bad installation. Directory 'addons' could not be found in '%s'" $MainDir]
+    if { ![file isdirectory [file join $topdir_external addons]] } {
+	set text [_ "Error: bad installation. Directory 'addons' could not be found in '%s'" $topdir_external]
 	puts $text
 	catch { tk_messageBox -message $text }
     }
@@ -189,12 +187,12 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	set iswince 1
     } else { set iswince 0 }
    
-    lappend ::auto_path [file dirname $MainDir]
-    lappend ::auto_path [file join $MainDir scripts]
-    lappend ::auto_path [file join $MainDir addons]
+    lappend ::auto_path [file dirname $topdir]
+    lappend ::auto_path [file join $topdir scripts]
+    lappend ::auto_path [file join $topdir_external addons]
 
     if { $iswince } {
-	set AppDataDir $MainDir
+	set AppDataDir $topdir_external
     } elseif { $::tcl_platform(platform) eq "windows" } {
 	set usecommR 1
 	if { [info exists ::env(APPDATA)] } {
@@ -226,7 +224,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    file mkdir $exe
 	}
 	foreach i $exeList {
-	    file copy [file join $MainDir addons exe $i] $exe
+	    file copy [file join $topdir addons exe $i] $exe
 	}
     }
     if { [file exists $exe] } {
@@ -265,7 +263,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     }
     set dirs ""
     lappend dirs [file join $AppDataDir cache]
-    lappend dirs [file join $MainDir cache]
+    lappend dirs [file join $topdir_external cache]
 
     foreach i $dirs {
 	catch { file mkdir $i }
@@ -424,10 +422,11 @@ proc RamDebugger::SetFont { cual como } {
 
 proc RamDebugger::UpdateExecDirs {} {
     variable options
-    variable MainDir
+    variable topdir
+    variable topdir_external
 
     if { $::tcl_platform(platform) == "windows" } {
-	set file [filenormalize [file join $MainDir addons]]
+	set file [filenormalize [file join $topdir_external addons]]
 	if { [file isdirectory $file] && [lsearch -exact $options(executable_dirs) $file] == -1 } {
 	    lappend options(executable_dirs) $file
 	}
@@ -511,7 +510,6 @@ proc RamDebugger::rdebug { args } {
     variable instrumentedfilesSent
     variable debuggerstate
     variable gdblog
-    variable MainDir
     variable options
     variable initialcommands
     variable usecommR
@@ -716,7 +714,7 @@ proc RamDebugger::rdebug { args } {
 	set gdblog ""
 	set remoteserverType gdb
 	#          if { $::tcl_platform(platform) == "windows" } {
-	#              set cat [file join $MainDir addons cat.exe]
+	#              set cat [file join $topdir addons cat.exe]
 	#          } else { set cat cat }
 	set dir [lindex $opts(program) 1]
 	set pwd [pwd]
@@ -4561,12 +4559,12 @@ proc RamDebugger::ViewInstrumentedFile { what } {
 }
 
 proc RamDebugger::ViewHelpFile { { file "" } } {
-    variable MainDir
+    variable topdir
     variable AppDataDir
     
 #     if { [ tk windowingsystem] eq "aqua" } {
 #         tk_messageBox -message [_ "Normal help is not active on MacOSX. You'll be redirected to a web browser"]
-#         exec open [file join $MainDir help 01RamDebugger RamDebugger_toc.html] &
+#         exec open [file join $topdir help 01RamDebugger RamDebugger_toc.html] &
 #         return
 #     }
     package require helpviewer
@@ -4574,9 +4572,9 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
     HelpViewer::EnterDirForIndex $AppDataDir
 
     if { $file == "" } {
-	set w [HelpViewer::HelpWindow [file join $MainDir help]]
+	set w [HelpViewer::HelpWindow [file join $topdir help]]
     } else {
-	set w [HelpViewer::HelpWindow [file join $MainDir help $file]]
+	set w [HelpViewer::HelpWindow [file join $topdir help $file]]
     }
     return $w
 }
@@ -6126,7 +6124,7 @@ proc RamDebugger::ListBoxLabelMenu { w x y } {
     variable currentfile
     variable options
     variable WindowFilesList
-    variable MainDir
+    variable topdir
 
     set dirs [list $options(defaultdir)]
     set sep 0
@@ -6165,12 +6163,12 @@ proc RamDebugger::ListBoxLabelMenu { w x y } {
 	}
     }
     set sep 0
-    if { $MainDir != $options(defaultdir) && [lsearchfile $dirs $MainDir] == -1 } {
+    if { $topdir_external ne $options(defaultdir) && [lsearchfile $dirs $topdir] == -1 } {
 	if { !$sep } {
 	    lappend dirs ---
 	    set sep 1
 	}
-	lappend dirs $MainDir
+	lappend dirs $topdir_external
     }
 
     set menu $w.menu
@@ -7908,13 +7906,13 @@ proc RamDebugger::RegisterExtension {} {
 }
 
 proc RamDebugger::ExtractExamplesDir {} {
-    variable MainDir
+    variable topdir_external
     variable text 
 
-    set dir [tk_chooseDirectory -initialdir $MainDir -parent $text \
+    set dir [tk_chooseDirectory -initialdir $topdir_external -parent $text \
 		 -title [_ "Select directory where to extract the Examples directory"]]
     if { $dir eq "" } { return }
-    file copy -force [file join $MainDir Examples] $dir
+    file copy -force [file join $topdir_external Examples] $dir
     SetMessage [_ "Copied examples directory into directory '%s'" $dir]
 }
 
@@ -8011,7 +8009,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable textOUT
     variable textCOMP
     variable breakpoints
-    variable MainDir
+    variable topdir
+    variable topdir_external
     variable TimeMeasureData
     variable debuggerstate
     variable descmenu
@@ -9182,13 +9181,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     # if we do it at the beginning, an ugly update is made
     if { $::tcl_platform(platform) != "windows" } {
-	set img [image create photo -file [file join $MainDir addons ramdebugger.png]]
+	set img [image create photo -file [file join $topdir addons ramdebugger.png]]
 	wm iconphoto $w $img
-	#wm iconbitmap $w @$MainDir/addons/ramdebugger.xbm
+	#wm iconbitmap $w @$topdir/addons/ramdebugger.xbm
     } elseif { !$iswince } {
-	wm iconbitmap $w $MainDir/addons/ramdebugger.ico
+	wm iconbitmap $w $topdir/addons/ramdebugger.ico
 	if { ![info exists ::is_package] || !$::is_package } {
-	    catch { wm iconbitmap $w -default $MainDir/addons/ramdebugger.ico }
+	    catch { wm iconbitmap $w -default $topdir/addons/ramdebugger.ico }
 	}
     }
     if { !$iswince } {

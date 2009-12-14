@@ -329,7 +329,7 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	    $interp eval [list set argc 2]
 	    $interp eval [list set argv [list [file join $cvsworkdir $file1] \
 		        [file join $cvsworkdir $file2]]]
-	    $interp eval [list source [file join $RamDebugger::MainDir addons tkcvs bin tkdiff.tcl]]
+	    $interp eval [list source [file join $RamDebugger::topdir addons tkcvs bin tkdiff.tcl]]
 	    cd $pwd
 	}
 	set action [$w waitforwindow]
@@ -697,7 +697,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
     append script "[list namespace eval RamDebugger ""]\n"
-    append script "[list set RamDebugger::MainDir $RamDebugger::MainDir]\n"
+    append script "[list set RamDebugger::topdir $RamDebugger::topdir]\n"
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory $current_or_last]\n"
     
@@ -1808,7 +1808,7 @@ if { $argv0 eq [info script] } {
     wm withdraw .
     package require compass_utils
     set RamDebugger::currentfile ""
-    set RamDebugger::MainDir [file dirname [info script]]
+    set RamDebugger::topdir [file dirname [info script]]
     RamDebugger::CVS::update_recursive "" last
 }
 

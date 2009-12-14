@@ -130,7 +130,7 @@ if { $tcl_platform(platform) eq "windows" } {
     set exe ramdebugger
 }
 set files [list $exe]
-set filesFT [list [list $topdir/addons/commR addons/commR .tcl] \
+set filesFT [list [list [give_package_dir commR] addons/commR .tcl] \
 	[list $topdir/Examples Examples .tcl]]
 
 if { $tcl_platform(platform) eq "windows" } {

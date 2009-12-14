@@ -323,11 +323,11 @@ proc RamDebugger::Instrumenter::NeedsToInsertSnitPackage { name } {
 }
 
 proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } {
-    variable MainDir
+    variable topdir
 
     if { $RamDebugger::iswince } { return }
     
-    set MainDir $RamDebugger::MainDir
+    set topdir $RamDebugger::topdir
     set AppDataDir $RamDebugger::AppDataDir
 
     if { $::tcl_platform(machine) == "amd64" } {
@@ -339,13 +339,13 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     set dynlib [file join $AppDataDir $dynlib_base]
 
     if { [file readable $dynlib] && [file mtime $dynlib] >= \
-	     [file mtime [file join $MainDir scripts RamDebuggerInstrumenter.cc]] } {
+	[file mtime [file join $topdir scripts RamDebuggerInstrumenter.cc]] } {
 	catch { load $dynlib }
 	if {[info commands RamDebuggerInstrumenterDoWork] ne "" } { return }
     }
     file delete -force [file join $AppDataDir compile]
-    file copy -force [file join $MainDir scripts RamDebuggerInstrumenter.cc] \
-	[file join $MainDir scripts compile] \
+    file copy -force [file join $topdir scripts RamDebuggerInstrumenter.cc] \
+	[file join $topdir scripts compile] \
 	$AppDataDir
 
     set sourcefile [file join $AppDataDir RamDebuggerInstrumenter.cc]
@@ -401,7 +401,7 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 		} else {
 		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
 		}
-		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+		set dynlib [file join $RamDebugger::topdir scripts $dynlib_base]
 		set err [catch { load $dynlib }]
 		if { $err } {
 		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
@@ -819,7 +819,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" 
 		} else {
 		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
 		}
-		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+		set dynlib [file join $RamDebugger::topdir scripts $dynlib_base]
 		set err [catch { load $dynlib }]
 		if { $err } {
 		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
@@ -1490,7 +1490,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 		} else {
 		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
 		}
-		set dynlib [file join $RamDebugger::MainDir scripts $dynlib_base]
+		set dynlib [file join $RamDebugger::topdir scripts $dynlib_base]
 		set err [catch { load $dynlib }]
 		if { $err } {
 		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
