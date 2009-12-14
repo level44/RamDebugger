@@ -66,7 +66,7 @@ IconifiedConsole
 if { $clean } {
     set files [glob -nocomplain -dir [file dirname [info script]] *.deb *.rpm *.tar.gz *.zip \
 	    *.app *.dmg *.exe modulesinfo-* \
-	    [string tolower $program_name]\[0-9\]* *~]
+	    [string tolower $program_name]\[0-9\]* $program_name-source\[0-9\]* *~]
     puts "deleting generated files '$files'"
     if { [llength $files] } {
 	file delete -force {*}$files
@@ -167,11 +167,11 @@ if { $tcl_platform(platform) eq "windows" } {
 }
 file delete $exe
 
-if { $tcl_platform(platform) eq "unix" } {
+if { $tcl_platform(platform) eq "windows" } {
     create_README -tcl_source_dist RamDebugger.tcl $pNode README
     set files [list addons scripts Examples help pkgIndex.tcl]
-    lappend files [file normalize README]
-    lappend files [file normalize license.terms]
+    #lappend files [file normalize README]
+    #lappend files [file normalize license.terms]
     set createdistribution::libdir addons
     
     lappend createdistribution::remove_packages autoscroll base64 cmdline fileutil \
