@@ -96,6 +96,11 @@ if { $copy_remote } {
     exit
 }
 
+regsubfiles [list \
+	{set Version ([0-9.]+)} ../RamDebugger.tcl "set Version $version" \
+	{set Version ([0-9.]+)} ../pkgIndex.tcl "set Version $version" \
+	]
+
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
