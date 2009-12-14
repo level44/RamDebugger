@@ -65,7 +65,7 @@ IconifiedConsole
 
 if { $clean } {
     set files [glob -nocomplain -dir [file dirname [info script]] *.deb *.rpm *.tar.gz *.zip \
-	    *.app *.dmg *.exe modulesinfo-* \
+	    *.app *.dmg *.exe modulesinfo-* [string tolower $program_name] \
 	    [string tolower $program_name]\[0-9\]* $program_name-source\[0-9\]* *~]
     puts "deleting generated files '$files'"
     if { [llength $files] } {
