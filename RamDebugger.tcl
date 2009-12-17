@@ -147,7 +147,7 @@ namespace eval RamDebugger {
     variable options
     variable options_def
     
-    variable topdir [file dirname [info script]]
+    variable topdir [file normalize [file dirname [info script]]]
     if { [info exists starkit::topdir] } {
 	if { [file exists [file dirname $starkit::topdir]/../share/ramdebugger] } {
 	    variable topdir_external [file normalize  [file dirname $starkit::topdir]/../share/ramdebugger]
