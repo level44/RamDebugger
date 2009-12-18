@@ -1116,7 +1116,13 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
     if { [auto_execok fossil] ne "" && [catch { exec fossil info } info] == 0 } {
 	regexp -line {^local-root:\s*(.*)} $info {} dirLocal
 	set dirLocal [string trimright $dirLocal /]
-	
+	set fossil_version 0
+	set err [catch { exec fossil version } ret]
+	if { !$err && [regexp {\d{4}-\d{2}-\d{2}} $ret date] } {
+	    if { [clock scan $date] >= [clock scan "2009-12-18"] } {
+		set fossil_version 1
+	    }
+	}
 	cd $dirLocal
 	if { $item eq "" || [$tree item text $item 0] ne $dirLocal } {
 	    set item [$tree insert end [list $dirLocal] $itemP]
@@ -1127,32 +1133,37 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 		snit_messageBox -message $ret -parent $w
 	    }
 	}
-	set err [catch { exec fossil ls 2>@1 } list_files]
+	if { $fossil_version == 0 } {
+	    set err [catch { exec fossil ls 2>@1 } list_files]
+	} else {
+	    set err [catch { exec fossil ls -l 2>@1 } list_files]
+	}
 	if { !$err } {
 	    set err [catch { exec fossil extras 2>@1 } list_files2]
 	    foreach line [split $list_files2 \n] {
 		append list_files "\n? $line"
 	    }
 	}
-	if { $what ne "view" } {
-	    lassign $what op version
-	    switch $op {
-		update {
-		    set err [catch { exec fossil update 2>@1 } list_files3]
-		}
-		update_this {
-		    set err [catch { exec fossil update $version 2>@1 } list_files3]
-		}
-		merge_this {
-		    set err [catch { exec fossil merge $version 2>@1 } list_files3]
-		}
-		checkout_this {
-		    set err [catch { exec fossil checkout $version 2>@1 } list_files3]
-		}
+	lassign $what op version
+	switch $op {
+	    update {
+		set err [catch { exec fossil update 2>@1 } list_files3]
 	    }
-	    if { !$err } {
-		append list_files "\n$list_files3"
+	    update_this {
+		set err [catch { exec fossil update $version 2>@1 } list_files3]
 	    }
+	    merge_this {
+		set err [catch { exec fossil merge $version 2>@1 } list_files3]
+	    }
+	    checkout_this {
+		set err [catch { exec fossil checkout $version 2>@1 } list_files3]
+	    }
+	    view {
+		set err [catch { exec fossil update --nochange 2>@1 } list_files3]
+	    }
+	}
+	if { !$err } {
+	    append list_files "\n$list_files3"
 	}
 	if { ![$w exists_uservar fossil_timeline_view_more] } {
 	    $w set_uservar_value fossil_timeline_view_more 0
@@ -1262,7 +1273,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    $menu add command -label [_ "Refresh view"] -command \
 		[list "update_recursive_cmd" $w update view $tree $sel_ids]
-	    $menu add command -label [_ "Update to last"] -command \
+	    $menu add command -label [_ "Update"] -command \
 		[list "update_recursive_cmd" $w update update $tree $sel_ids]
 	    
 	    if { $is_timeline } {
@@ -1296,13 +1307,16 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    $menu add separator
 		}
 	    }
+	    set need_sep 0
 	    if { !$is_timeline && ($has_cvs || $has_fossil) } {
 		$menu add command -label [_ "View diff"] -accelerator Ctrl-d -command \
 		    [list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
+		set need_sep 1
 	    }
 	    if { $cvs_active } {
 		$menu add command -label [_ "Open tkcvs"] -command \
 		    [list "update_recursive_cmd" $w open_program tkcvs $tree $sel_ids]
+		set need_sep 1
 	    }
 	    if { $fossil_active } {
 		if { !$is_timeline && $has_fossil } {
@@ -1320,8 +1334,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		$menu add command -label [_ "Fossil pull"] -command \
 		    [list "update_recursive_cmd" $w fossil_syncronize pull $tree $sel_ids]
 		$w set_uservar_value fossil_autosync [update_recursive_cmd $w give_fossil_sync]
+		set need_sep 1
 	    }
-	    $menu add separator
+	    if { $need_sep } {
+		$menu add separator
+	    }
 	    foreach i [list all normal] t [list [_ All] [_ Normal]] {
 		$menu add command -label [_ "View %s" $t] -command \
 		    [list "update_recursive_cmd" $w view $tree 0 $i]
