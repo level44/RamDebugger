@@ -1080,6 +1080,7 @@ proc RamDebugger::CVS::update_recursive_do1 { w } {
 }
 
 proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item "" } } {
+    variable fossil_version
     
     waitstate $w on $what 
     if { $item ne "" } {
@@ -1235,6 +1236,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 }
 
 proc RamDebugger::CVS::update_recursive_cmd { w what args } {
+    variable fossil_version
     
     switch $what {
 	contextual {
@@ -1555,7 +1557,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set info [exec fossil info]
 		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
 		cd $dir
-		set err [catch { exec fossil revert --yes $file 2>@1 } ret]
+		if { $fossil_version == 0 } {
+		    set err [catch { exec fossil revert --yes $file 2>@1 } ret]
+		} else {
+		    set err [catch { exec fossil revert $file 2>@1 } ret]   
+		}
 		if { $err } { break }
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
 	    }
