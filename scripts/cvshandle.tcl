@@ -692,7 +692,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     set script ""
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
 	    update_recursive_do1 update_recursive_accept update_recursive_cmd \
-	    waitstate] {
+	    waitstate parse_timeline parse_finfo] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
@@ -1005,29 +1005,14 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
     }
     set pwd [pwd]
     cd [$w give_uservar_value dir]
-    set err [catch { exec fossil timeline -n 2000 -t t } data]
+    set err [catch { parse_timeline [exec fossil timeline -n 2000 -t t] } ret]
     cd $pwd
-    if { $err } { set data "" }
-    lassign "" date full_line lineList
-    foreach line [split $data \n] {
-	if { [regexp {^===\s*(\S+)\s*===} $line {} date] } {
-	    # nothing
-	} elseif { [regexp {^\S+\s+(.*)} $line {} l] } {
-	    if { $full_line ne "" } {
-		lappend lineList [list $date $full_line]
-	    }
-	    set full_line $l
-	} else {
-	    append full_line " [string trim $line]"
-	}
-    }
-    if { $full_line ne "" } {
-	lappend lineList [list $date $full_line]
-    }
+    if { $err } { set ret "" }
+
     set has_sep 0
-    foreach i $lineList {
-	lassign $i date txt
-	if { [regexp {New ticket\s*(\[\w+\])\s+<i>(.*)</i>} $txt {} ticket message] } {
+    foreach i $ret {
+	lassign $i date time checkin comment
+	if { [regexp {New ticket\s*(\[\w+\])\s+<i>(.*)</i>} $comment {} ticket message] } {
 	    if { !$has_sep } {
 		$menu add separator
 		set has_sep 1
@@ -1077,6 +1062,52 @@ proc RamDebugger::CVS::update_recursive_do1 { w } {
     set tree [$w give_uservar_value tree]
     $tree item delete all
     update_recursive_accept $w $what $dir $tree 0
+}
+
+proc RamDebugger::CVS::parse_timeline { timeline } {
+    
+    lassign "" list date time checkin comment
+    foreach line [split $timeline \n] {
+	if { [regexp {===\s*(\S+)\s*===} $line {} date_curr] } {
+	    # nothing
+	} elseif { [regexp {^(\S+)\s+\[([^]]*)\]\s*(.*)} $line {} time_curr checkin_curr comment_curr] } {
+	    if { $comment ne "" } {
+		lappend list [list $date $time $checkin $comment]
+	    }
+	    set d [clock scan "$date_curr $time_curr" -timezone :UTC]
+	    set date  [clock format $d -format "%Y-%m-%d"]
+	    set time [clock format $d -format "%H:%M:%S"]
+	    set checkin $checkin_curr
+	    set comment $comment_curr
+	} else {
+	    append comment " [string trim $line]"
+	}
+    }
+    if { $comment ne "" } {
+	lappend list [list $date $time $checkin $comment]
+    }
+    return $list
+}
+
+proc RamDebugger::CVS::parse_finfo { finfo } {
+    
+    lassign "" list line
+    foreach l [split $finfo \n] {
+	if { [regexp {^\d} $l] } {
+	    if { $line ne "" } {
+		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*(\S+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
+		lappend list [list $date $checkin $comment $user $artifact]
+	    }
+	    set line $l
+	} elseif { [regexp {^\s} $l] } {
+	    append line " [string trim $l]"
+	}
+    }
+    if { $line ne "" } {
+	regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*(\S+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
+	lappend list [list $date $checkin $comment $user $artifact]
+    }
+    return $list
 }
 
 proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item "" } } {
@@ -1170,29 +1201,15 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    $w set_uservar_value fossil_timeline_view_more 0
 	}
 	if { [$w give_uservar_value fossil_timeline_view_more] } {
-	    set err [catch { exec fossil timeline -n 200 -t ci } timeline]
+	    set err [catch { parse_timeline [exec fossil timeline -n 200 -t ci] } ret]
 	} else {
-	    set err [catch { exec fossil timeline descendants current } timeline]
+	    set err [catch { parse_timeline [exec fossil timeline after current] } ret]
 	}
 	if { !$err } {
 	    set itemT [$tree insert end [list [_ Timeline]] $item]
-	    lassign "" date line_full
-	    foreach line [split $timeline \n] {
-		if { [regexp {===\s*(\S+)\s*===} $line {} date] } {
-		    # nothing
-		} elseif { [regexp {^(\S+)\s+(.*)} $line {} time l] } {
-		    if { $line_full ne "" } {
-		        $tree insert end [list $line_full] $itemT
-		    }
-		    set d [clock scan "$date $time" -timezone :UTC]
-		    set dateF [clock format $d -format "%Y-%m-%d %H:%M:%S"]
-		    set line_full "$dateF $l"
-		} else {
-		    append line_full " [string trim $line]"
-		}
-	    }
-	    if { $line_full ne "" } {
-		$tree insert end [list $line_full] $itemT
+	    foreach i $ret {
+		lassign $i date time checkin comment
+		$tree insert end [list "$date $time \[$checkin\] $comment"] $itemT
 	    }
 	    $tree item collapse $itemT
 	}
@@ -1636,7 +1653,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		            cd $dir
 		            set err [catch {
 		                    set info [exec fossil info]
-		                    regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dirF
+		                    regexp -line {^local-root:\s*(.*)} $info {} dirF
 		                } ret]
 		            if { $err } {
 		                snit_messageBox -message $ret -parent $w
@@ -1649,20 +1666,65 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                cd [file dirname $fileF]
 		                RamDebugger::OpenProgram -new_interp 1 tkdiff -r [file tail $fileF]
 		            } else {
-		                file rename -force $fileF $fileF.current
-		                set err [catch {
-		                        cd $dirF
-		                        exec fossil revert $file
-		                        file rename -force $fileF $fileF.trunk
-		                    } ret]
-		                file rename -force $fileF.current $fileF
-		                if { !$err } {
-		                    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $fileF $fileF.trunk } ret]
-		                    file delete -force $fileF.trunk
+		                cd $dirF
+		                set err [catch { parse_timeline [exec fossil descendants] } ret]
+		                if { !$err && [llength $ret] > 0 } {
+		                    lassign [lindex $ret 0] date time checkin comment
+		                    set err [catch { parse_finfo [exec fossil finfo $file] } finfo_list]
+		                } else {
+		                    set err 1
 		                }
+		                if { $err } {
+		                    cd $pwd
+		                    snit_messageBox -message [_ "Fossil version is too old. It needs subcommand 'finfo'. Please, upgrade"] \
+		                        -parent $w
+		                    return
+		                }
+		                set found 0
+		                foreach i $finfo_list {
+		                    lassign $i date_in checkin_in comment_in user_in artifact
+		                    set len [string length $checkin_in]
+		                    if { [string equal -length $len $checkin $checkin_in] } {
+		                        set found 1
+		                        break
+		                    }
+		                    if { $date_in < $date } {
+		                        break
+		                    }
+		                }
+		                if { !$found } {
+		                    set ret [parse_timeline [exec fossil timeline parents $checkin -n 2000]]
+		                    foreach i $ret {
+		                        lassign $i date time checkin comment
+		                        foreach i $finfo_list {
+		                            lassign $i date_in checkin_in comment_in user_in artifact
+		                            set len [string length $checkin_in]
+		                            if { [string equal -length $len $checkin $checkin_in] } {
+		                                set found 1
+		                                break
+		                            }
+		                            if { $date_in < $date } {
+		                                break
+		                            }
+		                        }
+		                        if { $found } {
+		                            break
+		                        }
+		                    }
+		                }
+		                if { !$found } {
+		                    cd $pwd
+		                    snit_messageBox -message [_ "Could not find version to compare"] -parent $w
+		                    return
+		                }
+		                set c [string range $checkin 0 9]
+		                exec fossil artifact $artifact $file.$c.$date
+
+		                set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file $file.$c.$date } ret]
 		                if { $err } {
 		                    lappend errList $ret
 		                }
+		                file delete -force $file.$c.$date
 		            }
 		        }
 		    }
@@ -1713,26 +1775,12 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    set pwd [pwd]
 	    cd $dir
-	    set err [catch { exec fossil finfo $file } data]
+	    set err [catch { parse_finfo [exec fossil finfo $file] } ret]
 	    cd $pwd
 	    if { $err } {
 		snit_messageBox -message [_ "Fossil version is too old. It needs subcommand 'finfo'. Please, upgrade"] \
 		    -parent $w
 		return
-	    }
-	   lassign "" lines line
-	    foreach l [split $data \n] {
-		if { [regexp {^\d} $l] } {
-		    if { $line ne "" } {
-		        lappend lines $line
-		    }
-		    set line $l
-		} elseif { [regexp {^\s} $l] } {
-		    append line " [string trim $l]"
-		}
-	    }
-	    if { $line ne "" } {
-		lappend lines $line
 	    }
 	    set wD $w.diffs
 	    destroy $wD
@@ -1758,9 +1806,9 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    ttk::checkbutton $f.cb1 -text [_ "Ignore white space"] -variable [$wD give_uservar ignore_blanks 0]
 	    
 	    set num 0
-	    foreach i $lines {
-		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*(\S+),\s*artifact:\s*\[(\w+)\]\s*\)} $i {} date checkin txt user artifact
-		$f.lf insert end [list $date $checkin $txt $user $artifact]
+	    foreach i $ret {
+		lassign $i date checkin comment user artifact
+		$f.lf insert end [list $date $checkin $comment $user $artifact]
 		incr num
 	    }
 	    if { $num } {
@@ -1800,23 +1848,25 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		snit_messageBox -message [_ "Select only one or two versions"] \
 		    -parent $wD
 	    } else {
-		lassign [lindex $selecteditems 0] date1 - - - artifact1
+		lassign [lindex $selecteditems 0] date1 checkin1 - - artifact1
+		set c1 [string range $checkin1 0 9]
 		set pwd [pwd]
 		cd $dir
-		exec fossil artifact $artifact1 $file.$date1
+		exec fossil artifact $artifact1 $file.$c1.$date1
 		if { [llength $selecteditems] == 1 } {
-		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file $file.$date1 } ret]
+		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file $file.$c1.$date1 } ret]
 		} else {
-		    lassign [lindex $selecteditems 1] date2 - - - artifact2
-		    exec fossil artifact $artifact2 $file.$date2
-		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file.$date1 $file.$date2 } ret]
+		    lassign [lindex $selecteditems 1] date2 checkin2 - - artifact2
+		    set c2 [string range $checkin2 0 9]
+		    exec fossil artifact $artifact2 $file.$c2.$date2
+		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file.$c1.$date1 $file.$c2.$date2 } ret]
 		}
 		if { $err } {
 		    snit_messageBox -message $ret -parent $wD
 		}
-		file delete -force $file.$date1
+		file delete -force $file.$c1.$date1
 		if { [llength $selecteditems] == 2 } {
-		    file delete -force $file.$date2
+		    file delete -force $file.$c2.$date2
 		}
 		cd $pwd
 	    }
