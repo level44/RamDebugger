@@ -10,6 +10,7 @@ namespace eval RamDebugger::CVS {
     variable lasttimeautosave ""
     variable autosave_after ""
     variable autosaveidle_after ""
+    variable try_threaded 1
 }
 
 proc RamDebugger::CVS::Init {} {
@@ -683,6 +684,7 @@ proc RamDebugger::CVS::indicator_update_do { cvs_or_fossil } {
 ################################################################################
 
 proc RamDebugger::CVS::update_recursive { wp current_or_last } {
+    variable try_threaded
     
     if { [file isdirectory [file dirname $RamDebugger::currentfile]] } {
 	set directory [file dirname $RamDebugger::currentfile]
@@ -700,9 +702,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     append script "[list set RamDebugger::topdir $RamDebugger::topdir]\n"
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory $current_or_last]\n"
-    
-    set try_threaded 1
-    
+	
     if { $try_threaded eq "debug" } {
 	uplevel #0 $script
     } elseif { $try_threaded && $::tcl_platform(os) ne "Darwin" && $::tcl_platform(threaded) } {
@@ -1095,7 +1095,7 @@ proc RamDebugger::CVS::parse_finfo { finfo } {
     foreach l [split $finfo \n] {
 	if { [regexp {^\d} $l] } {
 	    if { $line ne "" } {
-		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*(\S+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
+		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
 		lappend list [list $date $checkin $comment $user $artifact]
 	    }
 	    set line $l
@@ -1104,7 +1104,7 @@ proc RamDebugger::CVS::parse_finfo { finfo } {
 	}
     }
     if { $line ne "" } {
-	regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*(\S+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
+	regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
 	lappend list [list $date $checkin $comment $user $artifact]
     }
     return $list
@@ -1670,13 +1670,14 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                set err [catch { parse_timeline [exec fossil descendants] } ret]
 		                if { !$err && [llength $ret] > 0 } {
 		                    lassign [lindex $ret 0] date time checkin comment
-		                    set err [catch { parse_finfo [exec fossil finfo $file] } finfo_list]
+		                    set err [catch { parse_finfo [exec fossil finfo $file] } ret]
+		                    set finfo_list $ret
 		                } else {
 		                    set err 1
 		                }
 		                if { $err } {
 		                    cd $pwd
-		                    snit_messageBox -message [_ "Fossil version is too old. It needs subcommand 'finfo'. Please, upgrade"] \
+		                    snit_messageBox -message [_ "Fossil version is too old. It needs subcommand 'finfo'. Please, upgrade (%s)" $ret] \
 		                        -parent $w
 		                    return
 		                }
@@ -1882,6 +1883,7 @@ if { $argv0 eq [info script] } {
     package require compass_utils
     set RamDebugger::currentfile ""
     set RamDebugger::topdir [file dirname [info script]]
+    set RamDebugger::CVS::try_threaded debug
     RamDebugger::CVS::update_recursive "" last
 }
 
