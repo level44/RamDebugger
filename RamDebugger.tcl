@@ -1,7 +1,7 @@
 #!/bin/sh
 # the next line restarts using wish \
 exec wish "$0" "$@"
-# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Feb-2007
+# RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Dec-2009
 
 package require Tcl 8.5
 package require Tk 8.5
