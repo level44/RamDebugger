@@ -377,6 +377,11 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     $w set_uservar_value combo [ttk::combobox $f.e1 -textvariable [$w give_uservar expression] \
 	-values $options(old_expressions)]
 
+    set c { %W icursor [expr { [%W index "insert"]-1}] }
+    bind $f.e1 <$::control-Key-2> "[list ttk::entry::Insert $f.e1 {""}];$c"
+    bind $f.e1 <$::control-Key-9> "[list ttk::entry::Insert $f.e1 {()}];$c"
+    bind $f.e1 <$::control-plus> "[list ttk::entry::Insert $f.e1 {[]}];$c"
+
     $w set_uservar_value expression $var
     
     set sw [ScrolledWindow $f.lf -relief sunken -borderwidth 0]
@@ -385,7 +390,6 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 
     bind $f.l1 <1> [list $w invokeok]
     bind $sw.text <<Contextual>> [list RamDebugger::DisplayVarWindow_contextual %W %X %Y]
-
 
     $sw setwidget $sw.text
 
@@ -2795,7 +2799,7 @@ proc RamDebugger::inline_replace { w search_entry } {
     entry $w.replace -width 25 -textvariable RamDebugger::replacestring -relief solid -bd 1
     place $w.replace -in $w -x $x1 -rely 1 -y -1 -anchor sw
     set err [catch { clipboard get } data]
-    if { !$err && [string length $data] < 20 } {
+    if { !$err && [string length $data] < 30 } {
 	$w.replace delete 0 end
 	$w.replace insert end $data
 	$w.replace selection range 0 end
