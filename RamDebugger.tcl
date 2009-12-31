@@ -212,7 +212,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	set AppDataDir [file join $::env(HOME) .RamDebugger]
     }
     set exe [file join $AppDataDir exe]
-
+    if { ![file exists $exe] } {
+	file mkdir $exe
+    }
     if { $::tcl_platform(platform) eq "windows" && !$iswince } {
 	if { ![info exists ::env(PATH)] } {
 	    set list ""
