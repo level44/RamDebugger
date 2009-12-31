@@ -1656,9 +1656,9 @@ proc RamDebugger::AboutWindow {} {
     label $w.l -text RamDebugger -font "-family {new century schoolbook} -size 24 -weight bold" \
 	    -fg \#d3513d
 
-    set tt [_ "Author: %s\n" "Ramon Ribó (RAMSAN)"]
+    set tt [_ "Author: %s\n" "Ramon Ribo (RAMSAN)"]
     append tt "ramsan@compassis.com\nhttp://www.gidhome.com/ramsan\n"
-    append tt "http://www2.compassis.com/ramdebugger"
+    append tt "http://www.compassis.com/ramdebugger"
 
     text $w.l2 -bd 0 -bg [$w cget -bg] -width 10 -height 4 \
 	    -highlightthickness 0 
