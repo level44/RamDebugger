@@ -2,7 +2,7 @@
 <Infoproblemtype version="1.0">
   <Program n="ramdebugger">
     <Name>RamDebugger</Name>
-    <Version>7.5</Version>
+    <Version>7.6</Version>
     <Section>contrib/devel</Section>
     <Categories>Development;Debugger;IDE;Application</Categories>
     <Dependencies>libc6 (&gt;= 2.3.6-6), 
@@ -28,6 +28,11 @@
 	* It supports editing XML code
 	* It contains a GUI for version control system (cvs or fossil)
     </Description>
+    <NewsInVersion version="7.6" date="2009-12-31"> 
+	*  Correction in Windows for an error when copying files "cat.exe" ...
+	*  Fast insert of brackets in "Expressions" window
+	*  When inserting replace string from clipboard, change max length from 20 to 30
+    </NewsInVersion>
     <NewsInVersion version="7.5" date="2009-12-28"> 
 	*  Pressing button 'View' in fossil, gives information about files to be updated
     </NewsInVersion>
