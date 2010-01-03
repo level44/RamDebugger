@@ -8327,7 +8327,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::OpenProgram tkdiff"] \
 		[list command [_ "Open Tkcvs"] {} [_ "Open Tkcvs"] "" \
 		    -command "RamDebugger::OpenProgram tkcvs"] \
-	       [list command [_ "Version control system"]... {} [_ "Open Version control system window with cvs or fossil"] "" \
+		    [list command [_ "Version control system"]... {} \
+		    [_ "Open Version control system window with cvs or fossil"] "Ctrl 7" \
 		   -command "RamDebugger::CVS::update_recursive . last"] \
 		separator \
 	       [list cascad [_ "File type"] {} filetype 0 [list \
