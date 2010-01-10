@@ -934,8 +934,13 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     
     bind $w <Control-d> [list "update_recursive_cmd" $w open_program tkdiff $f.toctree ""]
     bind $w <Control-i> [list "update_recursive_cmd" $w commit $f.toctree ""]
+    bind $w <Control-e> [list $w invokeok]
+    bind $w <Control-u> [list $w invokebutton 2]
     bind $f.e2 <Control-i> "[bind $w <Control-i>];break"
 
+    $w tooltip_button 1 [_ "View modified files and file to be updated from repository Ctrl-e"]
+    $w tooltip_button 2 [_ "Update files from repository Ctrl-u"]
+    
     tk::TabToWindow $f.e1
     bind $w <Return> [list $w invokeok]
     $w createwindow
