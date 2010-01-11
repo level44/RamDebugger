@@ -9182,7 +9182,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 #     }
 
     # if we do it at the beginning, an ugly update is made
-    if { $::tcl_platform(platform) != "windows" } {
+    if { $::tcl_platform(platform) ne "windows" } {
 	set img [image create photo -file [file join $topdir addons ramdebugger.png]]
 	wm iconphoto $w $img
 	#wm iconbitmap $w @$topdir/addons/ramdebugger.xbm

@@ -729,6 +729,13 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     set w [dialogwin_snit ._ask -title [_ "VCS management"] \
 	    -okname [_ View] -morebuttons [list [_ "Update"]] \
 	    -cancelname [_ Close] -grab 0 -callback [list update_recursive_do1]]
+    
+    if { $::tcl_platform(platform) ne "windows" } {
+	catch {
+	    set img [image create photo -file [file join $::RamDebugger::topdir addons ramdebugger.png]]
+	    wm iconphoto $w $img
+	}
+    }
     set f [$w giveframe]
     
     ttk::label $f.l0 -text [_ "Select origin directory for CVS or fossil update recursive, then use the contextual menu on the files:"] \
