@@ -1160,6 +1160,12 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 		set fossil_version 1
 	    }
 	}
+	# this is to avoid problems with update
+	if { ![winfo exists $tree] } {
+	    cd $olddir    
+	    waitstate $w off
+	    return
+	}
 	cd $dirLocal
 	if { $item eq "" || [$tree item text $item 0] ne $dirLocal } {
 	    set item [$tree insert end [list $dirLocal] $itemP]
