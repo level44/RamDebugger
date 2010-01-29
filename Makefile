@@ -83,7 +83,7 @@ ifneq ($(OBJDIR),debug)
 endif
 
 clean:
-	rm -f $(OBJDIR)/*.o $(EXE)
+	rm -f $(OBJDIR)/*.o $(OBJDIR)/*.o.depend $(EXE)
 
 copy:
 	cp $(EXE) $(EXE_INSTALL)
