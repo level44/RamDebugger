@@ -1014,6 +1014,9 @@ proc RamDebugger::rdebug { args } {
 	append remotecomm "set breakpoint pending on\n"
 	append remotecomm "set print elements 2000\n"
 	lassign $opts(program) cmd dir args
+	if { [file exists $dir] } {
+	    append remotecomm "cd \"$dir\"\n"
+	}
 	if { [string is integer $cmd] } {
 	    append remotecomm "attach $cmd\n"
 	} else {
