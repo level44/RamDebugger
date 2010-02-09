@@ -1013,6 +1013,14 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 		    [namespace code [list insert_in_entry $w $entry $txt]] 
 		lappend insertedList $f
 	    }
+	    if { [llength [file split $file]] > 1 } {
+		set f [file tail $file]
+		if { $f in $insertedList } { continue }
+		set txt "$f: "
+		$menu add command -label [_ "Insert '%s'" $txt] -command  \
+		    [namespace code [list insert_in_entry $w $entry $txt]] 
+		lappend insertedList $f
+	    }
 	}
     }
     set pwd [pwd]
