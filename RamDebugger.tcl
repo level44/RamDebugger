@@ -61,7 +61,7 @@ namespace eval RamDebugger {
     #    RamDebugger version
     ################################################################################
 
-    set Version 7.6
+    set Version 7.7
 
     ################################################################################
     #    Non GUI commands
@@ -514,6 +514,7 @@ proc RamDebugger::rdebug { args } {
     variable options
     variable initialcommands
     variable usecommR
+    variable tclsh_default_dirs
 
     set usagestring {usage: rdebug ?switches? ?program?
 	-h:             displays usage
@@ -624,8 +625,29 @@ proc RamDebugger::rdebug { args } {
 		    lappend ::auto_path $i
 		}
 	    }
+	    foreach "n v" [array get env TCL*_TM_PATH] {
+		foreach i [split $v ":;"] {
+		    ::tcl::tm::path add $i
+		}
+	    }
 	}
-
+	if { ![info exists tclsh_default_dirs] } {
+	    set tclsh_default_dirs [list "" ""]
+	    set err [catch { exec tclsh << {puts [set auto_path]}} ret]
+	    if { !$err } {
+		lset tclsh_default_dirs 0 $ret
+	    }
+	    set err [catch { exec tclsh << {puts [::tcl::tm::path list]}} ret]
+	    if { !$err } {
+		lset tclsh_default_dirs 1 $ret
+	    }
+	}
+	if { [llength [lindex $tclsh_default_dirs 0]] } {
+	    local eval lappend :auto_path [lindex $tclsh_default_dirs 0]
+	}
+	if { [llength [lindex $tclsh_default_dirs 1]] } {
+	    local eval ::tcl::tm::path add [lindex $tclsh_default_dirs 1]
+	}
 	set filetodebug $currentfile
 	set LocalDebuggingType tk
 	if { [info exists options(LocalDebuggingType)] } {
