@@ -2,7 +2,7 @@
 <Infoproblemtype version="1.0">
   <Program n="ramdebugger">
     <Name>RamDebugger</Name>
-    <Version>7.6</Version>
+    <Version>7.7</Version>
     <Section>contrib/devel</Section>
     <Categories>Development;Debugger;IDE;Application</Categories>
     <Dependencies>libc6 (&gt;= 2.3.6-6), 
@@ -28,6 +28,12 @@
 	* It supports editing XML code
 	* It contains a GUI for version control system (cvs or fossil)
     </Description>
+    <NewsInVersion version="7.7" date="2010-02-10"> 
+	 *  Control-7 opens the VCS management window
+	 *  Added accelerators for View and Update
+	 *  Improving default messages in "commit message"
+	 *  TCL modules default dirs added to debugging interpreter
+    </NewsInVersion>
     <NewsInVersion version="7.6" date="2009-12-31"> 
 	*  Correction in Windows for an error when copying files "cat.exe" ...
 	*  Fast insert of brackets in "Expressions" window
