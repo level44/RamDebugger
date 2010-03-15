@@ -551,13 +551,20 @@ proc RamDebugger::CVS::indicator_init { f } {
 }
 
 proc RamDebugger::CVS::indicator_menu { cvs_indicator_frame x y } {
-
+    set currentfileL $RamDebugger::currentfile
+    
     destroy $cvs_indicator_frame.menu
     set menu [menu $cvs_indicator_frame.menu -tearoff 0]
     $menu add command -label [_ "Open"] -command \
 	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
     $menu add command -label [_ "Open - current directory"] -command \
 	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame current]
+    $menu add separator
+    $menu add command -label [_ "Differences"] -command \
+	[list RamDebugger::CVS::update_recursive_cmd "" open_program tkdiff "" "" [list $RamDebugger::currentfile]]
+    $menu add command -label [_ "Differences window"] -command \
+	[list RamDebugger::CVS::update_recursive_cmd "" diff_window "" "" [list $RamDebugger::currentfile]]
+
     tk_popup $menu $x $y
 }
 
@@ -1660,19 +1667,37 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    $tree item configure $item -visible $visible
 	}
 	open_program {
-	    lassign $args what_in tree sel_ids
-	    if { $sel_ids eq "" } {
+	    lassign $args what_in tree sel_ids files
+	    if { $sel_ids eq "" && $tree ne "" } {
 		set sel_ids [$tree selection get]
 	    }
 	    switch $what_in {
 		tkdiff {
+		    set files_list ""
 		    set fileF ""
 		    set pwd [pwd]
 		    set errList ""
+		    foreach file $files {
+		        cd [file dirname $file]
+		        set err [catch { exec fossil info } info]
+		        if { !$err } {
+		            regexp -line {^local-root:\s*(.*)} $info {} dirF
+		            set len [llength [file split $dirF]]
+		            set file [file join {*}[lrange [file split $file] $len end]]
+		            lappend files_list [list EDITED $dirF $file]
+		        } else {
+		            set dir [file dirname $file]
+		            lappend files_list [list M [file dirname $file] [file tail $file]]
+		        }
+		        cd $pwd
+		    }
 		    foreach item $sel_ids {
 		        if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
 		        set dir [$tree item text [$tree item parent $item] 0]
-		        
+		        lappend files_list [list $mode $dir $file]
+		    }
+		    foreach i $files_list {
+		        lassign $i mode dir file
 		        if { [string length $mode] == 1 } {
 		            set fileF [file join $dir $file]
 		        } else {
@@ -1787,20 +1812,36 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	}
 	diff_window {
-	    lassign $args tree sel_ids
-	    if { $sel_ids eq "" } {
+	    lassign $args tree sel_ids files
+	    set files_list ""
+	    set pwd [pwd]
+	    foreach file $files {
+		cd [file dirname $file]
+		set err [catch { exec fossil info } info]
+		if { !$err } {
+		    regexp -line {^local-root:\s*(.*)} $info {} dirF
+		    set len [llength [file split $dirF]]
+		    set file [file join {*}[lrange [file split $file] $len end]]
+		    lappend files_list [list EDITED $dirF $file]
+		} else {
+		    set dir [file dirname $file]
+		    lappend files_list [list M [file dirname $file] [file tail $file]]
+		}
+		cd $pwd
+	    }
+	    if { $sel_ids eq "" && $tree ne "" } {
 		set sel_ids [$tree selection get]
 	    }
-	    if { [llength $sel_ids] > 1 } {
+	    foreach item $sel_ids {
+		if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
+		set dir [$tree item text [$tree item parent $item] 0]
+		lappend files_list [list $mode $dir $file]
+	    }
+	    if { [llength $files_list] > 1 } {
 		snit_messageBox -message [_ "Differences window can only be used with one file"] -parent $w
 		return
 	    }
-	    foreach item $sel_ids {
-		if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { return }
-		set dir [$tree item text [$tree item parent $item] 0]
-		break
-	    }
-	    set pwd [pwd]
+	    lassign [lindex $files_list 0] mode dir file
 	    cd $dir
 	    set err [catch { parse_finfo [exec fossil finfo $file] } ret]
 	    cd $pwd
@@ -1813,7 +1854,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    destroy $wD
 	    dialogwin_snit $wD -title [_ "Choose version"] -entrytext \
 		[_ "Choose one or two versions for file '%s'" $file] -okname [_ View] -cancelname [_ Close] \
-		-grab 1 -transient 1 -callback [list "update_recursive_cmd" $w diff_window_accept $dir $file]
+		-grab 1 -transient 1 -callback [namespace code [list "update_recursive_cmd" $w diff_window_accept $dir $file]]
 	    set f [$wD giveframe]
 	    
 	    set columns [list \

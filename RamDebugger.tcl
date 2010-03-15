@@ -1786,6 +1786,11 @@ proc RamDebugger::rlist { args } {
 	    }
 	}
 	if { $filetype == "XML" } {
+	    set err [catch { dom parset $files($currentfile) } doc]
+	    if { !$err } {
+		set files($currentfile) [$doc asXML]
+		$doc delete
+	    }
 	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
 	    if { $err } {
 		set einfo $::errorInfo
