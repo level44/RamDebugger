@@ -119,25 +119,28 @@ snit::widgetadaptor cu::combobox {
 	installhull using ttk::combobox
 
 	cu::add_contextual_menu_to_entry $win init
+	bind $win <<ComboboxSelected>> [mymethod combobox_selected]
 	$self configurelist $args
     }
     destructor {
-	if { $options(-valuesvariable) ne "" } {
-	    upvar #0 $options(-valuesvariable) v
-	    trace remove variable v write "[mymethod _changed_values_var];#"
-	}
-	if { $options(-dictvariable) ne "" } {
-	    upvar #0 $options(-dictvariable) v
-	    trace remove variable v write "[mymethod _changed_values_var];#"
-	}
-	if { $options(-textvariable) ne "" } {
-	    upvar #0 $options(-textvariable) v
-	    trace remove variable v write "[mymethod _written_textvariable];#"
-	}
-	if { $options(-statevariable) ne "" } {
-	    upvar #0 $options(-statevariable) v
-	    trace remove variable v write "[mymethod _written_statevariable];#"
-	    trace remove variable v read "[mymethod _read_statevariable];#"
+	catch {
+	    if { $options(-valuesvariable) ne "" } {
+		upvar #0 $options(-valuesvariable) v
+		trace remove variable v write "[mymethod _changed_values_var];#"
+	    }
+	    if { $options(-dictvariable) ne "" } {
+		upvar #0 $options(-dictvariable) v
+		trace remove variable v write "[mymethod _changed_values_var];#"
+	    }
+	    if { $options(-textvariable) ne "" } {
+		upvar #0 $options(-textvariable) v
+		trace remove variable v write "[mymethod _written_textvariable];#"
+	    }
+	    if { $options(-statevariable) ne "" } {
+		upvar #0 $options(-statevariable) v
+		trace remove variable v write "[mymethod _written_statevariable];#"
+		trace remove variable v read "[mymethod _read_statevariable];#"
+	    }
 	}
     }
     onconfigure -textvariable {value} {
@@ -260,10 +263,18 @@ snit::widgetadaptor cu::combobox {
 	    lappend vtrans $value
 	}
 	$self configure -_values $vtrans
+	$self _written_textvariable
     }
-    method _written_textvariable {} {
+    method _written_textvariable { args } {
+
+	set optional {
+	    { -force_dict "" 0 }
+	}
+	set compulsory ""
+	parse_args $optional $compulsory $args
 
 	upvar #0 $options(-textvariable) v
+	if { ![info exists v] } { return }
 	set value $v
 	if { $options(-dictvariable) ne "" } {
 	    upvar #0 $options(-dictvariable) vd
@@ -275,7 +286,9 @@ snit::widgetadaptor cu::combobox {
 	} else {
 	    set dict $options(-dict)
 	}
-	catch { set value [dict get $dict $value] }
+	if { $force_dict || [$self instate readonly] } {
+	    catch { set value [dict get $dict $value] }
+	}
 	if { $_translated_textvariable ne $value } {
 	    set _translated_textvariable $value
 	}
@@ -307,6 +320,11 @@ snit::widgetadaptor cu::combobox {
     method _read_statevariable {} {
 	upvar #0 $options(-statevariable) v
 	set v [$self state]
+    }
+    method combobox_selected {} {
+	if { ![$self instate readonly] } {
+	    $self _written_textvariable -force_dict
+	}
     }
 }
 
