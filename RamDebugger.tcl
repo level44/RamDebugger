@@ -6,8 +6,8 @@ exec wish "$0" "$@"
 package require Tcl 8.5
 package require Tk 8.5
 
-# package require compass_utils
-# mylog::init -view_binding <Control-L> debug
+#package require compass_utils
+#mylog::init -view_binding <Control-L> debug
 
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
@@ -487,7 +487,7 @@ proc RamDebugger::rhelp { args } {
 
     if { $opts(command) != "" } {
 	if { [info commands $opts(command)] == "" } {
-	    error [_ "command '%s' does not exists" $opts(command)]\n$usagestring
+	    error [_ "command '%s' does not exist" $opts(command)]\n$usagestring
 	}
 	catch { $opts(command) -h } string
 	return $string
@@ -2744,6 +2744,7 @@ proc RamDebugger::RecieveFromGdb {} {
     variable fileslist
     variable ExpressionResult
     variable options
+    variable WindowFilesList
 
     foreach "fid program state" $remoteserver break
 
@@ -2818,7 +2819,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	}
 	next - step {
 	    if { ![regexp {at\s+([^:]+):([0-9]+)} $aa {} file line] } {
-		if { [regexp {^\s*([0-9]+)} $aa {} line] } {
+		if { [regexp {^\s*([0-9]+)\s} $aa {} line] } {
 		    set file $currentfile
 		} else {
 		    set line ""
@@ -2833,15 +2834,23 @@ proc RamDebugger::RecieveFromGdb {} {
 		        
 		    }
 		}
+		if { [file pathtype $file] eq "relative" } {
+		    foreach i $WindowFilesList {
+		        if { [file tail $i] eq $file } {
+		            set file $i
+		            break
+		        }
+		    }
+		}
 		if { [file exists $file] } {
 		    set file [filenormalize $file]
 		}
 	    }
-	    if { $line != "" } {
+	    if { $line ne "" } {
 		set remoteserver [lreplace $remoteserver 2 2 ""]
 		set filenum [lsearch -exact $fileslist $file]
 		if { $filenum == -1 } {
-		    set err [catch {OpenFileF $file} errstring]
+		    set err [catch {OpenFileF -raise_error 1 $file} errstring]
 		    if { $err } {
 		        WarnWin [_ "Could not open file '%s' for stopping program" $file]
 		        return
@@ -2927,6 +2936,14 @@ proc RamDebugger::RecieveFromGdb {} {
 		set file [file join [file dirname $cproject::project] $file]
 	    }
 	}
+	if { [file pathtype $file] eq "relative" } {
+	    foreach i $WindowFilesList {
+		if { [file tail $i] eq $file } {
+		    set file $i
+		    break
+		}
+	    }
+	}
 	if { [file pathtype $file] == "volumerelative" } {
 	    set drive [string trim [lindex [file split [pwd]] 0] /]
 	    set file $drive$file
@@ -2934,7 +2951,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	set file [filenormalize $file]
 	set filenum [lsearch -exact $fileslist $file]
 	if { $filenum == -1 } {
-	    set err [catch {OpenFileF $file} errstring]
+	    set err [catch {OpenFileF -raise_error 1 $file} errstring]
 	    if { $err } {
 		WarnWin [_ "Could not open file '%s' for stopping program" $file]
 		return
@@ -3860,6 +3877,7 @@ proc RamDebugger::OpenFileF { args } {
 	{ -force boolean 0 }
 	{ -user_num_line line -1 }
 	{ -no_history boolean 0 }
+	{ -raise_error boolean 0 }
     }
     set compulsory "file"
     parse_args $optional $compulsory $args  
@@ -3910,8 +3928,13 @@ proc RamDebugger::OpenFileF { args } {
 	set currentfile $currentfile_save
 	set currentfile_endline $currentfile_endline_save
 	WaitState 0
-	WarnWin [lindex [split $errstring \n] 0]
-	return 1
+	
+	if { $raise_error } {
+	    error [lindex [split $errstring \n] 0]
+	} else {
+	    WarnWin [lindex [split $errstring \n] 0]
+	    return 1
+	}
     }
 
     $marker delete arrow
