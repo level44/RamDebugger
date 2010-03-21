@@ -1054,7 +1054,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 
   int i,p1,length,
     line,ichar,icharline,simplechar_line,simplechar_pos,
-    commentlevel,finishedline,result;
+    commentlevel,startofline,finishedline,result;
   Tcl_Obj *blockinfo,*blockinfocurrent,*tmpObj;
   char c,lastc,buf[1024];
   
@@ -1092,6 +1092,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
   simplechar_line=0;
   simplechar_pos=0;
   finishedline=1;
+  startofline=1;
   is->nextiscyan=0;
 
   for(i=0;i<length;i++){
@@ -1139,12 +1140,14 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 	blockinfocurrent=append_block_infoS(is,blockinfocurrent,"grey",p1,icharline+1);
 	is->wordtypeline=0;
       }
+      startofline=0;
       break;
     case '\'':
       if(!commentlevel && is->wordtype!=DQUOTE_WT && lastc != '\\'){
 	simplechar_line=line;
 	simplechar_pos=icharline;
       }
+      startofline=0;
       break;
     case '{':
       if(!commentlevel && is->wordtype!=DQUOTE_WT){
@@ -1156,6 +1159,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 	is->braces_hist_end=bh;
 	finishedline=1;
       }
+      startofline=0;
       break;
     case '}':
       if(!commentlevel && is->wordtype!=DQUOTE_WT){
@@ -1170,12 +1174,18 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 	}
 	finishedline=1;
       }
+      startofline=0;
       break;
     case '*':
       if(commentlevel==-1 || is->wordtype==DQUOTE_WT){
 	// nothing
       } else if(lastc=='/'){
 	if(commentlevel==0){
+	  if(startofline){
+	    Tcl_Obj *objPtr;
+	    Tcl_ListObjIndex(is->ip,blockinfocurrent,0,&objPtr);
+	    Tcl_SetIntObj(objPtr,0);
+	  }
 	  is->wordtype=NONE_WT;
 	  is->wordtypepos=icharline-1;
 	}
@@ -1183,14 +1193,21 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
       } else if(!commentlevel){
 	blockinfocurrent=check_word_color_cpp(is,blockinfocurrent,icharline,1);
       }
+      startofline=0;
       break;
     case '/':
       if(commentlevel==-1 || is->wordtype==DQUOTE_WT){
 	// nothing
       } else if(!commentlevel && lastc=='/'){
+	if(startofline){
+	  Tcl_Obj *objPtr;
+	  Tcl_ListObjIndex(is->ip,blockinfocurrent,0,&objPtr);
+	  Tcl_SetIntObj(objPtr,0);
+	}
 	is->wordtype=NONE_WT;
 	is->wordtypepos=icharline-1;
 	commentlevel=-1;
+	startofline=0;
       } else if(lastc=='*'){
 	is->wordtype=NONE_WT;
 	if(commentlevel>=1){
@@ -1199,34 +1216,37 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 	    blockinfocurrent=append_block_infoS(is,blockinfocurrent,"red",is->wordtypepos,icharline+1);
 	  }
 	}
+	startofline=0;
       } else if(!commentlevel){
 	blockinfocurrent=check_word_color_cpp(is,blockinfocurrent,icharline,1);
       }
       break;
     case '(':
 	if(!commentlevel && is->braceslevel==0 && is->wordtype!=DQUOTE_WT){
-	  char* cw=Tcl_GetString(is->currentword);
-	  char* cipos=strstr(cw,"::");
-	  if(!cipos){
-	    blockinfocurrent=append_block_infoS(is,blockinfocurrent,"blue",is->wordtypepos,icharline);
-	  } else {
-	    blockinfocurrent=append_block_infoS(is,blockinfocurrent,"green",is->wordtypepos,
-		                                is->wordtypepos+cipos-cw+2);
-	    blockinfocurrent=append_block_infoS(is,blockinfocurrent,"blue",
-		                                is->wordtypepos+cipos-cw+2,icharline);
-	  }
-	  is->nextiscyan=0;
-	} else if(!commentlevel){
-	  blockinfocurrent=check_word_color_cpp(is,blockinfocurrent,icharline,1);
+	char* cw=Tcl_GetString(is->currentword);
+	char* cipos=strstr(cw,"::");
+	if(!cipos){
+	  blockinfocurrent=append_block_infoS(is,blockinfocurrent,"blue",is->wordtypepos,icharline);
+	} else {
+	  blockinfocurrent=append_block_infoS(is,blockinfocurrent,"green",is->wordtypepos,
+	    is->wordtypepos+cipos-cw+2);
+	  blockinfocurrent=append_block_infoS(is,blockinfocurrent,"blue",
+	    is->wordtypepos+cipos-cw+2,icharline);
 	}
-	break;
-    case ';':
+	is->nextiscyan=0;
+      } else if(!commentlevel){
+	blockinfocurrent=check_word_color_cpp(is,blockinfocurrent,icharline,1);
+      }
+      startofline=0;
+      break;
+      case ';':
       if(!commentlevel){
 	blockinfocurrent=check_word_color_cpp(is,blockinfocurrent,icharline,1);
 	if(is->wordtype!=DQUOTE_WT){
 	  finishedline=1;
 	}
       }
+      startofline=0;
       break;
     case '\n':
       if(commentlevel){
@@ -1252,21 +1272,29 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
       blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
       if(finishedline){
 	Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+	startofline=1;
       } else {
 	Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("c",-1));
+	startofline=0;
       }
       break;
     default:
       if(commentlevel || is->wordtype==DQUOTE_WT){
 	// nothing
       } else if(is->wordtype==NONE_WT){
+	if(startofline && c=='#'){
+	  Tcl_Obj *objPtr;
+	  Tcl_ListObjIndex(is->ip,blockinfocurrent,0,&objPtr);
+	  Tcl_SetIntObj(objPtr,0);
+	}
 	if(isalnum(c) || c=='_' || c=='#' || c==':' || c==','){
 	  is->wordtype=W_WT;
 	  is->wordtypepos=icharline;
 	  is->currentword=Tcl_ResetString(is->currentword);
 	  is->currentword=Tcl_CopyIfShared(is->currentword);
 	  Tcl_AppendToObj(is->currentword,&c,1);
-	  finishedline=0;
+	  //finishedline=0;
+	  startofline=0;
 	}
       } else if(is->wordtype==W_WT){
 	if(isalnum(c) || c=='_' || c=='#' || c==':' || c==','){

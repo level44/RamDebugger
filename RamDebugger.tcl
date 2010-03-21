@@ -6788,8 +6788,16 @@ proc RamDebugger::CheckText { command args } {
 
     if { ![info exists instrumentedfilesInfo($currentfile)] } { return }
 
-    while { $l1_old > 1 && [lindex [lindex $instrumentedfilesInfo($currentfile) \
-		                        [expr $l1_old-1]] 1] != "n" } {
+    while { $l1_old > 1 } {
+	if { [lindex $instrumentedfilesInfo($currentfile) $l1_old-1 1] eq "n" } {
+	    set found 1
+	} else {
+	    set found 0
+	}
+	if { $filetype eq "C/C++" && [regexp {^\s*(#|//|/\*)} [$text get $l1_old.0 "$l1_old.0 lineend"]] } {
+	    set found 0
+	}
+	if { $found } { break }
 	incr l1_new -1
 	incr l1_old -1
     }
