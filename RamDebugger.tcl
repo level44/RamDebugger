@@ -3577,6 +3577,19 @@ proc RamDebugger::SavePreferences { { raise_error 0 } } {
     }
 }
 
+proc RamDebugger::SetPreference { name value } {
+    variable options
+    set options($name) $value
+}
+
+proc RamDebugger::GetPreference { name { default "" } } {
+    variable options
+    if { [info exists options($name)] } {
+	return $options($name)
+    }
+    return $default
+}
+
 proc RamDebugger::ApplyColorPrefs { t } {
     variable options
     

@@ -2381,10 +2381,14 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
 	-columns $columns -expand 1 \
 	-selectmode browse -showlines 0 -indent 0 -width 650
     $w set_uservar_value tree $f1.tree
+
+    set searchList [RamDebugger::GetPreference debug_cplus_attach_search_list]
     
-    ttk::entry $f1.e1 -textvariable [$w give_uservar search ""] -width 12
-    
+    ttk::combobox $f1.e1 -textvariable [$w give_uservar search] -width 12 -values $searchList
+	
     $w add_trace_to_uservar search [list RamDebugger::DebugCplusPlusWindowAttach_search $w]
+    
+    $w set_uservar_value search [lindex $searchList 0]
     
     ttk::button $f1.b1 -image actcross16 -style Toolbutton \
 	-command "[list $w set_uservar_value search ""] ; [list focus $f1.e1]"
@@ -2417,6 +2421,11 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
 	if { [llength $item] == 1 } {
 	    lassign [$f1.tree item text $item] cmd pid
 	    rdebug -debugcplusplus [list  $pid "" $cmd]
+	    set search [string trim [$w give_uservar_value search]]
+	    if { $search ne "" } {
+		set searchList [linsert0 -max_len 10 $searchList $search]
+		RamDebugger::SetPreference debug_cplus_attach_search_list $searchList
+	    }
 	    break
 	}
 	set action [$w waitforwindow]
