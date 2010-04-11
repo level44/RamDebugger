@@ -4812,8 +4812,13 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
 }
 
 proc RamDebugger::DisconnectStop {} {
+    variable mainframe
+    
     if { [catch [list RamDebugger::rdebug -disconnect] errstring] } {
-	WarnWin $errstring
+	set w [winfo toplevel $mainframe]
+	set menu1 $w.actualizeprogramsmenu
+	tk_popup $menu1 [winfo pointerx .] [winfo pointery .]
+	#WarnWin $errstring
     }
 }
 
@@ -9307,10 +9312,34 @@ proc RamDebugger::insert_translation_cmd {} {
     } else {
 	set i [$text index insert]
 	lassign [list $i $i] s1 s2
+	set s1_save $s1
+	while { [$text compare $s1 > "$s1 linestart"] && [regexp {[\w\s\"%]} [$text get "$s1-1c"]] } {
+	    if { $s1 ne $s1_save && [$text get $s1] eq {"} } { break }
+	    set s1 [$text index "$s1-1c"]
+	}
+	if { [$text get "$s1"] ne {"} } {
+		set s1 $s1_save
+		while { [$text compare $s1 > "$s1 linestart"] && [regexp {[\w\"%]} [$text get "$s1-1c"]] } {
+		    set s1 [$text index "$s1-1c"]
+		}
+		set rex {[\w%]}
+	    } else {
+		set rex {[\w\s%\"]}
+	    }
+	    while { [$text compare $s2 < "$s2 lineend"] && [regexp $rex [$text get "$s2+1c"]] } {
+	    if { [$text get $s2] eq {"} } { break }
+	    set s2 [$text index "$s2+1c"]
+	}
     }
     if { [$text get "$s1"] ne {"} } {
 	$text insert $s1 {"}
 	set s2 [$text index "$s2+1c"]
+    } elseif { [regexp {\[([_=])\s+} [$text get "$s1-3c" $s1] {} cmd] } {
+	switch -- $cmd {
+	    "_" { $text replace "$s1-2c" "$s1-1c" "=" }
+	    "=" { $text replace "$s1-2c" "$s1-1c" "_" }
+	}
+	return
     }
     $text insert $s1 "\[_ "
     set s2 [$text index "$s2+3c"]
