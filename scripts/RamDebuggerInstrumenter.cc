@@ -1302,6 +1302,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
 	  Tcl_AppendToObj(is->currentword,&c,1);
 	} else {
 	  blockinfocurrent=check_word_color_cpp(is,blockinfocurrent,icharline,1);
+	  finishedline=0;
 	}
       }
     }
