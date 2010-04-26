@@ -6368,16 +6368,18 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 
     set data [$textstack get "$idx linestart" "$idx lineend"]
     set rex {^\#([0-9]+)}
-    if { ![regexp $rex $data] && [$textstack compare "$idx linestart" > 1.0] } {
+    while { ![regexp $rex $data] && [$textstack compare "$idx linestart" > 1.0] } {
 	set prevline [$textstack get "$idx -1 line linestart" "$idx -1 line lineend"]
-	if { ![regexp $rex $prevline] } {
-	    set data "$prevline $data"
-	}
+	set data "$prevline $data"
+	set idx [$textstack index "$idx -1 line linestart"]
     }
-    if { [regexp $rex $data] && [$textstack compare "$idx lineend" < "end-1l"] } {
+    while { [regexp $rex $data] && [$textstack compare "$idx lineend" < "end-1l"] } {
 	set nextline [$textstack get "$idx +1 line linestart" "$idx +1 line lineend"]
 	if { ![regexp $rex $nextline] } {
 	    set data "$data $nextline"
+	    set idx [$textstack index "$idx +1 line linestart"]
+	} else {
+	    break
 	}
     }
     foreach pattern [list {((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+)} \
@@ -8980,7 +8982,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		}
 	    }
 	    regsub -all {(?q)$units} $comm $units comm
-	    bind all <$but> $comm
+	    bind Text <Button-$but> ""
+	    bind all <Button-$but> $comm
 	}
     } else {
 	bind Text <MouseWheel> ""

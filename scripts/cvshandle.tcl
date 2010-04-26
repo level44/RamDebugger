@@ -1844,10 +1844,20 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign [lindex $files_list 0] mode dir file
 	    cd $dir
 	    set err [catch { parse_finfo [exec fossil finfo $file] } ret]
+	    if { $err } {
+		set err_version [catch { exec fossil version }]
+		set err_info [catch { exec fossil info }]
+	    }
 	    cd $pwd
 	    if { $err } {
-		snit_messageBox -message [_ "Fossil version is too old. It needs subcommand 'finfo'. Please, upgrade"] \
-		    -parent $w
+		if { $err_version } {
+		    set txt [_ "Fossil executable is not installed or not in the PATH"]
+		} elseif { $err_info } {
+		    set txt [_ "File not located in a fossil checkout"]
+		} else {
+		    set txt [_ "Fossil version is too old. It needs subcommand 'finfo'. Please, upgrade"]
+		}
+		snit_messageBox -message $txt -parent $w
 		return
 	    }
 	    set wD $w.diffs
