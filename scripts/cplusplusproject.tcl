@@ -2384,12 +2384,11 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
 
     set searchList [RamDebugger::GetPreference debug_cplus_attach_search_list]
     
+    $w set_uservar_value search [lindex $searchList 0]
     ttk::combobox $f1.e1 -textvariable [$w give_uservar search] -width 12 -values $searchList
 	
     $w add_trace_to_uservar search [list RamDebugger::DebugCplusPlusWindowAttach_search $w]
-    
-    $w set_uservar_value search [lindex $searchList 0]
-    
+       
     ttk::button $f1.b1 -image actcross16 -style Toolbutton \
 	-command "[list $w set_uservar_value search ""] ; [list focus $f1.e1]"
     
