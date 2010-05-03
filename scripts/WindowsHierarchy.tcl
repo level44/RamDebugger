@@ -72,20 +72,65 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	}
 	if { [winfo class WIDGET] eq "Panedwindow" } {
 	    append retval "PANEDWINDOW MASTER\n"
+	    set retval_in ""
 	    foreach i [WIDGET panes] {
-		append retval "    $i [WIDGET paneconfigure $i]\n"
+		append retval_in "    $i [WIDGET paneconfigure $i]\n"
+		while { [string length $retval_in] > 80 } {
+		    append retval "[string range $retval_in 0 79]\n"
+		    set retval_in "        [string range $retval_in 80 end]"
+		}
+		if { [string length $retval_in] > 40 } {
+		    append retval "$retval_in\n"
+		    set retval_in ""
+		}
+	    }
+	    if { $retval_in ne "" } {
+		if { [string index $retval_in end] != "\n" } {
+		    append retval_in \n
+		}
+		append retval $retval_in
 	    }
 	}
 	if { [winfo class WIDGET] eq "TPanedwindow" } {
 	    append retval "TKPANEDWINDOW MASTER\n"
+	    set retval_in ""
 	    foreach i [WIDGET panes] {
-		append retval "    $i [WIDGET pane $i]\n"
+		append retval_in "    $i [WIDGET pane $i]\n"
+		while { [string length $retval_in] > 80 } {
+		    append retval "[string range $retval_in 0 79]\n"
+		    set retval_in "        [string range $retval_in 80 end]"
+		}
+		if { [string length $retval_in] > 40 } {
+		    append retval "$retval_in\n"
+		    set retval_in ""
+		}
+	    }
+	    if { $retval_in ne "" } {
+		if { [string index $retval_in end] != "\n" } {
+		    append retval_in \n
+		}
+		append retval $retval_in
 	    }
 	}
 	if { [winfo class WIDGET] eq "TNotebook" } {
 	    append retval "TNOTEBOOK MASTER\n"
+	    set retval_in ""
 	    foreach i [WIDGET tabs] {
-		append retval "    $i [WIDGET tab $i]\n"
+		append retval_in "    $i [WIDGET tab $i]\n"
+		while { [string length $retval_in] > 80 } {
+		    append retval [string range $retval_in 0 79]\n
+		    set retval_in "        [string range $retval_in 80 end]"
+		}
+		if { [string length $retval_in] > 40 } {
+		    append retval "$retval_in\n"
+		    set retval_in ""
+		}
+	    }
+	    if { $retval_in ne "" } {
+		if { [string index $retval_in end] != "\n" } {
+		    append retval_in \n
+		}
+		append retval $retval_in
 	    }
 	}
 	append retval "OPTIONS\n"
@@ -94,17 +139,19 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	    append retval_in "[lindex $i 0] [WIDGET cget [lindex $i 0]] "
 	    while { [string length $retval_in] > 80 } {
 		append retval [string range $retval_in 0 79]\n
-		set retval_in [string range $retval_in 80 end]
+		set retval_in "        [string range $retval_in 80 end]"
 	    }
 	    if { [string length $retval_in] > 40 } {
-		append retval $retval_in\n
+		append retval "$retval_in\n"
 		set retval_in ""
 	    }
 	}
-	if { [string index $retval_in end] != "\n" } {
-	    append retval_in \n
+	if { $retval_in ne "" } {
+	    if { [string index $retval_in end] != "\n" } {
+		append retval_in \n
+	    }
+	    append retval $retval_in
 	}
-	append retval $retval_in
 	append retval "SIZES\n"
 	append retval "    width=[winfo width WIDGET] reqwidth=[winfo reqwidth WIDGET]\n"
 	append retval "    height=[winfo height WIDGET] reqheight=[winfo reqheight WIDGET]\n"
