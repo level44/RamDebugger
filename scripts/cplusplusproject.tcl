@@ -2378,6 +2378,7 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
     package require fulltktree
     fulltktree $f1.tree -selecthandler2 \
 	"[list $w invokeok];#" \
+	-contextualhandler_menu [list RamDebugger::DebugCplusPlusWindowAttach_contextual $w] \
 	-columns $columns -expand 1 \
 	-selectmode browse -showlines 0 -indent 0 -width 650
     $w set_uservar_value tree $f1.tree
@@ -2430,6 +2431,18 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
 	set action [$w waitforwindow]
     }
     destroy $w
+}
+
+proc RamDebugger::DebugCplusPlusWindowAttach_contextual { w tree menu item itemList } {
+
+    set pid [$tree item text $item 1]
+    $menu add command -label [_ "Kill process"] -command \
+	[list RamDebugger::DebugCplusPlusWindowAttach_kill $w $pid]
+}
+
+proc RamDebugger::DebugCplusPlusWindowAttach_kill { w pid } {
+    cu::kill $pid
+    DebugCplusPlusWindowAttach_update $w
 }
 
 proc RamDebugger::DebugCplusPlusWindowAttach_update { w } {
