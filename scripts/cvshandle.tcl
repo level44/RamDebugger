@@ -1,7 +1,6 @@
 
-package require textutil
-package require base64
-package require sha1
+package require Tk 8.5
+#package require textutil
 
 namespace eval RamDebugger::CVS {
     variable cvsrootdir
@@ -130,6 +129,8 @@ proc RamDebugger::CVS::_ManageAutoSaveDo {} {
 proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
     variable cvsworkdir
     variable null
+
+    package require sha1
 
     RamDebugger::WaitState 1
 
@@ -1957,7 +1958,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 
 if { $argv0 eq [info script] } {
     wm withdraw .
-    package require compass_utils
+    source [file join [file dirname [info script]] mini_compass_utils.tcl]
+    #package require compass_utils
     set RamDebugger::currentfile ""
     set RamDebugger::topdir [file dirname [info script]]
     set RamDebugger::CVS::try_threaded debug
