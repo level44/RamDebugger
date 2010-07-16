@@ -3174,7 +3174,7 @@ proc RamDebugger::OpenProgram { args } {
 	visualregexp { set file [file join $topdir addons visualregexp visual_regexp.tcl] }
 	tkcvs {
 	    set file [file join $topdir addons tkcvs bin tkcvs.tcl]
-	    if {  [llength $args] == 0 && [file isdirectory [file dirname $currentfile]] } {
+	    if {  [llength $argv] == 0 && [file isdirectory [file dirname $currentfile]] } {
 		lappend argv -dir [file dirname $currentfile]
 	    }
 	}
