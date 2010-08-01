@@ -6366,6 +6366,7 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     variable currentfile
     variable options
 
+    set idx [$textstack index $idx]
     set data [$textstack get "$idx linestart" "$idx lineend"]
     set rex {^\#([0-9]+)}
     while { ![regexp $rex $data] && [$textstack compare "$idx linestart" > 1.0] } {
