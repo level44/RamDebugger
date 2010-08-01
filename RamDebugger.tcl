@@ -8820,7 +8820,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	catch { destroy $f.m }
 	menu $f.m
 	switch $page {
-	    stacktrace {
+	    stacktrace { 
+		set xt [expr {$x-[winfo rootx $f]}]
+		set yt [expr {$y-[winfo rooty $f]}]
+		$f.m add command -label [_ "Activate stack level"] -command \
+		    [list RamDebugger::StackDouble1 $f @$xt,$yt]
 		$f.m add checkbutton -label [_ "Auto raise stack trace"] -variable \
 		    RamDebugger::options(auto_raise_stack_trace)
 	    }
