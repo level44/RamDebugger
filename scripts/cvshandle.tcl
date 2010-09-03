@@ -700,6 +700,9 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
 	set directory ""
     }
     set script ""
+    append script "[list set ::control $::control]\n"
+    append script "[list set ::control_txt $::control_txt]\n"
+
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
 	    update_recursive_do1 update_recursive_accept update_recursive_cmd \
 	    waitstate parse_timeline parse_finfo] {
@@ -710,7 +713,8 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     append script "[list set RamDebugger::topdir $RamDebugger::topdir]\n"
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory $current_or_last]\n"
-	
+    
+
     if { $try_threaded eq "debug" } {
 	uplevel #0 $script
     } elseif { $try_threaded && $::tcl_platform(os) ne "Darwin" && $::tcl_platform(threaded) } {
@@ -720,8 +724,6 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     } else {
 	if { ![interp exists update_recursive_intp] } {
 	    interp create update_recursive_intp
-	    update_recursive_intp eval [list set ::control $::control]
-	    update_recursive_intp eval [list set ::control_txt $::control_txt]
        }
 	update_recursive_intp eval $script
     }
