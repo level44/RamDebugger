@@ -8180,6 +8180,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     
     set tktablet_ok [expr {![catch { package require tktablet }]}]
 
+    if { $::tcl_platform(os) eq "Darwin" } {
+	set tktablet_ok 0 
+    }
+    
     if { !$iswince && $tktablet_ok && [info commands ::tktablet::init_input_panel] ne "" } {
 	tktablet::init_input_panel
 	tktablet::init_input_panel_text
@@ -8734,10 +8738,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	event add <<Contextual>> <ButtonRelease-3>
 	event add <<Contextual>> <App>
 	set ::control Control
+	set ::control_txt Ctrl
     } elseif { [tk windowingsystem] eq "aqua" } {
 	event add <<ContextualPress>> <ButtonPress-2>
 	event add <<Contextual>> <ButtonRelease-2>
 	set ::control Command
+	set ::control_txt Command
 	
 	foreach ev [bind Text] {
 	    if { [regsub {Control} $ev {Command} evC] } {
@@ -8748,6 +8754,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	event add <<ContextualPress>> <ButtonPress-3>
 	event add <<Contextual>> <ButtonRelease-3>
 	set ::control Control
+	set ::control_txt Ctrl
     }
     bind $marker <<Contextual>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
     

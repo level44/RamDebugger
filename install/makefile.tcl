@@ -105,7 +105,12 @@ regsubfiles [list \
 set createdistribution::doencrypt 0
 #set createdistribution::encrypt_packages_list [list compass_utils]
 
-set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib starkit tkdnd]
+set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib]
+
+if { $::tcl_platform(os) ne "Darwin" } {
+    lappend createdistribution::add_packages tkdnd
+}
+
 lappend createdistribution::remove_packages trf bwidget \
     vfs vfs::ftp he_dialog wce compass_utils compass_utils::c \
     textutil::adjust textutil::repeat \
@@ -188,6 +193,7 @@ if { $tcl_platform(platform) eq "unix" } {
     set ipos [lsearch $exts [info sharedlibextension]]
     set exts [lreplace $exts $ipos $ipos]
     foreach ext $exts {
+	if { ![file exists $topdir/libs/RamDebuggerInstrumenter6_x32$ext] } { continue }
 	file copy -force $topdir/libs/RamDebuggerInstrumenter6_x32$ext $topdir/scripts
     }
     CreateDistribution zip $program_name-source  $topdir RamDebugger.tcl \
