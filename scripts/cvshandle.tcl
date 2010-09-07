@@ -1150,7 +1150,8 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	foreach i [$tree item children $item] { $tree item delete $i }
     }
     set olddir [pwd]
-    cd $dir
+    set err [catch { cd $dir } ret]
+    if { $err } { return }
 
     set has_vcs 0
     if { [file exists [file join $dir CVS]] } {
