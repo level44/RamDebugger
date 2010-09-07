@@ -3290,7 +3290,7 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
 	    set x [winfo x $t]
 	}
 	if { !$view_all_simple } {
-	    wm geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
+	    cu::set_window_geometry $t [winfo width $fulltext]x[winfo height $t]+$x+[winfo y $t]
 	}
 	set options(ViewOnlyTextOrAll) OnlyText
     } else {
@@ -3319,14 +3319,14 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
 	
 	incr width [expr {$delta+$delta_ext}]
 	if { !$view_all_simple } {
-	    wm geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
+	    cu::set_window_geometry $t ${width}x[winfo height $t]+$x+[winfo y $t]
 	}
 	set options(ViewOnlyTextOrAll) All
     }
     set geomkey maingeometry_$options(ViewOnlyTextOrAll)
     if { [info exists options($geomkey)] && !$view_all_simple } {
 	if { $options($geomkey) eq "zoomed" } {
-	    wm geom $w 800x600+0+0
+	    cu::set_window_geometry $w 800x600+0+0
 	    if { $::tcl_platform(platform) eq "windows" } {
 		wm state $w zoomed
 	    } else {
@@ -4868,7 +4868,7 @@ proc RamDebugger::ChooseViewFile { what args } {
     set w $text
 
     if { [winfo exists $w._choosevf] } {
-	wm geometry $w._choosevf [wm geometry $w._choosevf]
+	cu::set_window_geometry $w._choosevf [wm geometry $w._choosevf]
     }
 
     set entrylen 16
@@ -9171,7 +9171,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	if { [regexp {(\d+)x(\d+)[+]([-\d]+)[+]([-\d]+)} $options($geomkey) {} wi he xpos ypos] } {
 	    incr xpos 20
 	    incr ypos 20
-	    wm geometry $w ${wi}x$he+$xpos+$ypos
+	    cu::set_window_geometry $w ${wi}x$he+$xpos+$ypos
 	    if { [info exists options(currentfile)] && \
 		     [AreFilesEqual $options(currentfile) \
 		          [sendmaster set ::RamDebugger::currentfile]] } {
@@ -9195,7 +9195,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    }
 	    wm geometry $w 800x600+0+0
 	} else {
-	    wm geometry $w $options($geomkey)
+	    cu::set_window_geometry $w $options($geomkey)
 	}
     }
 

@@ -599,7 +599,7 @@ proc cu::get_program_preferences { args } {
 }
 
 ################################################################################
-#    cu::give_window_geometry
+#    cu::set_window_geometry u::give_window_geometry
 ################################################################################
 
 proc cu::give_window_geometry { w } {
@@ -611,6 +611,17 @@ proc cu::give_window_geometry { w } {
 	incr y -24
     }
     return ${width}x$height$m1$x$m2$y
+}
+
+proc cu::set_window_geometry { w geometry } {
+
+    regexp {(\d+)x(\d+)([-+])([-\d]\d*)([-+])([-\d]+)} $geometry {} width height m1 x m2 y
+    if { $x < 0 } { set x 0 }
+    if { $y < 0 } { set y 0 }
+    if { $x > [winfo screenwidth $w]-100 } { set x [expr {[winfo screenwidth $w]-100}] }
+    if { $y > [winfo screenheight $w]-100 } { set y [expr {[winfo screenheight $w]-100}] }
+
+    wm geometry $w ${width}x$height$m1$x$m2$y
 }
 
 ################################################################################
