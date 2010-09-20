@@ -1369,6 +1369,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    if { !$is_timeline && ($has_cvs || $has_fossil) } {
 		$menu add command -label [_ "View diff"] -accelerator $::control_txt-d -command \
 		    [list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
+		$menu add command -label [_ "View diff (ignore blanks)"] -command \
+		    [list "update_recursive_cmd" $w open_program tkdiff_ignore_blanks $tree $sel_ids]
 		set need_sep 1
 	    }
 	    if { $cvs_active } {
@@ -1678,11 +1680,16 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set sel_ids [$tree selection get]
 	    }
 	    switch $what_in {
-		tkdiff {
+		tkdiff - tkdiff_ignore_blanks {
 		    set files_list ""
 		    set fileF ""
 		    set pwd [pwd]
 		    set errList ""
+		    if { $what_in eq "tkdiff_ignore_blanks" } {
+		        set ignore_blanks -b
+		    } else {
+		        set ignore_blanks ""
+		    }
 		    foreach file $files {
 		        cd [file dirname $file]
 		        set err [catch { exec fossil info } info]
@@ -1778,7 +1785,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                set c [string range $checkin 0 9]
 		                exec fossil artifact $artifact $file.$c.$date
 
-		                set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff $file $file.$c.$date } ret]
+		                set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks \
+		                            $file $file.$c.$date } ret]
 		                if { $err } {
 		                    lappend errList $ret
 		                }
