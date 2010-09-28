@@ -122,6 +122,19 @@ lappend createdistribution::remove_packages trf bwidget \
 
 set createdistribution::libdir ""
 
+if { $::tcl_platform(platform) eq "windows" && !$iswince } {
+    set exeList [list cat.exe cvs.exe diff.exe grep.exe kill.exe tlist.exe]
+} elseif { $::tcl_platform(os) eq "Darwin" } {
+    set exeList [list cvs]
+} else {
+    set exeList ""
+}
+foreach i $exeList {
+    if { ![file exists [file join .. addons exe $i]] } {
+	error "file '[file normalize [file join .. addons exe]]' does not exist"
+    }
+}
+
 set files [list addons scripts help]
 
 if { $fossil } {
