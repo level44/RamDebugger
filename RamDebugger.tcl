@@ -9217,11 +9217,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	::etcl::autofit $w
 	bind $w <ConfigureRequest> {::etcl::autofit %W}
     }
-
+    
+    set menu [$mainframe getmenu activeprograms]
     if { [ tk windowingsystem] eq "aqua" } {
 	ActualizeActivePrograms $menu
     } else {
-	set menu [$mainframe getmenu activeprograms]
 	$menu configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu 1]
     }
 
