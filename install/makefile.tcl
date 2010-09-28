@@ -122,7 +122,7 @@ lappend createdistribution::remove_packages trf bwidget \
 
 set createdistribution::libdir ""
 
-if { $::tcl_platform(platform) eq "windows" && !$iswince } {
+if { $::tcl_platform(platform) eq "windows" } {
     set exeList [list cat.exe cvs.exe diff.exe grep.exe kill.exe tlist.exe]
 } elseif { $::tcl_platform(os) eq "Darwin" } {
     set exeList [list cvs]
