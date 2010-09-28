@@ -1066,7 +1066,7 @@ proc RamDebugger::PreferencesWindow {} {
     $nb add $fd -text [_ Directories] -sticky nsew
 
     set sw [ScrolledWindow $fd.lf -relief sunken -borderwidth 0]
-    listbox $sw.lb -listvariable DialogWin::user(executable_dirs) -selectmode extended
+    listbox $sw.lb -listvariable [$w give_uservar executable_dirs] -selectmode extended
     $sw setwidget $sw.lb
     
     ttk::frame $fd.bbox1
@@ -1088,6 +1088,8 @@ proc RamDebugger::PreferencesWindow {} {
 
     set tt [_ "Include here all directories where RamDebugger should find executables\n\
 	    This is primary useful in Windows to describe where mingw is installed"]
+    append tt "\n[_ "These directories are also added to the 'auto_path' variable. So they will be used to find TCL packages"]"
+
     tooltip::tooltip $sw.lb $tt
 
     grid $fd.lf -sticky nsew

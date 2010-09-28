@@ -9,6 +9,7 @@ namespace eval RamDebugger::CVS {
     variable lasttimeautosave ""
     variable autosave_after ""
     variable autosaveidle_after ""
+    #variable try_threaded debug
     variable try_threaded 1
 }
 

@@ -261,7 +261,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
 	    file mkdir $exe
 	}
 	foreach i $exeList {
-	    file copy -force [file join $topdir addons exe $i] $exe
+	    if { [file exists [file join $topdir addons exe $i]] } {
+		file copy -force [file join $topdir addons exe $i] $exe
+	    }
 	}
     }
     set dirs ""
@@ -466,6 +468,16 @@ proc RamDebugger::UpdateExecDirs {} {
 	set ::env(PATH) [join $list \;]
 	# this is a variable from the TCL library
 	array unset ::auto_execs
+    }
+    
+    set dirs ""
+    foreach i $options(executable_dirs) {
+	if { $i ni $::auto_path } {
+	    lappend dirs $i
+	}
+    }
+    if { [llength $dirs] } {
+	set ::auto_path [linsert $::auto_path 0 {*}$dirs]
     }
 }
 
