@@ -618,9 +618,11 @@ proc cu::set_window_geometry { w geometry } {
     regexp {(\d+)x(\d+)([-+])([-\d]\d*)([-+])([-\d]+)} $geometry {} width height m1 x m2 y
     if { $x < 0 } { set x 0 }
     if { $y < 0 } { set y 0 }
+    if { [ tk windowingsystem] eq "aqua" } {
+	if { $y < 20 } { set y 20 }
+    }
     if { $x > [winfo screenwidth $w]-100 } { set x [expr {[winfo screenwidth $w]-100}] }
     if { $y > [winfo screenheight $w]-100 } { set y [expr {[winfo screenheight $w]-100}] }
-
     wm geometry $w ${width}x$height$m1$x$m2$y
 }
 
