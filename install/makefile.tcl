@@ -50,6 +50,7 @@ set pNode [lindex $pNodes 0]
 set program_name [$pNode selectNodes string(Name)]
 set version [$pNode selectNodes string(Version)]
  
+set architecture ""
 if { $tcl_platform(os) eq "Darwin" } {
     set dist_type starpack
     set dist macosx
