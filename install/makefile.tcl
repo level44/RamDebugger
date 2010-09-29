@@ -93,7 +93,7 @@ if { $copy_remote } {
 	lappend filesList [list $program_name$version-macosx.dmg $program_name-current-macosx.dmg]
     }
     set remote_dir "/home/ftp/pub/ramdebugger"
-    set host ramsan@ftp.compassis.com
+    set host gidweb@ftp.compassis.com
 
     puts "starting copy remote..."
     copy_remote $filesList $remote_dir $host
