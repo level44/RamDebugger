@@ -22,14 +22,43 @@
 	    ul { text-align:justify; font-family:Arial, Helvetica, sans-serif; font-size: 17; 
 		margin-top: 7px; }
 	</style>
-        <title>Windows hierarchy</title>
+        <title>Expressions window</title>
     </head>
     <body>
-        <a name="Usage&gt;Windows hierarchy"/>
-        <h3>Windows hierarchy</h3>
-        <p>With this command, it is possible to draw a graph of the widgets hierarchy in either
-the debugged program or in RamDebugger. Moving the cursor over the widgets names, it
-is possible to obtain some information on the widget and on its packing/gridding
-options.</p>
+        <a name="Usage&gt;Expressions window"/>
+        <h3>Expressions window</h3>
+        <p>To open the window use: <code>Debug-&gt;Expressions...</code>
+        </p>
+        <p>Examples of possible expressions in TCL:</p>
+        <ul>
+            <li>
+                <b>variablename</b>
+: Enter the name of a variable            </li>
+            <li>
+                <b>$variablename+4</b>
+: Enter a expression like the ones accepted by <b>expr</b>
+            </li>
+            <li>
+                <b>[lindex $variablename 2]</b>
+: Enter any command between brackets            </li>
+            <li>
+                <b>[set variablename 6]</b>
+: modify variable            </li>
+        </ul>
+        <p>Examples of possible expressions in C++:</p>
+        <ul>
+            <li>
+                <b>variablename</b>
+: Enter the name of a variable            </li>
+            <li>
+                <b>$variablename+4</b>
+: Enter any expression that <b>gdb</b>
+ accepts            </li>
+            <li>
+                <b>$variablename[4:2][6::8]</b>
+: One extension to the <b>gdb</b>
+ expressions. Permmits to
+print part of a string or vector            </li>
+        </ul>
     </body>
 </html>

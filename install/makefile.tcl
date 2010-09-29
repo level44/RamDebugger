@@ -56,6 +56,10 @@ if { $tcl_platform(os) eq "Darwin" } {
 } elseif { $tcl_platform(platform) ne "windows" } {
     set dist_type starpack
     set dist linux
+    switch $tcl_platform(machine) {
+	"x86_64" { set architecture amd64 }
+	default { set architecture i386 }
+    }
 } else {
     set dist_type starpack
     set dist windows
@@ -77,16 +81,16 @@ if { $clean } {
 if { $copy_remote } {
     set filesList ""
     if { $tcl_platform(platform) eq "windows" } {
-	lappend filesList [list $program_name$version-$dist.zip $program_name-$dist.zip]
+	lappend filesList [list $program_name$version-$dist.zip $program_name-current-$dist.zip]
 	#lappend filesList [list setup-$program_name$version-$dist.exe setup-$program_name-$dist.exe]
     } elseif { $tcl_platform(os) ne "Darwin" } {
 	set exe [string tolower $program_name]
-	lappend filesList [list ${exe}$version-linux_i386.tar.gz ${exe}-linux_i386.tar.gz]
-	lappend filesList [list ${exe}_$version-1_i386.deb ${exe}_i386.deb]
-	lappend filesList [list ${program_name}-source$version.zip ${program_name}-source.zip]
+	lappend filesList [list ${exe}$version-linux_$architecture.tar.gz ${exe}-current-linux_$architecture.tar.gz]
+	lappend filesList [list ${exe}_$version-1_$architecture.deb ${exe}_current_$architecture.deb]
+	lappend filesList [list ${program_name}-source$version.zip ${program_name}-source-current.zip]
 	## RPM ???
     } else {
-	lappend filesList [list  $program_name$version-macosx.dmg $program_name-macosx.dmg]
+	lappend filesList [list $program_name$version-macosx.dmg $program_name-current-macosx.dmg]
     }
     set remote_dir "/home/ftp/pub/ramdebugger"
     set host ramsan@ftp.compassis.com
@@ -164,7 +168,7 @@ if { $tcl_platform(platform) eq "windows" } {
     file delete README.txt
 } elseif { $tcl_platform(os) ne "Darwin" } {
     set exe [string tolower $program_name]
-    set tarfile ${exe}$version-linux_i386.tar.gz
+    set tarfile ${exe}$version-linux_$architecture.tar.gz
 
     set dir $exe$version
     file delete -force $dir
@@ -172,11 +176,11 @@ if { $tcl_platform(platform) eq "windows" } {
     file copy {*}$files $dir
     copy_filesFT $dir $filesFT
 
-    create_README $pNode $dir/README
+    create_README -architecture $architecture $pNode $dir/README
     file copy license.terms $dir/License.txt
     clean_vcs_dirs $dir
     CreateTarGzDist $tarfile $dir
-    set deb [create_debian_package $pNode $dir ".RamDebugger .ramdebugger_prefs" \
+    set deb [create_debian_package -architecture $architecture $pNode $dir ".RamDebugger .ramdebugger_prefs" \
 	    $topdir/addons/ramdebugger.png]
     #exec sudo alien --to-rpm --scripts $deb
     
@@ -192,7 +196,7 @@ if { $tcl_platform(platform) eq "windows" } {
 file delete $exe
 
 if { $tcl_platform(platform) eq "unix" } {
-    create_README -tcl_source_dist RamDebugger.tcl $pNode README
+    create_README -architecture $architecture  -tcl_source_dist RamDebugger.tcl $pNode README
     set files [list addons scripts Examples help pkgIndex.tcl]
     #lappend files [file normalize README]
     #lappend files [file normalize license.terms]

@@ -22,43 +22,27 @@
 	    ul { text-align:justify; font-family:Arial, Helvetica, sans-serif; font-size: 17; 
 		margin-top: 7px; }
 	</style>
-        <title>Expressions window</title>
+        <title>Revisions</title>
     </head>
     <body>
-        <a name="Usage&gt;Expressions window"/>
-        <h3>Expressions window</h3>
-        <p>To open the window use: <code>Debug-&gt;Expressions...</code>
-        </p>
-        <p>Examples of possible expressions in TCL:</p>
-        <ul>
-            <li>
-                <b>variablename</b>
-: Enter the name of a variable            </li>
-            <li>
-                <b>$variablename+4</b>
-: Enter a expression like the ones accepted by <b>expr</b>
-            </li>
-            <li>
-                <b>[lindex $variablename 2]</b>
-: Enter any command between brackets            </li>
-            <li>
-                <b>[set variablename 6]</b>
-: modify variable            </li>
-        </ul>
-        <p>Examples of possible expressions in C++:</p>
-        <ul>
-            <li>
-                <b>variablename</b>
-: Enter the name of a variable            </li>
-            <li>
-                <b>$variablename+4</b>
-: Enter any expression that <b>gdb</b>
- accepts            </li>
-            <li>
-                <b>$variablename[4:2][6::8]</b>
-: One extension to the <b>gdb</b>
- expressions. Permmits to
-print part of a string or vector            </li>
-        </ul>
+        <a name="Usage&gt;Revisions"/>
+        <h3>Revisions</h3>
+        <p>
+            <code>RamDebugger</code>
+ uses program <code>cvs</code>
+ in order to maintain revisions of the edited
+files. It creates automatically a CVS repository in a hidden directory and saves revisions
+of the files to that repository.        </p>
+        <p>It is possible to visualize the differences between two revisions or between one revision
+and current file by using menu command: Files-&gt;Revisions-&gt;Open revisions list. (it uses
+program <code>Tkdiff</code>
+ to visualize the differences.        </p>
+        <p>It is possible to remove revisions history for a set of selected files (in Files-&gt;Revision-&gt;
+View revised files). The history is removed but the file is not modified. It can save
+disk space.</p>
+        <p>It is possible to activate or deactivate the <code>Auto save</code>
+ feature in the preferences
+window (Edit-&gt;Preferences-&gt;Auto save). If activated, instead of making backups of the
+files it saves automatically revisions of the edited file at fixed intervals.        </p>
     </body>
 </html>
