@@ -954,9 +954,12 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     
     bind $w <$::control-d> [list "update_recursive_cmd" $w open_program tkdiff $f.toctree ""]
     bind $w <$::control-i> [list "update_recursive_cmd" $w commit $f.toctree ""]
+    bind $w <$::control-f> [list "update_recursive_cmd" $w open_program fossil_ui $f.toctree ""]
+
     bind $w <$::control-e> [list $w invokeok]
     bind $w <$::control-u> [list $w invokebutton 2]
     bind $f.e2 <$::control-i> "[bind $w <$::control-i>];break"
+    bind $f.e2 <$::control-f> "[bind $w <$::control-f];break"
 
     $w tooltip_button 1 [_ "View modified files and file to be updated from repository %s" $::control_txt-e]
     $w tooltip_button 2 [_ "Update files from repository %s" $::control_txt-u]
@@ -1384,7 +1387,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    $menu add command -label [_ "View diff window"]... -command \
 		        [list "update_recursive_cmd" $w diff_window $tree $sel_ids]
 		}
-		$menu add command -label [_ "Open fossil browser"] -command \
+		$menu add command -label [_ "Open fossil browser"] -accelerator $::control_txt-f -command \
 		    [list "update_recursive_cmd" $w open_program fossil_ui $tree $sel_ids]
 		$menu add separator
 		$menu add checkbutton -label [_ "Fossil autosync"] -variable \
@@ -1809,6 +1812,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    RamDebugger::OpenProgram tkcvs -dir [$w give_uservar_value dir]
 		}
 		fossil_ui {
+		    if { [llength $sel_ids] == 0 } {
+		        set sel_ids [$tree selection get]
+		        if { [llength $sel_ids] == 0 } { return }
+		    }
 		    set dirs ""
 		    foreach item $sel_ids {
 		        if { [$tree item text [$tree item parent $item] 0] eq [_ "Timeline"] } { continue }
