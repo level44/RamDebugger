@@ -557,9 +557,9 @@ proc RamDebugger::CVS::indicator_menu { cvs_indicator_frame x y } {
     
     destroy $cvs_indicator_frame.menu
     set menu [menu $cvs_indicator_frame.menu -tearoff 0]
-    $menu add command -label [_ "Open"] -command \
+    $menu add command -label [_ "Open"] -accelerator "Ctrl+7" -command \
 	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
-    $menu add command -label [_ "Open - current directory"] -command \
+    $menu add command -label [_ "Open - current directory"] -accelerator "Ctrl+Shift-7" -command \
 	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame current]
     $menu add separator
     $menu add command -label [_ "Differences"] -command \
@@ -697,6 +697,13 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     
     if { [file isdirectory [file dirname $RamDebugger::currentfile]] } {
 	set directory [file dirname $RamDebugger::currentfile]
+	set pwd [pwd]
+	cd $directory
+	if { [auto_execok fossil] ne "" && [catch { exec fossil info } info] == 0 } {
+	    regexp -line {^local-root:\s*(.*)} $info {} dirLocal
+	    set directory [string trimright $dirLocal /]
+	}
+	cd $pwd
     } else {
 	set directory ""
     }
@@ -1010,7 +1017,16 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 
     set tree [$w give_uservar_value tree]
     set files ""
+    set dirList ""
     foreach item [$tree selection get] {
+	set itemL $item
+	while { $itemL != 0 } {
+	    if { [file isdirectory [$tree item text $itemL 0]] } {
+		lappend dirList [$tree item text $itemL 0]
+		break
+	    }
+	    set itemL [$tree item parent $itemL]
+	}
 	if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
 	    lappend files $file
 	} elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
@@ -1039,25 +1055,54 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	    }
 	}
     }
+    
+    set dir [$w give_uservar_value dir]
+    if { [llength $dirList] } {
+	set pwd [pwd]
+	cd [lindex $dirList 0]
+	if { [catch { exec fossil info } info] == 0 } {
+	    regexp -line {^local-root:\s*(.*)} $info {} dir
+	}
+	cd $pwd
+    }
+    
     set pwd [pwd]
-    cd [$w give_uservar_value dir]
+    cd $dir
     set err [catch { parse_timeline [exec fossil timeline -n 2000 -t t] } ret]
     cd $pwd
     if { $err } { set ret "" }
-
-    set has_sep 0
+    
+    set ticketList ""
     foreach i $ret {
 	lassign $i date time checkin comment
-	if { [regexp {New ticket\s*(\[\w+\])\s+<i>(.*)</i>} $comment {} ticket message] } {
-	    if { !$has_sep } {
-		$menu add separator
-		set has_sep 1
+	if { [regexp {New ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
+	    set ipos [lsearch -exact -index 0 $ticketList $ticket]
+	    if { $ipos != -1 } {
+		#nothing
+	    } else {
+		lappend ticketList [list $ticket $message 1]
 	    }
-	    set txt1 [string range "$ticket $message" 0 100]...
-	    set txt2 "$ticket $message"
-	    $menu add command -label [_ "Insert ticket '%s'" $txt1] -command  \
-		[namespace code [list insert_in_entry $w $entry $txt2]]
+	} elseif { [regexp {Fixed ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
+	    set ipos [lsearch -exact -index 0 $ticketList $ticket]
+	    if { $ipos != -1 } {
+		lset ticketList $ipos 2 0
+	    } else {
+		lappend ticketList [list $ticket $message 0]
+	    }
 	}
+    }
+    set has_sep 0
+    foreach i $ticketList {
+	lassign $i ticket message active
+	if { !$active } { continue }
+	if { !$has_sep } {
+	    $menu add separator
+	    set has_sep 1
+	}
+	set txt1 [string range "$ticket $message" 0 80]...
+	set txt2 "$ticket $message"
+	$menu add command -label [_ "Insert ticket '%s'" $txt1] -command  \
+	    [namespace code [list insert_in_entry $w $entry $txt2]]
     }    
 }
 
@@ -1069,13 +1114,15 @@ proc RamDebugger::CVS::select_directory { w } {
 }
 
 proc RamDebugger::CVS::clear_entry { w entry } {
+    update
     $entry delete 1.0 end
-    focus $entry
+    tk::TabToWindow $entry
 }
 
 proc RamDebugger::CVS::insert_in_entry { w entry txt } {
+    update
     tk::TextInsert $entry $txt
-    focus $entry
+    tk::TabToWindow $entry
 }
 
 proc RamDebugger::CVS::update_recursive_do1 { w } {
@@ -1818,8 +1865,13 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    }
 		    set dirs ""
 		    foreach item $sel_ids {
-		        if { [$tree item text [$tree item parent $item] 0] eq [_ "Timeline"] } { continue }
-		        lappend dirs [$tree item text [$tree item parent $item] 0]
+		        set itemL $item
+		        while { $itemL != 0 } {
+		            if { [file isdirectory [$tree item text $itemL 0]] } {
+		                lappend dirs [$tree item text $itemL 0]
+		            }
+		            set itemL [$tree item parent $itemL]
+		        }
 		    }
 		    lappend dirs [$w give_uservar_value dir]
 		    set pwd [pwd]

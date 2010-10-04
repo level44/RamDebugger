@@ -9090,6 +9090,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
     bind $text <$::control-I> [list RamDebugger::Search $w iforward_get_insert]
+    bind $w <$::control-slash> [list RamDebugger::CVS::update_recursive . current] ;# control-shift-7
 
     set menu [$mainframe getmenu edit]
     $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift-I"
