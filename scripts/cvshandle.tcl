@@ -1082,7 +1082,7 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	    } else {
 		lappend ticketList [list $ticket $message 1]
 	    }
-	} elseif { [regexp {Fixed ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
+	} elseif { [regexp {(?:Fixed|Closed) ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
 	    set ipos [lsearch -exact -index 0 $ticketList $ticket]
 	    if { $ipos != -1 } {
 		lset ticketList $ipos 2 0
