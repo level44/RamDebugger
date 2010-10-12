@@ -1100,7 +1100,7 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	    set has_sep 1
 	}
 	set txt1 [string range "$ticket $message" 0 80]...
-	set txt2 "$ticket $message"
+	set txt2 "ticket $ticket $message"
 	$menu add command -label [_ "Insert ticket '%s'" $txt1] -command  \
 	    [namespace code [list insert_in_entry $w $entry $txt2]]
     }    
