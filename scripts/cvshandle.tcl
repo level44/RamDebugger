@@ -9,8 +9,8 @@ namespace eval RamDebugger::CVS {
     variable lasttimeautosave ""
     variable autosave_after ""
     variable autosaveidle_after ""
-    #variable try_threaded debug
-    variable try_threaded 1
+    variable try_threaded debug
+    #variable try_threaded 1
 }
 
 proc RamDebugger::CVS::Init {} {
@@ -712,7 +712,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
     append script "[list set ::control_txt $::control_txt]\n"
 
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
-	    update_recursive_do1 update_recursive_accept update_recursive_cmd \
+	    insert_ticket update_recursive_do1 update_recursive_accept update_recursive_cmd \
 	    waitstate parse_timeline parse_finfo] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
@@ -772,7 +772,8 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	set directories [linsert0 $directories $directory]
     }
     $w set_uservar_value directories $directories
-    $w set_uservar_value messages  [dict_getd $dict messages ""]
+    $w set_uservar_value messages [dict_getd $dict messages ""]
+    $w set_uservar_value ticket_status [dict_getd $dict ticket_status "Fixed"]
     
     if { [info command RamDebugger::CVS::document-open-16] eq "" } {
 	image create photo RamDebugger::CVS::document-open-16 -data {
@@ -936,6 +937,15 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	-menu $f.b3.m -style Toolbutton
     menu $f.b3.m -tearoff 0 -postcommand [namespace code [list messages_menu $w $f.b3.m  $f.e2]] 
     
+    ttk::label $f.l3 -text [_ "Change ticket status"]:
+    ttk::entry $f.e3 -textvariable [$w give_uservar tickets ""]
+    
+    tooltip::tooltip $f.e3 [_ "Enter a list of 'ticket unique ids' in order to change its status"]
+    
+    set statusList [list "" Open Verified Review Deferred Fixed Tested Closed]
+    ttk::combobox $f.cb1 -textvariable [$w give_uservar ticket_status] -width 8 \
+	-values $statusList -state readonly
+    
     package require fulltktree
     set columns [list [list 100 [_ "line"] left item 0]]
     fulltktree $f.toctree -height 350 \
@@ -945,14 +955,15 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	-contextualhandler_menu [list "update_recursive_cmd" $w contextual]
     $w set_uservar_value tree $f.toctree
     
-    grid $f.l0    -         -      -sticky w -padx 2 -pady 2
-    grid $f.l1 $f.e1 $f.b1 -sticky w -padx 2 -pady 2
-    grid $f.l2 $f.e2 $f.b2 -sticky w -padx 2 -pady 2
-    grid $f.sem         ^   $f.b3 -sticky w -padx 2 -pady 2
-    grid $f.toctree - - -sticky nsew
+    grid $f.l0    -      -   -      -sticky w -padx 2 -pady 2
+    grid $f.l1 $f.e1 - $f.b1 -sticky w -padx 2 -pady 2
+    grid $f.l2 $f.e2 - $f.b2 -sticky w -padx 2 -pady 2
+    grid $f.sem         ^  ^ $f.b3 -sticky w -padx 2 -pady 2
+    grid $f.l3  $f.e3  $f.cb1 - -sticky w -padx 2 -pady 2
+    grid $f.toctree - - - -sticky nsew
     grid configure $f.l2 -pady "2 0"
     grid configure $f.sem -pady 0
-    grid configure $f.e1 $f.e2 -sticky ew
+    grid configure $f.e1 $f.e2 $f.e3 -sticky ew
     grid columnconfigure $f 1 -weight 1
     grid rowconfigure $f 4 -weight 1
     
@@ -1068,26 +1079,45 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
     
     set pwd [pwd]
     cd $dir
-    set err [catch { parse_timeline [exec fossil timeline -n 2000 -t t] } ret]
-    cd $pwd
-    if { $err } { set ret "" }
-    
-    set ticketList ""
-    foreach i $ret {
-	lassign $i date time checkin comment
-	if { [regexp {New ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
-	    set ipos [lsearch -exact -index 0 $ticketList $ticket]
-	    if { $ipos != -1 } {
-		#nothing
-	    } else {
-		lappend ticketList [list $ticket $message 1]
-	    }
-	} elseif { [regexp {(?:Fixed|Closed) ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
-	    set ipos [lsearch -exact -index 0 $ticketList $ticket]
-	    if { $ipos != -1 } {
-		lset ticketList $ipos 2 0
-	    } else {
-		lappend ticketList [list $ticket $message 0]
+    set err [catch { exec fossil ticket show 0 "status=='Open'" } ret]
+    if { !$err } {
+	set fieds [split [lindex [split $ret \n] 0] \t]
+	set ipos_tkt_uuid [lsearch -exact $fieds tkt_uuid]
+	set ipos_title [lsearch -exact $fieds title]
+	if { $ipos_tkt_uuid == -1 || $ipos_title == -1 } {
+	    set err 1
+	}
+    }
+    if { !$err } {
+	set ticketList ""
+	foreach line [lrange [split $ret \n] 1 end] {
+	    set values [split $line \t]
+	    set ticket [lindex $values $ipos_tkt_uuid]
+	    set message [lindex $values $ipos_title]
+	    lappend ticketList [list "\[[string range $ticket 0 9]\]" $message 1]
+	}
+    } else {
+	set err [catch { parse_timeline [exec fossil timeline -n 2000 -t t] } ret]
+	cd $pwd
+	if { $err } { set ret "" }
+	
+	set ticketList ""
+	foreach i $ret {
+	    lassign $i date time checkin comment
+	    if { [regexp {New ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
+		set ipos [lsearch -exact -index 0 $ticketList $ticket]
+		if { $ipos != -1 } {
+		    #nothing
+		} else {
+		    lappend ticketList [list $ticket $message 1]
+		}
+	    } elseif { [regexp {(?:Fixed|Closed) ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
+		set ipos [lsearch -exact -index 0 $ticketList $ticket]
+		if { $ipos != -1 } {
+		    lset ticketList $ipos 2 0
+		} else {
+		    lappend ticketList [list $ticket $message 0]
+		}
 	    }
 	}
     }
@@ -1100,9 +1130,9 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	    set has_sep 1
 	}
 	set txt1 [string range "$ticket $message" 0 80]...
-	set txt2 "ticket $ticket $message"
+	set txt2 "ticket $ticket: $message"
 	$menu add command -label [_ "Insert ticket '%s'" $txt1] -command  \
-	    [namespace code [list insert_in_entry $w $entry $txt2]]
+	    [namespace code [list insert_ticket $w $entry $ticket $txt2]]
     }    
 }
 
@@ -1123,6 +1153,17 @@ proc RamDebugger::CVS::insert_in_entry { w entry txt } {
     update
     tk::TextInsert $entry $txt
     tk::TabToWindow $entry
+}
+
+proc RamDebugger::CVS::insert_ticket { w entry ticket txt } {
+    
+    set tickets [string trim [$w give_uservar_value tickets]]
+    if { $tickets ne "" } {
+	append tickets ","
+    }
+    append tickets $ticket
+    $w set_uservar_value tickets $tickets
+    insert_in_entry $w $entry $txt
 }
 
 proc RamDebugger::CVS::update_recursive_do1 { w } {
@@ -1574,6 +1615,48 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    set item [dict get $items fossil $dir $file]
 		    $tree item element configure $item 0 e_text_sel -fill $color -text $ret
 		}
+		if { [regexp {New_Version:\s*(\S+)} $ret {} c] } {
+		    set new_commit "\[[string range $c 0 9]\]"
+		} else {
+		    set new_commit ""
+		}
+		set tickets [string trim [$w give_uservar_value tickets]]
+		set ticket_status [$w give_uservar_value ticket_status]
+		if { !$err && $ticket_status ne "" && $tickets ne "" } {
+		    set err [catch { exec fossil ticket show 0 } ret]
+		    if { !$err } {
+		        set fieds [split [lindex [split $ret \n] 0] \t]
+		        set ipos_tkt_uuid [lsearch -exact $fieds tkt_uuid]
+		        set ipos_comment [lsearch -exact $fieds comment]
+		        set ipos_status [lsearch -exact $fieds status]
+		        if { $ipos_tkt_uuid == -1 || $ipos_comment == -1 || $ipos_status == -1 } {
+		            set err 1
+		        }
+		    } else {
+		        set ret [_ "Version of fossil executable is too old to manage tickets. Upgrade fossil"]
+		    }
+		    if { !$err } {
+		        set ticketList ""
+		        foreach line [lrange [split $ret \n] 1 end] {
+		            set values [split $line \t]
+		            set ticket [lindex $values $ipos_tkt_uuid]
+		            set comment [lindex $values $ipos_comment]
+		            lappend ticketList [list "\[[string range $ticket 0 9]\]" $ticket $comment]
+		        }
+		        foreach ticket [split $tickets ", ;"] {
+		            set ipos [lsearch -exact -index 0 $ticketList $ticket]
+		            if { $ipos == -1 } {
+		                set err 1
+		                set ret [_ "Ticket '%s' not found in list" $ticket]
+		                break
+		            }
+		            lassign [lindex $tickets $ipos] - ticketF comment
+		            append comment "\ncommit: $new_commit. Changes status to: $ticket_status"
+		            exec fossil ticket change $ticketF status $ticket_status comment $comment
+		        }
+		    }
+		    if { $err } { break }
+		}
 	    }
 	    cd $pwd
 	    if { $err } {
@@ -1583,6 +1666,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
 	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
+	    dict set dict ticket_status [$w give_uservar_value ticket_status]
 	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
 	}
 	add - add_binary - add_fossil {
