@@ -1105,7 +1105,7 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	foreach i $ret {
 	    lassign $i date time checkin comment
 	    if { [regexp {New ticket\s*(\[\w+\]):?\s+<i>(.*)</i>} $comment {} ticket message] } {
-		set ipos [lsearch -exact -index 0 $ticketList $ticket]
+		set ipos [lsearch -exact -index 0 $ticketList $ticket] 
 		if { $ipos != -1 } {
 		    #nothing
 		} else {
