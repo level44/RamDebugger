@@ -965,7 +965,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     grid configure $f.sem -pady 0
     grid configure $f.e1 $f.e2 $f.e3 -sticky ew
     grid columnconfigure $f 1 -weight 1
-    grid rowconfigure $f 4 -weight 1
+    grid rowconfigure $f 5 -weight 1
     
     $w set_uservar_value dir $dir
     $w set_uservar_value message ""
