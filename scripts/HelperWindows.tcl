@@ -70,7 +70,8 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 	if { [string length $val] > 500 } {
 	    set val [string range $val 0 496]...
 	}
-	$w.l conf -text "$var=$val"
+	$w.l configure -text "$var=$val"
+	wm deiconify $w
 	raise $w
     }
 }
