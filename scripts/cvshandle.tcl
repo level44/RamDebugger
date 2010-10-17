@@ -1945,7 +1945,6 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		fossil_ui {
 		    if { [llength $sel_ids] == 0 } {
 		        set sel_ids [$tree selection get]
-		        if { [llength $sel_ids] == 0 } { return }
 		    }
 		    set dirs ""
 		    foreach item $sel_ids {
