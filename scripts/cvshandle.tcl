@@ -1038,6 +1038,8 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	    }
 	    set itemL [$tree item parent $itemL]
 	}
+	set color [$tree item element cget $item 0 e_text_sel -fill]
+	if { $color in "red blue" } { continue }
 	if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
 	    lappend files $file
 	} elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
