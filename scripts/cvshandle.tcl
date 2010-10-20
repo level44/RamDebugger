@@ -1100,7 +1100,6 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	}
     } else {
 	set err [catch { parse_timeline [exec fossil timeline -n 2000 -t t] } ret]
-	cd $pwd
 	if { $err } { set ret "" }
 	
 	set ticketList ""
@@ -1135,7 +1134,24 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	set txt2 "ticket $ticket: $message"
 	$menu add command -label [_ "Insert ticket '%s'" $txt1] -command  \
 	    [namespace code [list insert_ticket $w $entry $ticket $txt2]]
-    }    
+    }
+
+    set num 1
+    set err [catch { exec fossil ticket list reports } ret]
+    if { !$err } {
+	foreach line [split $ret \n] {
+	    if { [regexp {(\d)\s+(.*)} $line {} num_in txt] && $num_in > 0 && [regexp {(?i)open} $txt] } {
+		set num $num_in
+		break
+	    }
+	}
+    }
+    set url "http://localhost:PORT/rptview?rn=$num"
+    $menu add separator
+    $menu add command -label [_ "Open tickets browser"] -command \
+	[list "update_recursive_cmd" $w open_program fossil_ui $tree "" $url]
+    
+    cd $pwd
 }
 
 proc RamDebugger::CVS::select_directory { w } {
@@ -1963,7 +1979,31 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    foreach dir $dirs {
 		        cd $dir
 		        if { [catch { exec fossil info }] } { continue }
-		        exec fossil ui &
+		        if { $files eq "" } {
+		            exec fossil ui &
+		        } else {
+		            set port ""
+		            set fin [open "|fossil server" r]
+		            fconfigure $fin -blocking 0
+		            while { ![eof $fin] } {
+		                set line [read $fin]
+		                if { [string length $line] } {
+		                    regexp {port\s+(\d+)} $line {} port
+		                    break
+		                }
+		            }
+		            if { $port ne "" } {
+		                set url [string map [list PORT $port] $files]
+		                set line [exec fossil settings web-browser]
+		                set browser ""
+		                regexp {\((local|global)\)\s+(.*)$} $line {} {} browser
+		                if { $browser ne "" } {
+		                    exec $browser $url &
+		                } else {
+		                    cu::file::execute url $url
+		                }
+		            }
+		        }
 		        break
 		    }
 		    cd $pwd

@@ -750,7 +750,7 @@ proc linsert0 { args } {
 }
 
 ################################################################################
-#    cu::kill and cu::ps
+#     cu::file::execute, cu::kill and cu::ps
 ################################################################################
 
 proc cu::kill { pid } {
@@ -789,4 +789,144 @@ proc cu::ps { args } {
 	    return $retList
 	}
     }
+}
+
+proc cu::file::execute { args } {
+    
+    set optional {
+	{ -workdir directory "" }
+	{ -wait boolean 0 }
+	{ -hide_window boolean 0 }
+    }
+    set compulsory "what file"
+
+    set args [parse_args -raise_compulsory_error 0 $optional $compulsory $args]
+
+    switch -- $what {
+	gid {
+	    set exe [get_executable_path gid]
+	    if { $exe eq "" } { return }
+	    if { $wait || $hide_window } {
+		set err [catch { package require twapi }]
+		if { $err } { set has_twapi 0 } else { set has_twapi 1 }
+	    }
+	    if { !$wait || $has_twapi } { lappend args & }
+	    set pid [exec $exe $file {*}$args]
+	   
+	    if { !$wait && !$hide_window } { return }
+	    if { !$has_twapi } { return }
+
+	    if { $hide_window } {
+		foreach hwin [twapi::find_windows -pids $pid -visible true] {
+		    twapi::hide_window $hwin
+		}
+	    }
+	    if { $wait } {
+		while { [twapi::process_exists $pid] } {
+		    after 200
+		}
+	    }
+	}
+	emacs {
+	    exec runemacs -g 100x72 &
+	}
+	wish {
+	    set pwd [pwd]
+	    cd [file dirname $file]
+	    eval exec wish [list [file normalize $file]] $args &
+	    cd $pwd
+	}
+	tkdiff {
+	    set pwd [pwd]
+	    cd [file dirname $file]
+	    exec wish ~/myTclTk/tkcvs/bin/tkdiff.tcl -r [file tail $file] &
+	    cd $pwd
+	}
+	start {
+	    if { $::tcl_platform(platform) eq "unix" } {
+		set programs [list xdg-open gnome-open]
+		if { $::tcl_platform(os) eq "Darwin" } {
+		    set programs [linsert $programs 0 open]
+		}
+		foreach i $programs {
+		    if { [auto_execok $i] ne "" } {
+		        exec $i $file &
+		        return
+		    }
+		}
+		error "could not open file '$file'"
+	    } elseif { [regexp {[&]} $file] } {
+		set bat [file join [file dirname $file] a.bat]
+		set fout [open $bat w]
+		puts $fout "start \"\" \"$file\""
+		close $fout
+		exec $bat 
+		file delete $bat
+	    } else {
+		eval exec [auto_execok start] \"\" [list $file] {*}$args &
+	    }
+	}
+	url {
+	    if { [regexp {^[-\w.]+$} $file] } {
+		set file http://$file
+	    }
+	    if { ![regexp {(?i)^\w+://} $file] && ![regexp {(?i)^mailto:} $file] } {
+		set txt [_ "url does not begin with a known handler like: %s. Proceed?" \
+		        "http:// ftp:// mailto:"]
+		set retval [tk_messageBox -default ok -icon question -message $txt \
+		        -type okcancel]
+		if { $retval == "cancel" } { return }
+	    }
+	    if { $::tcl_platform(platform) eq "windows" } {
+		exec rundll32 url.dll,FileProtocolHandler $file &
+	    } else {
+		set programs [list xdg-open gnome-open]
+		if { $::tcl_platform(os) eq "Darwin" } {
+		    set programs [linsert $programs 0 open]
+		}
+		foreach i $programs {
+		    if { [auto_execok $i] ne "" } {
+		        exec $i $file &
+		        return
+		    }
+		}
+		set cmdList ""
+		foreach i [list firefox konqueror mozilla opera netscape] {
+		    lappend cmdList "$i \"$file\""
+		}
+		exec sh -c [join $cmdList "||"] & 
+	    }
+	}
+	exec {
+	    if { $workdir ne "" } {
+		set pwd [pwd]
+		cd $workdir
+	    }
+	    set err [catch { exec $file {*}$args } errstring]
+	    if { $workdir ne "" } { cd $pwd }
+	    if { $err } {
+		error $errstring $::errorInfo
+	    }
+	}
+	execList {
+	    foreach i $file {
+		if { [auto_execok [lindex $i 0]] ne "" } {
+		    exec {*}$i &
+		    return
+		}
+	    }
+	  error "Could not execute files"
+	}
+	default {
+	    if { $workdir ne "" } {
+		set pwd [pwd]
+		cd $workdir
+	    }
+	    set err [catch { exec $file {*}$args & } errstring]
+	    if { $workdir ne "" } { cd $pwd }
+	    if { $err } {
+		error $errstring $::errorInfo
+	    }
+	}
+    }  
 }
