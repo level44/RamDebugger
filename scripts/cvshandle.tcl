@@ -1668,7 +1668,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                set ret [_ "Ticket '%s' not found in list" $ticket]
 		                break
 		            }
-		            lassign [lindex $tickets $ipos] - ticketF comment
+		            lassign [lindex $ticketList $ipos] - ticketF comment
 		            append comment "\ncommit: $new_commit. Changes status to: $ticket_status"
 		            exec fossil ticket change $ticketF status $ticket_status comment $comment
 		        }
