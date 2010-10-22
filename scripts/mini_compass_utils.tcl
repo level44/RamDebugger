@@ -15,6 +15,7 @@ proc info_fullargs { procname } {
 }
 
 namespace eval cu {}
+namespace eval cu::file {}
 
 # for tclIndex to work 
 proc cu::menubutton_button { args } {}

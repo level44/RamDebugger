@@ -758,7 +758,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     }
     set f [$w giveframe]
     
-    ttk::label $f.l0 -text [_ "Select origin directory for CVS or fossil update recursive, then use the contextual menu on the files:"] \
+    ttk::label $f.l0 -text [_ "Select origin directory for fossil or CVS update recursive, then use the contextual menu on the files:"] \
 	-wraplength 400 -justify left
 
     set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
@@ -2157,6 +2157,32 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 if { $argv0 eq [info script] } {
     wm withdraw .
     source [file join [file dirname [info script]] mini_compass_utils.tcl]
+    
+    
+    if { $::tcl_platform(platform) eq "windows" } {
+	event add <<ContextualPress>> <ButtonPress-3>
+	event add <<Contextual>> <ButtonRelease-3>
+	event add <<Contextual>> <App>
+	set ::control Control
+	set ::control_txt Ctrl
+    } elseif { [tk windowingsystem] eq "aqua" } {
+	event add <<ContextualPress>> <ButtonPress-2>
+	event add <<Contextual>> <ButtonRelease-2>
+	set ::control Command
+	set ::control_txt Command
+	
+	foreach ev [bind Text] {
+	    if { [regsub {Control} $ev {Command} evC] } {
+		bind Text $evC [bind Text $ev]
+	    }
+	}
+    } else {
+	event add <<ContextualPress>> <ButtonPress-3>
+	event add <<Contextual>> <ButtonRelease-3>
+	set ::control Control
+	set ::control_txt Ctrl
+    }
+    
     #package require compass_utils
     set RamDebugger::currentfile ""
     set RamDebugger::topdir [file dirname [info script]]
