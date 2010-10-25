@@ -5609,8 +5609,13 @@ proc RamDebugger::TextMotion { X Y x y } {
 	set err [catch { expr { abs($X-$x_old) <= 3 && abs($Y-$y_old) <= 3 } } ret]
 	if { $err || $ret } { return }
     }
-    after cancel $TextMotionAfterId
-    if { [winfo exists $text.help] } { destroy $text.help }
+    if { $TextMotionAfterId ne "" } {
+	after cancel $TextMotionAfterId
+	set TextMotionAfterId ""
+    }
+    if { [winfo exists $text.help] } {
+	destroy $text.help
+    }
     if { $X == -1 || $currentfile == "" || !$IsInStop } { return }
 
     set TextMotionAfterId [after 500 RamDebugger::DisplayVar $X $Y $x $y]

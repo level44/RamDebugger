@@ -10,7 +10,12 @@ proc RamDebugger::DisplayVar { X Y x y } {
     variable text
     variable remoteserverType
     variable debuggerstate
+    variable TextMotionAfterId
 
+    if { $TextMotionAfterId ne "" } {
+	after cancel $TextMotionAfterId
+	set TextMotionAfterId ""
+    }
     if { $debuggerstate != "debug" } { return }
 
     if { abs($X-[winfo pointerx $text])> 3 || abs($Y-[winfo pointery $text])> 3 } {
@@ -54,11 +59,11 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
     if { $remoteserverType == "gdb" } {
 	lset res 1 [list expr [lindex $res 1]]
     }
-
     if { [lindex $res 0] == 0 && [lindex $res 1 0] ne "error" } {
 	set w $text.help
 	if { [winfo exists $w] } { destroy $w }
 	toplevel $w
+	wm withdraw $w
 	wm overrideredirect $w 1
 	wm transient $w $text
 	wm geom $w +$X+$Y
