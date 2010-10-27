@@ -1669,7 +1669,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                break
 		            }
 		            lassign [lindex $ticketList $ipos] - ticketF comment
-		            append comment "\ncommit: $new_commit. Changes status to: $ticket_status"
+		            append comment "\ncommit: $new_commit. Change status to: $ticket_status"
 		            exec fossil ticket change $ticketF status $ticket_status comment $comment
 		        }
 		    }
