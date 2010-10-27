@@ -1679,6 +1679,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    cd $pwd
 	    if { $err } {
 		snit_messageBox -message $ret -parent $w
+	    } else {
+		$w set_uservar_value tickets ""
 	    }
 	    waitstate $w off
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
