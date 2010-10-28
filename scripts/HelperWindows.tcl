@@ -426,6 +426,8 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     bind [$w give_uservar_value combo] <Return> "[list $w invokeok] ; break"
     [$w give_uservar_value textv] configure -state disabled
     bind [$w give_uservar_value textv] <1> [list focus [$w give_uservar_value textv]]
+    
+    bind $w <F12> [list destroy $w]
 
     $w createwindow
     $w invokeok

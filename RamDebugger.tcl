@@ -8373,7 +8373,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ContNextGUI rstep"] \
 		[list command [_ "Break"] debugentry [_ "Break execution as fast as possible"] "" \
 		-command "RamDebugger::ContNextGUI rnextfull"] \
-		[list command [_ "Return"] debugentry [_ "Makes the code return from proc without finishing execution"] "F12" \
+		[list command [_ "Return"] debugentry [_ "Makes the code return from proc without finishing execution"] "" \
 		-command "RamDebugger::ContNextGUI rnextreturn"] \
 		[list command [_ "Stop debugging"] debugentry [_ "Stop current debugging"] "Shift F5" \
 		     -command RamDebugger::DisconnectStop] \
@@ -8384,7 +8384,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ContNextGUI rcontoutloop"] \
 		separator \
 		[list command &[_ "Expressions"]... debugentry \
-		    [_ "Open a window to visualize expresions or variables"] "" \
+		    [_ "Open a window to visualize expresions or variables"] "F12" \
 		-command "RamDebugger::DisplayVarWindow $w"] \
 		[list command [_ "Breakpoints"]... debugentry \
 		    [_ "Open a window to visualize the breakpoints list"] "Alt F9" \
