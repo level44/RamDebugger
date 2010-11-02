@@ -3200,9 +3200,9 @@ proc RamDebugger::OpenProgram { args } {
     interp alias $what exit_interp "" interp delete $what
     $what eval [list proc exit { args } "destroy . ; exit_interp"]
     interp alias $what puts "" RamDebugger::_OpenProgram_puts
-    $what eval [list load {} Tk]
     $what eval [list set argc [llength $argv]]
     $what eval [list set argv $argv]
+    $what eval [list load {} Tk]
     $what eval [list source $file]
 }
 

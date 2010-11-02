@@ -971,6 +971,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     $w set_uservar_value message ""
     
     bind $w <$::control-d> [list "update_recursive_cmd" $w open_program tkdiff $f.toctree ""]
+    bind $w <$::control-D> [list "update_recursive_cmd" $w open_program tkdiff_ignore_blanks $f.toctree ""]
     bind $w <$::control-i> [list "update_recursive_cmd" $w commit $f.toctree ""]
     bind $w <$::control-f> [list "update_recursive_cmd" $w open_program fossil_ui $f.toctree ""]
 
@@ -1370,6 +1371,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 		return
 	    }
 	    if { [regexp {^Total network traffic:} $line] } {  continue }
+	    if { [regexp {^waiting for server} $line] } {  continue }
 	    if { $item eq "" } {
 		set item [$tree insert end [list $dir] $itemP]
 	    }
@@ -1479,7 +1481,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    if { !$is_timeline && ($has_cvs || $has_fossil) } {
 		$menu add command -label [_ "View diff"] -accelerator $::control_txt-d -command \
 		    [list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
-		$menu add command -label [_ "View diff (ignore blanks)"] -command \
+		$menu add command -label [_ "View diff (ignore blanks)"] -accelerator $::control_txt-D -command \
 		    [list "update_recursive_cmd" $w open_program tkdiff_ignore_blanks $tree $sel_ids]
 		set need_sep 1
 	    }
@@ -1864,6 +1866,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        set dir [$tree item text [$tree item parent $item] 0]
 		        lappend files_list [list $mode $dir $file]
 		    }
+		    set num_open 0
 		    foreach i $files_list {
 		        lassign $i mode dir file
 		        if { [string length $mode] == 1 } {
@@ -1939,11 +1942,22 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                }
 		                set c [string range $checkin 0 9]
 		                exec fossil artifact $artifact $file.$c.$date
-
-		                set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks \
+		                
+		                if { [winfo screenheight .] > 800 } {
+		                    set y [expr {400+$num_open*40}]
+		                    if { $y > [winfo screenheight .] - 100 } {
+		                        set y [expr {[winfo screenheight .] - 100}]
+		                    }
+		                    set geom_opt [list -geometry 80x20+0+$y]
+		                } else {
+		                    set geom_opt ""
+		                }
+		                set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$geom_opt {*}$ignore_blanks \
 		                            $file $file.$c.$date } ret]
 		                if { $err } {
 		                    lappend errList $ret
+		                } else {
+		                    incr num_open
 		                }
 		                file delete -force $file.$c.$date
 		            }
