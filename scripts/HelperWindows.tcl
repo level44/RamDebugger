@@ -64,9 +64,8 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 	if { [winfo exists $w] } { destroy $w }
 	toplevel $w
 	wm withdraw $w
-	wm overrideredirect $w 1
-	wm transient $w $text
-	wm geom $w +$X+$Y
+	wm transient $w [winfo toplevel $text]
+	wm geometry $w +$X+$Y
 	$w configure -highlightthicknes 1 -highlightbackground grey \
 	    -highlightcolor grey
 	pack [label $w.l -fg black -bg grey95 -wraplength 400 -justify left]
@@ -76,7 +75,10 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 	    set val [string range $val 0 496]...
 	}
 	$w.l configure -text "$var=$val"
+	update
+	if { ![winfo exists $w] } { return }
 	wm deiconify $w
+	wm overrideredirect $w 1
 	raise $w
     }
 }
