@@ -1414,6 +1414,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set txt [$tree item text $item 0]
 		if { [regexp {^\d+} $txt] && [$tree item text [$tree item parent $item] 0] eq [_ "Timeline"] } {
 		    set is_timeline 1
+		} elseif { [$tree item text $item] eq [_ "Timeline"] } {
+		    set is_timeline 1
 		} elseif { [regexp {^\s*(\w)\s+} $txt] } {
 		    set has_cvs 1
 		    set cvs_active 1
@@ -1490,7 +1492,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    [list "update_recursive_cmd" $w open_program tkcvs $tree $sel_ids]
 		set need_sep 1
 	    }
-	    if { $fossil_active } {
+	    if { $fossil_active || $is_timeline} {
 		if { !$is_timeline && $has_fossil } {
 		    $menu add command -label [_ "View diff window"]... -command \
 		        [list "update_recursive_cmd" $w diff_window $tree $sel_ids]
@@ -1943,8 +1945,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                set c [string range $checkin 0 9]
 		                exec fossil artifact $artifact $file.$c.$date
 		                
-		                if { [winfo screenheight .] > 800 } {
-		                    set y [expr {400+$num_open*40}]
+		                if { [winfo screenheight .] > 500 } {
+		                    set y [expr {[winfo screenheight .]-500+$num_open*40}]
 		                    if { $y > [winfo screenheight .] - 100 } {
 		                        set y [expr {[winfo screenheight .] - 100}]
 		                    }
