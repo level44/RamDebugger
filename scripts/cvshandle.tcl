@@ -183,6 +183,8 @@ proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
 proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     variable cvsworkdir
 
+    package require sha1
+
     RamDebugger::WaitState 1
     
     if { $file eq "" } { set file $RamDebugger::currentfile }
