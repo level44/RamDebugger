@@ -1267,7 +1267,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
     if { $err } { return }
 
     set has_vcs 0
-    if { [file exists [file join $dir CVS]] } {
+    if { [file isdirectory [file join $dir CVS]] } {
 	if { $what eq "view" } {
 	    set err [catch { exec cvs -n -q update 2>@1 } ret]
 	} else {

@@ -3118,8 +3118,8 @@ proc RamDebugger::ViewSecondText {} {
 	bind $text_secondary <Enter> [list RamDebugger::SecondaryTextHelp begin]
 	grid $text_secondary $f.textpane.f.yscroll -sticky nsew
 
-	bind $text_secondary <Alt-Left> "RamDebugger::GotoPreviousNextInWinList prev ; break"
-	bind $text_secondary <Alt-Right> "RamDebugger::GotoPreviousNextInWinList next ; break"
+	bind $text_secondary <$::alt-Left> "RamDebugger::GotoPreviousNextInWinList prev ; break"
+	bind $text_secondary <$::alt-Right> "RamDebugger::GotoPreviousNextInWinList next ; break"
 	bind $text_secondary <Control-Tab> [bind $text <Control-KeyPress-Tab>]
 	bind $text_secondary <Tab> "RamDebugger::Indent ; break"
 
@@ -5189,9 +5189,9 @@ proc RamDebugger::ActualizeViewMenu { menu } {
 	$menu del 11 end
     }
 
-    $menu add command -label [_ "Previous"] -acc "Alt-Left" -command \
+    $menu add command -label [_ "Previous"] -acc "$::alt_txt-Left" -command \
 	"RamDebugger::GotoPreviousNextInWinList prev"
-    $menu add command -label [_ "Next"] -acc "Alt-Right" -command \
+    $menu add command -label [_ "Next"] -acc "$::alt_txt-Right" -command \
 	"RamDebugger::GotoPreviousNextInWinList next"
     $menu add command -label [_ "Select"]... -acc "Ctrl-Tab" -command \
 	[list RamDebugger::ChooseViewFile start] -underline 1
@@ -8142,7 +8142,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     #require BWidgetR, a BWidget with some modifications, marked with RAMSAN
     #inside the GiD scripts BWidget is really BWidgetR, to avoid duplicate it
-    if { [catch {package require BWidgetR}] } { 
+    if { [catch {package require BWidgetR}] } {
+	puts "could not load package BWidgetR. Loading package BWidget. Some problems with accelerators may appear, specially on MacOSX"
 	package require BWidget
     }
    
@@ -8756,11 +8757,15 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	event add <<Contextual>> <App>
 	set ::control Control
 	set ::control_txt Ctrl
+	set ::alt Alt
+	set ::alt_txt Alt
     } elseif { [tk windowingsystem] eq "aqua" } {
 	event add <<ContextualPress>> <ButtonPress-2>
 	event add <<Contextual>> <ButtonRelease-2>
 	set ::control Command
 	set ::control_txt Command
+	set ::alt Control
+	set ::alt_txt Ctrl
 	
 	foreach ev [bind Text] {
 	    if { [regsub {Control} $ev {Command} evC] } {
@@ -8772,6 +8777,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	event add <<Contextual>> <ButtonRelease-3>
 	set ::control Control
 	set ::control_txt Ctrl
+	set ::alt Alt
+	set ::alt_txt Alt
     }
     bind $marker <<Contextual>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
     
@@ -9061,12 +9068,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # in linux, F10 makes some stupid thing
     bind all <F10> ""
 
-    bind $text <Alt-Left> "RamDebugger::GotoPreviousNextInWinList prev ; break"
+    bind $text <$::alt-Left> "RamDebugger::GotoPreviousNextInWinList prev ; break"
     bind $text <Control-Tab> "[list RamDebugger::ChooseViewFile start] ; break"
 
 #     bind $text <Control-Tab> "RamDebugger::GotoPreviousNextInWinList prev ; break"
 #     bind $text <Control-Shift-Tab> "RamDebugger::GotoPreviousNextInWinList next ; break"
-    bind $text <Alt-Right> "RamDebugger::GotoPreviousNextInWinList next ; break"
+    bind $text <$::alt-Right> "RamDebugger::GotoPreviousNextInWinList next ; break"
     bind $text <Tab> "RamDebugger::Indent ; break"
     bind $text <Return> "[bind Text <Return>] ; RamDebugger::IndentLine {} ; break"
 
@@ -9090,7 +9097,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-x> "RamDebugger::CutCopyPasteText cut   ; break"
     bind $text <$::control-c> "RamDebugger::CutCopyPasteText copy  ; break"
     bind $text <$::control-v> "RamDebugger::CutCopyPasteText paste ; break"
-    bind $text <Alt-BackSpace> [list RamDebugger::DeletePreviousWord]
+    bind $text <$::alt-BackSpace> [list RamDebugger::DeletePreviousWord]
     bind [winfo toplevel $text] <$::control-v> ""
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]

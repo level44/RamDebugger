@@ -62,24 +62,35 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
     if { [lindex $res 0] == 0 && [lindex $res 1 0] ne "error" } {
 	set w $text.help
 	if { [winfo exists $w] } { destroy $w }
-	toplevel $w
-	wm withdraw $w
-	wm transient $w [winfo toplevel $text]
+	cu::create_tooltip_toplevel $w
 	wm geometry $w +$X+$Y
 	$w configure -highlightthicknes 1 -highlightbackground grey \
 	    -highlightcolor grey
 	pack [label $w.l -fg black -bg grey95 -wraplength 400 -justify left]
-	#$w.l conf -bd 1 -relief solid
 	set val [lindex $res 1 1]
 	if { [string length $val] > 500 } {
 	    set val [string range $val 0 496]...
 	}
 	$w.l configure -text "$var=$val"
-	update
-	if { ![winfo exists $w] } { return }
-	wm deiconify $w
-	wm overrideredirect $w 1
-	raise $w
+	
+#         toplevel $w
+#         wm withdraw $w
+#         wm transient $w [winfo toplevel $text]
+#         wm geometry $w +$X+$Y
+#         $w configure -highlightthicknes 1 -highlightbackground grey \
+#             -highlightcolor grey
+#         pack [label $w.l -fg black -bg grey95 -wraplength 400 -justify left]
+#         #$w.l conf -bd 1 -relief solid
+#         set val [lindex $res 1 1]
+#         if { [string length $val] > 500 } {
+#             set val [string range $val 0 496]...
+#         }
+#         $w.l configure -text "$var=$val"
+#         update
+#         if { ![winfo exists $w] } { return }
+#         wm deiconify $w
+#         wm overrideredirect $w 1
+#         raise $w
     }
 }
 

@@ -72,7 +72,7 @@ proc RamDebugger::GetFile { what types title }  {
     bind $f.e1 <$::control-o> "[list $f.b1 invoke] ; break"
     bind $f.e1 <Return> "[list set RamDebugger::getFile_done 1] ; break"
     bind $f.e1 <Escape> [list set RamDebugger::getFile_done 0]
-    bind $f.e1 <Alt-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
+    bind $f.e1 <$::alt-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
     bind $f.e1 <$::control-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
     bind $f.e1 <Home> [list RamDebugger::GetFile_Home home]
     bind $f.e1 <Shift-Home> [list RamDebugger::GetFile_Home desktop]
@@ -198,7 +198,7 @@ proc RamDebugger::GetFile_contextual { f combo button x y } {
 	-command [list RamDebugger::GetFile_Complete $combo]
     $menu add command -label "Accept" -accelerator Enter \
 	-command [list set RamDebugger::getFile_done 1]
-    $menu add command -label "Back delete" -accelerator Alt-Backspace \
+    $menu add command -label "Back delete" -accelerator $::alt_txt-Backspace \
 	-command [list RamDebugger::GetFile_del_backwards]
     $menu add separator
     $menu add checkbutton -label "Ask password" -variable \

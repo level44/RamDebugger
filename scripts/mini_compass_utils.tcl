@@ -627,6 +627,21 @@ proc cu::set_window_geometry { w geometry } {
     wm geometry $w ${width}x$height$m1$x$m2$y
 }
 
+proc cu::create_tooltip_toplevel { b } {
+
+    toplevel $b -class Tooltip
+    if {[tk windowingsystem] eq "aqua"} {
+	::tk::unsupported::MacWindowStyle style $b help none
+    } else {
+	wm overrideredirect $b 1
+    }
+    catch {wm attributes $b -topmost 1}
+    # avoid the blink issue with 1 to <1 alpha on Windows
+    catch {wm attributes $b -alpha 0.99}
+    wm positionfrom $b program
+
+}
+
 ################################################################################
 #    XML & xpath utilities
 ################################################################################
