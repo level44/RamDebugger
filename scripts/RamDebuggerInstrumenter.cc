@@ -3,7 +3,19 @@
 #include <string.h>
 #include <ctype.h>
 #include <tcl.h>
-
+  
+  #if(defined(_MSC_VER) && _MSC_VER >= 1400)
+//1400==VS 2005, this secure functions are not defined in VS 2003
+//this print functions accept a format with argument order,
+//like "%2$d" instead "%d" to use the second integer argument
+//Visual C standar fprintf and snprintf functions doesn't support this 2$ index
+#define FPRINTF _fprintf_p
+#define SNPRINTF _sprintf_p
+#else
+// WARNING: check equivalents in linux and other Visual Studio old versions
+#define FPRINTF fprintf
+#define SNPRINTF snprintf
+#endif
 
 enum P_or_R {P=0,R=1,PP=2};
 enum Word_types { NONE_WT,W_WT,BRACE_WT,DQUOTE_WT,BRACKET_WT};
@@ -68,10 +80,10 @@ int InstrumenterState::braces_history_error(int line)
   Braces_history* bh=braces_hist_1;
   while(bh){
     if(bh->type==open_BHT)
-      sprintf(buf,"%s:%d open brace pos=%d Level after=%d\n",
+      SNPRINTF(buf,1024,"%s:%d open brace pos=%d Level after=%d\n",
 	      currentfile,bh->line,bh->icharline,bh->level);
     else
-      sprintf(buf,"%s:%d close brace pos=%d Level after=%d\n",
+      SNPRINTF(buf,1024,"%s:%d close brace pos=%d Level after=%d\n",
 	      currentfile,bh->line,bh->icharline,bh->level);
     Tcl_AppendToObj(objPtr,buf,-1);
     bh=bh->next;
@@ -83,7 +95,7 @@ int InstrumenterState::braces_history_error(int line)
   Tcl_IncrRefCount(listPtr);
   Tcl_EvalObjEx(ip,listPtr,TCL_EVAL_GLOBAL);
   Tcl_DecrRefCount(listPtr);
-  sprintf(buf,"error in line %d. There is one unmatched closing brace (})",line);
+  SNPRINTF(buf,1024,"error in line %d. There is one unmatched closing brace (})",line);
   Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));
   return TCL_ERROR;
 }
@@ -191,7 +203,7 @@ int RamDebuggerInstrumenterEndState(InstrumenterState* is)
   char type,buf[1024];
 
   if(is->wordtype!=NONE_WT && is->wordtype!=W_WT){
-    sprintf(buf,"There is a block of type (%c) beginning at line %d "
+    SNPRINTF(buf,1024,"There is a block of type (%c) beginning at line %d "
 	    "that is not closed at the end of the file\n",is->wordtype,is->wordtypeline);
     Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
     return TCL_ERROR;
@@ -203,7 +215,7 @@ int RamDebuggerInstrumenterEndState(InstrumenterState* is)
     case DQUOTE_WT: type='"'; break;
     case BRACKET_WT: type='['; break;
     }
-    sprintf(buf,"There is a block of type (%c) beginning at line %d "
+    SNPRINTF(buf,1024,"There is a block of type (%c) beginning at line %d "
 	    "that is not closed at the end of the file\n",type,is->stack[i].wordtypeline);
     if(result==NULL) result=Tcl_NewStringObj("",-1);
     Tcl_AppendToObj(result,buf,-1);
@@ -314,7 +326,7 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	    Tcl_ListObjIndex(is->ip,is->words,2,&wordi);
 	    tmpObj=Tcl_NewListObj(1,&wordi);
 	    Tcl_IncrRefCount(tmpObj);
-	    sprintf(buf,"namespace eval %s {\n",Tcl_GetStringFromObj(tmpObj,NULL));
+	    SNPRINTF(buf,1024,"namespace eval %s {\n",Tcl_GetStringFromObj(tmpObj,NULL));
 	    Tcl_DecrRefCount(tmpObj);
 	    Tcl_AppendToObj(is->newblock[P],buf,-1);
 	    is->NeedsNamespaceClose=1;
@@ -329,7 +341,7 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	  Tcl_IncrRefCount(tmpObj);
 	  Tcl_ListObjAppendElement(is->ip,tmpObj,word0);
 	  Tcl_ListObjAppendElement(is->ip,tmpObj,word1);
-	  sprintf(buf,"%s {\n",Tcl_GetStringFromObj(tmpObj,NULL));
+	  SNPRINTF(buf,1024,"%s {\n",Tcl_GetStringFromObj(tmpObj,NULL));
 	  Tcl_DecrRefCount(tmpObj);
 	  is->NeedsNamespaceClose=1;
 	}
@@ -426,7 +438,7 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
     if(last_type != BRACE_WT){
       for(i=0;i<is->level;i++){
 	if(is->stack[i].type==BRACE_WT){
-	  sprintf(buf,"Using a close brace (}) in line %d when there is an open brace "
+	  SNPRINTF(buf,1024,"Using a close brace (}) in line %d when there is an open brace "
 		  "in line %d and an open bracket ([) in line %d"
 		  ,line,is->stack[i].line,is->stack[is->level-1].line);
 	  Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
@@ -591,7 +603,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	  case BRACE_WT: cblocktype='}'; break;
 	  case DQUOTE_WT: cblocktype='"'; break;
 	  }
-	  sprintf(buf,"There is a non valid character (%c) in line %d "
+	  SNPRINTF(buf,1024,"There is a non valid character (%c) in line %d "
 		  "after a closing block with (%c)",c,line,cblocktype);
 	  Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));
 	  Tcl_DecrRefCount(is->newblock[P]);
@@ -606,7 +618,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
     if(is->DoInstrument==1 && lastinstrumentedline!=line && !strchr(" \t\n#",c) &&
        wordslen==0){
       if(c!='}' || !RamDebuggerInstrumenterIsProcUpLevel(is) || instrument_proc_last_line){
-	sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+	SNPRINTF(buf,1024,"RDC::F %d %d ; ",filenum,line);
 	Tcl_AppendToObj(is->newblock[is->OutputType],buf,-1);
 	lastinstrumentedline=line;
       }
@@ -649,7 +661,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	    Tcl_GetStringFromObj(is->words,&len);
 	    newllen-=len;
 	    if(lastinstrumentedline==line){
-	      sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+	      SNPRINTF(buf,1024,"RDC::F %d %d ; ",filenum,line);
 	      newllen -= ( int)strlen(buf);
 	    }
 	    Tcl_SetObjLength(is->newblock[R],newllen);
@@ -727,7 +739,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 		Tcl_GetStringFromObj(is->words,&len);
 		newllen-=len;
 		if(lastinstrumentedline==line){
-		  sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+		  SNPRINTF(buf,1024,"RDC::F %d %d ; ",filenum,line);
 		  newllen -= ( int)strlen(buf);
 		}
 		Tcl_SetObjLength(is->newblock[R],newllen);
@@ -755,7 +767,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 		if(*pword0==':' && *(pword0+1)==':') pword0+=2;
 	      }
 	      if(wordtype_before==DQUOTE_WT){
-		sprintf(buf,"Quoted text (\") in line %d contains and invalid brace (})",line);
+		SNPRINTF(buf,1024,"Quoted text (\") in line %d contains and invalid brace (})",line);
 		Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
 		Tcl_DecrRefCount(is->newblock[P]);
 		Tcl_DecrRefCount(is->newblock[R]);
@@ -792,7 +804,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	      Tcl_GetStringFromObj(is->words,&len);
 	      newllen-=len;
 	      if(lastinstrumentedline==line){
-		sprintf(buf,"RDC::F %d %d ; ",filenum,line);
+		SNPRINTF(buf,1024,"RDC::F %d %d ; ",filenum,line);
 		newllen -= ( int)strlen(buf);
 	      }
 	      Tcl_SetObjLength(is->newblock[R],newllen);
@@ -1103,7 +1115,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
     }
     if(simplechar_line>0){
       if(line>simplechar_line){
-	sprintf(buf,"error in line %d, position %d. There is no closing (')",simplechar_line,
+	SNPRINTF(buf,1024,"error in line %d, position %d. There is no closing (')",simplechar_line,
 		simplechar_pos);
 	Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
 	Tcl_DecrRefCount(blockinfo);
@@ -1319,7 +1331,7 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
   Tcl_ListObjAppendElement(is->ip,blockinfo,blockinfocurrent);
 
   if(commentlevel>0){
-    sprintf(buf,"error: There is a non-closed comment beginning at line %d",is->wordtypeline);
+    SNPRINTF(buf,1024,"error: There is a non-closed comment beginning at line %d",is->wordtypeline);
     Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
     Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
     Tcl_SetVar2Ex(is->ip,"blockinfo",NULL,blockinfo,0);
@@ -1451,11 +1463,11 @@ void Xml_state::pop_tag(char* tag,int raiseerror,int charlen)
     if(!raiseerror) return;
     char buf[1024];
     if(charlen>800) charlen=800;
-    sprintf(buf,"closing tag '%.*s' is not correct. line=%d position=%d. tags stack=\n",charlen,tag,
+    SNPRINTF(buf,1024,"closing tag '%.*s' is not correct. line=%d position=%d. tags stack=\n",charlen,tag,
 	    iline,icharline+1);
     Tcl_Obj *resPtr=Tcl_NewStringObj(buf,-1);
     for(int i=0;i<xml_state_tag_listNum;i++){
-      sprintf(buf,"\t%.*s\tLine: %d\n",xml_state_tag_list[i].charlen,
+      SNPRINTF(buf,1024,"\t%.*s\tLine: %d\n",xml_state_tag_list[i].charlen,
 	      xml_state_tag_list[i].tag,xml_state_tag_list[i].line);
       Tcl_AppendToObj(resPtr,buf,-1);
     }
@@ -1466,8 +1478,9 @@ void Xml_state::pop_tag(char* tag,int raiseerror,int charlen)
   indentlevel--;
   if(xml_state_tag_listNum<0){
     char buf[1024];
-    sprintf(buf,"error in pop_tag. Stack empty. line=%d position=%d",iline,icharline+1);
+    SNPRINTF(buf,1024,"error in pop_tag. Stack empty. line=%d position=%d",iline,icharline+1);
     Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));
+    printf("pop_tag error\n"); // without it, program crashes on MacOS
     throw 1;
   }
 }
@@ -1478,11 +1491,12 @@ void Xml_state::raise_error_if_tag_stack()
     char buf[1024];
     Tcl_Obj *resPtr=Tcl_NewStringObj("There are non-closed tags. tags stack=\n",-1);
     for(int i=0;i<xml_state_tag_listNum;i++){
-      sprintf(buf,"\t%.*s\tLine: %d\n",xml_state_tag_list[i].charlen,
+      SNPRINTF(buf,1024,"\t%.*s\tLine: %d\n",xml_state_tag_list[i].charlen,
 	xml_state_tag_list[i].tag,xml_state_tag_list[i].line);
       Tcl_AppendToObj(resPtr,buf,-1);
     }
     Tcl_SetObjResult(ip,resPtr);
+    printf("raise_error_if_tag_stack error\n"); // without it, program crashes on MacOS
     throw 1;
   }
 }
@@ -1493,7 +1507,7 @@ void Xml_state::raise_error(const char* txt,int raiseerror)
   char buf[1024];
   int charlen=(int)strlen(txt);
   if(charlen>800) charlen=800;
-  sprintf(buf,"error in line=%d position=%d. %.*s",iline,icharline+1,charlen,txt);
+  SNPRINTF(buf,1024,"error in line=%d position=%d. %.*s",iline,icharline+1,charlen,txt);
   Tcl_SetObjResult(ip,Tcl_NewStringObj(buf,-1));
   throw 1;
 }
@@ -1758,7 +1772,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_quote_XS) &&
 	      !xml_state.state_is(att_dquote_XS) && !xml_state.state_is(enter_tagtext_XS) &&
 	      !xml_state.state_is(att_entername_XS)){
-		sprintf(buf,"Not valid character '%c'",c);
+		SNPRINTF(buf,1024,"Not valid character '%c'",c);
 		xml_state.raise_error(buf,raiseerror);
 	    }
 	    break;
