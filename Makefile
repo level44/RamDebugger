@@ -23,7 +23,8 @@ OBJDIR = $(if $(filter yes,$(DEBUG)),debug,release)
 CC = gcc
 CPPFLAGS=-DUSE_TCL_STUBS -DUSE_TK_STUBS -DTCLVERSION -Wunused-variable
 
-INCLUDE_DIRECTORIES = /usr/local/ActiveTcl-8.5/include /opt/ActiveTcl-8.5/include $(LIBSDIR)/include
+INCLUDE_DIRECTORIES = /usr/local/ActiveTcl-8.5/include /opt/ActiveTcl-8.5/include \
+ /usr/include/tcl8.5 $(LIBSDIR)/include
 CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRECTORIES))
 
 ifeq ($(M64),yes)
