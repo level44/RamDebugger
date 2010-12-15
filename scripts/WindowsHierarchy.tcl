@@ -179,8 +179,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     
     set w $canvas.help
     if { [winfo exists $w] } { destroy $w }
-    toplevel $w
-    wm overrideredirect $w 1
+    cu::create_tooltip_toplevel $w
     wm transient $w $canvas
 
     $w configure -highlightthicknes 1 -highlightbackground grey \
@@ -225,7 +224,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 	width height rootX rootY]  } {
 	set wpos $w.helppos
 	if { [winfo exists $wpos] } { destroy $wpos }
-	toplevel $wpos
+	cu::create_tooltip_toplevel $wpos
 	$wpos configure -background blue -bd 2 -relief solid
 	
 	set idx 0
@@ -248,10 +247,10 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
 	    incr idx
 	}
 	if { $idx } { $wpos configure -bd 0 }
-	wm overrideredirect $wpos 1
+	#wm overrideredirect $wpos 1
 	wm geometry $wpos ${width}x$height+$rootX+$rootY
 	after 100 [list wm attributes $wpos -alpha .3]
-	raise $w
+	#raise $w
     }
 }
 

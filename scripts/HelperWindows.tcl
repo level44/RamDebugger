@@ -72,25 +72,6 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 	    set val [string range $val 0 496]...
 	}
 	$w.l configure -text "$var=$val"
-	
-#         toplevel $w
-#         wm withdraw $w
-#         wm transient $w [winfo toplevel $text]
-#         wm geometry $w +$X+$Y
-#         $w configure -highlightthicknes 1 -highlightbackground grey \
-#             -highlightcolor grey
-#         pack [label $w.l -fg black -bg grey95 -wraplength 400 -justify left]
-#         #$w.l conf -bd 1 -relief solid
-#         set val [lindex $res 1 1]
-#         if { [string length $val] > 500 } {
-#             set val [string range $val 0 496]...
-#         }
-#         $w.l configure -text "$var=$val"
-#         update
-#         if { ![winfo exists $w] } { return }
-#         wm deiconify $w
-#         wm overrideredirect $w 1
-#         raise $w
     }
 }
 
@@ -2436,6 +2417,15 @@ proc RamDebugger::SearchWindow_autoclose { { force "" } } {
     }
 }
 
+proc RamDebugger::SearchWindow_toggle_regexp {} {
+    variable searchmode
+    
+    switch -- $searchmode {
+	"-exact" { set searchmode "-regexp" }
+	"-regexp" { set searchmode "-exact" }
+    }
+}
+
 proc RamDebugger::SearchWindow { { replace 0 } }  {
     variable text
     variable options
@@ -2528,7 +2518,7 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     }
     set ::RamDebugger::SearchToolbar [list 1 $replace]
 
-    ttk::label $f.l1 -text "Search:"
+    ttk::label $f.l1 -text [_ "Search"]:
     ttk::combobox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs)
 
     # to avoid problems with paste, that sometimes pastes too to the main window
@@ -2549,17 +2539,17 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     grid $f2.r2 -sticky w
 
     set f25 [frame $f.f25 -bd 1 -relief ridge]
-    radiobutton $f25.r1 -text Forward -variable ::RamDebugger::SearchType \
+    radiobutton $f25.r1 -text [_ "Forward"] -variable ::RamDebugger::SearchType \
 	-value -forwards
-    radiobutton $f25.r2 -text Backward -variable ::RamDebugger::SearchType \
+    radiobutton $f25.r2 -text [_ "Backward"] -variable ::RamDebugger::SearchType \
 	-value -backwards
 
     grid $f25.r1 -sticky w
     grid $f25.r2 -sticky w
 
     set f3 [frame $f.f3]
-    checkbutton $f3.cb1 -text "Consider case" -variable ::RamDebugger::searchcase
-    checkbutton $f3.cb2 -text "From beginning" -variable ::RamDebugger::searchFromBegin
+    checkbutton $f3.cb1 -text [_ "Consider case"] -variable ::RamDebugger::searchcase
+    checkbutton $f3.cb2 -text [_ "From beginning"] -variable ::RamDebugger::searchFromBegin
 
     grid $f3.cb1 $f3.cb2 -sticky w
  
@@ -2578,6 +2568,8 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     ttk::checkbutton $f.cb3 -text Regexp -variable ::RamDebugger::searchmode \
 	-onvalue -regexp -offvalue -exact -style Toolbutton
 
+    tooltip::tooltip $f.cb3 [_ "Activate/deactivate regular expression search (Ctrl-r)"]
+
     set helps [list \
 	    $f.r09 "Search" \
 	    $f.r1 "Search backwards (PgUp)" \
@@ -2590,16 +2582,16 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     }
 
     if { $replace } {
-	ttk::label $f.l11 -text "Replace:"
+	ttk::label $f.l11 -text [_ "Replace"]:
 	ttk::combobox $f.e11 -textvariable ::RamDebugger::replacestring \
 	    -values $options(old_replaces)
 	raise $f.e11 $f2.r1
 	frame $f.buts
 	
 	set ic 0
-	foreach "txt cmd help" [list "Skip" beginreplace "Search next (Shift-Return)" \
-		"Replace" replace "Replace (Return)" \
-		"Replace all" replaceall "Replace all"] {
+	foreach "txt cmd help" [list [_ "Skip"] beginreplace [_ "Search next (Shift-Return)"] \
+		[_ "Replace"] replace [_ "Replace (Return)"] \
+		[_ "Replace all"] replaceall [_ "Replace all"]] {
 	    ttk::button $f.buts.b[incr ic] -text $txt -width 9 \
 		-style Toolbutton -command \
 		[list RamDebugger::SearchReplace $w $cmd]
@@ -2658,6 +2650,7 @@ proc RamDebugger::SearchWindow { { replace 0 } }  {
     bind $f.e1 <End> "[list set ::RamDebugger::searchFromBegin 0] ; break"
     bind $f.e1 <Prior> "[list set ::RamDebugger::SearchType -backwards] ; break"
     bind $f.e1 <Next> "[list set ::RamDebugger::SearchType -forwards] ; break"
+    bind $f.e1 <Control-r> "[list RamDebugger::SearchWindow_toggle_regexp]; break"
 
     tk::TabToWindow $f.e1
     if { !$replace } {
