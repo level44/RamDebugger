@@ -639,11 +639,13 @@ proc cu::create_tooltip_toplevel { b } {
     # avoid the blink issue with 1 to <1 alpha on Windows
     catch {wm attributes $b -alpha 0.99}
     wm positionfrom $b program
-    set focus [focus]
-    focus -force $b ;# this is necessary in Linux
-    raise $b
-    if { $focus ne "" } {
-	after 100 [list focus $focus]
+    if { [tk windowingsystem]  eq "x11" } {
+	set focus [focus]
+	focus -force $b
+	raise $b
+	if { $focus ne "" } {
+	    after 100 [list focus $focus]
+	}
     }
 }
 
