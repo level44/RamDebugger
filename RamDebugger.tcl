@@ -9098,6 +9098,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-c> "RamDebugger::CutCopyPasteText copy  ; break"
     bind $text <$::control-v> "RamDebugger::CutCopyPasteText paste ; break"
     bind $text <$::alt-BackSpace> [list RamDebugger::DeletePreviousWord]
+    bind $text <$::control-BackSpace> [list RamDebugger::DeletePreviousWord]
     bind [winfo toplevel $text] <$::control-v> ""
     bind [winfo toplevel $text] <Tab> ""
     bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
