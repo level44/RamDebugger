@@ -694,10 +694,13 @@ proc RamDebugger::CVS::indicator_update_do { cvs_or_fossil } {
 #    proc CVS update recursive
 ################################################################################
 
-proc RamDebugger::CVS::update_recursive { wp current_or_last } {
+proc RamDebugger::CVS::update_recursive { wp current_or_last_or_this args } {
     variable try_threaded
     
-    if { [file isdirectory [file dirname $RamDebugger::currentfile]] } {
+    if { $current_or_last_or_this eq "this" } {
+	set directory [file normalize [lindex $args 0]]
+	set current_or_last_or_this current
+    } elseif { [file isdirectory [file dirname $RamDebugger::currentfile]] } {
 	set directory [file dirname $RamDebugger::currentfile]
 	set pwd [pwd]
 	cd $directory
@@ -715,14 +718,14 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last } {
 
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
 	    insert_ticket update_recursive_do1 update_recursive_accept update_recursive_cmd \
-	    waitstate parse_timeline parse_finfo] {
+	    waitstate parse_timeline parse_finfo open_program] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
     append script "[list namespace eval RamDebugger ""]\n"
     append script "[list set RamDebugger::topdir $RamDebugger::topdir]\n"
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
-    append script "[list update_recursive_do0 $directory $current_or_last]\n"
+    append script "[list update_recursive_do0 $directory $current_or_last_or_this]\n"
     
 
     if { $try_threaded eq "debug" } {
@@ -1891,7 +1894,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        if { [file exists $fileF] } {
 		            if { [string length $mode] == 1 } {
 		                cd [file dirname $fileF]
-		                RamDebugger::OpenProgram -new_interp 1 tkdiff -r [file tail $fileF]
+		                open_program -new_interp 1 tkdiff -r [file tail $fileF]
 		            } else {
 		                cd $dirF
 		                set err [catch { parse_timeline [exec fossil descendants] } ret]
@@ -1957,7 +1960,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                } else {
 		                    set geom_opt ""
 		                }
-		                set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$geom_opt {*}$ignore_blanks \
+		                set err [catch { open_program -new_interp 1 tkdiff {*}$geom_opt {*}$ignore_blanks \
 		                            $file $file.$c.$date } ret]
 		                if { $err } {
 		                    lappend errList $ret
@@ -1979,7 +1982,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    cd $pwd
 		}
 		tkcvs {
-		    RamDebugger::OpenProgram tkcvs -dir [$w give_uservar_value dir]
+		    open_program tkcvs -dir [$w give_uservar_value dir]
 		}
 		fossil_ui {
 		    if { [llength $sel_ids] == 0 } {
@@ -2152,12 +2155,12 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		cd $dir
 		exec fossil artifact $artifact1 $file.$c1.$date1
 		if { [llength $selecteditems] == 1 } {
-		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file $file.$c1.$date1 } ret]
+		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks $file $file.$c1.$date1 } ret]
 		} else {
 		    lassign [lindex $selecteditems 1] date2 checkin2 - - artifact2
 		    set c2 [string range $checkin2 0 9]
 		    exec fossil artifact $artifact2 $file.$c2.$date2
-		    set err [catch { RamDebugger::OpenProgram -new_interp 1 tkdiff {*}$ignore_blanks $file.$c1.$date1 $file.$c2.$date2 } ret]
+		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks $file.$c1.$date1 $file.$c2.$date2 } ret]
 		}
 		if { $err } {
 		    snit_messageBox -message $ret -parent $wD
@@ -2174,6 +2177,41 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	}
     } 
 }
+
+proc RamDebugger::CVS::open_program { args } {
+    variable openprogram_uniqueid
+    
+    upvar #0 ::RamDebugger::topdir topdir
+    
+    set optional {
+	{ -new_interp boolean 0 }
+    }
+    set compulsory "what"
+    set argv [parse_args -raise_compulsory_error 0  $optional $compulsory $args]
+
+    switch $what {
+	visualregexp { set file [file join $topdir addons visualregexp visual_regexp.tcl] }
+	tkcvs {
+	    set file [file join $topdir addons tkcvs bin tkcvs.tcl]
+	}
+	tkdiff { set file [file join $topdir addons tkcvs bin tkdiff.tcl] }
+    }
+    if { $new_interp } {
+	set what $what[incr openprogram_uniqueid]
+    }
+    if { [interp exists $what] } {
+	interp delete $what
+    }
+    interp create $what
+    interp alias $what exit_interp "" interp delete $what
+    $what eval [list proc exit { args } "destroy . ; exit_interp"]
+    interp alias $what puts "" RamDebugger::_OpenProgram_puts
+    $what eval [list set argc [llength $argv]]
+    $what eval [list set argv $argv]
+    $what eval [list load {} Tk]
+    $what eval [list source $file]
+}
+
 
 if { $argv0 eq [info script] } {
     wm withdraw .
@@ -2206,17 +2244,21 @@ if { $argv0 eq [info script] } {
     
     #package require compass_utils
     set RamDebugger::currentfile ""
-    set RamDebugger::topdir [file dirname [info script]]
+    set RamDebugger::topdir [file dirname [file dirname [info script]]]
     set RamDebugger::CVS::try_threaded debug
-    set w [RamDebugger::CVS::update_recursive "" last]
+    if { [lindex $argv 0] ne "" } {
+	set w [RamDebugger::CVS::update_recursive "" this [lindex $argv 0]]
+    } else {
+	set w [RamDebugger::CVS::update_recursive "" last]
+    }
 
     bind $w <Destroy> {
 	if { "%W" eq [winfo toplevel %W] } {
 	    exit
 	}
     }
+    bind $w <Control-q> [list destroy $w]
 }
-
 
 
 
