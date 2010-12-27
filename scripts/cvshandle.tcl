@@ -988,6 +988,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     tk::TabToWindow $f.e1
     bind $w <Return> [list $w invokeok]
     $w createwindow
+    return $w
 }
 
 proc RamDebugger::CVS::waitstate { w on_off { txt "" } } {
@@ -2207,7 +2208,13 @@ if { $argv0 eq [info script] } {
     set RamDebugger::currentfile ""
     set RamDebugger::topdir [file dirname [info script]]
     set RamDebugger::CVS::try_threaded debug
-    RamDebugger::CVS::update_recursive "" last
+    set w [RamDebugger::CVS::update_recursive "" last]
+
+    bind $w <Destroy> {
+	if { "%W" eq [winfo toplevel %W] } {
+	    exit
+	}
+    }
 }
 
 

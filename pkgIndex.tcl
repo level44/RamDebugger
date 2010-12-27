@@ -1,5 +1,5 @@
 
-set Version 7.8
+set Version 7.9
 
 proc LoadRamDebugger { dir version } {
     if { [info exists ::GIDDEFAULT] } {
