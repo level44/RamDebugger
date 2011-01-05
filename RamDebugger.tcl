@@ -8048,13 +8048,20 @@ proc RamDebugger::ShowButtonsToolBar {} {
 
 proc RamDebugger::ToogleToolbarsStatusbar {} {
     variable options
+    variable text
+
+    set w [winfo toplevel $text]
 
     if {$options(showbuttonstoolbar) } {
 	set options(showbuttonstoolbar) 0
 	set options(showstatusbar) 0
+	$w configure -menu ""
+	grid remove [winfo parent $text].xscroll
     } else {
 	set options(showbuttonstoolbar) 1
 	set options(showstatusbar) 1
+	$w configure -menu $w.menubar
+	grid [winfo parent $text].xscroll
     }
     ShowStatusBar
     ShowButtonsToolBar
