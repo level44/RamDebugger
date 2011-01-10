@@ -6385,7 +6385,11 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 
     set idx [$textstack index $idx]
     set data [$textstack get "$idx linestart" "$idx lineend"]
-    set rex {^\#([0-9]+)}
+    
+    set patternList [list {((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+)} \
+	    {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)}]
+    #set rex {^\#([0-9]+)}
+    set rex [join $patternList "|"]
     while { ![regexp $rex $data] && [$textstack compare "$idx linestart" > 1.0] } {
 	set prevline [$textstack get "$idx -1 line linestart" "$idx -1 line lineend"]
 	set data "$prevline $data"
@@ -6400,8 +6404,7 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 	    break
 	}
     }
-    foreach pattern [list {((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+)} \
-		         {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)}] {
+    foreach pattern $patternList {
 
 	if { [regexp $pattern $data {} file line] } {
 
@@ -8872,7 +8875,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		$f.m add checkbutton -label [_ "Auto raise stack trace"] -variable \
 		    RamDebugger::options(auto_raise_stack_trace)
 	    }
-	    compile { $f.m add command -label [_ "Clear"] -command RamDebugger::TextCompClear }
+	    compile {
+		set xt [expr {$x-[winfo rootx $f]}]
+		set yt [expr {$y-[winfo rooty $f]}]
+		$f.m add command -label [_ "Activate stack level"] -command \
+		    [list RamDebugger::StackDouble1 $f @$xt,$yt]
+		$f.m add command -label [_ "Clear"] -command RamDebugger::TextCompClear
+	    }
 	}
 	tk_popup $f.m $x $y
     }
