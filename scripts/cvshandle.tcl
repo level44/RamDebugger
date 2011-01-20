@@ -1894,7 +1894,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        if { [file exists $fileF] } {
 		            if { [string length $mode] == 1 } {
 		                cd [file dirname $fileF]
-		                open_program -new_interp 1 tkdiff -r [file tail $fileF]
+		                open_program -new_interp 1 tkdiff {*}$ignore_blanks -r [file tail $fileF]
 		            } else {
 		                cd $dirF
 		                set err [catch { parse_timeline [exec fossil descendants] } ret]
