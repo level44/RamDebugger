@@ -88,7 +88,7 @@ int InstrumenterState::braces_history_error(int line)
     Tcl_AppendToObj(objPtr,buf,-1);
     bh=bh->next;
   }
-  Tcl_EvalEx(ip,"RamDebugger::TextOutClear; RamDebugger::TextOutRaise",-1,TCL_EVAL_GLOBAL);
+  //Tcl_EvalEx(ip,"RamDebugger::TextOutClear; RamDebugger::TextOutRaise",-1,TCL_EVAL_GLOBAL);
   Tcl_Obj *listPtr=Tcl_NewListObj(0,NULL);
   Tcl_ListObjAppendElement(ip,listPtr,Tcl_NewStringObj("RamDebugger::TextOutInsert",-1));
   Tcl_ListObjAppendElement(ip,listPtr,objPtr);

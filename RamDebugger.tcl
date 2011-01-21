@@ -6348,30 +6348,31 @@ proc RamDebugger::PrevNextCompileError { what } {
 	    prev { set idx end-1c }
 	}
 	$textCOMP tag add sel2 "$idx linestart" "$idx lineend"
-    } else {
-	$textCOMP tag remove sel2 1.0 end
-	set idxini $idx
-	while { [$textCOMP tag range sel2] == "" } {
-	    switch $what {
-		next {
-		    set idx [$textCOMP index $idx+1l]
-		    if { [$textCOMP compare $idx > end-1c] } {
-		        set idx 1.0
-		    }
-		}
-		prev {
-		    set idx [$textCOMP index $idx-1l]
-		    if { [$textCOMP compare $idx < 1.0] } {
-		        set idx end-1c
-		    }
+	set err [catch { $textCOMP index sel2.first} idx]
+	if { $err } { return }
+    }
+    $textCOMP tag remove sel2 1.0 end
+    set idxini $idx
+    while { [$textCOMP tag range sel2] == "" } {
+	switch $what {
+	    next {
+		set idx [$textCOMP index $idx+1l]
+		if { [$textCOMP compare $idx > end-1c] } {
+		    set idx 1.0
 		}
 	    }
-	    set rex {(((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+))|(((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+))}
-	    if { [regexp $rex [$textCOMP get "$idx linestart" "$idx lineend"]] } {
-		$textCOMP tag add sel2 "$idx linestart" "$idx lineend"
+	    prev {
+		set idx [$textCOMP index $idx-1l]
+		if { [$textCOMP compare $idx < 1.0] } {
+		    set idx end-1c
+		}
 	    }
-	    if { $idx == $idxini } { break }
 	}
+	set rex {(((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+))|(((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+))}
+	if { [regexp $rex [$textCOMP get "$idx linestart" "$idx lineend"]] } {
+	    $textCOMP tag add sel2 "$idx linestart" "$idx lineend"
+	}
+	if { $idx == $idxini } { break }
     }
     $textCOMP see $idx
     StackDouble1 $textCOMP $idx
