@@ -14,6 +14,8 @@ else ifeq ($(HOST),hoschi)
 else ifeq ($(HOST),akenatonix)
   LIBSDIR=/opt/ActiveTcl-8.5
   M64 = yes
+else ifeq ($(HOST),akenatonviii)
+  LIBSDIR=/opt/ActiveTcl-8.5
 else
   LIBSDIR=
 endif
