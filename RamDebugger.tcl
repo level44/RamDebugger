@@ -8220,7 +8220,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     if { $iswince } { pocketpc::init }
 
     if { $topleveluse == "" } {
-	toplevel $w
+	toplevel $w -class RamDebugger
     } else {
 	toplevel $w -use $topleveluse
 	update idletasks ;# doesn't work if this is removed; does not work with it either
