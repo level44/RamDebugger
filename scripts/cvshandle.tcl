@@ -751,15 +751,18 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     wm withdraw .
     
     destroy ._ask
-    set w [dialogwin_snit ._ask -title [_ "VCS management"] \
+    set w [dialogwin_snit ._ask -title [_ "VCS management"] -class VCS \
 	    -okname [_ View] -morebuttons [list [_ "Update"]] \
 	    -cancelname [_ Close] -grab 0 -callback [list update_recursive_do1]]
     
     if { $::tcl_platform(platform) ne "windows" } {
 	catch {
+	    package require img::png
 	    set img [image create photo -file [file join $::RamDebugger::topdir addons ramdebugger.png]]
 	    wm iconphoto $w $img
 	}
+    } else {
+	catch { wm iconbitmap $w $::RamDebugger::topdir/addons/ramdebugger.ico }
     }
     set f [$w giveframe]
     
