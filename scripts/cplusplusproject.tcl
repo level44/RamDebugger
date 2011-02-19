@@ -1801,8 +1801,17 @@ proc cproject::Compile { w { unique_file "" } } {
 
     set dr $RamDebugger::options(debugrelease)
 
+    set state [RamDebugger::ViewOnlyTextOrAll -return_state]
+    
+    set c1 [RamDebugger::TextCompGet]
+    
     RamDebugger::TextCompClear
     CompileDo $w $dr 0 $unique_file
+    
+    set c2 [RamDebugger::TextCompGet]
+    if { $state eq "all" && $c1 eq $c2 } {
+	RamDebugger::ViewOnlyTextOrAll -force_only_text
+    }
 }
 
 proc cproject::CompileNoStop { w } {

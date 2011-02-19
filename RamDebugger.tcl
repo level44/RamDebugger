@@ -3016,6 +3016,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	WarnWin $aa
 	TextOutInsert $aa
 	rstack -handler RamDebugger::UpdateGUIStack
+	ViewOnlyTextOrAll -force_all
 	return
     }
     if { [string match "*No executable specified, use 'target exec'.*" $aa] } {
@@ -3224,6 +3225,8 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
     
     set optional {
 	{ -force_all "" 0 }
+	{ -force_only_text "" 0 }
+	{ -return_state "" 0 }
     }
     set compulsory ""
     parse_args $optional $compulsory $args
@@ -3243,7 +3246,17 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
 	set fulltext $f.fulltext
     }
 
+    if { $return_state } {
+	if { [lindex [grid info $fulltext] 1] != $f } {
+	    return all
+	} else {
+	    return only_text
+	}
+    }
     if { $force_all && [lindex [grid info $fulltext] 1] != $f } {
+	return
+    }
+    if { $force_only_text && [lindex [grid info $fulltext] 1] == $f } {
 	return
     }
     set delta [expr {[$f.pw cget -sashwidth]+2*[$f.pw cget -sashpad]}]
@@ -6039,6 +6052,13 @@ proc RamDebugger::TextOutInsertBlue { data } {
     $textOUT tag configure blue -foreground blue
     $textOUT conf -state disabled
     if { $yend == 1 } { $textOUT yview moveto 1 }
+}
+
+proc RamDebugger::TextCompGet {} {
+    variable textCOMP
+
+    if { ![info exists textCOMP] || ![winfo exists $textCOMP] } { return "" }
+    return [$textCOMP get 1.0 end-1c]
 }
 
 proc RamDebugger::TextCompClear {} {
