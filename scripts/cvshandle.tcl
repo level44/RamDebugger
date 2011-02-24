@@ -1894,10 +1894,15 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		            }
 		            set fileF [file join $dirF $file]
 		        }
+		        set rex {gdiff-command\s+\((local|global)\)\s+(.*)}
+		        
 		        if { [file exists $fileF] } {
 		            if { [string length $mode] == 1 } {
 		                cd [file dirname $fileF]
 		                open_program -new_interp 1 tkdiff {*}$ignore_blanks -r [file tail $fileF]
+		            } elseif { ![catch { exec fossil settings gdiff-command } ret] && [regexp $rex $ret {} {} cmd] } {
+		                cd [file dirname $fileF]
+		                exec fossil gdiff $fileF &
 		            } else {
 		                cd $dirF
 		                set err [catch { parse_timeline [exec fossil descendants] } ret]
