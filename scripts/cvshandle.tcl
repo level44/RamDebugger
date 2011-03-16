@@ -1419,6 +1419,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	contextual {
 	    lassign $args tree menu id sel_ids
 	    lassign "0 0 0 0 0 0" has_cvs has_fossil cvs_active fossil_active can_be_added is_timeline
+	    set dirs ""
 	    foreach item $sel_ids {
 		set txt [$tree item text $item 0]
 		if { [regexp {^\d+} $txt] && [$tree item text [$tree item parent $item] 0] eq [_ "Timeline"] } {
@@ -1433,6 +1434,13 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    set fossil_active 1
 		} elseif { [regexp {^\s*\?\s+} $txt] } {
 		    set can_be_added 1
+		}
+		set itemL $item
+		while { $itemL != 0 } {
+		    if { [file isdirectory [$tree item text $itemL 0]] } {
+		        lappend dirs [$tree item text $itemL 0]
+		    }
+		    set itemL [$tree item parent $itemL]
 		}
 	    }
 	    set pwd [pwd]
@@ -1513,9 +1521,9 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    [$w give_uservar fossil_autosync] -command \
 		    [list "update_recursive_cmd" $w fossil_toggle_autosync]
 		$menu add command -label [_ "Fossil syncronize"] -command \
-		    [list "update_recursive_cmd" $w fossil_syncronize sync $tree $sel_ids]
+		    [list "update_recursive_cmd" $w fossil_syncronize sync $tree $sel_ids $dirs]
 		$menu add command -label [_ "Fossil pull"] -command \
-		    [list "update_recursive_cmd" $w fossil_syncronize pull $tree $sel_ids]
+		    [list "update_recursive_cmd" $w fossil_syncronize pull $tree $sel_ids $dirs]
 		$w set_uservar_value fossil_autosync [update_recursive_cmd $w give_fossil_sync]
 		set need_sep 1
 	    }
@@ -1565,13 +1573,15 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    update_recursive_accept $w view $dir $tree 0
 	}
 	fossil_syncronize {
-	    lassign $args sync_type
-	    set pwd [pwd]
-	    cd [$w give_uservar_value dir]
+	    lassign $args sync_type tree sel_ids dirs
 	    waitstate $w on sync
-	    set err [catch { exec fossil $sync_type } ret]
-	    if { $ret ne "" } {
-		snit_messageBox -message $ret -parent $w
+	    set pwd [pwd]
+	    foreach dir $dirs {
+		cd $dir
+		set err [catch { exec fossil $sync_type } ret]
+		if { $ret ne "" } {
+		    snit_messageBox -message $ret -parent $w
+		}
 	    }
 	    waitstate $w off
 	    cd $pwd
