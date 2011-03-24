@@ -541,8 +541,34 @@ proc "Background color region" { w } {
     $w tag lower background_color_$color sel
 }
 
+################################################################################
+#    proc Toggle debug lines
+################################################################################
 
+set "macrodata(Toggle debug lines,inmenu)" 1
+set "macrodata(Toggle debug lines,accelerator)" ""
+set "macrodata(Toggle debug lines,help)" "convert C functions: printf_debug to printf_debug_OFF and viceversa"
 
+proc "Toggle debug lines" { w } {
+    
+    lassign [$w tag ranges sel] idx idx_end
+    if { $idx eq "" } {
+	lassign [list "insert linestart" "insert lineend"] idx idx_end
+    }
+    set num_changes 0
+    while { [set idx [$w search -regexp -count ::count {\m(printf_\w+)} $idx $idx_end]] ne "" } {
+	set name [$w get $idx "$idx + $::count c"]
+	if { ![regexp {(.*)_OFF} $name {} name] } {
+	    set name ${name}_OFF
+	}
+	$w replace $idx "$idx + $::count c" $name
+	set idx [$w index "$idx + $::count c"]
+	incr num_changes
+    }
+    if { $num_changes == 0 } {
+	tk_messageBox -message "Current line should contain a command similar to \"printf_debug...\""
+    }
+}
 
 
 
