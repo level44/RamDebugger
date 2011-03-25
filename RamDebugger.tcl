@@ -4836,10 +4836,17 @@ proc RamDebugger::ActualizeActivePrograms { menu { force 0 } } {
     WaitState 0
 }
 
-proc RamDebugger::DisconnectStop {} {
+proc RamDebugger::DisconnectStop { args } {
     variable mainframe
     
+    set optional {
+	{ -force "" 0 }
+    }
+    set compulsory ""
+    parse_args $optional $compulsory $args
+
     if { [catch [list RamDebugger::rdebug -disconnect] errstring] } {
+	if { $force } { return }
 	set w [winfo toplevel $mainframe]
 	set menu1 $w.actualizeprogramsmenu
 	tk_popup $menu1 [winfo pointerx .] [winfo pointery .]

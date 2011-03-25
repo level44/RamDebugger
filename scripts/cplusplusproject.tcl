@@ -2021,6 +2021,7 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	return -1
     }
     
+    RamDebugger::DisconnectStop -force
     RamDebugger::SaveFile -only_if_modified 1 auto_save
     RamDebugger::ViewOnlyTextOrAll -force_all
     
