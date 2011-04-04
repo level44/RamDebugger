@@ -862,7 +862,7 @@ proc cproject::Create { par } {
     set nf32 [ttk::labelframe $nf3.f2 -text [_  "working directory"]]
 
     ttk::entry $nf32.e -textvariable cproject::thisdataE(execdir)
-    ttk::button $nf32.b -image [Bitmap::get file]  -style Toolbutton -command \
+    ttk::button $nf32.b -image [Bitmap::get file] -style Toolbutton -command \
 	[list cproject::select_executable_dir $w]
     
     grid $nf32.e $nf32.b -sticky ew -padx 2 -pady 2
@@ -937,7 +937,7 @@ proc cproject::select_executable_dir { w } {
 	    -mustexist 1]
     if { $dir eq "" } { return }
     set dir [ConvertToRelative [file dirname $project] $dir]
-    set thisdataE(execdir) $file
+    set thisdataE(execdir) $dir
 }
 
 proc cproject::update_active_inactive_makefile { w wList } {
