@@ -555,6 +555,9 @@ proc RamDebugger::CVS::indicator_init { f } {
 }
 
 proc RamDebugger::CVS::indicator_menu { cvs_indicator_frame x y } {
+
+    update
+    
     set currentfileL $RamDebugger::currentfile
     
     destroy $cvs_indicator_frame.menu
