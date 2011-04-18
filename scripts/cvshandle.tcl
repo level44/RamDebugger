@@ -549,14 +549,12 @@ proc RamDebugger::CVS::indicator_init { f } {
     foreach i [list 1 2 3] {
 	#bind $f.l$i <1> [list RamDebugger::OpenProgram tkcvs]
 	bind $f.l$i <1> [list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
-	bind $f.l$i <<Contextual>> [list RamDebugger::CVS::indicator_menu $cvs_indicator_frame %X %Y]
+	bind $f.l$i <<ContextualPress>> [list RamDebugger::CVS::indicator_menu $cvs_indicator_frame %X %Y]
     }
     grid $f.l1 $f.l2 $f.l3 -sticky w
 }
 
 proc RamDebugger::CVS::indicator_menu { cvs_indicator_frame x y } {
-
-    update
     
     set currentfileL $RamDebugger::currentfile
     
