@@ -177,13 +177,23 @@ set "macrodata(Comment header,accelerator)" ""
 set "macrodata(Comment header,help)" "This commands inserts a comment menu for TCL"
 
 proc "Comment header" { w } {
+    
+    switch [mc::give_active_file_type] {
+	"C/C++" { lassign [list "//" ""] prefix suffix }
+	"XML" { lassign [list "<!-- " " -->"] prefix suffix }
+	default { lassign [list "#" ""] prefix suffix }
+    }
+    set options_def(extensions,C/C++) ".c .cpp .cc .h"
+    set options_def(extensions,XML) ".xml .spd .xsl .xslt .svg (xml)*"
+
+    
     $w mark set insert "insert linestart"
-    $w insert insert "[string repeat # 80]\n"
+    $w insert insert "$prefix[string repeat # 80]$suffix\n"
     set idx [$w index insert]
-    $w insert insert "#    Comment\n"
-    $w insert insert "[string repeat # 80]\n"
-    $w tag add sel "$idx+5c" "$idx+12c"
-    $w mark set insert $idx+12c
+    $w insert insert "$prefix    Comment$suffix\n"
+    $w insert insert "$prefix[string repeat # 80]$suffix\n"
+    $w tag add sel "$idx+[expr {4+[string length $prefix]}]c" "$idx+[expr {11+[string length $prefix]}]c"
+    $w mark set insert $idx+[expr {11+[string length $prefix]}]c
 }
 
 ################################################################################

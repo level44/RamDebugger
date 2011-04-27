@@ -3794,6 +3794,15 @@ proc RamDebugger::PositionsStack { what args } {
 # Macros
 ################################################################################
 
+namespace eval ::RamDebugger::Macros {
+    namespace eval mc {}
+}  
+
+proc ::RamDebugger::GiveActiveFileType {} {
+    variable currentfile
+
+    return [GiveFileType $currentfile]
+}
 
 proc RamDebugger::MacrosDo { w what } {
     variable text
@@ -3812,7 +3821,9 @@ proc RamDebugger::MacrosDo { w what } {
 		return
 	    }
 	    set macro [$list item text [lindex $itemList 0] 0]
-	    RamDebugger::Macros::$macro $text
+	    tk_messageBox -message AA-[namespace children ::RamDebugger::Macros]
+
+	    ::RamDebugger::Macros::$macro $text
 	}
 	default {
 	    set ret [snit_messageBox -default ok -icon warning -message \
@@ -3963,6 +3974,8 @@ proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
     namespace eval Macros {}
     set Macros::menu $menu
     set Macros::mainframe $mainframe
+    
+    interp alias "" Macros::mc::give_active_file_type "" RamDebugger::GiveActiveFileType
 
     if { [catch {_AddActiveMacrosToMenu $mainframe $menu} errstring] } {
 	WarnWin "There is an error when trying to use Macros ($::errorInfo). Correct it please"
