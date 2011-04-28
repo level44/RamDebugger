@@ -7455,12 +7455,8 @@ proc RamDebugger::IndentLine { line { pos -1 } } {
 }
 
 proc RamDebugger::UpdateLineNum { command args } {
-    variable LineNum
     variable text
-    variable filesmtime
-    variable currentfile
     variable currentfileIsModified
-    variable CheckExternalFileModification
 
     RamDebugger::CVS::SetUserActivity
 
@@ -7471,6 +7467,27 @@ proc RamDebugger::UpdateLineNum { command args } {
 	wm title [winfo toplevel $text] [wm title [winfo toplevel $text]]*
 	set currentfileIsModified 1
     }
+    UpdateLineNumDo
+}
+
+proc RamDebugger::SetIsModified {} {
+    variable text
+    variable currentfileIsModified
+
+    if { !$currentfileIsModified } {
+	wm title [winfo toplevel $text] [wm title [winfo toplevel $text]]*
+	set currentfileIsModified 1
+    }
+    UpdateLineNumDo
+}
+
+proc RamDebugger::UpdateLineNumDo {} {
+    variable LineNum
+    variable text
+    variable filesmtime
+    variable currentfile
+    variable currentfileIsModified
+    variable CheckExternalFileModification
 
     set idx [$text index insert]
     set line ""

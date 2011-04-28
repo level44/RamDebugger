@@ -30,12 +30,13 @@ set "macrodata(To upper,help)" "This commands converts to uppercase the editor s
 proc "To upper" { w } {
 
     set range [$w tag nextrange sel 1.0 end]
-    if { $range == "" } { bell; return }
+    if { $range eq "" } { bell; return }
 
-    set txt [eval $w get $range]
-    eval $w delete $range
+    set txt [$w get {*}$range]
+    $w delete {*}$range
     $w insert [lindex $range 0] [string toupper $txt]
-    eval $w tag add sel $range
+    $w tag add sel {*}$range
+    mc::set_is_modified
 }
 
 ################################################################################
@@ -49,12 +50,13 @@ set "macrodata(To lower,help)" "This commands converts to lowercase the editor s
 proc "To lower" { w } {
 
     set range [$w tag nextrange sel 1.0 end]
-    if { $range == "" } { bell; return }
+    if { $range eq "" } { bell; return }
 
-    set txt [eval $w get $range]
-    eval $w delete $range
+    set txt [$w get {*}$range]
+    $w delete {*}$range
     $w insert [lindex $range 0] [string tolower $txt]
-    eval $w tag add sel $range
+    $w tag add sel {*}$range
+    mc::set_is_modified
 }
 
 ################################################################################
@@ -68,12 +70,13 @@ set "macrodata(To title,help)" "This commands converts to lowercase the editor s
 proc "To title" { w } {
 
     set range [$w tag nextrange sel 1.0 end]
-    if { $range == "" } { bell; return }
+    if { $range eq "" } { bell; return }
 
-    set txt [eval $w get $range]
-    eval $w delete $range
+    set txt [$w get {*}$range]
+    $w delete {*}$range
     $w insert [lindex $range 0] [string totitle $txt]
-    eval $w tag add sel $range
+    $w tag add sel {*}$range
+    mc::set_is_modified
 }
 
 ################################################################################
@@ -98,6 +101,7 @@ proc "Insert rectangular text" { w } {
 	$w delete $i.$c1 $i.$c2
 	$w insert $i.$c1 $txt
     }
+    mc::set_is_modified
 }
 
 ################################################################################
@@ -120,8 +124,8 @@ proc "Kill rectangular text" { w } {
     for { set i $l1 } { $i <= $l2 } { incr i } {
 	$w delete $i.$c1 $i.$c2
     }
+    mc::set_is_modified
 }
-
 
 ################################################################################
 #    proc Macro regsub
@@ -166,6 +170,7 @@ proc "Macro regsub" { w } {
     eval $w delete $range
     $w insert [lindex $range 0] $sel
     eval $w tag add sel $range
+    mc::set_is_modified
 }
 
 ################################################################################
@@ -194,6 +199,7 @@ proc "Comment header" { w } {
     $w insert insert "$prefix[string repeat # 80]$suffix\n"
     $w tag add sel "$idx+[expr {4+[string length $prefix]}]c" "$idx+[expr {11+[string length $prefix]}]c"
     $w mark set insert $idx+[expr {11+[string length $prefix]}]c
+    mc::set_is_modified
 }
 
 ################################################################################
@@ -501,6 +507,7 @@ proc "Convert GiD help Strings" { w } {
 
     eval $w delete $range
     $w insert [lindex $range 0] "\[$trans_cmd $data\]"
+    mc::set_is_modified
 }
 
 ################################################################################
@@ -555,35 +562,190 @@ proc "Background color region" { w } {
 #    proc Toggle debug lines
 ################################################################################
 
-set "macrodata(Toggle debug lines,inmenu)" 1
-set "macrodata(Toggle debug lines,accelerator)" ""
-set "macrodata(Toggle debug lines,help)" "convert C functions: printf_debug to printf_debug_OFF and viceversa"
-
-proc "Toggle debug lines" { w } {
+proc activate_deactivate_debug_lines { w activate_deactivate_toggle } {
     
     lassign [$w tag ranges sel] idx idx_end
     if { $idx eq "" } {
 	lassign [list "insert linestart" "insert lineend"] idx idx_end
     }
-    set num_changes 0
+    lassign "0 0" num_changes num_found
     while { [set idx [$w search -regexp -count ::count {\m(printf_\w+)} $idx $idx_end]] ne "" } {
 	set name [$w get $idx "$idx + $::count c"]
+	set replace 1
+	switch $activate_deactivate_toggle {
+	    activate {
+		if { ![regexp {(.*)_OFF} $name {} name] } { set replace 0 }
+	    }
+	    deactivate {
+		if { [regexp {(.*)_OFF} $name {} name] } { set replace 0 }
+	    }
+	}
+	if { $replace } {
 	if { ![regexp {(.*)_OFF} $name {} name] } {
 	    set name ${name}_OFF
 	}
 	$w replace $idx "$idx + $::count c" $name
-	set idx [$w index "$idx + $::count c"]
 	incr num_changes
     }
-    if { $num_changes == 0 } {
+	set idx [$w index "$idx + $::count c"]
+	incr num_found
+    }
+    if { $num_found == 0 } {
 	tk_messageBox -message "Current line should contain a command similar to \"printf_debug...\""
     }
+    mc::set_is_modified
 }
 
+set "macrodata(Activate debug lines,inmenu)" 1
+# recommended: <Shift-F8>
+set "macrodata(Activate debug lines,accelerator)" ""
+set "macrodata(Activate debug lines,help)" "convert C functions: printf_debug to printf_debug_OFF and viceversa"
 
+proc "Activate debug lines" { w } {
 
+    set wg $w.g
+    destroy $wg
+    dialogwin_snit $wg -title [_ "Enter action"] -entrylabel [_ "Action"]: \
+	-entrytype noneditable_entry -entryvalues [list activate deactivate toggle] \
+	-entrydefault activate
+    set action [$wg createwindow]
+    set txt [$wg giveentryvalue]
+    destroy $wg
+    if { $action <= 0 } {  return }
+    activate_deactivate_debug_lines $w $txt
+}
 
+set "macrodata(Toggle debug lines,inmenu)" 1
+# recommended: <F8>
+set "macrodata(Toggle debug lines,accelerator)" ""
+set "macrodata(Toggle debug lines,help)" "convert C functions: printf_debug to printf_debug_OFF and viceversa"
 
+proc "Toggle debug lines" { w } {
+    activate_deactivate_debug_lines $w toggle
+}
+
+################################################################################
+#    proc Debug GiD Post
+################################################################################
+
+package require commR
+	set tkcon_commr_id [commR::register tkcon 1]
+
+proc ddp { args } {
+    global debug_commr_id
+    
+    if { ![info exists debug_commr_id] } {
+	package require commR
+	set debug_commr_id [commR::register debug_GiDPost 1]
+    }
+    for { set i 12350 } { $i < 12360 } { incr i } {
+	set err [catch { commR::comm send $i [list commR::givename $debug_commr_id] } ret]
+	if { !$err && $ret eq "GiDPost" } {
+	    break
+	}
+    }
+    commR::comm send $i {*}$args
+}
+
+proc send_draw_point_to_gidpost { txt } {
+    if { ![regexp {([-+.\deE]+),([-+.\deE]+),([-+.\deE]+)} $txt {} px py pz] } { continue }
+    ddp [list draw_post::draw_signal_point 0 [list $px $py $pz]]
+}
+
+proc send_draw_box_to_gidpost { txt } {
+    if { ![regexp {p0=(\S+)\s+L=(\S+)} $txt {} p0 L] } { continue }
+    
+    set p0 [split $p0 ","]
+    set L [split $L ","]
+    if { [llength $L] == 1 } {
+	set L [lrepeat 3 $L]
+    }
+    set entList ""
+    foreach i [list point ariste face] {
+	set rex [format {idx_%s[^=]*=(\d+)} $i]
+	if { [regexp $rex $txt {} num] } {
+	    lappend entList $i $num
+	}
+    }
+    ddp [list draw_post::draw_point_line_indicator -draw_arrow_to_center 0 box_axes $p0 $L $entList]
+}
+    
+set "macrodata(Debug box GiD Post,inmenu)" 0
+# recommended: <Control-u><F1>
+set "macrodata(Debug box GiD Post,accelerator)" ""
+set "macrodata(Debug box GiD Post,help)" "Draw a debug box in an open GiDPost"
+
+proc "Debug box GiD Post" { w } {
+
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range ne "" } {
+	set txt [$w get {*}$range]
+    } else {
+       set txt ""
+    }
+    if { $range eq "" || [regexp {idx_point|idx_ariste|idx_face} $txt] } {
+	set wg $w.g
+	destroy $wg
+	dialogwin_snit $wg -title [_ "Enter variable"] -entrylabel [_ "Enter variable name"]: \
+	    -entrytype entry -entryvalues [list this] -entrydefault "this $txt"
+	set action [$wg createwindow]
+	set txt [string trim [$wg giveentryvalue]]
+	destroy $wg
+	if { $action <= 0 } {  return }
+    }
+    lassign [split $txt] var1 var2
+    if { $var2 ne "" } {
+	set format "\"$var2=%d\",$var2"   
+    } else {
+	set format "\"\""
+    }
+    set ev [RamDebugger::reval $var1]
+    if { [regexp {PointAristeFace} $ev] } {
+	set ev [RamDebugger::reval "bprintf_debug_paf(\"DEBUG PAF\",*$var1,$format)"]
+    } elseif { [regexp {mesh_tree_full_leave} $ev] } {
+	switch -- $var2 {
+	    "idx_point" { set cmd "bprintf_debug_boxP(\"DEBUG BOX\",$var1,$var2)" }
+	    "idx_ariste" { set cmd "bprintf_debug_boxA(\"DEBUG BOX\",$var1,$var2)" }
+	    "idx_face" { set cmd "bprintf_debug_boxF(\"DEBUG BOX\",$var1,$var2)" }
+	    "default" {   set cmd "bprintf_debug_box(\"DEBUG BOX\",$var1,\"\")" }
+	}
+	set ev [RamDebugger::reval $cmd]
+    } else {
+	return
+    }
+    send_draw_box_to_gidpost $ev
+}
+
+set "macrodata(Debug point GiD Post,inmenu)" 0
+# recommended: <Control-u><F2>
+set "macrodata(Debug point GiD Post,accelerator)" ""
+set "macrodata(Debug point GiD Post,help)" "Draw a debug point in an open GiDPost"
+
+proc "Debug point GiD Post" { w } {
+
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range eq "" } {
+	set wg $w.g
+	destroy $wg
+	dialogwin_snit $wg -title [_ "Enter variable"] -entrylabel [_ "Enter variable name"]: \
+	    -entrytype entry -entryvalues [list this]
+	set action [$wg createwindow]
+	set txt [$wg giveentryvalue]
+	destroy $wg
+	if { $action <= 0 } {  return }
+    } else {
+	set txt [$w get {*}$range]
+    }
+    set ev [RamDebugger::reval $txt]
+    if { [regexp {PointAristeFace} $ev] } {
+	set ev [RamDebugger::reval "bprintf_debug_paf(\"DEBUG PAF\",*$txt,\"\")"]
+    } elseif { [regexp {mesh_tree_full_leave} $ev] } {
+	set ev [RamDebugger::reval "bprintf_debug_box(\"DEBUG BOX\",$txt,\"\")"]
+    } else {
+	return
+    }
+    send_draw_point_to_gidpost $ev
+}
 
 
 

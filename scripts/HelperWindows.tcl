@@ -3976,6 +3976,7 @@ proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
     set Macros::mainframe $mainframe
     
     interp alias "" Macros::mc::give_active_file_type "" RamDebugger::GiveActiveFileType
+    interp alias "" Macros::mc::set_is_modified "" RamDebugger::SetIsModified
 
     if { [catch {_AddActiveMacrosToMenu $mainframe $menu} errstring] } {
 	WarnWin "There is an error when trying to use Macros ($::errorInfo). Correct it please"
