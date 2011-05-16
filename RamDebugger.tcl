@@ -3484,25 +3484,43 @@ proc RamDebugger::ExitGUI {} {
 	lappend options(watchedvars) $EvalEntries($i,left)
 	incr i
     }
-    if { ![info exists options(ViewOnlyTextOrAll)] || $options(ViewOnlyTextOrAll) != "OnlyText" } {
-	foreach i [array names options paneweights,*] {
-	    regexp {paneweights,(.*),(.*)} $i {} orient panedw
-	    if { [winfo exists $panedw] } {
-		set idx 0
-		set sum 0
-		set res ""
-		foreach pane [$panedw panes] {
-		    switch $orient {
-		        h { lappend res [winfo width $pane] }
-		        v { lappend res [winfo height $pane] }
-		    }
-		    incr idx
-		    set sum [expr {$sum+[lindex $res end]}]
+#     if { ![info exists options(ViewOnlyTextOrAll)] || $options(ViewOnlyTextOrAll) != "OnlyText" } {
+#         foreach i [array names options paneweights,*] {
+#             regexp {paneweights,(.*),(.*)} $i {} orient panedw
+#             if { [winfo exists $panedw] } {
+#                 set idx 0
+#                 set sum 0
+#                 set res ""
+#                 foreach pane [$panedw panes] {
+#                     switch $orient {
+#                         h { lappend res [winfo width $pane] }
+#                         v { lappend res [winfo height $pane] }
+#                     }
+#                     incr idx
+#                     set sum [expr {$sum+[lindex $res end]}]
+#                 }
+#                 if { $sum > $idx } { set options($i) $res }
+#             }
+#         }
+#     }
+    foreach i [array names options paneweights,*] {
+	regexp {paneweights,(.*),(.*)} $i {} orient panedw
+	if { [winfo exists $panedw] } {
+	    set idx 0
+	    set sum 0
+	    set res ""
+	    foreach pane [$panedw panes] {
+		switch $orient {
+		    h { lappend res [winfo width $pane] }
+		    v { lappend res [winfo height $pane] }
 		}
-		if { $sum > $idx } { set options($i) $res }
+		incr idx
+		set sum [expr {$sum+[lindex $res end]}]
 	    }
+	    if { $sum > $idx } { set options($i) $res }
 	}
     }
+
     set options(currentfile) $currentfile
     set options(currentidx) [$text index insert]
 
