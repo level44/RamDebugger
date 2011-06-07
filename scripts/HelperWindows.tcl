@@ -2983,7 +2983,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
-	    bind $w.search <1> "destroy $w.search"
+	    bind $w.search <1> "destroy $w.search; break"
 	    bind $w.search <<Contextual>> "destroy $w.search"
 	    foreach i [list F1 F2 F5 F6 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
