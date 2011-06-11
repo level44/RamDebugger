@@ -9,8 +9,8 @@ namespace eval RamDebugger::CVS {
     variable lasttimeautosave ""
     variable autosave_after ""
     variable autosaveidle_after ""
-    #variable try_threaded debug
-    variable try_threaded 1
+    variable try_threaded debug
+    #variable try_threaded 1
 }
 
 proc RamDebugger::CVS::Init {} {
@@ -612,8 +612,9 @@ proc RamDebugger::CVS::indicator_update {} {
 	fileevent $cvs_indicator_fileid readable [list RamDebugger::CVS::indicator_update_do cvs]
     }
     set  fossil_indicator_data ""
-    if { [auto_execok fossil] ne "" && [catch { exec fossil info }] == 0 } {
-	set fossil_indicator_fileid [open "|fossil changes" r]
+    set fossil [auto_execok fossil]
+    if { $fossil ne "" && [catch { exec $fossil info }] == 0 } {
+	set fossil_indicator_fileid [open "|$fossil changes" r]
 	fconfigure $fossil_indicator_fileid -blocking 0
 	fileevent $fossil_indicator_fileid readable \
 	    [list RamDebugger::CVS::indicator_update_do fossil]
@@ -705,7 +706,8 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last_or_this args } {
 	set directory [file dirname $RamDebugger::currentfile]
 	set pwd [pwd]
 	cd $directory
-	if { [auto_execok fossil] ne "" && [catch { exec fossil info } info] == 0 } {
+	set fossil [auto_execok fossil]
+	if { $fossil ne "" && [catch { exec $fossil info } info] == 0 } {
 	    regexp -line {^local-root:\s*(.*)} $info {} dirLocal
 	    set directory [string trimright $dirLocal /]
 	}
@@ -1084,7 +1086,8 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
     if { [llength $dirList] } {
 	set pwd [pwd]
 	cd [lindex $dirList 0]
-	if { [catch { exec fossil info } info] == 0 } {
+	set fossil [auto_execok fossil]
+	if { $fossil ne "" && [catch { exec $fossil info }] == 0 } {
 	    regexp -line {^local-root:\s*(.*)} $info {} dir
 	}
 	cd $pwd
@@ -1092,14 +1095,19 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
     
     set pwd [pwd]
     cd $dir
-    set err [catch { exec fossil ticket show 0 "status=='Open'" } ret]
-    if { !$err } {
-	set fieds [split [lindex [split $ret \n] 0] \t]
-	set ipos_tkt_uuid [lsearch -exact $fieds tkt_uuid]
-	set ipos_title [lsearch -exact $fieds title]
-	if { $ipos_tkt_uuid == -1 || $ipos_title == -1 } {
-	    set err 1
+    set fossil [auto_execok fossil]
+    if { $fossil ne "" && [catch { exec $fossil info }] == 0 } {
+	set err [catch { exec $fossil ticket show 0 "status=='Open'" } ret]
+	if { !$err } {
+	    set fieds [split [lindex [split $ret \n] 0] \t]
+	    set ipos_tkt_uuid [lsearch -exact $fieds tkt_uuid]
+	    set ipos_title [lsearch -exact $fieds title]
+	    if { $ipos_tkt_uuid == -1 || $ipos_title == -1 } {
+		set err 1
+	    }
 	}
+    } else {
+	set err 1
     }
     if { !$err } {
 	set ticketList ""
@@ -1110,7 +1118,7 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	    lappend ticketList [list "\[[string range $ticket 0 9]\]" $message 1]
 	}
     } else {
-	set err [catch { parse_timeline [exec fossil timeline -n 2000 -t t] } ret]
+	set err [catch { parse_timeline [exec $fossil timeline -n 2000 -t t] } ret]
 	if { $err } { set ret "" }
 	
 	set ticketList ""
@@ -1148,7 +1156,8 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
     }
 
     set num 1
-    set err [catch { exec fossil ticket list reports } ret]
+    set fossil [auto_execok fossil]
+    set err [catch { exec $fossil ticket list reports } ret]
     if { !$err } {
 	foreach line [split $ret \n] {
 	    if { [regexp {(\d)\s+(.*)} $line {} num_in txt] && $num_in > 0 && [regexp {(?i)open} $txt] } {
@@ -1299,11 +1308,12 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	}
 	set has_vcs 1
     }
-    if { [auto_execok fossil] ne "" && [catch { exec fossil info } info] == 0 } {
+    set fossil [auto_execok fossil]
+    if { $fossil ne "" && [catch { exec $fossil info } info] == 0 } {
 	regexp -line {^local-root:\s*(.*)} $info {} dirLocal
 	set dirLocal [string trimright $dirLocal /]
 	set fossil_version 0
-	set err [catch { exec fossil version } ret]
+	set err [catch { exec $fossil version } ret]
 	if { !$err && [regexp {\d{4}-\d{2}-\d{2}} $ret date] } {
 	    if { [clock scan $date] >= [clock scan "2009-12-18"] } {
 		set fossil_version 1
@@ -1320,18 +1330,18 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    set item [$tree insert end [list $dirLocal] $itemP]
 	}
 	if { $what eq "view" &&  [update_recursive_cmd $w give_fossil_sync $dir] } {
-	    set err [catch { exec fossil pull } ret]
+	    set err [catch { exec $fossil pull } ret]
 	    if { $err && $ret ne "" } {
 		snit_messageBox -message $ret -parent $w
 	    }
 	}
 	if { $fossil_version == 0 } {
-	    set err [catch { exec fossil ls 2>@1 } list_files]
+	    set err [catch { exec $fossil ls 2>@1 } list_files]
 	} else {
-	    set err [catch { exec fossil ls -l 2>@1 } list_files]
+	    set err [catch { exec $fossil ls -l 2>@1 } list_files]
 	}
 	if { !$err } {
-	    set err [catch { exec fossil extras 2>@1 } list_files2]
+	    set err [catch { exec $fossil extras 2>@1 } list_files2]
 	    foreach line [split $list_files2 \n] {
 		append list_files "\n? $line"
 	    }
@@ -1339,19 +1349,19 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	lassign $what op version
 	switch $op {
 	    update {
-		set err [catch { exec fossil update 2>@1 } list_files3]
+		set err [catch { exec $fossil update 2>@1 } list_files3]
 	    }
 	    update_this {
-		set err [catch { exec fossil update $version 2>@1 } list_files3]
+		set err [catch { exec $fossil update $version 2>@1 } list_files3]
 	    }
 	    merge_this {
-		set err [catch { exec fossil merge $version 2>@1 } list_files3]
+		set err [catch { exec $fossil merge $version 2>@1 } list_files3]
 	    }
 	    checkout_this {
-		set err [catch { exec fossil checkout $version 2>@1 } list_files3]
+		set err [catch { exec $fossil checkout $version 2>@1 } list_files3]
 	    }
 	    view {
-		set err [catch { exec fossil update --nochange 2>@1 } list_files3]
+		set err [catch { exec $fossil update --nochange 2>@1 } list_files3]
 	    }
 	}
 	if { !$err } {
@@ -1361,9 +1371,9 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    $w set_uservar_value fossil_timeline_view_more 0
 	}
 	if { [$w give_uservar_value fossil_timeline_view_more] } {
-	    set err [catch { parse_timeline [exec fossil timeline -n 200 -t ci] } ret]
+	    set err [catch { parse_timeline [exec $fossil timeline -n 200 -t ci] } ret]
 	} else {
-	    set err [catch { parse_timeline [exec fossil timeline after current] } ret]
+	    set err [catch { parse_timeline [exec $fossil timeline after current] } ret]
 	}
 	if { !$err } {
 	    set itemT [$tree insert end [list [_ Timeline]] $item]
@@ -1416,6 +1426,8 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 proc RamDebugger::CVS::update_recursive_cmd { w what args } {
     variable fossil_version
     
+    set fossil [auto_execok fossil]
+    
     switch $what {
 	contextual {
 	    lassign $args tree menu id sel_ids
@@ -1449,7 +1461,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    if { [auto_execok cvs] ne "" && [file isdirectory CVS] } {
 		set cvs_active 1
 	    }
-	    if { [auto_execok fossil] ne "" && [catch { exec fossil info }] == 0 } {
+	    set fossil [auto_execok fossil]
+	    if { $fossil ne "" && [catch { exec $fossil info }] == 0 } {
 		set fossil_active 1
 	    }
 	    cd $pwd
@@ -1542,7 +1555,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    set autosync 0
 	    set pwd [pwd]
 	    cd $dir
-	    set err [catch { exec fossil settings autosync } ret]
+	    set fossil [auto_execok fossil]
+	    set err [catch { exec $fossil settings autosync } ret]
 	    if { !$err } {
 		regexp {(\d)\s*$} $ret {} autosync
 	    }
@@ -1553,7 +1567,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign $args autosync
 	    set pwd [pwd]
 	    cd [$w give_uservar_value dir]
-	    set err [catch { exec fossil settings autosync $autosync } ret]
+	    set fossil [auto_execok fossil]
+	    set err [catch { exec $fossil settings autosync $autosync } ret]
 	    if { !$err } {
 		snit_messageBox -message $ret -parent $w
 	    }
@@ -1579,7 +1594,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    set pwd [pwd]
 	    foreach dir $dirs {
 		cd $dir
-		set err [catch { exec fossil $sync_type } ret]
+		set fossil [auto_execok fossil]
+		set err [catch { exec $fossil $sync_type } ret]
 		if { $ret ne "" } {
 		    snit_messageBox -message $ret -parent $w
 		}
@@ -1648,10 +1664,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    dict for "dir fs" $fossil_files_dict {
 		cd $dir
-		set info [exec fossil info]
-		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dirF
+		set fossil [auto_execok fossil]
+		set info [exec $fossil info]
+		regexp -line {^local-root:\s*(.*)} $info {} dirF
 		cd $dirF
-		set err [catch { exec fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
+		set err [catch { exec $fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
 		if { $err } { set color red } else { set color blue }
 		foreach file $fs {
 		    set item [dict get $items fossil $dir $file]
@@ -1665,7 +1682,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set tickets [string trim [$w give_uservar_value tickets]]
 		set ticket_status [$w give_uservar_value ticket_status]
 		if { !$err && $ticket_status ne "" && $tickets ne "" } {
-		    set err [catch { exec fossil ticket show 0 } ret]
+		    set err [catch { exec $fossil ticket show 0 } ret]
 		    if { !$err } {
 		        set fieds [split [lindex [split $ret \n] 0] \t]
 		        set ipos_tkt_uuid [lsearch -exact $fieds tkt_uuid]
@@ -1694,7 +1711,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		            }
 		            lassign [lindex $ticketList $ipos] - ticketF comment
 		            append comment "\ncommit: $new_commit. Change status to: $ticket_status"
-		            exec fossil ticket change $ticketF status $ticket_status comment $comment
+		            exec $fossil ticket change $ticketF status $ticket_status comment $comment
 		        }
 		    }
 		    if { $err } { break }
@@ -1752,10 +1769,11 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		if { $what in "add add_binary" } {
 		    set err [catch { exec cvs add -m $message {*}$kopt $file 2>@1 } ret]
 		} else {
-		    set info [exec fossil info]
-		    regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
+		    set fossil [auto_execok fossil]
+		    set info [exec $fossil info]
+		    regexp -line {^local-root:\s*(.*)} $info {} dir
 		    cd $dir
-		    set err [catch { exec fossil add $file 2>@1 } ret]
+		    set err [catch { exec $fossil add $file 2>@1 } ret]
 		}
 		if { $err } { break }
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
@@ -1791,13 +1809,13 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		if { ![regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
 		cd $dir
-		set info [exec fossil info]
-		regexp -line {^local-root:\s*(.*)} [exec fossil info] {} dir
+		set info [exec $fossil info]
+		regexp -line {^local-root:\s*(.*)} $info {} dir
 		cd $dir
 		if { $fossil_version == 0 } {
-		    set err [catch { exec fossil revert --yes $file 2>@1 } ret]
+		    set err [catch { exec $fossil revert --yes $file 2>@1 } ret]
 		} else {
-		    set err [catch { exec fossil revert $file 2>@1 } ret]   
+		    set err [catch { exec $fossil revert $file 2>@1 } ret]   
 		}
 		if { $err } { break }
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
@@ -1871,7 +1889,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    }
 		    foreach file $files {
 		        cd [file dirname $file]
-		        set err [catch { exec fossil info } info]
+		        set fossil [auto_execok fossil]
+		        set err [catch { exec $fossil info } info]
 		        if { !$err } {
 		            regexp -line {^local-root:\s*(.*)} $info {} dirF
 		            set len [llength [file split $dirF]]
@@ -1888,6 +1907,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        set dir [$tree item text [$tree item parent $item] 0]
 		        lappend files_list [list $mode $dir $file]
 		    }
+		    set fossil [auto_execok fossil]
 		    set num_open 0
 		    foreach i $files_list {
 		        lassign $i mode dir file
@@ -1896,7 +1916,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        } else {
 		            cd $dir
 		            set err [catch {
-		                    set info [exec fossil info]
+		                    set info [exec $fossil info]
 		                    regexp -line {^local-root:\s*(.*)} $info {} dirF
 		                } ret]
 		            if { $err } {
@@ -1911,15 +1931,15 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		            if { [string length $mode] == 1 } {
 		                cd [file dirname $fileF]
 		                open_program -new_interp 1 tkdiff {*}$ignore_blanks -r [file tail $fileF]
-		            } elseif { ![catch { exec fossil settings gdiff-command } ret] && [regexp $rex $ret {} {} cmd] } {
+		            } elseif { ![catch { exec $fossil settings gdiff-command } ret] && [regexp $rex $ret {} {} cmd] } {
 		                cd [file dirname $fileF]
-		                exec fossil gdiff $fileF &
+		                exec $fossil gdiff $fileF &
 		            } else {
 		                cd $dirF
-		                set err [catch { parse_timeline [exec fossil descendants] } ret]
+		                set err [catch { parse_timeline [exec $fossil descendants] } ret]
 		                if { !$err && [llength $ret] > 0 } {
 		                    lassign [lindex $ret 0] date time checkin comment
-		                    set err [catch { parse_finfo [exec fossil finfo $file] } ret]
+		                    set err [catch { parse_finfo [exec $fossil finfo $file] } ret]
 		                    set finfo_list $ret
 		                } else {
 		                    set err 1
@@ -1943,7 +1963,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                    }
 		                }
 		                if { !$found } {
-		                    set ret [parse_timeline [exec fossil timeline parents $checkin -n 2000]]
+		                    set ret [parse_timeline [exec $fossil timeline parents $checkin -n 2000]]
 		                    foreach i $ret {
 		                        lassign $i date time checkin comment
 		                        foreach i $finfo_list {
@@ -1968,7 +1988,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                    return
 		                }
 		                set c [string range $checkin 0 9]
-		                exec fossil artifact $artifact $file.$c.$date
+		                exec $fossil artifact $artifact $file.$c.$date
 		                
 		                if { [winfo screenheight .] > 500 } {
 		                    set y [expr {[winfo screenheight .]-500+$num_open*40}]
@@ -2021,9 +2041,9 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    set pwd [pwd]
 		    foreach dir $dirs {
 		        cd $dir
-		        if { [catch { exec fossil info }] } { continue }
+		        if { [catch { exec $fossil info }] } { continue }
 		        if { $files eq "" } {
-		            exec fossil ui &
+		            exec $fossil ui &
 		        } else {
 		            set port ""
 		            set fin [open "|fossil server" r]
@@ -2037,7 +2057,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		            }
 		            if { $port ne "" } {
 		                set url [string map [list PORT $port] $files]
-		                set line [exec fossil settings web-browser]
+		                set line [exec $fossil settings web-browser]
 		                set browser ""
 		                regexp {\((local|global)\)\s+(.*)$} $line {} {} browser
 		                if { $browser ne "" } {
@@ -2059,7 +2079,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    set pwd [pwd]
 	    foreach file $files {
 		cd [file dirname $file]
-		set err [catch { exec fossil info } info]
+		set err [catch { exec $fossil info } info]
 		if { !$err } {
 		    regexp -line {^local-root:\s*(.*)} $info {} dirF
 		    set len [llength [file split $dirF]]
@@ -2085,10 +2105,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    lassign [lindex $files_list 0] mode dir file
 	    cd $dir
-	    set err [catch { parse_finfo [exec fossil finfo $file] } ret]
+	    set err [catch { parse_finfo [exec $fossil finfo $file] } ret]
 	    if { $err } {
-		set err_version [catch { exec fossil version }]
-		set err_info [catch { exec fossil info }]
+		set err_version [catch { exec $fossil version }]
+		set err_info [catch { exec $fossil info }]
 	    }
 	    cd $pwd
 	    if { $err } {
@@ -2172,13 +2192,13 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set c1 [string range $checkin1 0 9]
 		set pwd [pwd]
 		cd $dir
-		exec fossil artifact $artifact1 $file.$c1.$date1
+		exec $fossil artifact $artifact1 $file.$c1.$date1
 		if { [llength $selecteditems] == 1 } {
 		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks $file $file.$c1.$date1 } ret]
 		} else {
 		    lassign [lindex $selecteditems 1] date2 checkin2 - - artifact2
 		    set c2 [string range $checkin2 0 9]
-		    exec fossil artifact $artifact2 $file.$c2.$date2
+		    exec $fossil artifact $artifact2 $file.$c2.$date2
 		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks $file.$c1.$date1 $file.$c2.$date2 } ret]
 		}
 		if { $err } {
