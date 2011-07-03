@@ -9163,6 +9163,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
+    bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces $text];break"
+    bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces $text];break"
 
     set cmd {
 	if { "%A" eq "\}" } {

@@ -4229,14 +4229,43 @@ proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
     DialogWinTop::CreateWindow $f
 }
 
+#################################################################################
+#    insert_brackets_braces
+#################################################################################
 
-
-
-
-
-
-
-
-
+proc RamDebugger::insert_brackets_braces { text } {
+    variable last_insert_brackets_braces
+    
+    if { ![info exists last_insert_brackets_braces] } {
+	set last_insert_brackets_braces ""
+    }
+    set list [list "{}" "\[\]" "\"\"" "\\\\"]
+    set t [clock milliseconds]
+    lassign $last_insert_brackets_braces time d
+    if { $time eq "" } {
+	set d "{}"
+    } elseif { $t > $time+1000 } {
+	set d $d
+    } else {
+	set idx [$text search $d insert-1c]
+	if { [$text compare $idx == insert-1c] } {
+	    if { [string length $d] == 1 } {
+		$text delete insert-1c
+	    } else {
+		$text delete insert-1c insert+1c
+	    }
+	}
+	set ipos [lsearch -exact $list $d]
+	incr ipos
+	if { $ipos >= [llength $list] } {
+	    set ipos 0
+	}
+	set d [lindex $list $ipos]
+    }
+    set idx [$text index insert]
+    $text insert insert $d
+    $text mark set insert "$idx+1c"
+    set last_insert_brackets_braces [list $t $d]
+}
 
 
