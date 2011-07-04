@@ -8362,6 +8362,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		            -command "RamDebugger::CommentSelection toggle"] \
 		    [list command &[_ "Uncomment region"] {} [_ "Un-comment selected region"] "Shift F6" \
 		        -command "RamDebugger::CommentSelection off"] \
+		    [list command &[_ "Insert braces/brackets"] {} [_ "Inserts  pairs of brackets, braces or quotes"] "Ctrl less" \
+		        -command "RamDebugger::insert_brackets_braces"] \
 		    separator \
 		    [list command [_ "Center display"] {} [_ "Center text display"] "Ctrl l" \
 		        -command "RamDebugger::CenterDisplay"] \
@@ -9163,8 +9165,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
-    bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces $text];break"
-    bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces $text];break"
+    bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces];break"
+    bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces];break"
 
     set cmd {
 	if { "%A" eq "\}" } {

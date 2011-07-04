@@ -4233,8 +4233,9 @@ proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
 #    insert_brackets_braces
 #################################################################################
 
-proc RamDebugger::insert_brackets_braces { text } {
+proc RamDebugger::insert_brackets_braces {} {
     variable last_insert_brackets_braces
+    variable text
     
     if { ![info exists last_insert_brackets_braces] } {
 	set last_insert_brackets_braces ""
@@ -4266,6 +4267,8 @@ proc RamDebugger::insert_brackets_braces { text } {
     $text insert insert $d
     $text mark set insert "$idx+1c"
     set last_insert_brackets_braces [list $t $d]
+    
+    RamDebugger::SetMessage [_ "Press key again to change insertion characters"]
 }
 
 
