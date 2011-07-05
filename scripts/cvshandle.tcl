@@ -1087,7 +1087,7 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	set pwd [pwd]
 	cd [lindex $dirList 0]
 	set fossil [auto_execok fossil]
-	if { $fossil ne "" && [catch { exec $fossil info }] == 0 } {
+	if { $fossil ne "" && [catch { exec $fossil info } info] == 0 } {
 	    regexp -line {^local-root:\s*(.*)} $info {} dir
 	}
 	cd $pwd
