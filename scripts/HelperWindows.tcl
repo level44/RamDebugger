@@ -4240,12 +4240,12 @@ proc RamDebugger::insert_brackets_braces {} {
     if { ![info exists last_insert_brackets_braces] } {
 	set last_insert_brackets_braces ""
     }
-    set list [list "{}" "\[\]" "\"\"" "\\\\"]
+    set list [list "{}" "\[\]" "\"\"" "\\\\" "#"]
     set t [clock milliseconds]
     lassign $last_insert_brackets_braces time d
     if { $time eq "" } {
 	set d "{}"
-    } elseif { $t > $time+1000 } {
+    } elseif { $t > $time+3000 } {
 	set d $d
     } else {
 	set idx [$text search $d insert-1c]

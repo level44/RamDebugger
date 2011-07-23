@@ -9165,6 +9165,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
+    
+    # backslash is here to help with a problem in Android VNC
     bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces];break"
     bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces];break"
 
