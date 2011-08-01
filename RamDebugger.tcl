@@ -8668,6 +8668,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set menu [$mainframe getmenu activeconfiguration]
     catch { $menu conf -postcommand "$menu conf -selectcolor black" }
 
+    
+    place [ttk::sizegrip $label.sg] -relx 1 -rely 1 -anchor se
+    
     set f [$mainframe getframe]
 
     ################################################################################
