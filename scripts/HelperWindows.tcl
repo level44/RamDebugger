@@ -2826,7 +2826,7 @@ proc RamDebugger::inline_replace { w search_entry } {
     focus $w.replace
     grab $w.replace
     
-    bind $w.replace <Return> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
+    #bind $w.replace <Return> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
     bind $w.replace <$::control-i> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry accept]
     bind $w.replace <Escape> [list RamDebugger::inline_replace_end $w $focus $grab $search_entry end]
     bind $w.replace <1> "[list RamDebugger::inline_replace_end $w $focus $grab $search_entry end];break"
@@ -2838,7 +2838,7 @@ proc RamDebugger::inline_replace { w search_entry } {
     bind $w.replace <$::control-j> "$cmd1; $cmd2; break"
     bind $w.replace <$::control-J> "$cmd1; $cmd3; break"
 
-    set msg [_ "Press <Return> or Ctrl+I to continue search and replace\nCtrl+J to replace\nCtrl+Shift+J to replace all"]
+    set msg [_ "Press Ctrl+I to continue search and replace\nCtrl+J to replace\nCtrl+Shift+J to replace all"]
     tooltip::tooltip $w.replace $msg
     
     label $w.searchl2 -text $msg -justify left -bd 1 -relief solid
@@ -2886,8 +2886,14 @@ proc RamDebugger::textPaste_insert_after { w } {
 }
 
 proc RamDebugger::Search_get_selection { active_text } {
-    if { [$active_text tag ranges sel] ne "" } {
-	set txt [$active_text get {*}[$active_text tag ranges sel]]
+    
+    lassign [GetSelOrWordInIndex -return_range 1 insert] idx1 idx2
+    set txt [$active_text get $idx1 "$idx2+1c"]
+    if { [string trim $txt] ne "" } {
+	$active_text mark set insert $idx1
+	set ::RamDebugger::SearchIni $idx1
+	set ::RamDebugger::SearchPos $idx1
+	$active_text tag add sel $idx1 "$idx2+1c"
     } else {
 	set err [catch { clipboard get } txt]
 	if { $err } { set txt "" }
@@ -2969,9 +2975,11 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    place $w.search -in $w -x 2 -rely 1 -y -1 -anchor sw
 
 	    set msg1 [_ "Press Ctrl+J to replace"]
-	    set msg2 [_ "Press Ctrl+C to use selection for search"]
+	    set msg2 [_ "Press Ctrl+C to use selection or word on cursor for search"]
 	    set msg3 [_ "Press Home to search from beginning"]
-	    tooltip::tooltip $w.search $msg1\n$msg2\n$msg3
+	    set msg4 [_ "Press Ctrl+I again to use last word for search"]
+	    set msg "$msg1\n$msg2\n$msg3\n$msg4"
+	    tooltip::tooltip $w.search $msg
 
 	    focus $active_text
 	    bindtags $active_text [linsert [bindtags $active_text] 0 $w.search]
@@ -2998,15 +3006,16 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    if { $active_text eq $text } {
 		bind $w.search <$::control-j> "RamDebugger::inline_replace $w $w.search; break"
 		
-		label $w.searchl1 -text $msg1
+		label $w.searchl1 -text $msg -justify left -bd 1 -relief solid
 		set x1 [expr {2+[winfo reqwidth $w.search]+2}]
 		place $w.searchl1 -in $w -x $x1 -rely 1 -y -1 -anchor sw
 		after 2000 [list catch [list destroy $w.searchl1]]
 	    }
 	    set ::RamDebugger::searchstring ""
-	    trace var RamDebugger::searchstring w "[list RamDebugger::Search $w {}];#"
-	    bind $w.search <Destroy> [list trace vdelete RamDebugger::searchstring w \
-		"[list RamDebugger::Search $w {}];#"]
+	    set  cmd "[list RamDebugger::Search $w {}]; destroy $w.searchl1; #"
+	    trace add variable RamDebugger::searchstring write $cmd
+	    bind $w.search <Destroy> [list trace remove variable RamDebugger::searchstring write \
+		    $cmd]
 	    bind $w.search <Destroy> "+ [list destroy $w.searchl1]"
 	    bind $w.search <Destroy> "+ [list bindtags $active_text [lreplace [bindtags $active_text] 0 0]] ; break"
 	    foreach i [bind Text] {

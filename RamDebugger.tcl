@@ -7300,18 +7300,31 @@ proc RamDebugger::SearchBraces { x y } {
 proc RamDebugger::CenterDisplay {} {
     variable text
     variable text_secondary
-
+    variable last_center_display
+    
     if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	set mytext $text_secondary
-    } else { set mytext $text }
-
+    } else {
+	set mytext $text
+    }
     scan [$mytext index insert] "%d" line
     set NumLines [scan [$mytext index end-1c] %d]
 
-    foreach "f1 f2" [$mytext yview] break
-    set ys [expr $line/double($NumLines)-($f2-$f1)/2.0]
+    set time [clock milliseconds]
+    set fac 0.5
+    lassign [$mytext yview] f1 f2
+    set ys [expr $line/double($NumLines)-$fac*($f2-$f1)]
+
+    if { [info exists last_center_display] } {
+	lassign $last_center_display last_ys last_time
+	if { $time  < $last_time+1000 && round($ys*1000) == round($last_ys*1000) } {
+	    set fac 0.25
+	}
+    }
+    set ys [expr $line/double($NumLines)-$fac*($f2-$f1)]
     if { $ys < 0 } { set ys 0 }
     $mytext yview moveto $ys
+    set last_center_display [list $ys $time]
 }
 
 proc RamDebugger::CommentSelection { what } {
@@ -9195,7 +9208,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $w <$::control-slash> [list RamDebugger::CVS::update_recursive . current] ;# control-shift-7
 
     set menu [$mainframe getmenu edit]
-    $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift-I"
+    $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift+I"
 
 
     bind $w <Shift-Key-F5> "RamDebugger::DisconnectStop ;break"
