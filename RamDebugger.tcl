@@ -8752,6 +8752,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     set idx 0
     foreach "img help cmd" $data {
+	if { $img ne "-" && $img ne "" } {
+	    package require compass_utils::img
+	    set img0 $img
+	    set img [image create photo -width 32 -height 32]
+	    cu::img::zoom $img $img0 Lanczos3
+	    image delete $img0
+	}        
 	if { [string match "menubutton_button *" $cmd] } {
 	    cu::menubutton_button $toolbar.bbox$idx -image $img -style Toolbutton \
 		-command [lindex $cmd 1] -menu $toolbar.bbox$idx.m \
@@ -8883,7 +8890,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		  -yscrollcommand [list RamDebugger::ScrollScrollAndCanvas $fulltext.text \
 		                       $fulltext.yscroll $fulltext.can]]
     scrollbar $fulltext.yscroll -orient vertical -grid 2 -command \
-	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can]
+	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can] -width 28
     scrollbar $fulltext.xscroll -orient horizontal -grid "0 2" -command "$fulltext.text xview"
 
     ApplyColorPrefs $text
