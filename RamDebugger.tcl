@@ -132,6 +132,7 @@ namespace eval RamDebugger {
     variable oldGrab
     variable grabStatus
     variable oldFocus
+    variable big_icons 0
     
     ################################################################################
     # Handlers to save files. Array with names: filename
@@ -163,7 +164,7 @@ namespace eval RamDebugger {
 #   Init proc
 ################################################################################
 
-proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
+proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } { _big_icons 0 } } {
     variable debuggerserver
     variable debuggerserverNum
     variable topdir
@@ -176,6 +177,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } } {
     variable iswince
     variable info_script
     variable usecommR
+    variable big_icons
+    
+    set big_icons $_big_icons
 
     set info_script [info script]
     
@@ -8167,6 +8171,33 @@ proc RamDebugger::Splash {} {
     update
 }
 
+proc RamDebugger::move_toolbar { what button toolbar x } {
+    variable move_toolbar
+    
+    switch $what {
+	BP1 {
+	    set px [dict get [place info $toolbar] -x]
+	    set move_toolbar [list $x $px]
+	}
+	BM1 {
+	    catch { $button state !pressed }
+	    if { ![info exists move_toolbar] } { return }
+	    lassign $move_toolbar x_old px_old
+	    if { abs($x-$x_old)>5 } {
+		set px [expr {$px_old+$x-$x_old}]
+		set widthT [winfo width $toolbar]
+		set widthP [winfo width [winfo parent $toolbar]]
+		if { $px < -$widthT+28 } {
+		    set px [expr {-$widthT+28}]
+		} elseif { $px > $widthP-28 } {
+		    set px [expr {$widthP-28}]
+		}
+		place $toolbar -x $px
+	    }
+	}
+    }
+}
+
 proc RamDebugger::EndSplash {} {
     destroy .splash
 }
@@ -8206,6 +8237,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable pane2
     variable pane3
     variable iswince
+    variable big_icons
 
     if { !$iswince } {
 	proc ::bgerror { errstring } {
@@ -8691,7 +8723,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     ################################################################################
 
     if { !$iswince } {
-	set toolbar [$mainframe addtoolbar]
+	set t [$mainframe addtoolbar]
+	set toolbar [ttk::frame $t.toolbar]
+	place $toolbar -anchor nw -relx 0 -y 0
+	bind $toolbar <Configure> { [winfo parent %W] configure -height [expr {[winfo height %W]+4}] }
+	bind $toolbar <ButtonPress-1> [list RamDebugger::move_toolbar BP1 %W $toolbar %X]
+	bind $toolbar <B1-Motion> [list RamDebugger::move_toolbar BM1 %W $toolbar %X]
     } else {
 	$mainframe addtoolbar
 	set toolbar [ttk::frame $f.toolbar]
@@ -8752,7 +8789,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     set idx 0
     foreach "img help cmd" $data {
-	if { $img ne "-" && $img ne "" } {
+	if { $big_icons && $img ne "-" && $img ne "" } {
 	    package require compass_utils::img
 	    set img0 $img
 	    set img [image create photo -width 32 -height 32]
@@ -8774,6 +8811,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    ttk::separator $toolbar.bbox$idx -orient vertical
 	}
 	grid $toolbar.bbox$idx -row 0 -column $idx -sticky ns
+	bindtags $toolbar.bbox$idx [linsert [bindtags $toolbar.bbox$idx] 2 $toolbar]
 	incr idx
     }
     grid columnconfigure $toolbar $idx -weight 1
@@ -8890,8 +8928,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		  -yscrollcommand [list RamDebugger::ScrollScrollAndCanvas $fulltext.text \
 		                       $fulltext.yscroll $fulltext.can]]
     scrollbar $fulltext.yscroll -orient vertical -grid 2 -command \
-	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can] -width 28
+	[list RamDebugger::ScrollTextAndCanvas $fulltext.text $fulltext.can]
     scrollbar $fulltext.xscroll -orient horizontal -grid "0 2" -command "$fulltext.text xview"
+    
+    if { $big_icons } {
+	$fulltext.yscroll configure -width 28
+    }
 
     ApplyColorPrefs $text
     
@@ -9635,9 +9677,18 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set iposm1 [expr {$ipos+1}]
 	set topleveluse [lindex $argv $iposm1]
 	set argv [lreplace $argv $ipos $iposm1]
-    } else { set topleveluse "" }
+    } else {
+	set topleveluse ""
+    }
+    if { [set ipos [lsearch $argv "-big_icons"]] != -1 } {
+	set iposm1 [expr {$ipos+1}]
+	set big_icons [lindex $argv $iposm1]
+	set argv [lreplace $argv $ipos $iposm1]
+    } else {
+	set big_icons 0
+    }
 
-    RamDebugger::Init $readwriteprefs $registerasremote
+    RamDebugger::Init $readwriteprefs $registerasremote $big_icons
     
     ################################################################################
     #     Init the GUI part

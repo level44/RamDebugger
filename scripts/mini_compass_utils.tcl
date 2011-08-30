@@ -20,7 +20,6 @@ namespace eval cu::file {}
 # for tclIndex to work 
 proc cu::menubutton_button { args } {}
 
-
 snit::widgetadaptor cu::menubutton_button {
     option -command ""
     option -image ""
@@ -31,12 +30,17 @@ snit::widgetadaptor cu::menubutton_button {
     delegate option -_image to hull as -image
     delegate option -_text to hull as -text
 
+    variable xmin
     variable is_button_active 1
+    variable press_after ""
     
     constructor args {
 	installhull using ttk::menubutton -style Toolbutton
 	bind $win <ButtonPress-1> [mymethod BP1 %x %y]
 	bind $win <ButtonRelease-1> [mymethod BR1 %x %y]
+	bind $win <Down> [list ttk::menubutton::Popdown %W]
+	bind $win <Motion> [mymethod check_cursor %x %y]
+	bind $win <Configure> [mymethod  _calc_xmin]
 
 	$self configurelist $args
     }
@@ -46,21 +50,8 @@ snit::widgetadaptor cu::menubutton_button {
 	if { $options(-text) ne "" } {
 	    $self configure -_image $img
 	    return
-	} elseif { $img ne "" } {
-	    set width [image width $img]
-	    set height [image height $img]
-	} else { foreach "width height" [list 0 16] break }
-
-	set new_img [image create photo -width [expr {$width+7}] -height $height]
-	if { $img ne "" } { $new_img copy $img -to 0 0 }
-	set coords {
-	    -3 -1
-	    -4 -2 -3 -2 -2 -2
-	    -5 -3 -4 -3 -3 -3 -2 -3 -1 -3
-	}
-	foreach "x y" $coords {
-	    $new_img put black -to [expr {$width+7+$x}] [expr {$height+$y}]
-	}
+	} 
+	set new_img [cu::add_down_arrow_to_image $img]
 	$self configure -_image $new_img
 	bind $win <Destroy> +[list image delete $new_img]
     }
@@ -75,28 +66,56 @@ snit::widgetadaptor cu::menubutton_button {
 	}
 	$self configure -_text $value
     }
+    method _calc_xmin {} {
+	if { [winfo width $win] > 1 } {
+	    set xmin  [expr {[winfo width $win]-12}]
+	} else {
+	    set xmin  [expr {[winfo reqwidth $win]-12}]
+	}
+    }
     method give_is_button_active_var {} {
 	return [myvar is_button_active]
     }
     method BP1 { x y } {
 	if { !$is_button_active } { return }
-	if { $x < [winfo width $win]-10 && $options(-command) ne "" } {
+	
+	if { $x < $xmin && $options(-command) ne "" } {
 	    $win instate !disabled {
 		catch { tile::clickToFocus $win }
 		catch { ttk::clickToFocus $win }
 		$win state pressed
 	    }
+	    set press_after [after 700 [mymethod BP1_after]]
 	    return -code break
+	}
+    }
+    method BP1_after {} {
+	set press_after ""
+	$win instate {pressed !disabled} {
+	    ttk::menubutton::Pulldown $self
 	}
     }
     method BR1 { x y } {
 	if { !$is_button_active } { return }
-	if { $x < [winfo width $win]-10 && $options(-command) ne "" } {
+	
+	if { $press_after ne "" } {
+	    after cancel $press_after
+	}
+	if { $press_after ne "" && $x < $xmin && $options(-command) ne "" } {
 	    $win instate {pressed !disabled} {
 		$win state !pressed
 		uplevel #0 $options(-command)
-	    } 
+	    }
+	    set press_after ""
 	    return -code break
+	}
+	set press_after ""
+    }
+    method check_cursor { x y } {
+	if { $x < $xmin } {
+	    $win configure -cursor ""
+	} else {
+	    $win configure -cursor bottom_side
 	}
     }
 }
