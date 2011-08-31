@@ -8173,7 +8173,7 @@ proc RamDebugger::Splash {} {
 
 proc RamDebugger::move_toolbar { what button toolbar x } {
     variable move_toolbar
-    
+
     switch $what {
 	BP1 {
 	    set px [dict get [place info $toolbar] -x]
@@ -8196,6 +8196,16 @@ proc RamDebugger::move_toolbar { what button toolbar x } {
 	    } elseif { $px > 0 } {
 		set px 0
 	    }
+	    place $toolbar -x $px
+	}
+	left {
+	    place $toolbar -x 0
+	}
+	right {
+	    set widthT [winfo width $toolbar]
+	    set widthP [winfo width [winfo parent $toolbar]]
+	    if { $widthT < $widthP} { return }
+	    set px [expr {$widthP-$widthT}]
 	    place $toolbar -x $px
 	}
     }
@@ -8732,6 +8742,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	bind $toolbar <Configure> { [winfo parent %W] configure -height [expr {[winfo height %W]+4}] }
 	bind $toolbar <ButtonPress-1> [list RamDebugger::move_toolbar BP1 %W $toolbar %X]
 	bind $toolbar <B1-Motion> [list RamDebugger::move_toolbar BM1 %W $toolbar %X]
+	bind $toolbar <Alt-Left> [list RamDebugger::move_toolbar left %W $toolbar %X]
+	bind $toolbar <Alt-Right> [list RamDebugger::move_toolbar right %W $toolbar %X]
     } else {
 	$mainframe addtoolbar
 	set toolbar [ttk::frame $f.toolbar]
