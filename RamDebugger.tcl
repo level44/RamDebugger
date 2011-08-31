@@ -8187,11 +8187,16 @@ proc RamDebugger::move_toolbar { what button toolbar x } {
 		set px [expr {$px_old+$x-$x_old}]
 		set widthT [winfo width $toolbar]
 		set widthP [winfo width [winfo parent $toolbar]]
-		if { $px < -$widthT+28 } {
-		    set px [expr {-$widthT+28}]
-		} elseif { $px > $widthP-28 } {
-		    set px [expr {$widthP-28}]
+		if { $px+$widthT < $widthP } {
+		    set px [expr {$widthP-$widthT}]
+		} elseif { $px > 0 } {
+		    set px 0
 		}
+#                 if { $px < -$widthT+28 } {
+#                     set px [expr {-$widthT+28}]
+#                 } elseif { $px > $widthP-28 } {
+#                     set px [expr {$widthP-28}]
+#                 }
 		place $toolbar -x $px
 	    }
 	}
@@ -8932,7 +8937,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     scrollbar $fulltext.xscroll -orient horizontal -grid "0 2" -command "$fulltext.text xview"
     
     if { $big_icons } {
-	$fulltext.yscroll configure -width 28
+	$fulltext.yscroll configure -width 22
     }
 
     ApplyColorPrefs $text
@@ -9235,6 +9240,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces];break"
     bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces];break"
 
+    bind $text <$::control-A> [list tk::TextSetCursor %W 1.0]
+    bind $text <$::control-E> [list tk::TextSetCursor %W {end - 1 indices}]
+    
     set cmd {
 	if { "%A" eq "\}" } {
 	    %OLD_CMD%
