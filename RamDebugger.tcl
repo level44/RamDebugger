@@ -8177,28 +8177,26 @@ proc RamDebugger::move_toolbar { what button toolbar x } {
     switch $what {
 	BP1 {
 	    set px [dict get [place info $toolbar] -x]
-	    set move_toolbar [list $x $px]
+	    set move_toolbar [list 0 $x $px]
 	}
 	BM1 {
 	    catch { $button state !pressed }
 	    if { ![info exists move_toolbar] } { return }
-	    lassign $move_toolbar x_old px_old
-	    if { abs($x-$x_old)>5 } {
-		set px [expr {$px_old+$x-$x_old}]
-		set widthT [winfo width $toolbar]
-		set widthP [winfo width [winfo parent $toolbar]]
-		if { $px+$widthT < $widthP } {
-		    set px [expr {$widthP-$widthT}]
-		} elseif { $px > 0 } {
-		    set px 0
-		}
-#                 if { $px < -$widthT+28 } {
-#                     set px [expr {-$widthT+28}]
-#                 } elseif { $px > $widthP-28 } {
-#                     set px [expr {$widthP-28}]
-#                 }
-		place $toolbar -x $px
+	    lassign $move_toolbar started x_old px_old
+	    if { !$started } {
+		if { abs($x-$x_old)<=5 } { return }
+		set move_toolbar [list 1 $x_old $px_old]
 	    }
+	    set px [expr {$px_old+$x-$x_old}]
+	    set widthT [winfo width $toolbar]
+	    set widthP [winfo width [winfo parent $toolbar]]
+	    if { $widthT < $widthP} { return }
+	    if { $px+$widthT < $widthP } {
+		set px [expr {$widthP-$widthT}]
+	    } elseif { $px > 0 } {
+		set px 0
+	    }
+	    place $toolbar -x $px
 	}
     }
 }
