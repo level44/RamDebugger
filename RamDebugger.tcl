@@ -8180,13 +8180,14 @@ proc RamDebugger::move_toolbar { what button toolbar x } {
 	    set move_toolbar [list 0 $x $px]
 	}
 	BM1 {
-	    catch { $button state !pressed }
 	    if { ![info exists move_toolbar] } { return }
 	    lassign $move_toolbar started x_old px_old
 	    if { !$started } {
 		if { abs($x-$x_old)<=5 } { return }
 		set move_toolbar [list 1 $x_old $px_old]
 	    }
+	    catch { $button state !pressed }
+
 	    set px [expr {$px_old+$x-$x_old}]
 	    set widthT [winfo width $toolbar]
 	    set widthP [winfo width [winfo parent $toolbar]]
