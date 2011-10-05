@@ -628,8 +628,8 @@ proc "Toggle debug lines" { w } {
 #    proc Debug GiD Post
 ################################################################################
 
-package require commR
-	set tkcon_commr_id [commR::register tkcon 1]
+# package require commR
+# set tkcon_commr_id [commR::register tkcon 1]
 
 proc ddp { args } {
     global debug_commr_id
