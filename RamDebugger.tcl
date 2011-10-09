@@ -8632,7 +8632,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command &[_ "Count LOC"] {} [_ "Count number of lines of code"] "" \
 		-command "RamDebugger::CountLOCInFiles $w"] \
 		separator \
-		[list command &[_ "Windows hierarchy"] {} [_ "View windows hierarchy"] "Ctrl 1" \
+		[list command &[_ "Windows hierarchy"] {} [_ "View windows hierarchy"] "" \
 		-command "RamDebugger::DisplayWindowsHierarchy"] \
 		] \
 		&[_ "Help"] all help 0 [list \
@@ -9240,7 +9240,11 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Return> "[bind Text <Return>] ; RamDebugger::IndentLine {} ; break"
 
     set c [list $text mark set insert "insert-1c"]
-    bind $text <$::control-Key-2> "[list tk::TextInsert $text {""}];$c"
+    #bind $text <$::control-Key-2> "[list tk::TextInsert $text {""}];$c"
+
+    bind $text <$::control-Key-1> [list RamDebugger::PositionsStack save]
+    bind $text <$::control-Key-2> [list RamDebugger::PositionsStack go]
+
     bind $text <$::control-Key-9> "[list tk::TextInsert $text {()}];$c"
     bind $text <$::control-plus> "[list tk::TextInsert $text {[]}];$c"
     bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
@@ -9328,7 +9332,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	tk::CancelRepeat
     }
 
-    bind all <$::control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"
+    #bind all <$::control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"
 
     ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
 
