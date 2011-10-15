@@ -8787,6 +8787,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		editpaste22 [_ "Paste text from clipboard"] \
 		    [list menubutton_button "RamDebugger::CutCopyPasteText paste" "RamDebugger::CutCopyPasteText paste_stack %W"] \
 		find-22 [_ "Search text in source file"] "RamDebugger::SearchWindow" \
+		colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile" \
 		- - - \
 		player_end-22 [_ "begin/continue execution"] "RamDebugger::ContNextGUI rcont" \
 		player_stop-22 [_ "Set/unset &breakpoint"] "RamDebugger::SetGUIBreakpoint" \
@@ -8801,7 +8802,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	if { $tktablet_ok } {
 	    lappend data "" [_ "Activate TabletPC drag"] ""
 	}
-	lappend data colorize-22 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
     }
     set idx 0
     foreach "img help cmd" $data {
@@ -8832,7 +8832,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     grid columnconfigure $toolbar $idx -weight 1
     if { $tktablet_ok } {
-	set tabletPC_drag_button $toolbar.bbox[expr {$idx-2}]
+	set tabletPC_drag_button $toolbar.bbox[expr {$idx-1}]
     }
     ################################################################################
     # the horizontal 3 levels pane
@@ -9251,9 +9251,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
     
-    # backslash is here to help with a problem in Android VNC
+    # "backslash" and "c" are here to help with a problem in Android VNC
     bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces];break"
     bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces];break"
+    bind $text <$::control-less><plus> "[list RamDebugger::insert_brackets_braces {[]}];break"
+    bind $text <$::control-less><c> "[list RamDebugger::insert_brackets_braces {{}}];break"
+    bind $text <$::control-backslash><plus> "[list RamDebugger::insert_brackets_braces {[]}];break"
+    bind $text <$::control-backslash><c> "[list RamDebugger::insert_brackets_braces {{}}];break"
 
     bind $text <$::control-A> [list tk::TextSetCursor %W 1.0]
     bind $text <$::control-E> [list tk::TextSetCursor %W {end - 1 indices}]

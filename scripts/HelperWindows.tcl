@@ -4242,7 +4242,7 @@ proc RamDebugger::CountLOCInFilesDo { parent program dirs patterns } {
 #    insert_brackets_braces
 #################################################################################
 
-proc RamDebugger::insert_brackets_braces {} {
+proc RamDebugger::insert_brackets_braces { { what "" } } {
     variable last_insert_brackets_braces
     variable text
     
@@ -4252,11 +4252,9 @@ proc RamDebugger::insert_brackets_braces {} {
     set list [list "{}" "\[\]" "||" "\\" "#"]
     set t [clock milliseconds]
     lassign $last_insert_brackets_braces time d
-    if { $time eq "" } {
-	set d "{}"
-    } elseif { $t > $time+3000 } {
-	set d $d
-    } else {
+    
+    if { $d eq "" } { set d "{}" }
+    if { $time ne "" && $t < $time+3000 } {
 	set idx [$text search $d insert-1c]
 	if { [$text compare $idx == insert-1c] } {
 	    if { [string length $d] == 1 } {
@@ -4265,12 +4263,17 @@ proc RamDebugger::insert_brackets_braces {} {
 		$text delete insert-1c insert+1c
 	    }
 	}
-	set ipos [lsearch -exact $list $d]
-	incr ipos
-	if { $ipos >= [llength $list] } {
-	    set ipos 0
+	if { $what eq "" } {
+	    set ipos [lsearch -exact $list $d]
+	    incr ipos
+	    if { $ipos >= [llength $list] } {
+		set ipos 0
+	    }
+	    set d [lindex $list $ipos]
 	}
-	set d [lindex $list $ipos]
+    }
+    if { $what ne "" } {
+	set d $what
     }
     set idx [$text index insert]
     $text insert insert $d
