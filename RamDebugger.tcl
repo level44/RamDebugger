@@ -9254,10 +9254,15 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # "backslash" and "c" are here to help with a problem in Android VNC
     bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces];break"
     bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces];break"
-    foreach "acc c" [list plus {[]} c {{}} 1 || 3 {#}] {
+    foreach "acc1 acc2 c" [list plus "" {[]} c "" {{}} 1 "" || 1 1 \\ 3 "" {#}] {
 	set cmd "[list RamDebugger::insert_brackets_braces $c];break"
-	bind $text <$::control-less><KeyPress-$acc> $cmd
-	bind $text <$::control-backslash><KeyPress-$acc> $cmd
+	if { $acc2 eq "" } {
+	    set k2 ""
+	} else {
+	    set k2 <KeyPress-$acc2>
+	}
+	bind $text <$::control-less><KeyPress-$acc1>$k2 $cmd
+	bind $text <$::control-backslash><KeyPress-$acc1>$k2 $cmd
     }
     bind $text <$::control-A> [list tk::TextSetCursor %W 1.0]
     bind $text <$::control-E> [list tk::TextSetCursor %W {end - 1 indices}]
