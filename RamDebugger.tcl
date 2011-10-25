@@ -8493,7 +8493,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		 [_ "View/hide buttons toolbar"] "" \
 		-variable RamDebugger::options(showbuttonstoolbar) -command RamDebugger::ShowButtonsToolBar] \
 		[list command &[_ "Toggle toobars and statusbar"] {} \
-		[_ "Toggle the view of the toolbar and the statusbar"] "Ctrl 6" \
+		[_ "Toggle the view of the toolbar and the statusbar"] "" \
 		-command "RamDebugger::ToogleToolbarsStatusbar"] \
 		separator \
 		] \
@@ -9245,6 +9245,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-Key-1> [list RamDebugger::PositionsStack save]
     bind $text <$::control-Key-2> [list RamDebugger::PositionsStack go]
 
+    bind $text <$::control-Key-6> "RamDebugger::CommentSelection toggle"
     bind $text <$::control-Key-9> "[list tk::TextInsert $text {()}];$c"
     bind $text <$::control-plus> "[list tk::TextInsert $text {[]}];$c"
     bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
