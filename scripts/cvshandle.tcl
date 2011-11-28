@@ -1669,6 +1669,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		regexp -line {^local-root:\s*(.*)} $info {} dirF
 		cd $dirF
 		set err [catch { exec $fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
+		regsub -all {processed:\s*\d+%\s*} $ret {} ret
 		if { $err } { set color red } else { set color blue }
 		foreach file $fs {
 		    set item [dict get $items fossil $dir $file]
