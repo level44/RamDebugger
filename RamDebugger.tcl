@@ -8711,7 +8711,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     bind $label <1> RamDebugger::GotoLine
     set label [$mainframe addindicator -textvariable RamDebugger::remoteserver -width 15 \
-		   -anchor e -padx 3]
+		   -anchor e -padx 3 -anchor w]
     set menu [$mainframe getmenu activeprograms]
     set menu1 [menu $w.actualizeprogramsmenu -tearoff 0]
     $menu1 configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu1 1]
