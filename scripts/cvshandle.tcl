@@ -567,6 +567,9 @@ proc RamDebugger::CVS::indicator_menu { cvs_indicator_frame x y } {
     $menu add separator
     $menu add command -label [_ "Differences"] -command \
 	[list RamDebugger::CVS::update_recursive_cmd "" open_program tkdiff "" "" [list $RamDebugger::currentfile]]
+    $menu add command -label [_ "Differences (ignore blanks)"] -command \
+	[list RamDebugger::CVS::update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $RamDebugger::currentfile]]
+
     $menu add command -label [_ "Differences window"] -command \
 	[list RamDebugger::CVS::update_recursive_cmd "" diff_window "" "" [list $RamDebugger::currentfile]]
 
