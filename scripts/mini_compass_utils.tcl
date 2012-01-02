@@ -521,6 +521,93 @@ proc cu::add_contextual_menu_to_entry { w what args } {
 }
 
 ################################################################################
+#     cu::text_enty_bindings
+################################################################################
+
+proc cu::text_entry_bindings { w } {
+
+    if { ![info exists ::control] } {
+	if { $::tcl_platform(platform) eq "windows" } {
+	    set ::control Control
+	} elseif { [tk windowingsystem] eq "aqua" } {
+	    set ::control Command
+	} else {
+	    set ::control Control
+	}
+    }
+    # "backslash" and "c" are here to help with a problem in Android VNC
+    bind $w <$::control-backslash> "[list cu::text_entry_insert $w];break"
+    bind $w <$::control-less> "[list cu::text_entry_insert $w];break"
+    foreach "acc1 acc2 c" [list plus "" {[]} c "" {{}} 1 "" || 1 1 \\ 3 "" {#}] {
+	set cmd "[list cu::text_entry_insert $w $c];break"
+	if { $acc2 eq "" } {
+	set k2 ""
+    } else {
+	set k2 <KeyPress-$acc2>
+    }
+    bind $w <$::control-less><KeyPress-$acc1>$k2 $cmd
+    bind $w <$::control-backslash><KeyPress-$acc1>$k2 $cmd
+    }
+}
+
+proc cu::text_entry_insert { w { what "" } } {
+    variable last_text_enty_bindings
+    
+    if { ![info exists last_text_enty_bindings] } {
+	set last_text_enty_bindings ""
+    }
+    set list [list "{}" "\[\]" "||" "\\" "#"]
+    set t [clock milliseconds]
+    lassign [dict_getd $last_text_enty_bindings $w ""] time d
+    
+    if { $d eq "" } { set d "{}" }
+    if { $time ne "" && $t < $time+3000 } {
+	if { [winfo class $w] eq "Text" } {
+	    set idx [$w search $d insert-1c]
+	    if { [$w compare $idx == insert-1c] } {
+		if { [string length $d] == 1 } {
+		    $w delete insert-1c
+		} else {
+		    $w delete insert-1c insert+1c
+		}
+	    }
+	} else {
+	    set idx [$w index insert]
+	    if { $idx > 0 } {
+		set idx1 [expr {$idx-1}]
+		set idx2 [expr {$idx-1+[string length $d]}]
+		set txt [string range [$w get] $idx1 $idx2]
+		if { [string equal $d $txt] } {
+		    $w delete $idx1 $idx2
+		}
+	    }
+	}
+	if { $what eq "" } {
+	    set ipos [lsearch -exact $list $d]
+	    incr ipos
+	    if { $ipos >= [llength $list] } {
+		set ipos 0
+	    }
+	    set d [lindex $list $ipos]
+	}
+    }
+    if { $what ne "" } {
+	set d $what
+    }
+    if { [winfo class $w] eq "Text" } {
+	set idx [$w index insert]
+	$w insert insert $d
+	$w mark set insert "$idx+1c"
+    } else {
+	set idx [$w index insert]
+	$w insert insert $d
+	$w icursor [expr {$idx+1}]
+    }
+    dict set last_text_enty_bindings $w [list $t $d]
+}
+
+
+################################################################################
 #    store preferences
 ################################################################################
 

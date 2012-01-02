@@ -184,9 +184,9 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } { _big_icons 0 }
     set info_script [info script]
     
     if { ![file isdirectory [file join $topdir_external addons]] } {
-	set text [_ "Error: bad installation. Directory 'addons' could not be found in '%s'" $topdir_external]
-	puts $text
-	catch { tk_messageBox -message $text }
+	set txt [_ "Error: bad installation. Directory 'addons' could not be found in '%s'" $topdir_external]
+	puts $txt
+	catch { tk_messageBox -message $txt }
     }
 
     if { [info commands winfo] ne "" && [winfo screenwidth .] < 350 } {
@@ -8422,7 +8422,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		    [list command &[_ "Uncomment region"] {} [_ "Un-comment selected region"] "Shift F6" \
 		        -command "RamDebugger::CommentSelection off"] \
 		    [list command &[_ "Insert braces/brackets"] {} [_ "Inserts  pairs of brackets, braces or quotes"] "Ctrl less" \
-		        -command "RamDebugger::insert_brackets_braces"] \
+		        -command [list RamDebugger::insert_brackets_braces]] \
 		    separator \
 		    [list command [_ "Center display"] {} [_ "Center text display"] "Ctrl l" \
 		        -command "RamDebugger::CenterDisplay"] \
@@ -8456,7 +8456,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command [_ "Isearch backward"] {} [_ "Incrementally search backward"] "Ctrl r" \
 		-command "RamDebugger::Search $w ibackward"] \
 		[list command &[_ "Replace"]... {} [_ "Replace text in source file"] "" \
-		-command "RamDebugger::SearchWindow 1"] \
+		-command "RamDebugger::SearchWindow -replace 1"] \
 		[list command &[_ "Goto line"] {} [_ "Go to the given line"] "Ctrl g" \
 		-command "RamDebugger::GotoLine"] \
 		separator \
@@ -8809,7 +8809,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    package require compass_utils::img
 	    set img0 $img
 	    set img [image create photo -width 32 -height 32]
-	    cu::img::zoom $img $img0 Lanczos3
+	    $img copy $img0 -to 8 8
+	    #cu::img::zoom $img $img0 Lanczos3
 	    image delete $img0
 	}        
 	if { [string match "menubutton_button *" $cmd] } {
@@ -8951,6 +8952,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	$fulltext.yscroll configure -width 22
     }
 
+#    grid $fulltext.can $fulltext.text $fulltext.yscroll -sticky wns
+    
+#    grid $fulltext.can -bg grey90 -grid "0 wns"
+    
     ApplyColorPrefs $text
     
     if { !$iswince } {
@@ -9252,19 +9257,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
     
-    # "backslash" and "c" are here to help with a problem in Android VNC
-    bind $text <$::control-backslash> "[list RamDebugger::insert_brackets_braces];break"
-    bind $text <$::control-less> "[list RamDebugger::insert_brackets_braces];break"
-    foreach "acc1 acc2 c" [list plus "" {[]} c "" {{}} 1 "" || 1 1 \\ 3 "" {#}] {
-	set cmd "[list RamDebugger::insert_brackets_braces $c];break"
-	if { $acc2 eq "" } {
-	    set k2 ""
-	} else {
-	    set k2 <KeyPress-$acc2>
-	}
-	bind $text <$::control-less><KeyPress-$acc1>$k2 $cmd
-	bind $text <$::control-backslash><KeyPress-$acc1>$k2 $cmd
-    }
+    cu::text_entry_bindings $text
+
     bind $text <$::control-A> [list tk::TextSetCursor %W 1.0]
     bind $text <$::control-E> [list tk::TextSetCursor %W {end - 1 indices}]
     
@@ -9284,7 +9278,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-BackSpace> [list RamDebugger::DeletePreviousWord]
     bind [winfo toplevel $text] <$::control-v> ""
     bind [winfo toplevel $text] <Tab> ""
-    bind $text <FocusIn> [list RamDebugger::SearchWindow_autoclose]
+    bind $text <FocusIn> [list RamDebugger::SearchWindow -auto_close 1]
     bind $text <$::control-I> [list RamDebugger::Search $w iforward_get_insert]
     bind $text <Escape><i> "[list RamDebugger::Search $w iforward_get_insert] ;break"
     bind $w <$::control-slash> [list RamDebugger::CVS::update_recursive . current] ;# control-shift-7
@@ -9446,7 +9440,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
     if { [info exists options(SearchToolbar)] && [lindex $options(SearchToolbar) 0] && \
 	(![info exists options(SearchToolbar_autoclose)] || !$options(SearchToolbar_autoclose)) } {
-	SearchWindow [lindex $options(SearchToolbar) 1]
+	SearchWindow -replace [lindex $options(SearchToolbar) 1]
     }
     ShowStatusBar
     ShowButtonsToolBar
