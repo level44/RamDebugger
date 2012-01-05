@@ -6432,6 +6432,7 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     variable text
     variable currentfile
     variable options
+    variable WindowFilesList
 
     set idx [$textstack index $idx]
     set data [$textstack get "$idx linestart" "$idx lineend"]
@@ -6469,11 +6470,25 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 		    set file $fullfile
 		}
 	    }
-	    if { ![file exists $file] && [file exists [file join $options(defaultdir) \
-		                                           $file]] } {
+	    if { ![file exists $file] && [file exists [file join $options(defaultdir) $file]] } {
 		set file [file join $options(defaultdir) $file]
 	    }
-
+	    if { ![file exists $file] } {
+		foreach fileF $WindowFilesList {
+		    if { [file tail $fileF] eq $file } {
+		        set file $fileF
+		        break
+		    }
+		}
+	    }
+	    if { ![file exists $file] } {
+		foreach fileF $options(RecentFiles) {
+		    if { [file tail $fileF] eq $file } {
+		        set file $fileF
+		        break
+		    }
+		}
+	    }
 	    if { [file exists $file] } {
 		set file [filenormalize $file]
 		if { $file != $currentfile } {
