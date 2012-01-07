@@ -25,7 +25,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 
     set TextMotionAfterId ""
     set comm {
-	set retval "WIDGET\n\n"
+	set retval "WIDGET   (class: [winfo class WIDGET])\n\n"
 	if { [winfo class WIDGET] == "Toplevel" } {
 	    append retval "TITLE: [wm title WIDGET]\n"
 	}
