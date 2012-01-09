@@ -521,7 +521,7 @@ proc cu::add_contextual_menu_to_entry { w what args } {
 }
 
 ################################################################################
-#     cu::text_enty_bindings
+#     cu::text_entry_bindings
 ################################################################################
 
 proc cu::text_entry_bindings { w } {
