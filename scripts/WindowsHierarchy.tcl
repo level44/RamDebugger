@@ -179,19 +179,21 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     
     set w $canvas.help
     if { [winfo exists $w] } { destroy $w }
-    cu::create_tooltip_toplevel $w
+    cu::create_tooltip_toplevel -withdraw $w
     wm transient $w $canvas
 
     $w configure -highlightthicknes 1 -highlightbackground grey \
 	-highlightcolor grey
-    pack [label $w.l -fg black -justify left -anchor w -bg grey95]
-    $w.l conf -bd 0
+    grid [label $w.l -fg black -justify left -anchor w -bg grey95] -sticky nsew
+    grid columnconfigure $w 0 -weight 1
+    grid rowconfigure $w 0 -weight 1
+    $w.l configure -bd 0
 
     append res "\nPress Ctrl-x to copy widget name to clipboard. Ctrl-c to copy all.  Ctrl-a to toggle text visualization"
 
-    $w.l conf -text $res
+    $w.l configure -text $res
 
-    wm withdraw $w
+#     wm withdraw $w
     update idletasks
 
     incr x 5
@@ -212,6 +214,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     wm geometry $w +$x+$y
     wm deiconify $w
     update
+    wm geometry $w +$x+$y
     bind $w <Motion> "destroy $w"
 
     set widgetname [lindex [split $res \n] 0]
@@ -219,7 +222,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo2 { canvas x y res } {
     bind $w.l <$::control-a> [list RamDebugger::DisplayWindowsToggleLongShortText $w $w.l $res]
     bind $w.l <$::control-x> "clipboard clear; [list clipboard append $widgetname]"
     bind $w.l <$::control-c> "clipboard clear; [list clipboard append $res]"
-    
+
     if { [regexp {\mwidth=([-\d]+).*\mheight=([-\d]+).*rootX=([-\d]+).*rootY=([-\d]+)} $res {} \
 	width height rootX rootY]  } {
 	set wpos $w.helppos
