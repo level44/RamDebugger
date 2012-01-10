@@ -1839,6 +1839,13 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    foreach item [lsort -unique $ids] {
 		set dir [$tree item text $item 0]
+		set pwd [pwd]
+		catch { 
+		    cd $dir
+		    # if there is a problem with tme modification time, fossil seem to remember this checking later
+		    exec $fossil stat --sha1sum
+		}
+		cd $pwd
 		update_recursive_accept $w $what_in $dir $tree [$tree item parent $item] $item
 	    }
 	}
