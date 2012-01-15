@@ -35,14 +35,25 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 		append retval "LABEL: [WIDGET cget -text]\n"
 	    }
 	}
-	foreach "cols rows" [grid size WIDGET] break
+	lassign [grid size WIDGET] cols rows
 	if { $cols > 0 } {
 	    append retval "GRID MASTER\n"
 	    for { set i 0 } { $i < $rows } { incr i } {
 		for { set j 0 } { $j < $cols } { incr j } {
 		    set slave [grid slaves WIDGET -row $i -column $j]
-		    if { $slave != "" } {
-		        append retval "    $i,$j $slave [grid info $slave]\n"
+		    if { $slave ne "" } {
+		        append retval "    $i,$j $slave"
+		        set retval_in ""
+		        dict for "n v" [grid info $slave] {
+		            if { [string length $retval_in] > 55 } {
+		                append retval "$retval_in\n        "
+		                set retval_in ""
+		            } else {
+		                append retval_in " "
+		            }
+		            append retval_in "$n $v"
+		        }
+		        append retval "$retval_in\n"
 		    }
 		}
 	    }
@@ -58,8 +69,19 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 	    }
 	}
 	set info [grid info WIDGET]
-	if { $info != "" } {
-	    append retval "GRID SLAVE\n$info\n"
+	if { $info ne "" } {
+	    append retval "GRID SLAVE\n"
+	    set retval_in ""
+	    dict for "n v" $info {
+		if { [string length $retval_in] > 55 } {
+		    append retval "$retval_in\n        "
+		    set retval_in ""
+		} else {
+		    append retval_in " "
+		}
+		append retval_in "$n $v"
+	    }
+	    append retval "$retval_in\n"
 	}
 	if { [pack slaves WIDGET] != "" } {
 	    append retval "PACK MASTER\n"
@@ -79,7 +101,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 		    append retval "[string range $retval_in 0 79]\n"
 		    set retval_in "        [string range $retval_in 80 end]"
 		}
-		if { [string length $retval_in] > 40 } {
+		if { [string length $retval_in] > 55 } {
 		    append retval "$retval_in\n"
 		    set retval_in ""
 		}
@@ -100,7 +122,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 		    append retval "[string range $retval_in 0 79]\n"
 		    set retval_in "        [string range $retval_in 80 end]"
 		}
-		if { [string length $retval_in] > 40 } {
+		if { [string length $retval_in] > 55 } {
 		    append retval "$retval_in\n"
 		    set retval_in ""
 		}
@@ -121,7 +143,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 		    append retval [string range $retval_in 0 79]\n
 		    set retval_in "        [string range $retval_in 80 end]"
 		}
-		if { [string length $retval_in] > 40 } {
+		if { [string length $retval_in] > 55 } {
 		    append retval "$retval_in\n"
 		    set retval_in ""
 		}
@@ -141,7 +163,7 @@ proc RamDebugger::DisplayWindowsHierarchyInfoDo { w canvas widget x y } {
 		append retval [string range $retval_in 0 79]\n
 		set retval_in "        [string range $retval_in 80 end]"
 	    }
-	    if { [string length $retval_in] > 40 } {
+	    if { [string length $retval_in] > 55 } {
 		append retval "$retval_in\n"
 		set retval_in ""
 	    }
@@ -261,14 +283,14 @@ proc RamDebugger::DisplayWindowsToggleLongShortText { w wl txt } {
     
     if { [$wl cget -text] eq $txt } {
 	$wl configure -text [lindex [split $txt \n] 0]
-	if  { [winfo exists $w.helppos] } {
-	    wm withdraw $w.helppos
-	}
+#         if  { [winfo exists $w.helppos] } {
+#             wm withdraw $w.helppos
+#         }
     } else {
 	$wl configure -text $txt
-	if  { [winfo exists $w.helppos] } {
-	    wm deiconify $w.helppos
-	}
+#         if  { [winfo exists $w.helppos] } {
+#             wm deiconify $w.helppos
+#         }
     }
 }
 
@@ -429,29 +451,36 @@ proc RamDebugger::DisplayWindowsHierarchyFind { w } {
     if { ![info exists DisplayWindowsHierarchyFindLastId] } {
 	set DisplayWindowsHierarchyFindLastId -1
     }
-    set found 0
+    set foundList ""
     foreach i [$canvas find all] {
-	if { $DisplayWindowsHierarchyFindLastId > -1 && \
-		 $i <= $DisplayWindowsHierarchyFindLastId } {
-	    continue
-	}
 	if { [$canvas type $i] == "text" } {
 	    set text [$canvas itemcget $i -text]
 	    if { [string match -nocase *[$w give_uservar_value find]* $text] } {
-		set found 1
-		set DisplayWindowsHierarchyFindLastId $i
-		break
+		if { $DisplayWindowsHierarchyFindLastId > -1 && \
+		    $i <= $DisplayWindowsHierarchyFindLastId } {
+		    lappend foundList $i
+		} else {
+		    set foundList [list $i]
+		    break
+		}
 	    }
 	}
 	set tags [$canvas gettags $i]
 	if { [string match *.* [$w give_uservar_value find]] && \
 	    [lsearch $tags [$w give_uservar_value find]] != -1 } {
-	    set found 1
-	    set DisplayWindowsHierarchyFindLastId $i
-	    break
+	    if { $DisplayWindowsHierarchyFindLastId > -1 && \
+		$i <= $DisplayWindowsHierarchyFindLastId } {
+		lappend foundList $i
+	    } else {
+		set foundList [list $i]
+		break
+	    }
 	}
     }
-    if { $found } {
+    if { [llength $foundList] } {
+	set i [lindex $foundList 0]
+	set DisplayWindowsHierarchyFindLastId $i
+	
 	catch {
 	    $canvas select from $i 0
 	    $canvas select to $i end
@@ -548,6 +577,8 @@ proc RamDebugger::DisplayWindowsPickWindowDo { w l widget } {
     raise $w
     set DisplayWindowsHierarchyFindLastId -1
     $w set_uservar_value find $widget
+    
+    focus -force $w
     DisplayWindowsHierarchyFind $w
 } 
 
