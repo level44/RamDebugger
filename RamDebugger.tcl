@@ -7960,6 +7960,30 @@ proc RamDebugger::MarkerContextualSubmenuDo { line what } {
     }
 }
 
+proc RamDebugger::set_breakpoint { x y } {
+    variable text
+
+    set line [scan [$text index @0,$y] %d]
+    if { [rinfo $line] != "" } {
+	set hasbreak 1
+    } else { set hasbreak 0 }
+
+    if { $hasbreak } {
+	set hasbreak 0
+	foreach num [rinfo $line] {
+	    rdel $num
+	}
+    } else {
+	set hasbreak 1
+	if { [catch [list rbreak $line] errorstring] } {
+	    WaitState 0
+	    WarnWin $errorstring
+	    return
+	}
+    }
+    UpdateArrowAndBreak $line $hasbreak ""
+}
+
 proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
     variable text
     variable marker
@@ -9307,6 +9331,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     foreach i [bind $w] {
 	bind $text $i "[bind $w $i] ;break"
     }
+
+    bind $marker <Double-1> [list RamDebugger::set_breakpoint %x %y]
+
     bind $marker <1> {
 	catch { destroy [winfo toplevel %W].search }
 	tk::TextButton1 $RamDebugger::text 0 %y
