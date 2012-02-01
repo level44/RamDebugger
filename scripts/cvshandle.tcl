@@ -1473,7 +1473,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		$menu add command -label [_ "Commit"] -accelerator $::control_txt-i -command \
 		    [list "update_recursive_cmd" $w commit $tree $sel_ids]
 	    }
-	    if { !$is_timeline && $has_fossil } {
+	    if { !$is_timeline && ($has_cvs || $has_fossil) } {
 		$menu add command -label [_ "Revert"]... -command \
 		    [list "update_recursive_cmd" $w revert $tree $sel_ids]
 	    }
@@ -1793,7 +1793,9 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign $args tree sel_ids
 	    set files ""
 	    foreach item $sel_ids {
-		if { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
+		if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
+		    lappend files $file
+		} elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
 		    lappend files $file
 		}
 	    }
@@ -1810,16 +1812,19 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    waitstate $w on Revert
 	    set pwd [pwd]
 	    foreach item $sel_ids {
-		if { ![regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] || $mode eq "UNCHANGED" } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
 		cd $dir
-		set info [exec $fossil info]
-		regexp -line {^local-root:\s*(.*)} $info {} dir
-		cd $dir
-		if { $fossil_version == 0 } {
-		    set err [catch { exec $fossil revert --yes $file 2>@1 } ret]
-		} else {
-		    set err [catch { exec $fossil revert $file 2>@1 } ret]   
+		if { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
+		    set info [exec $fossil info]
+		    regexp -line {^local-root:\s*(.*)} $info {} dir
+		    cd $dir
+		    if { $fossil_version == 0 } {
+		        set err [catch { exec $fossil revert --yes $file 2>@1 } ret]
+		    } else {
+		        set err [catch { exec $fossil revert $file 2>@1 } ret]   
+		    }
+		} elseif { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } {
+		    set err [catch { exec cvs update -C $file } ret] 
 		}
 		if { $err } { break }
 		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
