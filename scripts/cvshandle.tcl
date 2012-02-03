@@ -9,8 +9,8 @@ namespace eval RamDebugger::CVS {
     variable lasttimeautosave ""
     variable autosave_after ""
     variable autosaveidle_after ""
-    variable try_threaded debug
-    #variable try_threaded 1
+    #variable try_threaded debug
+    variable try_threaded 1
 }
 
 proc RamDebugger::CVS::Init {} {
@@ -724,12 +724,13 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last_or_this args } {
 
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
 	    insert_ticket update_recursive_do1 update_recursive_accept update_recursive_cmd \
-	    waitstate parse_timeline parse_finfo open_program] {
+	    waitstate parse_timeline parse_finfo open_program show_help] {
 	set full_cmd RamDebugger::CVS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
     append script "[list namespace eval RamDebugger ""]\n"
     append script "[list set RamDebugger::topdir $RamDebugger::topdir]\n"
+    append script "[list set RamDebugger::AppDataDir $::RamDebugger::AppDataDir]\n"
     append script "[list lappend ::auto_path {*}$::auto_path]\n"
     append script "[list update_recursive_do0 $directory $current_or_last_or_this]\n"
     
@@ -746,6 +747,15 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last_or_this args } {
        }
 	update_recursive_intp eval $script
     }
+}
+
+proc RamDebugger::CVS::show_help {} {
+    package require helpviewer
+
+    set file "01RamDebugger/RamDebugger12.html"
+    
+    HelpViewer::EnterDirForIndex $::RamDebugger::AppDataDir
+    HelpViewer::HelpWindow [file join $::RamDebugger::topdir help $file]
 }
 
 proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
@@ -775,6 +785,8 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     ttk::label $f.l0 -text [_ "Select origin directory for fossil or CVS update recursive, then use the contextual menu on the files:"] \
 	-wraplength 400 -justify left
 
+    ttk::button $f.b0 -text [_ "Help"] -command show_help
+    
     set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
     
     set directories [dict_getd $dict directories ""]
@@ -969,12 +981,12 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	-contextualhandler_menu [list "update_recursive_cmd" $w contextual]
     $w set_uservar_value tree $f.toctree
     
-    grid $f.l0    -      -   -      -sticky w -padx 2 -pady 2
-    grid $f.l1 $f.e1 - $f.b1 -sticky w -padx 2 -pady 2
-    grid $f.l2 $f.e2 - $f.b2 -sticky w -padx 2 -pady 2
-    grid $f.sem         ^  ^ $f.b3 -sticky w -padx 2 -pady 2
-    grid $f.l3  $f.e3  $f.cb1 - -sticky w -padx 2 -pady 2
-    grid $f.toctree - - - -sticky nsew
+    grid $f.l0    -      -   $f.b0 -   -sticky w -padx 2 -pady 2
+    grid $f.l1 $f.e1 -        -   $f.b1 -sticky w -padx 2 -pady 2
+    grid $f.l2 $f.e2 -        -   $f.b2 -sticky w -padx 2 -pady 2
+    grid $f.sem         ^  ^ ^ $f.b3 -sticky w -padx 2 -pady 2
+    grid $f.l3  $f.e3  $f.cb1 -  - -sticky w -padx 2 -pady 2
+    grid $f.toctree - - - - -sticky nsew
     grid configure $f.l2 -pady "2 0"
     grid configure $f.sem -pady 0
     grid configure $f.e1 $f.e2 $f.e3 -sticky ew
@@ -1395,6 +1407,7 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    }
 	    if { [regexp {^Total network traffic:} $line] } {  continue }
 	    if { [regexp {^waiting for server} $line] } {  continue }
+	    if { [regexp {^-{5,}} $line] } { break }
 	    if { $item eq "" } {
 		set item [$tree insert end [list $dir] $itemP]
 	    }
@@ -1445,9 +1458,12 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		} elseif { [regexp {^\s*(\w)\s+} $txt] } {
 		    set has_cvs 1
 		    set cvs_active 1
-		} elseif  { [regexp {^\s*\w{2,}\s*} $txt] } {
+		} elseif  { [regexp {^\s*(\w{2,})\s*} $txt {} word] } {
 		    set has_fossil 1
 		    set fossil_active 1
+		    if { $word eq "DELETED" } {
+		        set can_be_added 1
+		    }
 		} elseif { [regexp {^\s*\?\s+} $txt] } {
 		    set can_be_added 1
 		}
@@ -1512,6 +1528,10 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		if { $cvs_active || $fossil_active } {
 		    $menu add separator
 		}
+	    }
+	    if { !$is_timeline && $has_fossil } {
+		$menu add command -label [_ "Remove"]... -command \
+		    [list "update_recursive_cmd" $w remove $tree $sel_ids]
 	    }
 	    set need_sep 0
 	    if { !$is_timeline && ($has_cvs || $has_fossil) } {
@@ -1671,6 +1691,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set info [exec $fossil info]
 		regexp -line {^local-root:\s*(.*)} $info {} dirF
 		cd $dirF
+		if { $message eq "" } { set message " " }
 		set err [catch { exec $fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
 		regsub -all {processed:\s*\d+%\s*} $ret {} ret
 		if { $err } { set color red } else { set color blue }
@@ -1739,7 +1760,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    set message [$w give_uservar_value message]
 	    set files ""
 	    foreach item $sel_ids {
-		if { ![regexp {^\?\s(\S+)} [$tree item text $item 0] {} file] } { continue }
+		if { ![regexp {^(?:\?|DELETED)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
 		lappend files $file
 	    }
 	    if { [string length $files] < 100 } {
@@ -1767,7 +1788,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    waitstate $w on Add
 	    set pwd [pwd]
 	    foreach item $sel_ids {
-		if { ![regexp {^\?\s(\S+)} [$tree item text $item 0] {} file] } { continue }
+		if { ![regexp {^(?:\?|DELETED)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
 		cd $dir
 		if { $what in "add add_binary" } {
@@ -1788,6 +1809,42 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
 	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
+	}
+	remove {
+	    lassign $args tree sel_ids
+	    set files ""
+	    foreach item $sel_ids {
+		if { ![regexp {^(?:UNCHANGED|DELETED)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
+		lappend files $file
+	    }
+	    if { [string length $files] < 100 } {
+		set filesT $files
+	    } else {
+		set filesT "[lindex $files 0] ... [lindex $files end]"
+	    }
+	    set txt [_ "Are you sure to remove from fossil %d files? (%s)" [llength $files] $filesT]
+	    set ret [snit_messageBox -icon question -title [_ "Remove files"] -type okcancel \
+		    -default ok -parent $w -message $txt]
+	    if { $ret eq "cancel" } { return }
+
+	    waitstate $w on Remove
+	    set pwd [pwd]
+	    foreach item $sel_ids {
+		if { ![regexp {^(?:UNCHANGED|DELETED)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
+		set dir [$tree item text [$tree item parent $item] 0]
+		cd $dir
+
+		set fossil [auto_execok fossil]
+		set info [exec $fossil info]
+		regexp -line {^local-root:\s*(.*)} $info {} dir
+		cd $dir
+		set err [catch { exec $fossil rm $file 2>@1 } ret]
+		
+		if { $err } { break }
+		$tree item element configure $item 0 e_text_sel -fill blue -text $ret
+	    }
+	    cd $pwd
+	    waitstate $w off
 	}
 	revert {
 	    lassign $args tree sel_ids
@@ -2300,6 +2357,26 @@ if { $argv0 eq [info script] } {
     #package require compass_utils
     set RamDebugger::currentfile ""
     set RamDebugger::topdir [file dirname [file dirname [info script]]]
+    
+    if { $::tcl_platform(platform) eq "windows" } {
+	set usecommR 1
+	if { [info exists ::env(APPDATA)] } {
+	    set RamDebugger::AppDataDir [file join $::env(APPDATA) RamDebugger]
+	} else {
+	    package require registry
+	    set key {HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion}
+	    append key {\Explorer\Shell Folders}
+	    set err [catch { registry get $key AppData } AppData]
+	    if { !$err } {
+		set RamDebugger::AppDataDir [file join [registry get $key AppData] RamDebugger]
+	    } else {
+		set RamDebugger::AppDataDir [file join $::env(HOME) .RamDebugger]
+	    }
+	}
+    } else {
+	set RamDebugger::AppDataDir [file join $::env(HOME) .RamDebugger]
+    }
+    
     set RamDebugger::CVS::try_threaded debug
     if { [lindex $argv 0] ne "" } {
 	set w [RamDebugger::CVS::update_recursive "" this [lindex $argv 0]]
