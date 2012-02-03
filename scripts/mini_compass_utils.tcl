@@ -471,6 +471,23 @@ snit::widget cu::multiline_entry {
 }
 
 ################################################################################
+#    cu::adapt_text_length
+################################################################################
+
+# remember to grid the label to fill all space. For example with -sticky ew
+proc cu::adapt_text_length { args } {
+    foreach w $args {
+	bind $w <Configure> [list cu::_adapt_text_length_do $w]
+    }
+}
+
+proc cu::_adapt_text_length_do { w } {
+    if { [winfo width $w] > 1 } {
+	$w configure -wraplength [winfo width $w] -justify left
+    }
+}
+
+################################################################################
 #    add_contextual_menu_to_entry
 ################################################################################
 
@@ -755,6 +772,29 @@ proc cu::create_tooltip_toplevel { b } {
 	}
     }
 }
+
+proc cu::give_widget_background { w } {
+ 
+    set err [catch { $w cget -background } bgcolor]
+    if { $err } {
+	set err [catch {
+		set style [$w cget -style]
+		if { $style eq "" } {
+		    set style [winfo class $w]
+		}
+		set bgcolor [ttk::style lookup $style -background]
+	    }]
+	if { $err } {
+	    if { $::tcl_platform(platform) eq "windows" } {
+		set bgcolor SystemButtonFace
+	    } else {
+		set bgcolor grey
+	    }
+	}
+    }
+   return $bgcolor
+}
+
 
 ################################################################################
 #    XML & xpath utilities

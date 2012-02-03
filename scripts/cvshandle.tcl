@@ -782,9 +782,10 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     }
     set f [$w giveframe]
     
-    ttk::label $f.l0 -text [_ "Select origin directory for fossil or CVS update recursive, then use the contextual menu on the files:"] \
-	-wraplength 400 -justify left
-
+    ttk::label $f.l0 -text [_ "Select origin directory for fossil or CVS update recursive, then use the contextual menu on the files"] \
+	-justify left -width 50
+    cu::adapt_text_length $f.l0
+    
     ttk::button $f.b0 -text [_ "Help"] -command show_help
     
     set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
@@ -978,6 +979,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	-columns $columns -expand 0 \
 	-selectmode extended -showheader 1 -showlines 0  \
 	-indent 0 -sensitive_cols all \
+	-have_search_button automatic \
 	-contextualhandler_menu [list "update_recursive_cmd" $w contextual]
     $w set_uservar_value tree $f.toctree
     
@@ -986,11 +988,13 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     grid $f.l2 $f.e2 -        -   $f.b2 -sticky w -padx 2 -pady 2
     grid $f.sem         ^  ^ ^ $f.b3 -sticky w -padx 2 -pady 2
     grid $f.l3  $f.e3  $f.cb1 -  - -sticky w -padx 2 -pady 2
-    grid $f.toctree - - - - -sticky nsew
+    grid $f.toctree - - - - -sticky nsew -padx 2 -pady 2
+    grid configure $f.l0 -sticky ew -padx "2 10" -columnspan 3
     grid configure $f.l2 -pady "2 0"
     grid configure $f.sem -pady 0
     grid configure $f.e1 $f.e2 $f.e3 -sticky ew
-    grid columnconfigure $f 1 -weight 1
+    grid columnconfigure $f "0" -weight 1
+    grid columnconfigure $f "1" -weight 100
     grid rowconfigure $f 5 -weight 1
     
     $w set_uservar_value dir $dir
@@ -1287,42 +1291,30 @@ proc RamDebugger::CVS::parse_finfo { finfo } {
     return $list
 }
 
-proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item "" } } {
+proc RamDebugger::CVS::update_recursive_accept { args } {
     variable fossil_version
+    
+    set optional {
+	{ -item item "" }
+	{ -cvs_and_fossil boolean 0 }
+    }
+    set compulsory "w what dir tree itemP"
+   parse_args $optional $compulsory $args
+    
+    if { $cvs_and_fossil } {
+	$w set_uservar_value cvs_and_fossil 1
+    }
     
     waitstate $w on $what 
     if { $item ne "" } {
 	foreach i [$tree item children $item] { $tree item delete $i }
-    }
+    }    
     set olddir [pwd]
     set err [catch { cd $dir } ret]
     if { $err } { return }
-
+    
     set has_vcs 0
-    if { [file isdirectory [file join $dir CVS]] } {
-	if { $what eq "view" } {
-	    set err [catch { exec cvs -n -q update 2>@1 } ret]
-	} else {
-	    set err [catch { exec cvs -q update 2>@1 } ret]
-	}
-	foreach line [split $ret \n] {
-	    if { ![winfo exists $tree] } {
-		cd $olddir
-		waitstate $w off
-		return
-	    }
-	    if { $line eq "cvs server: WARNING: global `-l' option ignored." } { continue }
-	    if { $item eq "" } {
-		set item [$tree insert end [list $dir] $itemP]
-	    }
-	    set i [$tree insert end [list "$line"] $item]
-	    if { ![regexp {^[A-Z]\s|^cvs} $line] } {
-		$tree item configure $i -visible 0
-	    }
-	    update
-	}
-	set has_vcs 1
-    }
+
     set fossil [auto_execok fossil]
     if { $fossil ne "" && [catch { exec $fossil info } info] == 0 } {
 	regexp -line {^local-root:\s*(.*)} $info {} dirLocal
@@ -1418,6 +1410,53 @@ proc RamDebugger::CVS::update_recursive_accept { w what dir tree itemP { item ""
 	    update
 	}
 	set has_vcs 1
+    }
+    if { [file isdirectory [file join $dir CVS]] } {
+	if { ![$w exists_uservar cvs_and_fossil] } {
+	    $w set_uservar_value cvs_and_fossil 0
+	}
+	if { $has_vcs && ![$w give_uservar_value cvs_and_fossil] } {
+	    set found 0
+	    foreach i [$tree item children $item] {
+		if { [$tree item text $i 0] eq [_ "Update CVS"] } {
+		    set found 1
+		    break
+		}
+	    }
+	    if { !$found } {
+		set itemCVS [$tree insert end [list [_ "Update CVS"]] $item]
+		set cmd [list update_recursive_accept -cvs_and_fossil 1 -item $item $w $what $dir $tree $itemP]
+		$tree item_window_configure -text [_ "Update CVS"] -command $cmd $itemCVS
+	    }
+	} else {
+	    set err [catch { cd $dir } ret]
+	    if { $err } { return }
+	    
+	    if { $what eq "view" } {
+		set err [catch { exec cvs -n -q update 2>@1 } ret]
+	    } else {
+		set err [catch { exec cvs -q update 2>@1 } ret]
+	    }
+	    set itemD ""
+	    foreach line [split $ret \n] {
+		if { ![winfo exists $tree] } {
+		    cd $olddir
+		    waitstate $w off
+		    return
+		}
+		if { $line eq "cvs server: WARNING: global `-l' option ignored." } { continue }
+		if { $itemD eq "" } {
+		    set itemD [$tree insert end [list $dir] $itemP]
+		}
+		set i [$tree insert end [list "$line"] $itemD]
+		if { ![regexp {^[A-Z]\s|^cvs} $line] } {
+		    $tree item configure $i -visible 0
+		}
+		update
+	    }
+	    set has_vcs 1
+	}
+	if { $item eq "" } { set item $itemD }
     }
     cd $olddir
 
@@ -1908,7 +1947,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    exec $fossil stat --sha1sum
 		}
 		cd $pwd
-		update_recursive_accept $w $what_in $dir $tree [$tree item parent $item] $item
+		update_recursive_accept -item $item $w $what_in $dir $tree [$tree item parent $item]
 	    }
 	}
 	apply_version {
@@ -2324,8 +2363,7 @@ proc RamDebugger::CVS::open_program { args } {
     $what eval [list source $file]
 }
 
-
-if { $argv0 eq [info script] } {
+if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] && [file tail $::starkit::topdir] eq "vcs-ramdebugger") } {
     wm withdraw .
     source [file join [file dirname [info script]] mini_compass_utils.tcl]
     
@@ -2356,8 +2394,8 @@ if { $argv0 eq [info script] } {
     
     #package require compass_utils
     set RamDebugger::currentfile ""
-    set RamDebugger::topdir [file dirname [file dirname [info script]]]
-    
+    set RamDebugger::topdir [file dirname [file dirname [file normalize [info script]]]]
+
     if { $::tcl_platform(platform) eq "windows" } {
 	set usecommR 1
 	if { [info exists ::env(APPDATA)] } {

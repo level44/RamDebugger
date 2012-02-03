@@ -2,7 +2,7 @@
 <Infoproblemtype version="1.0">
   <Program n="ramdebugger">
     <Name>RamDebugger</Name>
-    <Version>7.9</Version>
+    <Version>8.0</Version>
     <Section>contrib/devel</Section>
     <Categories>Development;Debugger;IDE;Application</Categories>
     <Dependencies>libc6 (&gt;= 2.3.6-6), 
@@ -28,6 +28,11 @@
 	* It supports editing XML code
 	* It contains a GUI for version control system (cvs or fossil)
     </Description>
+    <NewsInVersion version="8.0" date="2012-02-03"> 
+	 *  Improvements for managing fossil in VCS
+	 *  New program VCS-RamDebugger
+	 *  Added some capabilities for touchscreens like selecting with handles, fast drag, etc.
+    </NewsInVersion>
     <NewsInVersion version="7.9" date="2010-12-26"> 
 	 *  Control-f opens fossil web browser in VCS
 	 *  Control-Shift-7 Opens VCS with current directory selected
@@ -195,6 +200,35 @@
 	  *  Added option to search in files
 	  *  Several speed problems in linux were related to the TCL bug with raise command. Implemented one workaround.
 	  *  Fixed many bugs related to parsing files and other.
+    </NewsInVersion>
+  </Program>
+  <Program n="vcs-ramdebugger">
+    <Name>vcs-ramdebugger</Name>
+    <Version>1.0</Version>
+    <Section>contrib/devel</Section>
+    <Categories>Development;Debugger;IDE;Application</Categories>
+    <Dependencies>libc6 (&gt;= 2.3.6-6), 
+      libx11-6, libxext6</Dependencies>
+    <Maintainer>Compass Engineering &lt;info@compassis.com&gt;</Maintainer>
+    <Homepage>http://www.compassis.com</Homepage>
+    <Languages>
+      <Language n="en">English</Language>
+    </Languages>
+     <ShortDescription>vcs-ramdebugger is a graphical interface for VCS systems like fossil or cvs.</ShortDescription>
+    <Description>
+       Graphical interface for version control systems like fossil or cvs
+	
+	With vcs-ramdebugger, it is possible to update and commit files to VCS systems like
+	 fossil and CVS.
+
+	FEATURES
+	
+	* Graphical tree like interface
+	* Supports only most common operations: update, commit, add, remove, ...
+	* It does not support creating or cloning the repository, nor opening the files
+    </Description>
+    <NewsInVersion version="1.0" date="2012-02-03"> 
+	 *  First version independent from RamDebugger
     </NewsInVersion>
   </Program>
 </Infoproblemtype>
