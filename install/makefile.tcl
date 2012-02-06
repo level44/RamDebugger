@@ -84,6 +84,7 @@ if { $clean } {
 if { $copy_remote } {
     set filesList ""
     foreach pNode $pNodes {
+	set pname [$pNode @n]
 	set program_name [$pNode selectNodes string(Name)]
 	set version [$pNode selectNodes string(Version)]
 	
@@ -99,6 +100,10 @@ if { $copy_remote } {
 	} else {
 	    lappend filesList [list $program_name$version-macosx.dmg $program_name-current-macosx.dmg]
 	}
+    }
+    switch $pname {
+	"ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger" }
+	"vcs-ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger/vcs-ramdebugger" }
     }
     set remote_dir "/home/ftp/pub/ramdebugger"
     set host gidweb@ftp.compassis.com

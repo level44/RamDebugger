@@ -1853,7 +1853,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    lassign $args tree sel_ids
 	    set files ""
 	    foreach item $sel_ids {
-		if { ![regexp {^(?:UNCHANGED|DELETED)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
+		if { ![regexp {^(?:UNCHANGED|DELETED|MISSING|UPDATE)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
 		lappend files $file
 	    }
 	    if { [string length $files] < 100 } {
@@ -1869,7 +1869,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    waitstate $w on Remove
 	    set pwd [pwd]
 	    foreach item $sel_ids {
-		if { ![regexp {^(?:UNCHANGED|DELETED)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
+		if { ![regexp {^(?:UNCHANGED|DELETED|MISSING|UPDATE)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
 		set dir [$tree item text [$tree item parent $item] 0]
 		cd $dir
 
