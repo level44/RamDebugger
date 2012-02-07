@@ -8811,7 +8811,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		]
 	set tktablet_ok 0
 	if { $tktablet_ok } {
-	    lappend data "" [_ "Activate mouse drag"] ""
+	    lappend data "" [_ "Activate mouse drag for touchscreens"] ""
 	}
 	lappend data colorize-16 [_ "Reinstrument and recolorize code"] "RamDebugger::ReinstrumentCurrentFile"
     } else {
@@ -8839,7 +8839,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		- - - \
 		]
 	if { $tktablet_ok } {
-	    lappend data "" [_ "Activate mouse drag"] ""
+	    lappend data "" [_ "Activate mouse drag for touchscreens"] ""
 	}
     }
     set idx 0
