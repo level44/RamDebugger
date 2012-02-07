@@ -82,12 +82,12 @@ if { $clean } {
 }
 
 if { $copy_remote } {
-    set filesList ""
     foreach pNode $pNodes {
 	set pname [$pNode @n]
 	set program_name [$pNode selectNodes string(Name)]
 	set version [$pNode selectNodes string(Version)]
 	
+	set filesList ""
 	if { $tcl_platform(platform) eq "windows" } {
 	    lappend filesList [list $program_name$version-$dist.zip $program_name-current-$dist.zip]
 	    #lappend filesList [list setup-$program_name$version-$dist.exe setup-$program_name-current-$dist.exe]
@@ -103,10 +103,11 @@ if { $copy_remote } {
 	switch $pname {
 	    "ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger" }
 	    "vcs-ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger/vcs-ramdebugger" }
+	    default { error "error in copy_remote" }
 	}
 	set host gidweb@ftp.compassis.com
 	
-	puts "starting copy remote..."
+	puts "starting copy remote $pname --- $remote_dir --- $host ..."
 	copy_remote $filesList $remote_dir $host
 	puts "done"
     }
