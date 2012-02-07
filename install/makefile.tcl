@@ -203,7 +203,7 @@ foreach pNode $pNodes {
     if { $tcl_platform(platform) eq "windows" } {
 	create_README $pNode README.txt
 	lappend filesFT [list README.txt . .txt] [list license.terms ./License.txt .txt]
-	CopyAndCreateZipDist $program_name$version-$dist.zip $exe $files $filesFT
+	CopyAndCreateZipDist $program_name$version-$dist.zip $program_name $files $filesFT
 	file delete README.txt
     } elseif { $tcl_platform(os) ne "Darwin" } {
 	set tarfile ${exe}$version-linux_$architecture.tar.gz

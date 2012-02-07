@@ -1509,7 +1509,18 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set itemL $item
 		while { $itemL != 0 } {
 		    if { [file isdirectory [$tree item text $itemL 0]] } {
-		        lappend dirs [$tree item text $itemL 0]
+		        set dir [$tree item text $itemL 0]
+		        lappend dirs $dir
+		        set pwd [pwd]
+		        cd $dir
+		        if { [auto_execok cvs] ne "" && [file isdirectory CVS] } {
+		            set cvs_active 1
+		        }
+		        set fossil [auto_execok fossil]
+		        if { $fossil ne "" && [catch { exec $fossil info } ret] == 0 } {
+		            set fossil_active 1
+		        }
+		        cd $pwd
 		    }
 		    set itemL [$tree item parent $itemL]
 		}
@@ -1520,7 +1531,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		set cvs_active 1
 	    }
 	    set fossil [auto_execok fossil]
-	    if { $fossil ne "" && [catch { exec $fossil info }] == 0 } {
+	    if { $fossil ne "" && [catch { exec $fossil info } ret] == 0 } {
 		set fossil_active 1
 	    }
 	    cd $pwd
@@ -1606,8 +1617,8 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    if { $need_sep } {
 		$menu add separator
 	    }
-	    foreach i [list all normal] t [list [_ All] [_ Normal]] {
-		$menu add command -label [_ "View %s" $t] -command \
+	    foreach i [list all normal] t [list [_ "View All"] [_ "View Normal"]] {
+		$menu add command -label $t -command \
 		    [list "update_recursive_cmd" $w view $tree 0 $i]
 	    }
 	}
@@ -2363,7 +2374,8 @@ proc RamDebugger::CVS::open_program { args } {
     $what eval [list source $file]
 }
 
-if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] && [file tail $::starkit::topdir] eq "vcs-ramdebugger") } {
+if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] && 
+    [file root [file tail $::starkit::topdir]] eq "vcs-ramdebugger") } {
     wm withdraw .
     source [file join [file dirname [info script]] mini_compass_utils.tcl]
     
