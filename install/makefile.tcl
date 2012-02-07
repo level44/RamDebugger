@@ -100,16 +100,16 @@ if { $copy_remote } {
 	} else {
 	    lappend filesList [list $program_name$version-macosx.dmg $program_name-current-macosx.dmg]
 	}
+	switch $pname {
+	    "ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger" }
+	    "vcs-ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger/vcs-ramdebugger" }
+	}
+	set host gidweb@ftp.compassis.com
+	
+	puts "starting copy remote..."
+	copy_remote $filesList $remote_dir $host
+	puts "done"
     }
-    switch $pname {
-	"ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger" }
-	"vcs-ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger/vcs-ramdebugger" }
-    }
-    set host gidweb@ftp.compassis.com
-
-    puts "starting copy remote..."
-    copy_remote $filesList $remote_dir $host
-    puts "done"
     exit
 }
 
