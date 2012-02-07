@@ -105,7 +105,6 @@ if { $copy_remote } {
 	"ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger" }
 	"vcs-ramdebugger" { set remote_dir "/home/ftp/pub/ramdebugger/vcs-ramdebugger" }
     }
-    set remote_dir "/home/ftp/pub/ramdebugger"
     set host gidweb@ftp.compassis.com
 
     puts "starting copy remote..."
