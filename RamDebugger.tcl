@@ -8314,7 +8314,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     #require BWidgetR, a BWidget with some modifications, marked with RAMSAN
     #inside the GiD scripts BWidget is really BWidgetR, to avoid duplicate it
     if { [catch {package require BWidgetR}] } {
-	puts "could not load package BWidgetR. Loading package BWidget. Some problems with accelerators may appear, specially on MacOSX"
+	#puts "could not load package BWidgetR. Loading package BWidget. Some problems with accelerators may appear, specially on MacOSX"
 	package require BWidget
     }
    
@@ -8325,7 +8325,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     package require dialogwin
     package require textutil
     package require tooltip
-    package require img::png
+    #kike: catch porque no se porque da error tcl al arrancar desde GiD que ya tiene img::png interno
+    catch {package require img::png}
     
     if { ![catch { package vcompare [package provide Tk] 8.5 } ret] && $ret < 0} {
 	interp alias "" ttk::style "" style
