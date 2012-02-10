@@ -1923,14 +1923,11 @@ extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
   //Tk_InitStubs(interp,"8.5",0);
 #endif
 
-  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWork",RamDebuggerInstrumenterDoWork,
-		        ( ClientData)0, NULL);
-  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForCpp",RamDebuggerInstrumenterDoWorkForCpp,
-		        ( ClientData)0, NULL);
+  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWork",RamDebuggerInstrumenterDoWork,NULL,NULL);
+  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForCpp",RamDebuggerInstrumenterDoWorkForCpp,NULL,NULL);
 
 
-  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForXML",RamDebuggerInstrumenterDoWorkForXML,
-		        ( ClientData)0, NULL);
+  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForXML",RamDebuggerInstrumenterDoWorkForXML,NULL,NULL);
   return TCL_OK;
 }
 
