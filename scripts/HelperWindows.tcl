@@ -376,7 +376,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 
     $w set_uservar_value combo [ttk::combobox $f.e1 -textvariable [$w give_uservar expression] \
 	-values $options(old_expressions)]
-    
+
     cu::text_entry_bindings $f.e1
 
     set c { %W icursor [expr { [%W index "insert"]-1}] }
@@ -474,7 +474,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     ttk::entry $f.e1 -textvariable [$w give_uservar cond ""] -width 80
     
     cu::text_entry_bindings $f.e1
-
+    
     set columns [list \
 	    [list 6 [_ "Num"] left text 0] \
 	    [list 6 [_ "En/dis"] left text 0] \
@@ -944,14 +944,14 @@ proc RamDebugger::PreferencesWindow {} {
     ttk::label $f1.l2 -text [_ "Indent size TCL:"]
     tooltip::tooltip $f1.l2 [_ "Size used when indenting TCL with key: <Tab>"]
 
-    spinbox $f1.sb -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeTCL] \
+    ttk::spinbox $f1.sb -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeTCL] \
        -width 4
     $w set_uservar_value indentsizeTCL $options(indentsizeTCL)
 
     ttk::label $f1.l3 -text [_ "Indent size c++:"]
     tooltip::tooltip $f1.l3 [_ "Size used when indenting c++ with key: <Tab>"]
 
-    spinbox $f1.sb2 -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeC++] \
+    ttk::spinbox $f1.sb2 -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeC++] \
        -width 4
     $w set_uservar_value indentsizeC++ $options(indentsizeC++)
 
@@ -1110,13 +1110,13 @@ proc RamDebugger::PreferencesWindow {} {
     ttk::checkbutton $lb.c1 -text [_ "Perform auto save revisions"] -variable \
 	[$w give_uservar AutoSaveRevisions]
     ttk::label $lb.l1 -text [_ "Auto save time"]:
-    spinbox $lb.cb1 -textvariable [$w give_uservar AutoSaveRevisions_time] \
+    ttk::spinbox $lb.cb1 -textvariable [$w give_uservar AutoSaveRevisions_time] \
 	-from 0 -to 10000 -increment 1 -width 4
     ttk::label $lb.l2 -text [_ "seconds"]
     tooltip::tooltip $lb.l1 [_ "Time in seconds before performing an auto-save"]
 
     ttk::label $lb.l3 -text [_ "Auto save idle time"]:
-    spinbox $lb.cb2 -textvariable [$w give_uservar AutoSaveRevisions_idletime] \
+    ttk::spinbox $lb.cb2 -textvariable [$w give_uservar AutoSaveRevisions_idletime] \
 	-from 0 -to 10000 -increment 1 -width 4
     ttk::label $lb.l4 -text [_ "seconds"]
     set tt [_ "Time in seconds without user activity before performing an auto-save"]
@@ -1817,7 +1817,7 @@ proc RamDebugger::GotoLine {} {
     set f [$w giveframe]
 
     ttk::label $f.l -text [_ "Go to line:"]
-    spinbox $f.sb -from 1 -to 10000 -increment 1 -textvariable [$w give_uservar line] \
+    ttk::spinbox $f.sb -from 1 -to 10000 -increment 1 -textvariable [$w give_uservar line] \
 	    -width 8
 
     ttk::checkbutton $f.cb1 -text [_ "Relative to current line"] -variable \
@@ -2422,7 +2422,7 @@ proc RamDebugger::SearchWindow { args }  {
     variable SearchToolbar
     variable searchFromBegin
     variable iswince
-
+    
     set optional {
 	{ -replace boolean 0 }
 	{ -auto_close boolean|force 0 }
@@ -2435,7 +2435,7 @@ proc RamDebugger::SearchWindow { args }  {
     if { ![info exists options(SearchToolbar_autoclose)] } {
 	set options(SearchToolbar_autoclose) 1
     }
-    
+
     if { $auto_close != 0 } {
 	if { $auto_close ne "force" && !$options(SearchToolbar_autoclose) } { return }
 
@@ -3846,7 +3846,7 @@ proc RamDebugger::MacrosDo { w what } {
 		return
 	    }
 	    set macro [$list item text [lindex $itemList 0] 0]
-	    tk_messageBox -message AA-[namespace children ::RamDebugger::Macros]
+	    #tk_messageBox -message AA-[namespace children ::RamDebugger::Macros]
 
 	    ::RamDebugger::Macros::$macro $text
 	}
@@ -4262,7 +4262,7 @@ proc RamDebugger::insert_brackets_braces {} {
     variable text
     cu::text_entry_insert $text
 }
-
+    
 # 
 # proc RamDebugger::insert_brackets_braces { { what "" } } {
 #     variable last_insert_brackets_braces
