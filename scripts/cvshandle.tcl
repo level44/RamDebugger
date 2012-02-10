@@ -1426,7 +1426,7 @@ proc RamDebugger::CVS::update_recursive_accept { args } {
 	    if { !$found } {
 		set itemCVS [$tree insert end [list [_ "Update CVS"]] $item]
 		set cmd [list update_recursive_accept -cvs_and_fossil 1 -item $item $w $what $dir $tree $itemP]
-		$tree item_window_configure -text [_ "Update CVS"] -command $cmd $itemCVS
+		$tree item_window_configure_button -text [_ "Update CVS"] -command $cmd $itemCVS
 	    }
 	} else {
 	    set err [catch { cd $dir } ret]
