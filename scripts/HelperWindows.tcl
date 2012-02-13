@@ -944,14 +944,14 @@ proc RamDebugger::PreferencesWindow {} {
     ttk::label $f1.l2 -text [_ "Indent size TCL:"]
     tooltip::tooltip $f1.l2 [_ "Size used when indenting TCL with key: <Tab>"]
 
-    ttk::spinbox $f1.sb -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeTCL] \
+    spinbox $f1.sb -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeTCL] \
        -width 4
     $w set_uservar_value indentsizeTCL $options(indentsizeTCL)
 
     ttk::label $f1.l3 -text [_ "Indent size c++:"]
     tooltip::tooltip $f1.l3 [_ "Size used when indenting c++ with key: <Tab>"]
 
-    ttk::spinbox $f1.sb2 -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeC++] \
+    spinbox $f1.sb2 -from 0 -to 10 -increment 1 -textvariable [$w give_uservar indentsizeC++] \
        -width 4
     $w set_uservar_value indentsizeC++ $options(indentsizeC++)
 
@@ -1110,13 +1110,13 @@ proc RamDebugger::PreferencesWindow {} {
     ttk::checkbutton $lb.c1 -text [_ "Perform auto save revisions"] -variable \
 	[$w give_uservar AutoSaveRevisions]
     ttk::label $lb.l1 -text [_ "Auto save time"]:
-    ttk::spinbox $lb.cb1 -textvariable [$w give_uservar AutoSaveRevisions_time] \
+    spinbox $lb.cb1 -textvariable [$w give_uservar AutoSaveRevisions_time] \
 	-from 0 -to 10000 -increment 1 -width 4
     ttk::label $lb.l2 -text [_ "seconds"]
     tooltip::tooltip $lb.l1 [_ "Time in seconds before performing an auto-save"]
 
     ttk::label $lb.l3 -text [_ "Auto save idle time"]:
-    ttk::spinbox $lb.cb2 -textvariable [$w give_uservar AutoSaveRevisions_idletime] \
+    spinbox $lb.cb2 -textvariable [$w give_uservar AutoSaveRevisions_idletime] \
 	-from 0 -to 10000 -increment 1 -width 4
     ttk::label $lb.l4 -text [_ "seconds"]
     set tt [_ "Time in seconds without user activity before performing an auto-save"]
@@ -1817,7 +1817,7 @@ proc RamDebugger::GotoLine {} {
     set f [$w giveframe]
 
     ttk::label $f.l -text [_ "Go to line:"]
-    ttk::spinbox $f.sb -from 1 -to 10000 -increment 1 -textvariable [$w give_uservar line] \
+    spinbox $f.sb -from 1 -to 10000 -increment 1 -textvariable [$w give_uservar line] \
 	    -width 8
 
     ttk::checkbutton $f.cb1 -text [_ "Relative to current line"] -variable \
