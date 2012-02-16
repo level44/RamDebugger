@@ -1412,6 +1412,9 @@ proc RamDebugger::CVS::update_recursive_accept { args } {
 	set has_vcs 1
     }
     if { [file isdirectory [file join $dir CVS]] } {
+	if { ![winfo exists $w] } {
+	    return
+	}
 	if { ![$w exists_uservar cvs_and_fossil] } {
 	    $w set_uservar_value cvs_and_fossil 0
 	}
