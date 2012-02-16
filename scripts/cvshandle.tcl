@@ -217,7 +217,7 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     RamDebugger::WaitState 0
 
     set w $RamDebugger::text._openrev
-    dialogwin_snit $w -title [_ "Choose revision"] -entrytext \
+    dialogwin_snit $w -title [_ "Choose revision"] -class RamDebugger -entrytext \
 	[_ "Choose a revision for file '%s'" $file] -morebuttons [list [_ "Differences"]]
     set f [$w giveframe]
 
@@ -396,7 +396,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 
     set w $RamDebugger::text._openrev
     destroy $w
-    dialogwin_snit $w -title [_ "Choose revision file"] -entrytext \
+    dialogwin_snit $w -title [_ "Choose revision file"] -class RamDebugger -entrytext \
 	[_ "Choose a revision file to check its revisions or to remove revisions history"] \
 	-morebuttons [list [_ "Remove..."] [_ "Purge..."]] -okname [_ "Revisions"]
     set f [$w giveframe]
@@ -767,7 +767,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     wm withdraw .
     
     destroy ._ask
-    set w [dialogwin_snit ._ask -title [_ "VCS management"] -class VCS \
+    set w [dialogwin_snit ._ask -title [_ "VCS management"] -class RamDebugger \
 	    -okname [_ View] -morebuttons [list [_ "Update"]] \
 	    -cancelname [_ Close] -grab 0 -callback [list update_recursive_do1]]
     
@@ -2247,7 +2247,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    }
 	    set wD $w.diffs
 	    destroy $wD
-	    dialogwin_snit $wD -title [_ "Choose version"] -entrytext \
+	    dialogwin_snit $wD -title [_ "Choose version"] -class RamDebugger -entrytext \
 		[_ "Choose one or two versions for file '%s'" $file] -okname [_ View] -cancelname [_ Close] \
 		-grab 1 -transient 1 -callback [namespace code [list "update_recursive_cmd" $w diff_window_accept $dir $file]]
 	    set f [$wD giveframe]

@@ -1747,6 +1747,11 @@ proc RamDebugger::rlist { args } {
 	    Makefile { set filetype "Makefile" }
 	}
     }
+    if { [regexp -nocase -line -- {<\?xml\s+} [string range $files($currentfile) 0 50]] } {
+	set filetype XML
+    }
+    set options(filetype) $filetype
+    
     if { $filetype == "TCL" && ![info exists instrumentedfilesP($currentfile)] \
 	     && !$force && !$reinstrument && !$currentfileIsModified } {
 	set filenum [lsearchfile $fileslist $currentfile]
@@ -7742,7 +7747,6 @@ proc RamDebugger::InitOptions {} {
     #      option add *DisabledForeground grey60
     #      option add *HighlightBackground AntiqueWhite3
     
-
     if { $::tcl_platform(platform) != "windows" } {
 	option add *selectBackground \#48c96f
 	option add *selectForeground white
@@ -8084,7 +8088,7 @@ proc RamDebugger::RegisterExtension {} {
     }
 
     if { $val(1) eq $rval(1) && $val(2) eq $rval(2) && $val(3) eq $rval(3) } {
-	dialogwin_snit $text._ask -title [_ "Unassociate extension"]
+	dialogwin_snit $text._ask -title [_ "Unassociate extension"] -class RamDebugger
 	set f [$text._ask giveframe]
 	label $f.l1 -text [_ "Do you want to unassociate command 'RamDebugger from extension .tcl?"]
 	set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
@@ -8106,7 +8110,7 @@ proc RamDebugger::RegisterExtension {} {
 	}
 	return
     }
-    dialogwin_snit $text._ask -title [_ "Associate extension"]
+    dialogwin_snit $text._ask -title [_ "Associate extension"] -class RamDebugger
     set f [$text._ask giveframe]
     label $f.l1 -text [_ "Do you want to associate command 'RamDebugger to extension .tcl?"]
     set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
@@ -8671,6 +8675,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "RamDebugger::ViewInstrumentedFile gdb"] \
 		[list command &[_ "Count LOC"] {} [_ "Count number of lines of code"] "" \
 		-command "RamDebugger::CountLOCInFiles $w"] \
+	    [list command &[_ "Show processes"] {} [_ "Show running processes in the computer"] "" \
+		-command "RamDebugger::show_processes_window"] \
 		separator \
 		[list command &[_ "Windows hierarchy"] {} [_ "View windows hierarchy"] "" \
 		-command "RamDebugger::DisplayWindowsHierarchy"] \
@@ -9530,7 +9536,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # if we do it at the beginning, an ugly update is made
     if { $::tcl_platform(platform) ne "windows" } {
 	set img [image create photo -file [file join $topdir addons ramdebugger.png]]
-	wm iconphoto $w $img
+	wm iconphoto $w -default $img
 	#wm iconbitmap $w @$topdir/addons/ramdebugger.xbm
     } elseif { !$iswince } {
 	wm iconbitmap $w $topdir/addons/ramdebugger.ico

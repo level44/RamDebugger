@@ -340,7 +340,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	set var [GetSelOrWordInIndex insert]
     }
 
-    set w [dialogwin_snit $text.%AUTO% -title [_ "View expression or variable"] -okname \
+    set w [dialogwin_snit $text.%AUTO% -title [_ "View expression or variable"] -class RamDebugger -okname \
 	    [_ Eval] -cancelname [_ Close] -grab 0 -callback [list RamDebugger::DisplayVarWindowDo]]
     set f [$w giveframe]
  
@@ -459,7 +459,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
     variable breakpoints
     variable currentfile
     
-    set w [dialogwin_snit $text.%AUTO% -title [_ "Breakpoints window"] -okname \
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Breakpoints window"] -class RamDebugger -okname \
 	    [_ "Apply Cond"] -cancelname [_ Close] -morebuttons [list \
 		[_ Delete] [_ "Delete all"] [_ View] [_ En/Dis] [_ Trace]]]
     set f [$w giveframe]
@@ -845,7 +845,7 @@ proc RamDebugger::PreferencesWindow {} {
     variable options_def
     variable iswince
     
-    set w [dialogwin_snit $text.%AUTO% -title [_ "Preferences window"] -morebuttons \
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Preferences window"] -class RamDebugger -morebuttons \
 	    [list [_ Apply] [_ Defaults]]]
     set f [$w giveframe]
 
@@ -1341,7 +1341,7 @@ proc RamDebugger::DisplayTimesWindowReport { wp } {
     
     set w $wp.report
     destroy $w
-    dialogwin_snit $w -title [_ "Timing report"] -okname -]
+    dialogwin_snit $w -title [_ "Timing report"] -class RamDebugger -okname -]
     set f [$w giveframe]
 
     ttk::combobox $f.cb1 -textvariable [$w give_uservar units sec] -state readonly -width 10 \
@@ -1522,7 +1522,7 @@ proc RamDebugger::DisplayTimesWindow {} {
     variable text
     variable TimeMeasureData
     
-    set w [dialogwin_snit $text.%AUTO% -title [_ "Timing control"] -okname \
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Timing control"] -class RamDebugger -okname \
 	    [_ Start] -cancelname [_ Close] -morebuttons [list [_ "Stop"] [_ "Report"]] \
 	    -grab 0 -callback [list RamDebugger::DisplayTimesWindowDo]]
     set f [$w giveframe]
@@ -1656,7 +1656,7 @@ proc RamDebugger::AboutWindow {} {
     set par [winfo toplevel $text]
     set w $par.about
     destroy $w
-    toplevel $w
+    toplevel $w -class RamDebugger
     wm protocol $w WM_DELETE_WINDOW {
 	  # nothing
     }
@@ -1813,7 +1813,7 @@ proc RamDebugger::GotoLine {} {
 	set active_text $text_secondary
     } else { set active_text $text }
 
-    set w [dialogwin_snit $active_text._ask -title [_ "Goto line"]]
+    set w [dialogwin_snit $active_text._ask -title [_ "Goto line"] -class RamDebugger]
     set f [$w giveframe]
 
     ttk::label $f.l -text [_ "Go to line:"]
@@ -1922,7 +1922,7 @@ proc RamDebugger::DebugCurrentFileArgsWindow {} {
 	lappend tcl_or_tks $tcl_or_tk_in
     }
     
-    set w [dialogwin_snit $text._ask -title [_ "TCL Execution arguments"]]
+    set w [dialogwin_snit $text._ask -title [_ "TCL Execution arguments"] -class RamDebugger]
     set f [$text._ask giveframe]
 
     ttk::label $f.l -text [_ "Current file to debug:"]
@@ -2279,7 +2279,7 @@ proc RamDebugger::SearchInFiles {} {
 
     set txt [GetSelOrWordInIndex insert]
     
-    set w [dialogwin_snit $text.%AUTO% -title [_ "Search in files"] \
+    set w [dialogwin_snit $text.%AUTO% -title [_ "Search in files"] -class RamDebugger \
 	    -grab 0 -transient 1 -callback [namespace code SearchInFilesDo] \
 	    -cancelname [_ Close]]
     set f [$w giveframe]
@@ -3380,7 +3380,8 @@ proc RamDebugger::DoinstrumentThisfile { file } {
 	return 0
     }
 
-    set w [dialogwin_snit $text._ask -title "Debugged program source" -okname - -cancelname OK]
+    set w [dialogwin_snit $text._ask -title "Debugged program source" -class RamDebugger \
+	    -okname - -cancelname OK]
     set f [$w giveframe]
 
     label $f.l1 -text "The debugged program is trying to source file:" -grid "0 nw"
@@ -3487,7 +3488,7 @@ proc RamDebugger::DisplayPositionsStack { args } {
     }
     
     destroy $curr_text.dps
-    set w [dialogwin_snit $curr_text.dps -title [_ "Positions stack window"] -grab 0 \
+    set w [dialogwin_snit $curr_text.dps -title [_ "Positions stack window"] -class RamDebugger -grab 0 \
 	    -morebuttons [list [_ "Up"] [_ "Down"] [_ "View"]] -okname [_ "Delete"] -cancelname [_ "Close"] \
 	    -callback [list RamDebugger::DisplayPositionsStackDo0]]
     set f [$w giveframe]
@@ -3869,7 +3870,7 @@ proc RamDebugger::MacrosDo { w what } {
 proc RamDebugger::Macros { parent } {
     
     destroy $parent.macros
-    set w [dialogwin_snit $parent.macros -title [_ "Macros"] -okname [_ "Execute"] \
+    set w [dialogwin_snit $parent.macros -title [_ "Macros"] -class RamDebugger -okname [_ "Execute"] \
 	    -morebuttons [list [_ "Edit"] [_ "Default"]] \
 	    -cancelname [_ Close] -grab 0 -callback [list RamDebugger::MacrosDo0]]
     set f [$w giveframe]

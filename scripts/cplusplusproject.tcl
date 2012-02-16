@@ -598,7 +598,7 @@ proc cproject::CreateModifyGroup { w what } {
 	}
     }
     
-    set wd [dialogwin_snit $w._ask -title $title -entrylabel $label: -entryvalue $group]
+    set wd [dialogwin_snit $w._ask -title $title -class RamDebugger -entrylabel $label: -entryvalue $group]
     set action [$wd createwindow]
     while 1 {
 	if { $action <= 0 } { 
@@ -671,7 +671,7 @@ proc cproject::Create { par } {
 	set RamDebugger::options(recentprojects) ""
     }
     destroy $par.mpt
-    set w [dialogwin_snit $par.mpt -title [_ "C++ compilation project"] -grab 0 \
+    set w [dialogwin_snit $par.mpt -title [_ "C++ compilation project"] -class RamDebugger -grab 0 \
 	    -morebuttons [list [_ "Apply"]]  -callback [list cproject::CreateDo]]
     set f [$w giveframe]
 
@@ -2274,7 +2274,7 @@ proc RamDebugger::DebugCplusPlusWindow { { tryautomatic 0 } } {
     }
     
     destroy $text.cmp
-    set w [dialogwin_snit $text.cmp -title [_ "Debug c++"]]
+    set w [dialogwin_snit $text.cmp -title [_ "Debug c++"] -class RamDebugger]
     set f [$w giveframe]
     
     ttk::label $f.l1 -text [_ "Program to debug"];
@@ -2370,9 +2370,38 @@ proc RamDebugger::DebugCplusPlusWindow_getdir { w } {
 proc RamDebugger::DebugCplusPlusWindowAttach {} {
     variable text
     
+    show_processes_window -title [_ "Select program to attach the debugger"] -grab 1 \
+	-callback RamDebugger::DebugCplusPlusWindowAttach_do
+}
+
+proc RamDebugger::DebugCplusPlusWindowAttach_do { cmd pid create time mem } {
+
+    rdebug -debugcplusplus [list  $pid "" $cmd]
+}
+
+proc RamDebugger::show_processes_window { args } {
+    variable text
+    
+    set optional {
+	{ -title title "" }
+	{ -grab boolean 0 }
+	{ -callback cmd_prefix "" }
+    }
+    set compulsory ""
+    parse_args $optional $compulsory $args
+    
+    if { $title eq "" } {
+       set title [_ "Processes window"]
+    }
+    if { $callback eq "" } {
+	set okname "-"
+    } else {
+	set okname ""
+    }
     set w $text.debugatt
     destroy $w
-    dialogwin_snit $w -title [_ "Select program to attach the debugger"]
+    dialogwin_snit $w -title $title -grab $grab -okname $okname -class RamDebugger \
+	-callback [list RamDebugger::show_processes_window_accept $callback]
     set f [$w giveframe]
     
     set f1 [ttk::labelframe $f.f1 -text [_ "programs"]]
@@ -2382,7 +2411,7 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
 	    [list 10 [_ "PID"] right text 1] \
 	    [list 8 [_ "Create time"] left text 1] \
 	    [list 8 [_ "CPU time"] left text 1] \
-	    [list 10 [_ "Memory (KB)"] right text 1] \
+	    [list 12 [_ "Memory (MB)"] right text 1] \
 	    ]
     
     package require fulltktree
@@ -2390,7 +2419,8 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
 	"[list $w invokeok];#" \
 	-contextualhandler_menu [list RamDebugger::DebugCplusPlusWindowAttach_contextual $w] \
 	-columns $columns -expand 1 \
-	-selectmode browse -showlines 0 -indent 0 -width 650
+	-selectmode extended -showlines 0 -indent 0 -width 650 \
+	-sort_type_cols [list dictionary integer dictionary dictionary real]
     $w set_uservar_value tree $f1.tree
 
     set searchList [RamDebugger::GetPreference debug_cplus_attach_search_list]
@@ -2419,54 +2449,96 @@ proc RamDebugger::DebugCplusPlusWindowAttach {} {
     DebugCplusPlusWindowAttach_update $w
     
     tk::TabToWindow $f1.tree
-    bind [winfo toplevel $f1] <Return> [list $w invokeok]
-    set action [$w createwindow]
-    
-    while 1 {
-	if { $action <= 0 } { 
-	    destroy $w
-	    return
-	}
-	set item [$f1.tree selection get]
-	if { [llength $item] == 1 } {
-	    lassign [$f1.tree item text $item] cmd pid
-	    rdebug -debugcplusplus [list  $pid "" $cmd]
-	    set search [string trim [$w give_uservar_value search]]
-	    if { $search ne "" } {
-		set searchList [linsert0 -max_len 10 $searchList $search]
-		RamDebugger::SetPreference debug_cplus_attach_search_list $searchList
-	    }
-	    break
-	}
-	set action [$w waitforwindow]
+    if { $callback ne "" } {
+	bind $w <Return> [list $w invokeok]
+    }
+    $w createwindow
+}
+
+proc RamDebugger::show_processes_window_accept { callback w } {
+
+    set search [string trim [$w give_uservar_value search]]
+    if { $search ne "" } {
+	set searchList [RamDebugger::GetPreference debug_cplus_attach_search_list]
+	set searchList [linsert0 -max_len 10 $searchList $search]
+	RamDebugger::SetPreference debug_cplus_attach_search_list $searchList
+    }
+
+    if { [$w giveaction] < 1 } {
+	destroy $w
+	return
+    }
+    set tree [$w give_uservar_value tree]
+    set item [$tree selection get]
+    if { [llength $item] != 1 } {
+	snit_messageBox -message [_ "Select only one entry"] -parent $w
+	return
+    }
+    lassign [$tree item text $item] cmd pid create time mem
+    set err [catch { uplevel #0 $callback [list $cmd $pid $create $time $mem] } ret]
+    if { $err } {
+	snit_messageBox -message $ret -parent $w
+	return
     }
     destroy $w
 }
 
 proc RamDebugger::DebugCplusPlusWindowAttach_contextual { w tree menu item itemList } {
-
-    set pid [$tree item text $item 1]
+    
+    set pidList ""
+    foreach item $itemList {
+	lappend pidList [$tree item text $item 1]
+    }
     $menu add command -label [_ "Kill process"] -command \
-	[list RamDebugger::DebugCplusPlusWindowAttach_kill $w $pid]
+	[list RamDebugger::DebugCplusPlusWindowAttach_kill $w $pidList]
 }
 
-proc RamDebugger::DebugCplusPlusWindowAttach_kill { w pid } {
-    cu::kill $pid
+proc RamDebugger::DebugCplusPlusWindowAttach_kill { w pidList } {
+    foreach pid $pidList {
+	cu::kill $pid
+    }
     DebugCplusPlusWindowAttach_update $w
 }
 
 proc RamDebugger::DebugCplusPlusWindowAttach_update { w } {
     variable DebugCplusPlusWindowAttach_search_id
+    variable DebugCplusPlusWindowAttach_after
     
+    if { [info exist DebugCplusPlusWindowAttach_after] } {
+	after cancel $DebugCplusPlusWindowAttach_after
+    }
+    
+    if { ![winfo exists $w] } {
+	return
+    }
     unset -nocomplain DebugCplusPlusWindowAttach_search_id
     
     set tree [$w give_uservar_value tree]
     set search [string trim [$w give_uservar_value search]]
     
+    lassign [$tree yview] f0 f1
+    set pidList ""
+    foreach item [$tree selection get] {
+	lappend pidList [$tree item text $item 1]
+    }
+    
     $tree item delete all
     foreach i [cu::ps $search] {
-	$tree insert end $i
+	lassign $i cmd pid create time mem
+	set mem [format %.2f [expr {$mem/1024.0}]]
+	set item [$tree insert end [list $cmd $pid $create $time $mem]]
+	if { $pid in $pidList } {
+	    $tree selection add $item
+	}
     }
+    lassign [$tree sort_column] sortcolumn order
+    if { $sortcolumn ne "" } {
+	$tree sort_column $sortcolumn $order
+    }
+    $tree yview moveto $f0
+    
+    set DebugCplusPlusWindowAttach_after [after 1000 \
+	    [list RamDebugger::DebugCplusPlusWindowAttach_update $w]]
 }
 
 proc RamDebugger::DebugCplusPlusWindowAttach_search { w } {

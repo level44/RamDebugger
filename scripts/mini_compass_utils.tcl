@@ -954,6 +954,7 @@ proc cu::ps { args } {
 	    set retList ""
 	    foreach line [split $ret \n] {
 		regexp {(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)} $line {} pid stime cputime size cmd
+		if { $pattern ne "" && $cmd eq "grep -i $pattern" } { continue }
 		lappend retList [list $cmd $pid $stime $cputime $size]
 	    }
 	    return $retList

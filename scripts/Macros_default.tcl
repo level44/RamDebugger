@@ -309,7 +309,7 @@ proc "Go to proc" { w } {
 #     }
    
     
-    grid configure $f.lf -sticky ew
+    grid configure $f.lf -sticky nsew
     grid columnconfigure $f 0 -weight 1
     grid rowconfigure $f 0 -weight 1 
     focus $list
