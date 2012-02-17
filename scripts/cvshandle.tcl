@@ -1802,6 +1802,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		$w set_uservar_value tickets ""
 	    }
 	    waitstate $w off
+	    if { ![winfo exists $w] } { return }
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
 	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
 	    dict set dict messages [$w give_uservar_value messages]
