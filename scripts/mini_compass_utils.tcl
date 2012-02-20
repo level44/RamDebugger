@@ -972,6 +972,8 @@ proc cu::ps { args } {
 	lassign $args pattern
 	if { $pattern eq "" } {
 	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,size,cmd } ret]
+	} elseif { [string is integer -strict $pattern] } {
+	    set err [catch { exec ps --pid $pattern --no-headers -o pid,stime,time,size,cmd } ret]
 	} else {
 	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,size,cmd | grep -i $pattern } ret]
 	}        
