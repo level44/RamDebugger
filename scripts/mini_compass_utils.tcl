@@ -937,7 +937,34 @@ proc cu::ps { args } {
 
     if { $::tcl_platform(platform) eq "windows" } {
 	package require compass_utils::c
-	return [cu::_ps_win {*}$args]
+	set ps_args ""
+	foreach i $args {
+	    if { $i eq "" } { continue }
+	    if { ![regexp {^\*} $i] } {
+		set i "*$i"
+	    }
+	    if { ![regexp {\*$} $i] } {
+		set i "$i*"
+	    }
+	    lappend ps_args $i
+	}
+	set ret [cu::_ps_win {*}$ps_args]
+	catch { package require twapi }
+	set retret ""
+	foreach i $ret {
+	    lassign $i cmd pid
+	    if { [info command ::twapi::get_process_info] ne "" } {
+		set d [twapi::get_process_info $pid -createtime -privilegedtime -workingset]
+		set stime [clock format [twapi::large_system_time_to_secs [dict get $d -createtime]] \
+		        -format "%H:%M:%S"]
+		set cputime [clock format [twapi::large_system_time_to_secs \
+		            [dict get $d -privilegedtime]] -format "%H:%M:%S" -timezone :UTC]
+		set size [expr {[dict get $d -workingset]/1024}]
+		set i [list $cmd $pid $stime $cputime $size]
+	    }
+	    lappend retret $i
+	}
+	return $retret
     } else {
 	# does not do exactly the same than in Windows
 	#set err [catch { exec pgrep -l -f [lindex $args 0] } ret]

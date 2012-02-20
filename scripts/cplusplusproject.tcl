@@ -2525,7 +2525,9 @@ proc RamDebugger::DebugCplusPlusWindowAttach_update { w } {
     $tree item delete all
     foreach i [cu::ps $search] {
 	lassign $i cmd pid create time mem
-	set mem [format %.2f [expr {$mem/1024.0}]]
+	if { $mem ne "" } {
+	    set mem [format %.2f [expr {$mem/1024.0}]]
+	}
 	set item [$tree insert end [list $cmd $pid $create $time $mem]]
 	if { $pid in $pidList } {
 	    $tree selection add $item
