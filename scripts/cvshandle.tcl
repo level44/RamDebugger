@@ -1784,7 +1784,12 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 	    dict for "dir fs" $cvs_files_dict {
 		cd $dir
 		set err [catch { exec cvs commit -m $message {*}$fs 2>@1 } ret]
-		if { $err } { set color red } else { set color blue }
+		if { $err } {
+		    set color red
+		} else {
+		    set color blue
+		    regsub {\s*Bytes\s+Cards\s+Artifacts\s+Deltas...\s*} $ret {} ret
+		}
 		foreach file $fs {
 		    set item [dict get $items cvs $dir $file]
 		    $tree item element configure $item 0 e_text_sel -fill $color -text $ret
