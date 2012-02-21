@@ -2946,11 +2946,13 @@ proc RamDebugger::RecieveFromGdb {} {
 		set file $fullfile
 	    }
 	}
-	if { [file pathtype $file] == "relative" } {
-	    set executable [lindex $options(debugcplusplus) 0]
-	    set dir [file dirname $executable]
-	    if { [file exists [file join $dir $file]] } {
-		set file [file join $dir $file]
+	if { [file pathtype $file] eq "relative" } {
+	    if { [info exists options(debugcplusplus)] } {
+		set executable [lindex $options(debugcplusplus) 0]
+		set dir [file dirname $executable]
+		if { [file exists [file join $dir $file]] } {
+		    set file [file join $dir $file]
+		}
 	    }
 	    if { [info exists cproject::project] && \
 		     [file exists [file join [file dirname $cproject::project] $file]] } {
