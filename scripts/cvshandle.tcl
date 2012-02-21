@@ -1185,10 +1185,10 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
 	    }
 	}
     }
-    set url "http://localhost:PORT/rptview?rn=$num"
+    set url_suffix "/rptview?rn=$num"
     $menu add separator
     $menu add command -label [_ "Open tickets browser"] -command \
-	[list "update_recursive_cmd" $w open_program fossil_ui $tree "" $url]
+	[list "update_recursive_cmd" $w open_program fossil_ui $tree "" $url_suffix]
     
     cd $pwd
 }
@@ -2165,15 +2165,54 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		        }
 		    }
 		    lappend dirs [$w give_uservar_value dir]
+		    set url_suffix $files
 		    set pwd [pwd]
 		    foreach dir $dirs {
 		        cd $dir
 		        if { [catch { exec $fossil info }] } { continue }
-		        if { $files eq "" } {
-		            exec $fossil ui &
+		        
+		        if { ![$w exists_uservar local_remote_web_browser] } {
+		            set err [catch {
+		                    set remote [exec $fossil remote]
+		                    set autosync 0
+		                    regexp {\d\s*$} [exec $fossil settings autosync] autosync
+		                }]
+		            if { !$err && $remote ne "off" } {
+		                set w_lr [dialogwin_snit $w.lr -title [_ "Open local or remote"] -class RamDebugger -entrytext \
+		                        [_ "open local or remote web page?"]]
+		                set f [$w_lr giveframe]
+		                ttk::radiobutton $f.r1 -text [_ "Open local web page"] -variable \
+		                    [$w give_uservar local_remote_web_browser] -value local
+		                ttk::radiobutton $f.r2 -text [_ "Open remote web page"] -variable \
+		                    [$w give_uservar local_remote_web_browser] -value remote
+		                grid $f.r1 -padx 20 -pady 2 -sticky w
+		                grid $f.r2 -padx 20 -pady 2 -sticky w
+
+		                $w set_uservar_value remote_web_browser $remote
+		                if { $autosync } {
+		                    $w set_uservar_value local_remote_web_browser remote
+		                } else {
+		                    $w set_uservar_value local_remote_web_browser local
+		                }
+		                tk::TabToWindow $f.r1
+		                bind $w_lr <Return> [list $w invokeok]
+		                set action [$w_lr createwindow]
+		                destroy $w_lr
+		                if { $action < 1 } {
+		                    $w unset_uservar local_remote_web_browser
+		                    return
+		                }
+		                update
+		            } else {
+		                $w set_uservar_value local_remote_web_browser local
+		            }
+		        }
+		        if { [$w give_uservar_value local_remote_web_browser] eq "remote" } {
+		            set url [$w give_uservar_value remote_web_browser]$url_suffix
+		            cu::file::execute url $url
 		        } else {
 		            set port ""
-		            set fin [open "|fossil server" r]
+		            set fin [open "|[list $fossil server]" r]
 		            fconfigure $fin -blocking 0
 		            while { ![eof $fin] } {
 		                set line [read $fin]
@@ -2183,7 +2222,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                }
 		            }
 		            if { $port ne "" } {
-		                set url [string map [list PORT $port] $files]
+		                set url http://localhost:$port$url_suffix
 		                set line [exec $fossil settings web-browser]
 		                set browser ""
 		                regexp {\((local|global)\)\s+(.*)$} $line {} {} browser
@@ -2192,6 +2231,9 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		                } else {
 		                    cu::file::execute url $url
 		                }
+		            } else {
+		                snit_messageBox -message [_ "Could not open server"] -parent $w
+		                return
 		            }
 		        }
 		        break
