@@ -971,20 +971,22 @@ proc cu::ps { args } {
 	#set retList  [split $ret \n]
 	lassign $args pattern
 	if { $pattern eq "" } {
-	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,size,cmd } ret]
+	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,pcpu,size,cmd } ret]
 	} elseif { [string is integer -strict $pattern] } {
-	    set err [catch { exec ps --pid $pattern --no-headers -o pid,stime,time,size,cmd } ret]
+	    set err [catch { exec ps --pid $pattern --no-headers -o pid,stime,time,pcpu,size,cmd } ret]
 	} else {
-	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,size,cmd | grep -i $pattern } ret]
+	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,pcpu,size,cmd | grep -i $pattern } ret]
 	}        
 	if { $err } {
 	    return ""
 	} else {
 	    set retList ""
 	    foreach line [split $ret \n] {
-		regexp {(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)} $line {} pid stime cputime size cmd
+		regexp {(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)} $line {} pid stime cputime \
+		    pcpu size cmd
+		set pcpu [format "%02.0f%%" $pcpu]
 		if { $pattern ne "" && $cmd eq "grep -i $pattern" } { continue }
-		lappend retList [list $cmd $pid $stime $cputime $size]
+		lappend retList [list $cmd $pid $stime "$cputime ($pcpu)" $size]
 	    }
 	    return $retList
 	}

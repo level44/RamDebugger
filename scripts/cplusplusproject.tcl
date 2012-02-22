@@ -2410,7 +2410,7 @@ proc RamDebugger::show_processes_window { args } {
 	    [list 25 [_ "Program"] left text 1] \
 	    [list 10 [_ "PID"] right text 1] \
 	    [list 8 [_ "Create time"] left text 1] \
-	    [list 8 [_ "CPU time"] left text 1] \
+	    [list 14 [_ "CPU time"] left text 1] \
 	    [list 12 [_ "Memory (MB)"] right text 1] \
 	    ]
     
