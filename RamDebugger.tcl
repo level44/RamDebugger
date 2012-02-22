@@ -4106,6 +4106,9 @@ proc RamDebugger::OpenFileSecondary { args } {
 
     WaitState 1
 
+    if { $options(filetype) ne "auto" && $options(filetype_only_this_file) } {
+	set options(filetype) auto
+    }
     set linenum 1
     if { $file eq $currentfile } {
 	set linenum [scan [$text index insert] %d]
@@ -4194,6 +4197,9 @@ proc RamDebugger::OpenFileSaveHandler { file data handler } {
 
     WaitState 1
 
+    if { $options(filetype) ne "auto" && $options(filetype_only_this_file) } {
+	set options(filetype) auto
+    }
     set linenum 1
     if { $file == $currentfile } {
 	set idx [$text index insert]
@@ -7002,37 +7008,33 @@ proc RamDebugger::CheckText { command args } {
 proc RamDebugger::SearchBraces_xml { x y } {
     variable text
 
-    set rex {<\s*?(/?)\s*?([^>/\s]+?)(?:\s[^>]*?[^>/])?(/?)\s*?>}
+    set rex {<\s*?(?:(!--.*?-->)|(/?)\s*?([^!>/\s]+?)(?:\s[^>]*?[^>/])?(/?)\s*?>)}
     set sel [$text get insert-1c]
     set state normal
     while { $state eq "normal" && $sel eq ">" } {
 	set idx [$text search -backwards -regexp -nolinestop -count ::count0 $rex insert 1.0]
 	if { $idx eq "" } { break }
-	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_end tag is_start_end
+	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_comment is_end tag is_start_end
 	set idx_ini $idx
-	set idx_end insert
+	set idx_end [$text index insert]
 	set state found
     }
     set sel [$text get insert]
     while { $state eq "normal" && $sel eq "<" } {
 	set idx [$text search -regexp -nolinestop -count ::count0 $rex insert end]
 	if { $idx eq "" } { break }
-	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_end tag is_start_end
+	regexp $rex [$text get $idx "$idx+$::count0 chars"] {} is_comment is_end tag is_start_end
 	set idx_ini insert
 	set idx_end "$idx+$::count0 chars"
 	set state found
     }
     if { $state ne "found" } {
-	if { $x >= 0 } {
-	    set ::tkPriv(selectMode) word ;# tcl8.3
-	    catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
-	    tkTextSelectTo $text $x $y
-	    catch { $text mark set insert sel.last}
-	    catch { $text mark set anchor sel.first}
-	}
+	set openL [list "\[" "\{" "("]
+	set closeL [list "\]" "\}" ")"]
+	_search_braces_and_select $openL $closeL $x $y
 	return
     }
-    if { $is_start_end ne "" } {
+    if { $is_start_end ne "" || $is_comment ne "" } {
 	$text tag remove sel 0.0 end
 	$text tag add sel $idx "$idx+$::count0 chars"
 	$text mark set insert $idx
@@ -7045,8 +7047,8 @@ proc RamDebugger::SearchBraces_xml { x y } {
 	set idx_new [$text search -backwards -regexp -nolinestop -count ::count $rex $idx 1.0]
 	if { $idx_new eq "" } { break }
 	regexp $rex [$text get $idx_new "$idx_new+$::count chars"] \
-	    {} is_end_new tag_new is_start_end_new
-	if { $is_start_end_new ne "" } {
+	    {} is_comment_new is_end_new tag_new is_start_end_new
+	if { $is_start_end_new ne "" || $is_comment_new ne "" } {
 	    # nothing
 	} elseif { $is_end_new ne "" } {
 	    incr counter
@@ -7064,8 +7066,8 @@ proc RamDebugger::SearchBraces_xml { x y } {
 	set idx_new [$text search -regexp -nolinestop -count ::count $rex $idx end]
 	if { $idx_new eq "" } { break }
 	regexp $rex [$text get $idx_new "$idx_new+$::count chars"] \
-	    {} is_end_new tag_new is_start_end_new
-	if { $is_start_end_new ne "" } {
+	    {} is_comment_new is_end_new tag_new is_start_end_new
+	if { $is_start_end_new ne "" || $is_comment_new ne "" } {
 	    # nothing
 	} elseif { $is_end_new eq "" } {
 	    incr counter
@@ -7078,15 +7080,24 @@ proc RamDebugger::SearchBraces_xml { x y } {
 	}
 	set idx "$idx_new+$::count chars"
     }
+#     if { $state eq "normal" } {
+#         if { $x >= 0 } {
+#             set ::tkPriv(selectMode) word ;# tcl8.3
+#             catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
+#             tkTextSelectTo $text $x $y
+#             catch { $text mark set insert sel.last}
+#             catch { $text mark set anchor sel.first}
+#         }
+#         return
+#     }
     if { $state eq "normal" } {
-	if { $x >= 0 } {
-	    set ::tkPriv(selectMode) word ;# tcl8.3
-	    catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
-	    tkTextSelectTo $text $x $y
-	    catch { $text mark set insert sel.last}
-	    catch { $text mark set anchor sel.first}
+	# it is better to select up to the point where the problems begin
+	if { [$text compare $idx < $idx_ini] } {
+	    set idx_ini $idx
+	} elseif { [$text compare $idx > $idx_end] } {
+	    set idx_end $idx
 	}
-	return
+	set idx_see $idx
     }
     $text tag remove sel 0.0 end
     $text tag add sel $idx_ini $idx_end
@@ -7181,6 +7192,140 @@ proc RamDebugger::SearchBraces_cpp_defines { x y } {
     return 1
 }
 
+proc RamDebugger::_search_braces_and_select { openL closeL x y } {
+    variable text
+    
+    set allL [concat $openL $closeL]
+    set rex "\[\\[join $allL "\\"]\]"
+
+    if { [regexp "$rex{1}\\s*\$" [$text get "insert linestart" insert] ret] } {
+	set numA [string length $ret]
+    } else {
+	set numA -1
+    }
+    if { [regexp "^\\s*$rex{1}" [$text get insert "insert lineend"] ret] } {
+	set numB [string length $ret]
+    } else {
+	set numB -1
+    }
+    if { $numA > 0 && ($numB==-1 || $numA <= $numB) } {
+	set idx [$text index "insert -$numA c"]
+    } elseif { $numB > 0 } {
+	set idx [$text index "insert +[expr {$numB-1}] c"]
+    } else {
+	set idx -1
+    }
+    if { $idx == -1 || [$text get "$idx -1c"] == "\\" } {
+	# when not doing it by mouse, use x=-1
+	if { $x >= 0 } {
+	    set ::tkPriv(selectMode) word ;# tcl8.3
+	    catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
+	    tkTextSelectTo $text $x $y
+	    catch { $text mark set insert sel.last}
+	    catch { $text mark set anchor sel.first}
+	}
+	return
+    }
+    set sel [$text get $idx]
+    $text tag remove sel 0.0 end
+    $text tag add sel $idx "$idx+1c"
+
+    if { $sel in $openL } {
+	set dir -forwards
+	set stopindex [$text index end]
+	set idx [$text index sel.last]
+	set incr +1
+	$text mark set insert sel.first
+    } else {
+	set dir -backwards
+	set stopindex 1.0
+	set idx [$text index sel.first]
+	set incr -1
+	$text mark set insert sel.last
+	lassign [list $openL $closeL] closeL openL
+    }
+    set open $sel
+    set close [lindex $closeL [lsearch -exact $openL $open]]
+    
+    lassign [list 0 0 0 0 ""] error found level level_alt idx_alt
+    while { [set idx2 [$text search $dir -regexp -- $rex $idx $stopindex]] != "" } {
+	set ret [$text search -backwards -regexp -count ::nppar {\\+} $idx2 "$idx2 linestart"]
+	if { $ret eq "" || [$text compare "$ret+${::nppar}c" != $idx2] } {
+	    set ::nppar 0
+	}
+	if { $::nppar%2 == 1 } {
+	    if { $dir == "-forwards" } {
+		set idx [$text index $idx2+1c]
+	    } else {
+		set idx $idx2
+	    }
+	    continue
+	}
+	set newsel [$text get $idx2]
+	
+	if { $newsel eq $open } {
+	    incr level
+	} elseif { $newsel eq $close } {
+	    incr level -1
+	    if { $level < 0 } {
+		#                         if { $level_alt > 0 } {
+		    #                             set error 1
+		    #                             set idx2 $idx_alt
+		    #                             break
+		    #                         }
+		set found 1
+		break
+	    }
+	} elseif { $newsel in $openL } {
+	    incr level_alt
+	    set idx_alt $idx2
+	} elseif { $newsel in $closeL } {
+	    incr level_alt -1
+	    if { $level_alt < 0 } {
+		set level_alt 0
+		set error 1
+		break
+	    }
+	}
+	if { $dir == "-forwards" } {
+	    set idx [$text index $idx2+1c]
+	} else {
+	    set idx $idx2
+	}
+    }
+    if { $level_alt != 0 } {
+	set error 1
+    }
+    if { $idx2 eq "" } {
+	set error 1
+	set idx2 $stopindex
+    }
+    if { $error } { bell }
+    $text tag remove sel 1.0 end
+    
+    if { $dir == "-forwards" } {
+	set idxA insert
+	set idxB $idx2+1c
+    } else {
+	set idxA $idx2
+	set idxB insert
+    }
+    if { $error } { SetMessage [_ "Error: braces not OK"] }
+    
+    # when not doing it by mouse, use x=-1
+    if { $x >= 0 } {
+	$text tag add sel $idxA $idxB
+	catch { $text mark set insert $idx2 }
+	$text see $idx2
+    } else {
+	$text tag add tempmarker $idxA $idxB
+	$text tag conf tempmarker -background [$text tag cget sel -background] \
+	    -foreground [$text tag cget sel -foreground]
+	if { $error } { $text tag conf tempmarker -background red }
+	after 1000 $text tag remove tempmarker 1.0 end
+    }
+}
+
 proc RamDebugger::SearchBraces { x y } {
     variable text
     variable currentfile
@@ -7200,127 +7345,11 @@ proc RamDebugger::SearchBraces { x y } {
 	set found [SearchBraces_cpp_defines $x $y]
 	if { $found } { return }
     }
-
-    set sel [$text get insert-1c]
-    set selm1 [$text get insert-2c]
-    $text tag remove sel 0.0 end
-    $text tag add sel insert-1c insert
-    if { [lsearch -exact [list \[ \] \{ \}] $sel] == -1 || $selm1 == "\\" } {
-	set sel [$text get insert]
-	set selm1 [$text get insert-1c]
-	$text tag remove sel 0.0 end
-	$text tag add sel insert insert+1c
-	$text mark set insert insert+1c
-    }
-    if {[lsearch -exact [list \[ \] \{ \}] $sel] == -1  || $selm1 == "\\" } {
-	# when not doing it by mouse, use x=-1
-	if { $x >= 0 } {
-	    set ::tkPriv(selectMode) word ;# tcl8.3
-	    catch { set ::tk::Priv(selectMode) word } ;# tcl8.4
-	    tkTextSelectTo $text $x $y
-	    catch { $text mark set insert sel.last}
-	    catch { $text mark set anchor sel.first}
-	}
-    } else {
-	if { $sel == "\[" || $sel == "\{" } {
-	    set dir -forwards
-	    set stopindex [$text index end]
-	    set idx [$text index sel.last]
-	    set incr +1
-	    $text mark set insert insert-1c
-	} else {
-	    set dir -backwards
-	    set stopindex 1.0
-	    set idx [$text index sel.first]
-	    set incr -1
-	    #$text mark set insert insert+1c
-	}
-	switch $sel {
-	    "\{" { set open "\{" ; set close "\}" ; set openalt "\[" ; set closealt "\]" }
-	    "\[" { set open "\[" ; set close "\]" ; set openalt "\{" ; set closealt "\}" }
-	    "\}" { set open "\}" ; set close "\{" ; set openalt "\]" ; set closealt "\[" }
-	    "\]" { set open "\]" ; set close "\[" ; set openalt "\}" ; set closealt "\{" }
-	}
-	set error 0
-	set found 0
-	set level 0
-	set level_alt 0
-	set idx_alt ""
-	while { [set idx2 [$text search $dir -regexp -- {\{|\}|\[|\]} $idx $stopindex]] != "" } {
-	    set ret [$text search -backwards -regexp -count ::nppar {\\+} $idx2 "$idx2 linestart"]
-	    if { $ret eq "" || [$text compare "$ret+${::nppar}c" != $idx2] } {
-		set ::nppar 0
-	    }
-	    if { $::nppar%2 == 1 } {
-		if { $dir == "-forwards" } {
-		    set idx [$text index $idx2+1c]
-		} else { set idx $idx2 }
-		continue
-	    }
-	    set newsel [$text get $idx2]
-	    switch $newsel \
-		$open { incr level } \
-		$openalt {
-		    incr level_alt
-		    set idx_alt $idx2
-		} \
-		$close {
-		    incr level -1
-		    if { $level < 0 } {
-		        #                         if { $level_alt > 0 } {
-		        #                             set error 1
-		        #                             set idx2 $idx_alt
-		        #                             break
-		        #                         }
-		        set found 1
-		        break
-		    }
-		} \
-		$closealt {
-		    incr level_alt -1
-		    if { $level_alt < 0 } {
-		        set level_alt 0
-		        set error 1
-		        break
-		    }
-		}
-	    if { $dir == "-forwards" } {
-		set idx [$text index $idx2+1c]
-	    } else { set idx $idx2 }
-	}
-	if { $level_alt != 0 } {
-	    set error 1
-	}
-	if { $idx2 == "" } {
-	    set error 1
-	    set idx2 $stopindex
-	}
-	if { $error } { bell }
-	$text tag remove sel 1.0 end
-	
-	if { $dir == "-forwards" } {
-	    set idxA insert
-	    set idxB $idx2+1c
-	} else {
-	    set idxA $idx2
-	    set idxB insert
-	}
-	
-	if { $error } { SetMessage [_ "Error: braces not OK"] }
-	
-	  # when not doing it by mouse, use x=-1
-	if { $x >= 0 } {
-	    $text tag add sel $idxA $idxB
-	    catch { $text mark set insert $idx2 }
-	    $text see $idx2
-	} else {
-	    $text tag add tempmarker $idxA $idxB
-	    $text tag conf tempmarker -background [$text tag cget sel -background] \
-		-foreground [$text tag cget sel -foreground]
-	    if { $error } { $text tag conf tempmarker -background red }
-	    after 1000 $text tag remove tempmarker 1.0 end
-	}
-    }
+    
+    set openL [list "\[" "\{" "("]
+    set closeL [list "\]" "\}" ")"]
+    
+    _search_braces_and_select $openL $closeL $x $y
 }
 
 proc RamDebugger::CenterDisplay {} {
