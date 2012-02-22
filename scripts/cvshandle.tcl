@@ -1788,7 +1788,6 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
 		    set color red
 		} else {
 		    set color blue
-		    regsub {\s*Bytes\s+Cards\s+Artifacts\s+Deltas...\s*} $ret {} ret
 		}
 		foreach file $fs {
 		    set item [dict get $items cvs $dir $file]
