@@ -12,7 +12,7 @@ ifeq ($(HOST),rrg7.local)
 else ifeq ($(HOST),hoschi)
   LIBSDIR=/Users/miguel
 else ifeq ($(HOST),akenatonix)
-  LIBSDIR=/opt/ActiveTcl-8.5
+  LIBSDIR=/usr
   M64 = yes
 else ifeq ($(HOST),akenatonviii)
   LIBSDIR=/opt/ActiveTcl-8.5
@@ -60,6 +60,7 @@ LIBS += -ltclstub8.5
 EXE = $(OBJDIR)/RamDebuggerInstrumenter6$(LIBEXT)
 
 EXE_INSTALL = scripts/RamDebuggerInstrumenter6$(LIBEXT)
+EXE_INSTALL2 = libs/RamDebuggerInstrumenter6$(LIBEXT)
 
 VPATH = scripts
 
@@ -67,7 +68,7 @@ SRCS = RamDebuggerInstrumenter.cc
 
 OBJS = $(addprefix $(OBJDIR)/,$(SRCS:.cc=.o))
 
-all: compile $(EXE_INSTALL)
+all: compile $(EXE_INSTALL) $(EXE_INSTALL2)
 compile: $(OBJDIR) $(EXE)
 
 -include $(addprefix $(OBJDIR)/,$(SRCS:.cc=.o.depend))
@@ -96,8 +97,14 @@ ifneq ($(OBJDIR),debug)
 	cp $(EXE) $(EXE_INSTALL)
 endif
 
+$(EXE_INSTALL2): $(EXE)
+ifneq ($(OBJDIR),debug)
+	cp $(EXE) $(EXE_INSTALL2)
+endif
+
 clean:
 	rm -f $(OBJDIR)/*.o $(OBJDIR)/*.o.depend $(EXE)
 
 copy:
 	cp $(EXE) $(EXE_INSTALL)
+	cp $(EXE) $(EXE_INSTALL2)
