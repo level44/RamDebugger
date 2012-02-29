@@ -8512,6 +8512,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		        -command "RamDebugger::PositionsStack go"] \
 		    [list command &[_ "Display positions stack"] {} [_ "Display positions stack"] "Ctrl F2" \
 		        -command "RamDebugger::DisplayPositionsStack"] \
+		    separator \
+		    [list command &[_ "Go to proc"] {} \
+		        [_ "Go to proc definition in current file"] "ShiftCtrl g" \
+		        -command "RamDebugger::go_to_proc"] \
 		   ] \
 		] \
 		[list cascad &[_ "Macros"] {} macros 0 [list \

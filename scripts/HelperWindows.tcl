@@ -253,7 +253,7 @@ proc RamDebugger::GetSelOrWordInIndex { args } {
 		if { [$text compare $idx1 >= end-1c] } { break }
 		set char [$text get $idx1]
 	    }
-	    if { ![regexp {[^()]*\([^)]+\)} $var] } {
+	    if { ![regexp {[^()]*\([^\)]+\)} $var] } {
 		set var [string trimright $var "()"]
 	    }
 	} else { set var "" }
@@ -4307,3 +4307,137 @@ proc RamDebugger::insert_brackets_braces {} {
 # }
 
 
+################################################################################
+#    go_to_proc
+################################################################################
+
+proc RamDebugger::go_to_proc {} {
+    variable text
+    
+    lassign "" procs_n procs_c
+    set numline 1
+    set lines [split [$text get 1.0 end-1c] \n]
+    set len [llength $lines]
+    foreach line $lines {
+	set types {proc|method|constructor|onconfigure|snit::type|snit::widget|snit::widgetadaptor}
+
+	if { [regexp "^\\s*(?:::)?($types)\\s+(\[\\w:]+)" $line {} type name] } {
+	    set namespace ""
+	    regexp {(.*)::([^:]+)} $name {} namespace name
+	    set comments ""
+	    set iline [expr {$numline-1}]
+	    while { $iline > 0 } {
+		set tline [lindex $lines [expr {$iline-1}]]
+		if { [regexp {^\s*#\s*\}} $tline] } { break }
+		if { [regexp {^\s*#([-()\s\w.,;:]*)$} $tline {} c] } {
+		   append comments "$c " 
+		} elseif { ![regexp {^\s*$|^\s*#} $tline] } { break }
+		incr iline -1
+	    }
+	    set comments [string trim $comments]
+	    if { $comments eq "" } {
+		lappend procs_n [list $name $namespace "" $type $numline]
+	    } else {
+		lappend procs_c [list $name $namespace $comments $type $numline]
+	    }
+	}
+	incr numline
+    }
+    set procs [lsort -dictionary -index 0 $procs_c]
+    lappend procs {*}[lsort -dictionary -index 0 $procs_n]
+
+    set wg $text.g
+    destroy $wg
+    dialogwin_snit $wg -title [_ "Go to proc"]
+    set f [$wg giveframe]
+    
+    set columns [list \
+	    [list 32 [_ "Proc name"] left text 0] \
+	    [list 14 [_ "Proc namespace"] left text 0] \
+	    [list 32 [_ "Comments"] left text 0] \
+	    [list  8 [_ "Proc type"] left text 0] \
+	    [list  6 [_ "line"] right text 0] \
+	]
+    fulltktree $f.lf -width 650 \
+	-columns $columns -expand 0 \
+	-sort_type_cols [list dictionary dictionary dictionary dictionary integer] \
+	-selectmode extended -showheader 1 -showlines 0  \
+	-have_search_button automatic \
+	-indent 0 -sensitive_cols all \
+	-selecthandler2 "[list $wg invokeok];#"
+    set list $f.lf
+    
+    $f.lf element configure e_text_sel -lines 2
+
+    foreach i $procs {
+	$list insert end $i
+	if { [string match *snit* [lindex $i 3]] } {
+	    $f.lf item element configure end 0 e_text_sel -fill [list grey disabled \
+		    $fulltktree::SystemHighlightText {selected focus} orange ""]
+	}
+    }
+
+    set range [$text tag ranges sel]
+    if { [llength $range] } {
+	set txt [$text get {*}$range]
+	$f.lf set_search_string $txt
+    } else {
+	set var ""
+	set idx0 [$text index insert]
+	set char [$text get $idx0]
+	while { [string is wordchar $char] } {
+	    set var $char$var
+	    set idx0 [$text index $idx0-1c]
+	    if { [$text compare $idx0 <= 1.0] } { break }
+	    set char [$text get $idx0]
+	}
+	set idx1 [$text index insert+1c]
+	set char [$text get $idx1]
+	while { [string is wordchar $char] } {
+	    append var $char
+	    set idx1 [$text index $idx1+1c]
+	    if { [$text compare $idx1 >= end-1c] } { break }
+	    set char [$text get $idx1]
+	}
+	if { ![regexp {[^()]*\([^\)]+\)} $var] } {
+	    set var [string trimright $var "()"]
+	}
+	if { [$text compare $idx1 > $idx0] } {
+	    set txt [$text get "$idx0+1c" "$idx1"]
+	    $f.lf set_search_string $txt
+	}        
+	catch {
+	    $list selection add 1
+	    $list activate 1
+	}
+    }
+    grid configure $f.lf -sticky nsew
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1 
+    focus $list
+
+    set action [$wg createwindow]
+
+    while 1 {
+	switch -- $action {
+	    -1 - 0 {
+		destroy $wg
+		return
+	    }
+	    1 {
+		set itemList [$list selection get]
+		if { [llength $itemList] == 1 } {
+		    set line [$list item text [lindex $itemList 0] 4]
+		    $text mark set insert $line.0
+		    $text see $line.0
+		    focus $text
+		    destroy $wg
+		    return
+		} else {
+		    tk_messageBox -message [_ "Select one function in order to go to it"]
+		}
+	    }
+	}
+	set action [$wg waitforwindow]
+    }
+}
