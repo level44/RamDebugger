@@ -2,9 +2,10 @@
 package require Tk 8.5
 #package require textutil
 
-namespace eval RamDebugger::CVS {
-    variable cvsrootdir
-    variable cvsworkdir
+namespace eval RamDebugger::VCS {
+    variable vcsrootdir
+    variable vcsworkdir
+    variable cvs_or_fossil cvs
     variable null
     variable lasttimeautosave ""
     variable autosave_after ""
@@ -13,62 +14,71 @@ namespace eval RamDebugger::CVS {
     variable try_threaded 1
 }
 
-proc RamDebugger::CVS::Init {} {
-    variable cvsrootdir
-    variable cvsworkdir
+proc RamDebugger::VCS::Init {} {
+    variable vcsrootdir
+    variable vcsworkdir
     variable null
+    variable cvs_or_fossil
+    
+    set vcsrootdir [file join $RamDebugger::AppDataDir vcsroot]
+    set vcsworkdir  [file join $RamDebugger::AppDataDir vcswork]
 
-    if { [auto_execok cvs] eq "" } {
-	error "error: It is necessary to have program 'cvs' in the path"
-    }
-
-    unset -nocomplain ::env(CVSROOT)
-    unset -nocomplain ::env(CVS_RSH)
-
-    set cvsrootdir [file join $RamDebugger::AppDataDir cvsroot]
-    set cvsworkdir  [file join $RamDebugger::AppDataDir cvswork]
-    if { $::tcl_platform(platform) eq "windows" } {
-	set null NUL:
+    if { $cvs_or_fossil eq "cvs" } {
+	if { [auto_execok cvs] eq "" } {
+	    error "error: It is necessary to have program 'cvs' in the path"
+	}
+	
+	unset -nocomplain ::env(CVSROOT)
+	unset -nocomplain ::env(CVS_RSH)
+	
+	if { $::tcl_platform(platform) eq "windows" } {
+	    set null NUL:
+	} else {
+	    set null /dev/null
+	}
+	if { ![file exists vcsworkdir] } {
+	    file mkdir $vcsworkdir
+	}
+	if { ![file exists $vcsrootdir] } {
+	    set pwd [pwd]
+	    cd $vcsworkdir
+	    exec cvs -d :local:$vcsrootdir init
+	    exec cvs -d :local:$vcsrootdir import -m "" cvswork RamDebugger start
+	    cd ..
+	    exec cvs -d :local:$vcsrootdir checkout cvswork 2> $null
+	    cd $pwd
+	}
     } else {
-	set null /dev/null
-    }
-    if { ![file exists cvsworkdir] } {
-	file mkdir $cvsworkdir
-    }
-    if { ![file exists $cvsrootdir] } {
-	set pwd [pwd]
-	cd $cvsworkdir
-	exec cvs -d :local:$cvsrootdir init
-	exec cvs -d :local:$cvsrootdir import -m "" cvswork RamDebugger start
-	cd ..
-	exec cvs -d :local:$cvsrootdir checkout cvswork 2> $null
-	    
-#             cd cvswork
-#             exec cvs -d :local:$cvsrootdir checkout CVSROOT 2> $null
-#             set fout [open [file join CVSROOT modules] a]
-#             puts $fout "\n#M\tcvswork\tSupport for RamDebugger file changes"
-#             puts $fout "cvswork RamDebugger/cvswork"
-#             close $fout
-#             cd CVSROOT
-#             exec cvs commit -m "" modules
-#             cd ..
-#             file delete -force CVSROOT
-
-	cd $pwd
+	set fossil [auto_execok fossil]
+	if { $fossil eq "" } {
+	    set comment "fossil is a version control management system and can be freely download from http://www.fossil-scm.org"
+	    error "error: It is necessary to have program 'fossil' in the path ($comment)"
+	}
+	if { ![file exists vcsworkdir] } {
+	    file mkdir $vcsworkdir
+	}
+	if { ![file exists $vcsrootdir] } {
+	    file mkdir $vcsrootdir
+	    exec $fossil new [file join $vcsrootdir rev.fossil]
+	    set pwd [pwd]
+	    cd $vcsworkdir
+	    exec $fossil open [file join $vcsrootdir rev.fossil]
+	    cd $pwd
+	}
     }
 }
 
-proc RamDebugger::CVS::SetUserActivity {} {
+proc RamDebugger::VCS::SetUserActivity {} {
     variable autosaveidle_after
 
     if { $autosaveidle_after ne "" } {
 	after cancel $autosaveidle_after
 	set time [expr {int($RamDebugger::options(AutoSaveRevisions_idletime)*1000)}]
-	set autosaveidle_after [after $time RamDebugger::CVS::_ManageAutoSaveDo]
+	set autosaveidle_after [after $time RamDebugger::VCS::_ManageAutoSaveDo]
     }
 }
 
-proc RamDebugger::CVS::ManageAutoSave {} {
+proc RamDebugger::VCS::ManageAutoSave {} {
     variable lasttimeautosave
     variable autosave_after
     variable autosaveidle_after
@@ -86,14 +96,14 @@ proc RamDebugger::CVS::ManageAutoSave {} {
     if { $now-$lasttimeautosave < $RamDebugger::options(AutoSaveRevisions_time) } {
 	set time [expr {int(($RamDebugger::options(AutoSaveRevisions_time)-$now+\
 		                 $lasttimeautosave)*1000)}]
-	set $autosave_after [after $time RamDebugger::CVS::ManageAutoSave]
+	set $autosave_after [after $time RamDebugger::VCS::ManageAutoSave]
     } else {
 	set time [expr {int($RamDebugger::options(AutoSaveRevisions_idletime)*1000)}]
-	set autosaveidle_after [after $time RamDebugger::CVS::_ManageAutoSaveDo]
+	set autosaveidle_after [after $time RamDebugger::VCS::_ManageAutoSaveDo]
     }
 }
 
-proc RamDebugger::CVS::_ManageAutoSaveDo {} {
+proc RamDebugger::VCS::_ManageAutoSaveDo {} {
     variable lasttimeautosave
     variable autosaveidle_after
     variable autosave_warning
@@ -127,10 +137,11 @@ proc RamDebugger::CVS::_ManageAutoSaveDo {} {
     indicator_update
 }
 
-proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
-    variable cvsworkdir
+proc RamDebugger::VCS::SaveRevision { { raiseerror 0 } } {
+    variable vcsworkdir
     variable null
-
+    variable cvs_or_fossil
+    
     package require sha1
 
     RamDebugger::WaitState 1
@@ -158,30 +169,47 @@ proc RamDebugger::CVS::SaveRevision { { raiseerror 0 } } {
 
     set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
     set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
-    RamDebugger::_savefile_only [file join $cvsworkdir $lfile] $data
+    RamDebugger::_savefile_only [file join $vcsworkdir $lfile] $data
 
     set pwd [pwd]
-    cd $cvsworkdir
-    set err [catch { exec cvs log -R $lfile }]
-    if { $err } {
-	set err [catch { exec cvs add -ko -m $file $lfile 2> $null } errstring]
+    cd $vcsworkdir
+    if { $cvs_or_fossil eq "cvs" } {
+	set err [catch { exec cvs log -R $lfile }]
+	if { $err } {
+	    set err [catch { exec cvs add -ko -m $file $lfile 2> $null } errstring]
+	    if { $err } {
+		RamDebugger::WaitState 0
+		RamDebugger::SetMessage ""
+		if { $raiseerror } { error $errstring }
+		WarnWin $errstring
+		return
+	    }
+	}
+	exec cvs commit -m "" $lfile
+    } else {
+	set fossil [auto_execok fossil]
+	set err [catch { exec $fossil finfo -s $lfile } ret]
+	if { !$err && [regexp {^unknown} $ret] } {
+	    set err [catch { exec $fossil add $lfile } ret]
+	}
 	if { $err } {
 	    RamDebugger::WaitState 0
 	    RamDebugger::SetMessage ""
-	    if { $raiseerror } { error $errstring }
-	    WarnWin $errstring
+	    if { $raiseerror } { error $ret }
+	    WarnWin $ret
 	    return
 	}
+	exec $fossil commit -m "" $lfile
     }
-    exec cvs commit -m "" $lfile
     file delete $lfile
     cd $pwd
     RamDebugger::WaitState 0
     RamDebugger::SetMessage "Saved revision for file '$file'"
 }
 
-proc RamDebugger::CVS::OpenRevisions { { file "" } } {
-    variable cvsworkdir
+proc RamDebugger::VCS::OpenRevisions { { file "" } } {
+    variable vcsworkdir
+    variable cvs_or_fossil
 
     package require sha1
 
@@ -206,8 +234,16 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     }
 
     set pwd [pwd]
-    cd $cvsworkdir
-    set err [catch { exec cvs log $lfile } retval]
+    cd $vcsworkdir
+    if { $cvs_or_fossil eq "cvs" } {
+	set err [catch { exec cvs log $lfile } retval]
+    } else {
+	set fossil [auto_execok fossil]
+	set err [catch { exec $fossil finfo -s $lfile } ret]
+	if { !$err && [regexp {^unknown} $ret] } {
+	    set err 1
+	}
+    }
     cd $pwd
     if { $err } {
 	RamDebugger::WaitState 0
@@ -274,7 +310,7 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 		return
 	    }
 	    set revision [lindex $selecteditems 0 0]
-	    cd $cvsworkdir
+	    cd $vcsworkdir
 	    set data [exec cvs -Q update -p -r $revision $lfile]
 	    cd $pwd
 	    RamDebugger::OpenFileSaveHandler *[file tail $file].$revision* $data ""
@@ -283,7 +319,7 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	} elseif { [llength $selecteditems] < 1 || [llength $selecteditems] > 2 } {
 	    WarnWin [_ "Select one or two revisions in order to visualize the differences"] $w
 	} else {
-	    cd $cvsworkdir
+	    cd $vcsworkdir
 	    set deletefiles ""
 	    if { [llength $selecteditems] == 1 } {
 		set revision [lindex $selecteditems 0 0]
@@ -302,13 +338,13 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 		    set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
 		    set file1 [file tail $file]
 		    RamDebugger::_savefile_only $file1 $data
-		    lappend deletefiles [file join $cvsworkdir $file1]
+		    lappend deletefiles [file join $vcsworkdir $file1]
 		} else {
 		    set file1 $file
 		}
 		set file2 [file tail $file].$revision
 		exec cvs -Q update -p -r $revision $lfile > $file2
-		lappend deletefiles [file join $cvsworkdir $file2]
+		lappend deletefiles [file join $vcsworkdir $file2]
 	    } else {
 		set r1 [lindex $selecteditems 0 0]
 		set r2 [lindex $selecteditems 1 0]
@@ -316,8 +352,8 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 		exec cvs -Q update -p -r $r1 $lfile > $file1
 		set file2 [file tail $file].$r2
 		exec cvs -Q update -p -r $r2 $lfile > $file2
-		lappend deletefiles [file join $cvsworkdir $file1] \
-		    [file join $cvsworkdir $file2]
+		lappend deletefiles [file join $vcsworkdir $file1] \
+		    [file join $vcsworkdir $file2]
 	    }
 	    set ex ""
 	    set interp diff
@@ -330,10 +366,10 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
 	    interp alias $interp exit_interp "" interp delete $interp
 	    set cmd "file delete $deletefiles ; exit_interp"
 	    $interp eval [list proc exit { args } $cmd]
-	    $interp eval [list cd $cvsworkdir]
+	    $interp eval [list cd $vcsworkdir]
 	    $interp eval [list set argc 2]
-	    $interp eval [list set argv [list [file join $cvsworkdir $file1] \
-		        [file join $cvsworkdir $file2]]]
+	    $interp eval [list set argv [list [file join $vcsworkdir $file1] \
+		        [file join $vcsworkdir $file2]]]
 	    $interp eval [list source [file join $RamDebugger::topdir addons tkcvs bin tkdiff.tcl]]
 	    cd $pwd
 	}
@@ -341,15 +377,15 @@ proc RamDebugger::CVS::OpenRevisions { { file "" } } {
     }
 }
 
-proc RamDebugger::CVS::_showallfiles_update {} {
-    variable cvsrootdir
-    variable cvsworkdir
+proc RamDebugger::VCS::_showallfiles_update {} {
+    variable vcsrootdir
+    variable vcsworkdir
     variable null
 
     package require fileutil
 
     set pwd [pwd]
-    cd $cvsworkdir
+    cd $vcsworkdir
     set err [catch { exec cvs -Q log -t } retcvslog]
     cd $pwd
 
@@ -381,9 +417,9 @@ proc RamDebugger::CVS::_showallfiles_update {} {
     return [list $list $totalsize_show $retcvslog]
 }
 
-proc RamDebugger::CVS::ShowAllFiles {} {
-    variable cvsrootdir
-    variable cvsworkdir
+proc RamDebugger::VCS::ShowAllFiles {} {
+    variable vcsrootdir
+    variable vcsworkdir
     variable null
 
     RamDebugger::WaitState 1
@@ -478,7 +514,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 	    if { $isgood } {
 		RamDebugger::WaitState 1
 		set pwd [pwd]
-		cd $cvsworkdir
+		cd $vcsworkdir
 		
 		foreach i [textutil::splitx $retcvslog {=======+}] {
 		    if { [string trim $i] eq "" } { continue }
@@ -489,7 +525,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 		        set lfile [string range [file tail $rcsfile] 0 end-2]
 		        exec cvs remove $lfile 2> $null
 		        exec cvs commit -m "" $lfile
-		        file delete [file join $cvsrootdir cvswork Attic [file tail $rcsfile]]
+		        file delete [file join $vcsrootdir cvswork Attic [file tail $rcsfile]]
 		        continue
 		    }
 		    set size [file size $rcsfile]
@@ -508,10 +544,10 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 		        }
 		        exec cvs remove $lfile 2> $null
 		        exec cvs commit -m "" $lfile
-		        file delete [file join $cvsrootdir cvswork Attic [file tail $rcsfile]]
+		        file delete [file join $vcsrootdir cvswork Attic [file tail $rcsfile]]
 		        
 		        if { $action == 3 } {
-		            RamDebugger::_savefile_only [file join $cvsworkdir $lfile] $data
+		            RamDebugger::_savefile_only [file join $vcsworkdir $lfile] $data
 		            exec cvs add -ko -m $file $lfile 2> $null
 		            exec cvs commit -m "" $lfile
 		            file delete $lfile
@@ -534,7 +570,7 @@ proc RamDebugger::CVS::ShowAllFiles {} {
 #    CVS indicator
 ################################################################################
 
-proc RamDebugger::CVS::indicator_init { f } {
+proc RamDebugger::VCS::indicator_init { f } {
     variable cvs_indicator_frame
 
     if { [auto_execok cvs] eq "" && [auto_execok fossil] eq "" } { return }
@@ -548,35 +584,35 @@ proc RamDebugger::CVS::indicator_init { f } {
     
     foreach i [list 1 2 3] {
 	#bind $f.l$i <1> [list RamDebugger::OpenProgram tkcvs]
-	bind $f.l$i <1> [list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
-	bind $f.l$i <<ContextualPress>> [list RamDebugger::CVS::indicator_menu $cvs_indicator_frame %X %Y]
+	bind $f.l$i <1> [list RamDebugger::VCS::update_recursive $cvs_indicator_frame last]
+	bind $f.l$i <<ContextualPress>> [list RamDebugger::VCS::indicator_menu $cvs_indicator_frame %X %Y]
     }
     grid $f.l1 $f.l2 $f.l3 -sticky w
 }
 
-proc RamDebugger::CVS::indicator_menu { cvs_indicator_frame x y } {
+proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
     
     set currentfileL $RamDebugger::currentfile
     
     destroy $cvs_indicator_frame.menu
     set menu [menu $cvs_indicator_frame.menu -tearoff 0]
     $menu add command -label [_ "Open"] -accelerator "Ctrl+7" -command \
-	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame last]
+	[list RamDebugger::VCS::update_recursive $cvs_indicator_frame last]
     $menu add command -label [_ "Open - current directory"] -accelerator "Ctrl+Shift-7" -command \
-	[list RamDebugger::CVS::update_recursive $cvs_indicator_frame current]
+	[list RamDebugger::VCS::update_recursive $cvs_indicator_frame current]
     $menu add separator
     $menu add command -label [_ "Differences"] -command \
-	[list RamDebugger::CVS::update_recursive_cmd "" open_program tkdiff "" "" [list $RamDebugger::currentfile]]
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff "" "" [list $RamDebugger::currentfile]]
     $menu add command -label [_ "Differences (ignore blanks)"] -command \
-	[list RamDebugger::CVS::update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $RamDebugger::currentfile]]
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $RamDebugger::currentfile]]
 
     $menu add command -label [_ "Differences window"] -command \
-	[list RamDebugger::CVS::update_recursive_cmd "" diff_window "" "" [list $RamDebugger::currentfile]]
+	[list RamDebugger::VCS::update_recursive_cmd "" diff_window "" "" [list $RamDebugger::currentfile]]
 
     tk_popup $menu $x $y
 }
 
-proc RamDebugger::CVS::indicator_update {} {
+proc RamDebugger::VCS::indicator_update {} {
     variable cvs_indicator_fileid
     variable fossil_indicator_fileid
     variable cvs_indicator_data
@@ -612,7 +648,7 @@ proc RamDebugger::CVS::indicator_update {} {
     if { [auto_execok cvs] ne "" && [file isdirectory CVS] } {
 	set cvs_indicator_fileid [open "|cvs -n update" r]
 	fconfigure $cvs_indicator_fileid -blocking 0
-	fileevent $cvs_indicator_fileid readable [list RamDebugger::CVS::indicator_update_do cvs]
+	fileevent $cvs_indicator_fileid readable [list RamDebugger::VCS::indicator_update_do cvs]
     }
     set  fossil_indicator_data ""
     set fossil [auto_execok fossil]
@@ -620,12 +656,12 @@ proc RamDebugger::CVS::indicator_update {} {
 	set fossil_indicator_fileid [open "|$fossil changes" r]
 	fconfigure $fossil_indicator_fileid -blocking 0
 	fileevent $fossil_indicator_fileid readable \
-	    [list RamDebugger::CVS::indicator_update_do fossil]
+	    [list RamDebugger::VCS::indicator_update_do fossil]
     }
     cd $pwd
 }
 
-proc RamDebugger::CVS::indicator_update_do { cvs_or_fossil } {
+proc RamDebugger::VCS::indicator_update_do { cvs_or_fossil } {
     variable cvs_indicator_fileid
     variable fossil_indicator_fileid
     variable cvs_indicator_data
@@ -699,7 +735,7 @@ proc RamDebugger::CVS::indicator_update_do { cvs_or_fossil } {
 #    proc CVS update recursive
 ################################################################################
 
-proc RamDebugger::CVS::update_recursive { wp current_or_last_or_this args } {
+proc RamDebugger::VCS::update_recursive { wp current_or_last_or_this args } {
     variable try_threaded
     
     if { $current_or_last_or_this eq "this" } {
@@ -725,7 +761,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last_or_this args } {
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
 	    insert_ticket update_recursive_do1 update_recursive_accept update_recursive_cmd \
 	    waitstate parse_timeline parse_finfo open_program show_help] {
-	set full_cmd RamDebugger::CVS::$cmd
+	set full_cmd RamDebugger::VCS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
     append script "[list namespace eval RamDebugger ""]\n"
@@ -749,7 +785,7 @@ proc RamDebugger::CVS::update_recursive { wp current_or_last_or_this args } {
     }
 }
 
-proc RamDebugger::CVS::show_help {} {
+proc RamDebugger::VCS::show_help {} {
     package require helpviewer
 
     set file "01RamDebugger/RamDebugger12.html"
@@ -758,7 +794,7 @@ proc RamDebugger::CVS::show_help {} {
     HelpViewer::HelpWindow [file join $::RamDebugger::topdir help $file]
 }
 
-proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
+proc RamDebugger::VCS::update_recursive_do0 { directory current_or_last } {
 
     package require dialogwin
     package require tooltip
@@ -802,8 +838,8 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     $w set_uservar_value messages [dict_getd $dict messages ""]
     $w set_uservar_value ticket_status [dict_getd $dict ticket_status "Fixed"]
     
-    if { [info command RamDebugger::CVS::document-open-16] eq "" } {
-	image create photo RamDebugger::CVS::document-open-16 -data {
+    if { [info command RamDebugger::VCS::document-open-16] eq "" } {
+	image create photo RamDebugger::VCS::document-open-16 -data {
 	    R0lGODlhEAAQAPYAAAAAAFVXU1lbV11fW0VdeWFiX2FjX2NlYWdpZWpsaG1vaz9ghj5giTRlpENr
 	    nVNxllh2m2F6mmOVzGSWzGWXzGWYzWaYzGiYzWiZzWmZzWqazWuazWubzWqazmybzm2czm6czm6d
 	    znCdz3CeznKfz3ai0Hym0paXlZaZkpqcmKampqeppKmrqYGp1IWs1Yiu1omu1omv14qv14uw14yx
@@ -816,7 +852,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	    DTs04+TkMDnf1zozNDMyLy4tJiUkON89EDYjIiEgHx4cOmTAUOMbixgcNmjIcMFCBQoTJNx4QIDB
 	    tIvQFlDauDEQADs=
 	}
-	image create photo RamDebugger::CVS::edit-clear-16 -data {
+	image create photo RamDebugger::VCS::edit-clear-16 -data {
 	    R0lGODlhEAAQAPZvAHhIAHlJAHtKAHxLAKsbDaEkAKA2ALg4HYBOAYRSAYZSA4dkAIppAJx/AK1C
 	    E7tKKKZpCqlrCqttC7BpF7JyDLJ2C7x6D8F9EMhtM5qFAJyIAJyLAJ2MAJ6NAJ6NAZ+NAJ+NAZ+O
 	    AJ+OAZ+OBJ+PBaGIAaCOAaCPAaCPBaGQCKKQCaWUEaubGq6eG7GgHbulKb6uMsCwL8W0Msa1MMa2
@@ -829,13 +865,13 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	    hw0xbmJkYUlFQz5QWCCHGyttSEdGREI7OlQ0IYgmT1NDgvDQoSOKkxHDNrDQ0oPgDytNUAwzFKLG
 	    FSBSssjoMNFQsSVVZqT40PEdhw4cEwUCADs=
 	}
-	image create photo RamDebugger::CVS::list-add-16 -data {
+	image create photo RamDebugger::VCS::list-add-16 -data {
 	    R0lGODlhEAAQAPQAAAAAADRlpH2m13+o14Oq2Iat2ZCz2pK02pS225W325++4LTM5bXM5rbM5rbN
 	    5rfO5rvR57zR58DT6MzMzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACH5BAEA
 	    ABMALAAAAAAQABAAAAU94CSOZGmeqBisQToGz9O6EyzTdTyb7Kr3pIAEEonFHIzGrrZIIA6GAmEg
 	    UCx7gUIBi4Jtcd5lVwdm4c7nEAA7
 	}
-	image create photo RamDebugger::CVS::::semaphore_green -data {
+	image create photo RamDebugger::VCS::::semaphore_green -data {
 	    R0lGODlhNgAjAOf/AAEEAAUBBwAFCAkCAAMDEAAGEAQHAxEBARkCAAENBwgL
 	    ByACASQDAAYSBCsGARUQDDEEAwUbBhEZAxMVExYUFzcJABkXGggjDj8KAjMR
 	    AgUqBhscGgwnCysbAB4gHTcYBCUeHk0PBgwxDj4aCSMiKAwyGBsqGyQmI1YT
@@ -885,7 +921,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	    C8IKlKQkIb0w5lkO8ozk6HKcApmHEtawkHx0ZCH6FJjCO+H5j31woyJsZAi0
 	    +ElQggYEADs=   
 	}
-	image create photo RamDebugger::CVS::::semaphore_red -data {
+	image create photo RamDebugger::VCS::::semaphore_red -data {
 	    R0lGODlhNgAjAOf/AAQBBwEEAAgBAAAFCA4BCQwFAwALBAYJBQENABQDBBYF
 	    AB8FAxwHAgwOCx4GCwMWAQAZAyUHAREOEiQLACoHCCsJAAEfCjEKAwMiAjgK
 	    AgAlDhgXHBgZFwQoAz8MADYSBkwMAAstF0gSBAIzGDYcBjYaEyAjICUhIFUP
@@ -939,7 +975,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     ttk::label $f.l1 -text [_ "Directory"]:
     cu::combobox $f.e1 -textvariable [$w give_uservar dir ""] -valuesvariable \
 	[$w give_uservar directories] -width 60
-    ttk::button $f.b1 -image RamDebugger::CVS::document-open-16 \
+    ttk::button $f.b1 -image RamDebugger::VCS::document-open-16 \
 	-command [namespace code [list select_directory $w]] \
 	-style Toolbutton
     
@@ -950,17 +986,17 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
 	[$w give_uservar messages] -width 60
     bind $f.e2 <Return> "[bind Text <Return>] ; break"
     
-    label $f.sem -image RamDebugger::CVS::::semaphore_green -compound left -height 35 \
+    label $f.sem -image RamDebugger::VCS::::semaphore_green -compound left -height 35 \
 	-text " "
     $w set_uservar_value semaphore_label $f.sem
     
-    ttk::button $f.b2 -image RamDebugger::CVS::edit-clear-16 \
+    ttk::button $f.b2 -image RamDebugger::VCS::edit-clear-16 \
 	-command [namespace code [list clear_entry $w $f.e2]] \
 	-style Toolbutton
     
     tooltip::tooltip $f.b2 [_ "Clear the messages entry"]
     
-    ttk::menubutton $f.b3 -image RamDebugger::CVS::list-add-16 \
+    ttk::menubutton $f.b3 -image RamDebugger::VCS::list-add-16 \
 	-menu $f.b3.m -style Toolbutton
     menu $f.b3.m -tearoff 0 -postcommand [namespace code [list messages_menu $w $f.b3.m  $f.e2]] 
     
@@ -1021,7 +1057,7 @@ proc RamDebugger::CVS::update_recursive_do0 { directory current_or_last } {
     return $w
 }
 
-proc RamDebugger::CVS::waitstate { w on_off { txt "" } } {
+proc RamDebugger::VCS::waitstate { w on_off { txt "" } } {
     variable waitstate_stack
 
     if { ![info exists waitstate_stack] } {
@@ -1036,9 +1072,9 @@ proc RamDebugger::CVS::waitstate { w on_off { txt "" } } {
 	}
     }
     if { [llength $waitstate_stack] } {
-	set img RamDebugger::CVS::::semaphore_red
+	set img RamDebugger::VCS::::semaphore_red
     } else {
-	set img RamDebugger::CVS::::semaphore_green
+	set img RamDebugger::VCS::::semaphore_green
     }
     set txt [lindex $waitstate_stack end]
     if { $txt eq "" } { set txt " " }
@@ -1054,10 +1090,10 @@ proc RamDebugger::CVS::waitstate { w on_off { txt "" } } {
     update
 }
 
-proc RamDebugger::CVS::messages_menu { w menu entry } {
+proc RamDebugger::VCS::messages_menu { w menu entry } {
     
     $menu delete 0 end
-    $menu add command -label [_ "Clear message"] -image RamDebugger::CVS::edit-clear-16 \
+    $menu add command -label [_ "Clear message"] -image RamDebugger::VCS::edit-clear-16 \
 	-compound left -command [namespace code [list clear_entry $w $entry]] 
 
     set tree [$w give_uservar_value tree]
@@ -1195,26 +1231,26 @@ proc RamDebugger::CVS::messages_menu { w menu entry } {
     cd $pwd
 }
 
-proc RamDebugger::CVS::select_directory { w } {
+proc RamDebugger::VCS::select_directory { w } {
     set dir [tk_chooseDirectory -initialdir [$w give_uservar_value dir] \
 	    -mustexist 1 -parent $w -title [_ "Select origin directory"]]
     if { $dir eq "" } { return }
     $w set_uservar_value dir $dir
 }
 
-proc RamDebugger::CVS::clear_entry { w entry } {
+proc RamDebugger::VCS::clear_entry { w entry } {
     update
     $entry delete 1.0 end
     tk::TabToWindow $entry
 }
 
-proc RamDebugger::CVS::insert_in_entry { w entry txt } {
+proc RamDebugger::VCS::insert_in_entry { w entry txt } {
     update
     tk::TextInsert $entry $txt
     tk::TabToWindow $entry
 }
 
-proc RamDebugger::CVS::insert_ticket { w entry ticket txt } {
+proc RamDebugger::VCS::insert_ticket { w entry ticket txt } {
     
     set tickets [string trim [$w give_uservar_value tickets]]
     if { $tickets ne "" } {
@@ -1225,7 +1261,7 @@ proc RamDebugger::CVS::insert_ticket { w entry ticket txt } {
     insert_in_entry $w $entry $txt
 }
 
-proc RamDebugger::CVS::update_recursive_do1 { w } {
+proc RamDebugger::VCS::update_recursive_do1 { w } {
 
     set action [$w giveaction]
 
@@ -1247,7 +1283,7 @@ proc RamDebugger::CVS::update_recursive_do1 { w } {
     update_recursive_accept $w $what $dir $tree 0
 }
 
-proc RamDebugger::CVS::parse_timeline { timeline } {
+proc RamDebugger::VCS::parse_timeline { timeline } {
     
     lassign "" list date time checkin comment
     foreach line [split $timeline \n] {
@@ -1276,7 +1312,7 @@ proc RamDebugger::CVS::parse_timeline { timeline } {
     return $list
 }
 
-proc RamDebugger::CVS::parse_finfo { finfo } {
+proc RamDebugger::VCS::parse_finfo { finfo } {
     
     lassign "" list line
     foreach l [split $finfo \n] {
@@ -1297,7 +1333,7 @@ proc RamDebugger::CVS::parse_finfo { finfo } {
     return $list
 }
 
-proc RamDebugger::CVS::update_recursive_accept { args } {
+proc RamDebugger::VCS::update_recursive_accept { args } {
     variable fossil_version
     
     set optional {
@@ -1516,7 +1552,7 @@ proc RamDebugger::CVS::update_recursive_accept { args } {
     waitstate $w off
 }
 
-proc RamDebugger::CVS::update_recursive_cmd { w what args } {
+proc RamDebugger::VCS::update_recursive_cmd { w what args } {
     variable fossil_version
     
     set fossil [auto_execok fossil]
@@ -2466,7 +2502,7 @@ proc RamDebugger::CVS::update_recursive_cmd { w what args } {
     }
 }
 
-proc RamDebugger::CVS::open_program { args } {
+proc RamDebugger::VCS::open_program { args } {
     variable openprogram_uniqueid
     
     upvar #0 ::RamDebugger::topdir topdir
@@ -2553,11 +2589,11 @@ if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] &&
 	set RamDebugger::AppDataDir [file join $::env(HOME) .RamDebugger]
     }
     
-    set RamDebugger::CVS::try_threaded debug
+    set RamDebugger::VCS::try_threaded debug
     if { [lindex $argv 0] ne "" } {
-	set w [RamDebugger::CVS::update_recursive "" this [lindex $argv 0]]
+	set w [RamDebugger::VCS::update_recursive "" this [lindex $argv 0]]
     } else {
-	set w [RamDebugger::CVS::update_recursive "" last]
+	set w [RamDebugger::VCS::update_recursive "" last]
     }
 
     bind $w <Destroy> {

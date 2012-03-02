@@ -127,11 +127,11 @@ set createdistribution::doencrypt 0
 set createdistribution::libdir ""
 
 if { $::tcl_platform(platform) eq "windows" } {
-    set exeList [list cat.exe cvs.exe diff.exe grep.exe kill.exe tlist.exe]
+    set exeList [list cat.exe fossil.exe diff.exe grep.exe kill.exe tlist.exe]
 } elseif { $::tcl_platform(os) eq "Darwin" } {
-    set exeList [list cvs]
+    set exeList [list fossil]
 } else {
-    set exeList ""
+    set exeList [list fossil]
 }
 foreach i $exeList {
     if { ![file exists [file join .. addons exe $i]] } {

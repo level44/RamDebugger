@@ -435,7 +435,7 @@ proc RamDebugger::UpdateExecDirs {} {
     variable topdir_external
 
     if { $::tcl_platform(platform) == "windows" } {
-	set file [filenormalize [file join $topdir_external addons]]
+	set file [filenormalize [file join $topdir_external addons exe]]
 	if { [file isdirectory $file] && [lsearch -exact $options(executable_dirs) $file] == -1 } {
 	    lappend options(executable_dirs) $file
 	}
@@ -4077,7 +4077,7 @@ proc RamDebugger::OpenFileF { args } {
 	}
     }
     ManagePositionsImages
-    RamDebugger::CVS::indicator_update
+    RamDebugger::VCS::indicator_update
     WaitState 0
     if { [focus -lastfor $text] eq $text || \
 	     [focus -lastfor $text] eq [winfo toplevel $text] } {
@@ -4594,7 +4594,7 @@ proc RamDebugger::SaveFileF { args } {
 	}
     }
     ManagePositionsImages
-    RamDebugger::CVS::indicator_update
+    RamDebugger::VCS::indicator_update
     WaitState 0
     SetMessage [_ "Saved file '%s'" $file]
 }
@@ -5656,7 +5656,7 @@ proc RamDebugger::TextMotion { X Y x y } {
     variable IsInStop
     variable TextMotionAfterId
 
-    RamDebugger::CVS::SetUserActivity
+    RamDebugger::VCS::SetUserActivity
 
     set err [catch { lindex [after info $TextMotionAfterId] 0 } cmd]
     if { !$err && $cmd ne "" }  {
@@ -7544,7 +7544,7 @@ proc RamDebugger::UpdateLineNum { command args } {
     variable text
     variable currentfileIsModified
 
-    RamDebugger::CVS::SetUserActivity
+    RamDebugger::VCS::SetUserActivity
 
     if { [regexp {index|bbox|get} $command] } { return }
     if { [regexp {^(ins|del)} $command] } { CheckText $command $args }
@@ -8463,13 +8463,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		separator \
 		[list cascad &[_ "Revisions"] {} revisions 0 [list \
 		[list command &[_ "Save revision"] {} [_ "Saves a revision of the file"] "ShiftCtrl s" \
-		        -command "RamDebugger::CVS::SaveRevision"] \
+		        -command "RamDebugger::VCS::SaveRevision"] \
 		[list command &[_ "Open revisions list"] {} [_ "Open revisions list for current file"] "" \
-		        -command "RamDebugger::CVS::OpenRevisions"] \
+		        -command "RamDebugger::VCS::OpenRevisions"] \
 		separator \
 		[list command &[_ "View revised files"] {} \
 		     [_ "View all files under revision control"] "" \
-		     -command "RamDebugger::CVS::ShowAllFiles"] \
+		     -command "RamDebugger::VCS::ShowAllFiles"] \
 		                                             ]] \
 		[list cascad &[_ "Recent files"] {} recentfiles 0 {}] \
 		separator \
@@ -8648,7 +8648,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		    -command "RamDebugger::OpenProgram tkcvs"] \
 		    [list command [_ "Version control system"]... {} \
 		    [_ "Open Version control system window with cvs or fossil"] "Ctrl 7" \
-		   -command "RamDebugger::CVS::update_recursive . last"] \
+		   -command "RamDebugger::VCS::update_recursive . last"] \
 		separator \
 	       [list cascad [_ "File type"] {} filetype 0 [list \
 		    [list radiobutton [_ "Automatic"] filetype [_ "Selection is made based on extension"] "" \
@@ -8780,7 +8780,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     
     set cvs_indicator_frame [$mainframe addindicator -width 10 \
 	    -anchor e -padx 3]
-    RamDebugger::CVS::indicator_init $cvs_indicator_frame
+    RamDebugger::VCS::indicator_init $cvs_indicator_frame
     
     set label [$mainframe addindicator -textvariable RamDebugger::debuggerstate -width 6 \
 	    -anchor e -padx 3]
@@ -9362,7 +9362,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <FocusIn> [list RamDebugger::SearchWindow -auto_close 1]
     bind $text <$::control-I> [list RamDebugger::Search $w iforward_get_insert]
     bind $text <Escape><i> "[list RamDebugger::Search $w iforward_get_insert] ;break"
-    bind $w <$::control-slash> [list RamDebugger::CVS::update_recursive . current] ;# control-shift-7
+    bind $w <$::control-slash> [list RamDebugger::VCS::update_recursive . current] ;# control-shift-7
 
     set menu [$mainframe getmenu edit]
     $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift+I"
@@ -9580,7 +9580,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	}
     }
     if { !$iswince } {
-	RamDebugger::CVS::ManageAutoSave
+	RamDebugger::VCS::ManageAutoSave
     }
     update idletasks
 
