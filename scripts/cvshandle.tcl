@@ -21,7 +21,7 @@ proc RamDebugger::VCS::Init {} {
     variable cvs_or_fossil
     
     set vcsrootdir [file join $RamDebugger::AppDataDir vcsroot]
-    set vcsworkdir  [file join $RamDebugger::AppDataDir vcswork]
+    set vcsworkdir [file join $RamDebugger::AppDataDir vcswork]
 
     if { $cvs_or_fossil eq "cvs" } {
 	if { [auto_execok cvs] eq "" } {
@@ -59,11 +59,6 @@ proc RamDebugger::VCS::Init {} {
 	}
 	if { ![file exists $vcsrootdir] } {
 	    file mkdir $vcsrootdir
-	    exec $fossil new [file join $vcsrootdir rev.fossil]
-	    set pwd [pwd]
-	    cd $vcsworkdir
-	    exec $fossil open [file join $vcsrootdir rev.fossil]
-	    cd $pwd
 	}
     }
 }
@@ -123,9 +118,10 @@ proc RamDebugger::VCS::_ManageAutoSaveDo {} {
 	set lasttimeautosave ""
 	ManageAutoSave
     } else {
-	set err [catch {SaveRevision 1} errstring]
+	set err [catch {SaveRevision -raise_error 1 } errstring opts]
 	if { $err } {
 	    if { ![info exists autosave_warning] } {
+		set errstring [dict get $opts -errorinfo]
 		WarnWin "Failed auto saving revisions. Feature disconnected for this session. Reason: $errstring"
 		set autosave_warning 1
 	    }
@@ -137,85 +133,53 @@ proc RamDebugger::VCS::_ManageAutoSaveDo {} {
     indicator_update
 }
 
-proc RamDebugger::VCS::SaveRevision { { raiseerror 0 } } {
+proc RamDebugger::VCS::SaveRevision { args } {
     variable vcsworkdir
     variable null
     variable cvs_or_fossil
     
-    package require sha1
-
-    RamDebugger::WaitState 1
-
-    set map [list > "" < ""]
-    set file [string map $map $RamDebugger::currentfile]
+    set optional {
+	{ -raise_error boolean 0 }
+    }
+    set compulsory ""
+   parse_args $optional $compulsory $args
     
-    if { [regexp {^\*.*\*$} $file] } {
-	set file [string trim $file *]
-	set lfile $file.[sha1::sha1 $file]
-    } else {
-	set file [file normalize $file]
-	set lfile [file tail $file].[sha1::sha1 $file]
-    }
+    RamDebugger::WaitState 1
+    
+    set file $RamDebugger::currentfile
     RamDebugger::SetMessage "Saving revision for file '$file'..."
-
-    set err [catch { Init } errstring]
-    if { $err } {
-	RamDebugger::WaitState 0
-	RamDebugger::SetMessage ""
-	if { $raiseerror } { error $errstring }
-	WarnWin $errstring
-	return
-    }
-
-    set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
-    set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
-    RamDebugger::_savefile_only [file join $vcsworkdir $lfile] $data
-
     set pwd [pwd]
-    cd $vcsworkdir
-    if { $cvs_or_fossil eq "cvs" } {
-	set err [catch { exec cvs log -R $lfile }]
-	if { $err } {
-	    set err [catch { exec cvs add -ko -m $file $lfile 2> $null } errstring]
-	    if { $err } {
-		RamDebugger::WaitState 0
-		RamDebugger::SetMessage ""
-		if { $raiseerror } { error $errstring }
-		WarnWin $errstring
-		return
-	    }
-	}
-	exec cvs commit -m "" $lfile
-    } else {
-	set fossil [auto_execok fossil]
-	set err [catch { exec $fossil finfo -s $lfile } ret]
-	if { !$err && [regexp {^unknown} $ret] } {
-	    set err [catch { exec $fossil add $lfile } ret]
-	}
-	if { $err } {
-	    RamDebugger::WaitState 0
-	    RamDebugger::SetMessage ""
-	    if { $raiseerror } { error $ret }
-	    WarnWin $ret
-	    return
-	}
-	exec $fossil commit -m "" $lfile
-    }
-    file delete $lfile
-    cd $pwd
-    RamDebugger::WaitState 0
-    RamDebugger::SetMessage "Saved revision for file '$file'"
-}
 
-proc RamDebugger::VCS::OpenRevisions { { file "" } } {
+    set err [catch { SaveRevisionDo $file } ret opts]
+    
+    cd $pwd
+    RamDebugger::SetMessage ""
+    RamDebugger::WaitState 0
+    
+    if { $err } {
+	if { $raise_error } {
+	    error $ret [dict get $opts -errorinfo]
+	} else {
+	    WarnWin $ret
+	}
+    } else {
+	RamDebugger::SetMessage "Saved revision for file '$file'"
+    }
+}
+    
+proc RamDebugger::VCS::SaveRevisionDo { args } {
     variable vcsworkdir
+    variable null
     variable cvs_or_fossil
 
+    set optional {
+	{ -data data "" }
+    }
+    set compulsory "file"
+   parse_args $optional $compulsory $args
+
     package require sha1
 
-    RamDebugger::WaitState 1
-    
-    if { $file eq "" } { set file $RamDebugger::currentfile }
     set map [list > "" < ""]
     set file [string map $map $file]
     
@@ -226,31 +190,116 @@ proc RamDebugger::VCS::OpenRevisions { { file "" } } {
 	set file [file normalize $file]
 	set lfile [file tail $file].[sha1::sha1 $file]
     }
-    set err [catch { Init } errstring]
-    if { $err } {
-	RamDebugger::WaitState 0
-	WarnWin $errstring
-	return
-    }
 
+    Init
+
+    cd $vcsworkdir
+
+    if { $data eq "" } {
+	set map [list "\n[string repeat { } 16]" "\n\t\t" "\n[string repeat { } 8]" "\n\t"]
+	set data [string map $map [$RamDebugger::text get 1.0 end-1c]]
+    }
+    RamDebugger::_savefile_only [file join $vcsworkdir $lfile] $data
+
+    if { $cvs_or_fossil eq "cvs" } {
+	set err [catch { exec cvs log -R $lfile }]
+	if { $err } {
+	    exec cvs add -ko -m $file $lfile 2> $null
+	}
+	exec cvs commit -m "" $lfile
+    } else {
+	set fossil [auto_execok fossil]
+	if { ![file exists [file join $vcsrootdir $lfile.fossil]] } {
+	    exec $fossil new $vcsrootdir $lfile.fossil
+	}
+	if { [file exists _FOSSIL_] } {
+	    foreach f [glob -directory $vcsworkdir *] {
+		file delete $f
+	    }
+	}
+	exec $fossil open [file join $vcsrootdir $lfile.fossil]
+	set err [catch { exec $fossil finfo $lfile } ret]
+	if { $err } {
+	    exec $fossil add $lfile
+	    exec $fossil commit -m $file --tag first $lfile
+	} else {
+	    set d [exec $fossil diff -i $lfile]
+	    lassign [list 0 0] plus less
+	    foreach line [split $d \n] {
+		if  { [regexp {^\+\M} $line] } {
+		        incr plus
+		} elseif  { [regexp {^\-\M} $line] } {
+		        incr less
+		}
+	    }
+	    exec $fossil commit -m "+$plus -$less" $lfile
+	}
+    }
+    file delete $lfile _FOSSIL_
+}
+
+proc RamDebugger::VCS::OpenRevisions { args } {
+    variable vcsworkdir
+
+    set optional {
+	{ -file file "" }
+    }
+    set compulsory ""
+   parse_args $optional $compulsory $args
+
+    RamDebugger::WaitState 1
+    
+    if { $file eq "" } { set file $RamDebugger::currentfile }
     set pwd [pwd]
     cd $vcsworkdir
+
+    set err [catch { OpenRevisionsInit $file } ret opts]
+    
+    cd $pwd
+    RamDebugger::WaitState 0
+    
+    if { $err } {
+	WarnWin $ret
+	return
+    }
+    OpenRevisionsDo $ret
+}
+
+proc RamDebugger::VCS::OpenRevisionsInit { file } {
+    variable vcsworkdir
+    variable cvs_or_fossil
+
+    package require sha1
+    
+    set map [list > "" < ""]
+    set file [string map $map $file]
+    
+    if { [regexp {^\*.*\*$} $file] } {
+	set file [string trim $file *]
+	set lfile $file.[sha1::sha1 $file]
+    } else {
+	set file [file normalize $file]
+	set lfile [file tail $file].[sha1::sha1 $file]
+    }
+
+     Init
+
     if { $cvs_or_fossil eq "cvs" } {
 	set err [catch { exec cvs log $lfile } retval]
     } else {
 	set fossil [auto_execok fossil]
-	set err [catch { exec $fossil finfo -s $lfile } ret]
-	if { !$err && [regexp {^unknown} $ret] } {
-	    set err 1
-	}
+	set err [catch { exec $fossil finfo -l -b $lfile } retval]
     }
-    cd $pwd
     if { $err } {
-	RamDebugger::WaitState 0
-	WarnWin [_ "File '%s' has no revisions" $file]
-	return
+	error [_ "File '%s' has no revisions" $file]
+    } else {
+	return $retval
     }
-    RamDebugger::WaitState 0
+}
+
+proc RamDebugger::VCS::OpenRevisionsDo { finfo } {
+    variable vcsworkdir
+    variable cvs_or_fossil
 
     set w $RamDebugger::text._openrev
     dialogwin_snit $w -title [_ "Choose revision"] -class RamDebugger -entrytext \
@@ -258,13 +307,20 @@ proc RamDebugger::VCS::OpenRevisions { { file "" } } {
     set f [$w giveframe]
 
     set list ""
-    foreach i [lrange [textutil::splitx $retval {--------+}] 1 end] {
-	regexp -line {^revision\s+(\S+)} $i {} revision
-	regexp -line {date:\s+([^;]+)} $i {} date
-	regexp -line {author:\s+([^;]+)} $i {} author
-	set lines ""
-	regexp -line {lines:\s+([^;]+)} $i {} lines
-	lappend list [list $revision $date $author $lines]
+    if { $cvs_or_fossil eq "cvs" } {
+	foreach i [lrange [textutil::splitx $finfo {--------+}] 1 end] {
+	    regexp -line {^revision\s+(\S+)} $i {} revision
+	    regexp -line {date:\s+([^;]+)} $i {} date
+	    regexp -line {author:\s+([^;]+)} $i {} author
+	    set lines ""
+	    regexp -line {lines:\s+([^;]+)} $i {} lines
+	    lappend list [list $revision $date $author $lines]
+	}
+    } else {
+	foreach line [split $finfo \n] {
+	    regexp {(\S+)\s+(\S+)\s+(\S+)\s+(.*)} $line revision date author comment
+	    lappend list [list $revision $date $author $comment]            
+	}
     }
     set columns [list \
 	    [list  6 [_ "Rev"] left text 0] \
@@ -311,7 +367,11 @@ proc RamDebugger::VCS::OpenRevisions { { file "" } } {
 	    }
 	    set revision [lindex $selecteditems 0 0]
 	    cd $vcsworkdir
-	    set data [exec cvs -Q update -p -r $revision $lfile]
+	    if { $cvs_or_fossil eq "cvs" } {
+		set data [exec cvs -Q update -p -r $revision $lfile]
+	    } else {
+		set data [exec $fossil finfo -p -r $revision $lfile]
+	    }
 	    cd $pwd
 	    RamDebugger::OpenFileSaveHandler *[file tail $file].$revision* $data ""
 	    destroy $w
@@ -343,15 +403,24 @@ proc RamDebugger::VCS::OpenRevisions { { file "" } } {
 		    set file1 $file
 		}
 		set file2 [file tail $file].$revision
-		exec cvs -Q update -p -r $revision $lfile > $file2
+		if { $cvs_or_fossil eq "cvs" } {
+		    exec cvs -Q update -p -r $revision $lfile > $file2
+		} else {
+		    exec $fossil finfo -p -r $revision $lfile > $file2
+		}
 		lappend deletefiles [file join $vcsworkdir $file2]
 	    } else {
 		set r1 [lindex $selecteditems 0 0]
 		set r2 [lindex $selecteditems 1 0]
 		set file1 [file tail $file].$r1
-		exec cvs -Q update -p -r $r1 $lfile > $file1
 		set file2 [file tail $file].$r2
-		exec cvs -Q update -p -r $r2 $lfile > $file2
+		if { $cvs_or_fossil eq "cvs" } {
+		    exec cvs -Q update -p -r $r1 $lfile > $file1
+		    exec cvs -Q update -p -r $r2 $lfile > $file2
+		} else {
+		    exec $fossil finfo -p -r $r1 $lfile > $file1
+		    exec $fossil finfo -p -r $r2 $lfile > $file2
+		}
 		lappend deletefiles [file join $vcsworkdir $file1] \
 		    [file join $vcsworkdir $file2]
 	    }
@@ -378,6 +447,49 @@ proc RamDebugger::VCS::OpenRevisions { { file "" } } {
 }
 
 proc RamDebugger::VCS::_showallfiles_update {} {
+    variable cvs_or_fossil
+    
+    if { $cvs_or_fossil eq "cvs" } {
+	return [_showallfiles_update_cvs]
+    } else {
+	return [_showallfiles_update_fossil]
+    }
+}
+
+proc RamDebugger::VCS::_showallfiles_update_fossil {} {
+    variable vcsrootdir
+    variable vcsworkdir
+
+    set list ""
+    set totalsize 0
+    
+    set fossil [auto_execok fossil]
+
+    foreach fossil_file [glob -directory $vcsrootdir "*.fossil"] {
+	set size [file size $fossil_file]
+	set ret [exec $fossil info first -R $fossil_file]
+	regexp -line {^comment:\s+(.*)} $ret file
+	set file [string trim $file]
+	incr totalsize $size
+	set size_show [format "%.3g KB" [expr {$size/1024.0}]]
+	if { [file exists $file] } {
+	    set current_size [file size $file]
+	    set current_size_show [format "%.3g KB" [expr {$current_size/1024.0}]]
+	} else {
+	    set current_size_show ""
+	}
+	set dirname [file dirname $file]
+	if { $dirname eq "." } { set dirname "" }
+	lappend list [list [file tail $file] $dirname $size_show $current_size_show $fossil_file]
+    }
+    set totalsize_show [format "%.3g MB" [expr {$totalsize/1024.0/1024.0}]]
+    if { $totalsize_show < 1 } {
+	set totalsize_show [format "%.3g KB" [expr {$totalsize/1024.0}]]
+    }
+    return [list $list $totalsize_show]
+}
+
+proc RamDebugger::VCS::_showallfiles_update_cvs {} {
     variable vcsrootdir
     variable vcsworkdir
     variable null
@@ -407,20 +519,20 @@ proc RamDebugger::VCS::_showallfiles_update {} {
 	} else { set current_size_show "" }
 	set dirname [file dirname $file]
 	if { $dirname eq "." } { set dirname "" }
-	lappend list [list [file tail $file] $dirname $size_show $current_size_show]
+	lappend list [list [file tail $file] $dirname $size_show $current_size_show $rcsfile]
     }
-
     set totalsize_show [format "%.3g MB" [expr {$totalsize/1024.0/1024.0}]]
     if { $totalsize_show < 1 } {
 	set totalsize_show [format "%.3g KB" [expr {$totalsize/1024.0}]]
     }
-    return [list $list $totalsize_show $retcvslog]
+    return [list $list $totalsize_show]
 }
 
 proc RamDebugger::VCS::ShowAllFiles {} {
     variable vcsrootdir
     variable vcsworkdir
     variable null
+    variable cvs_or_fossil
 
     RamDebugger::WaitState 1
     set err [catch { Init } errstring]
@@ -434,10 +546,10 @@ proc RamDebugger::VCS::ShowAllFiles {} {
     destroy $w
     dialogwin_snit $w -title [_ "Choose revision file"] -class RamDebugger -entrytext \
 	[_ "Choose a revision file to check its revisions or to remove revisions history"] \
-	-morebuttons [list [_ "Remove..."] [_ "Purge..."]] -okname [_ "Revisions"]
+	-morebuttons [list [_ "Purge..."]] -okname [_ "Revisions"]
     set f [$w giveframe]
 
-    lassign [_showallfiles_update] list totalsize_show retcvslog
+    lassign [_showallfiles_update] list totalsize_show
 
     ttk::label $f.lsize -text [_ "Total size of revision storage: %s" $totalsize_show]
     
@@ -455,7 +567,7 @@ proc RamDebugger::VCS::ShowAllFiles {} {
 
     set num 0
     foreach i $list {
-	$f.lf insert end $i
+	$f.lf insert end [lrange $i 0 3]
 	incr num
     }
     if { $num } {
@@ -485,7 +597,7 @@ proc RamDebugger::VCS::ShowAllFiles {} {
 		WarnWin [_ "Select one file in order to visualize its revisions"]
 	    } else {
 		destroy $w
-		OpenRevisions [file join [lindex $selecteditems 0 1] \
+		OpenRevisions -file [file join [lindex $selecteditems 0 1] \
 		        [lindex $selecteditems 0 0]]
 		return
 	    }
@@ -500,13 +612,9 @@ proc RamDebugger::VCS::ShowAllFiles {} {
 		set isgood 0
 	    } else {
 		set len [llength $selecteditems]
-		if { $action == 2 } {
-		    set title [_ "Remove revisions"]
-		    set txt [_ "Are you user to remove revision history for the %s selected files?" $len]
-		} else {
-		    set title [_ "Purge revisions"]
-		    set txt [_ "Are you user to purge revision history for the %s selected files?" $len]
-		}
+		set title [_ "Purge revisions"]
+		set txt [_ "Are you user to purge revision history for the %s selected files?" $len]
+
 		set ret [snit_messageBox -icon question -title $title -type okcancel \
 		        -default ok -parent $w -message $txt]
 		if { $ret ne "ok" } { set isgood 0 }
@@ -516,49 +624,35 @@ proc RamDebugger::VCS::ShowAllFiles {} {
 		set pwd [pwd]
 		cd $vcsworkdir
 		
-		foreach i [textutil::splitx $retcvslog {=======+}] {
-		    if { [string trim $i] eq "" } { continue }
-		    regexp -line {^RCS file:\s+(.*)} $i {} rcsfile
-		    regexp -line {^description:\s+(.*)} $i {} file
-		    set file [string trim $file]
-		    if { $file eq "" } {
-		        set lfile [string range [file tail $rcsfile] 0 end-2]
-		        exec cvs remove $lfile 2> $null
-		        exec cvs commit -m "" $lfile
-		        file delete [file join $vcsrootdir cvswork Attic [file tail $rcsfile]]
-		        continue
-		    }
+		foreach i $list {
+		    lassign $i file - - - rcsfile
 		    set size [file size $rcsfile]
 		    set size_show [format "%.3g KB" [expr {$size/1024.0}]]
 		    if { [file exists $file] } {
 		        set current_size [file size $file]
 		        set current_size_show [format "%.3g KB" [expr {$current_size/1024.0}]]
-		    } else { set current_size_show "" }
+		    } else {
+		        set current_size_show ""
+		    }
 		    set dirname [file dirname $file]
 		    if { $dirname eq "." } { set dirname "" }
 		    set key [list [file tail $file] $dirname $size_show $current_size_show]
 		    if { [lsearch -exact $selecteditems $key] != -1 } {
-		        set lfile [string range [file tail $rcsfile] 0 end-2]
-		        if { $action == 3 } {
-		            set data [exec cvs -Q update -p $lfile]
-		        }
-		        exec cvs remove $lfile 2> $null
-		        exec cvs commit -m "" $lfile
-		        file delete [file join $vcsrootdir cvswork Attic [file tail $rcsfile]]
-		        
-		        if { $action == 3 } {
-		            RamDebugger::_savefile_only [file join $vcsworkdir $lfile] $data
-		            exec cvs add -ko -m $file $lfile 2> $null
+		        if { $cvs_or_fossil eq "cvs" } {                  
+		            set lfile [string range [file tail $rcsfile] 0 end-2]
+		            exec cvs remove $lfile 2> $null
 		            exec cvs commit -m "" $lfile
-		            file delete $lfile
+		            file delete [file join $vcsrootdir cvswork Attic [file tail $rcsfile]]
+		        } else {
+		            file delete $rcsfile
 		        }
 		    }
 		}
 		cd $pwd
-		lassign [_showallfiles_update] list totalsize_show retcvslog
+		lassign [_showallfiles_update] list totalsize_show
 		$f.lsize configure -text [_ "Total size of revision storage: %s" $totalsize_show]
 		$sw.lb delete 0 end
-		$sw.lb insertlist end $list
+		$sw.lb insertlist end [lrange $list 0 3]
 		RamDebugger::WaitState 0
 	    }
 	}

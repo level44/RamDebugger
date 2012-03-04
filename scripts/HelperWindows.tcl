@@ -1253,7 +1253,7 @@ proc RamDebugger::PreferencesWindow {} {
 		    }
 		    set options(executable_dirs) [$w give_uservar_value executable_dirs]
 		    UpdateExecDirs
-		    RamDebugger::CVS::ManageAutoSave
+		    RamDebugger::VCS::ManageAutoSave
 		    if { $options(CompileFastInstrumenter) == 1 } {
 		        Instrumenter::TryCompileFastInstrumenter 1
 		    }
@@ -1314,7 +1314,7 @@ proc RamDebugger::PreferencesWindow {} {
 		foreach i [array names options_def extensions,*] {
 		    set options($i) $options_def($i)
 		}
-		RamDebugger::CVS::ManageAutoSave
+		RamDebugger::VCS::ManageAutoSave
 	    }
 	}
 	set action [$w waitforwindow]

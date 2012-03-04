@@ -9334,6 +9334,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-Key-6> "RamDebugger::CommentSelection toggle"
     bind $text <$::control-Key-9> "[list tk::TextInsert $text {()}];$c"
     bind $text <$::control-plus> "[list tk::TextInsert $text {[]}];$c"
+    bind $text <$::control-bracketright> "[list tk::TextInsert $text {[]}];$c"
     bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
