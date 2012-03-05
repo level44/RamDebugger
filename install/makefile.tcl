@@ -128,6 +128,7 @@ set createdistribution::libdir ""
 
 if { $::tcl_platform(platform) eq "windows" } {
     set exeList [list cat.exe fossil.exe diff.exe grep.exe kill.exe tlist.exe]
+    error "check programs not used anymore, like cvs.exe"
 } elseif { $::tcl_platform(os) eq "Darwin" } {
     set exeList [list fossil]
 } else {

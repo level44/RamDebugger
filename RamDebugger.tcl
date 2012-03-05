@@ -4493,6 +4493,8 @@ proc RamDebugger::SaveFileF { args } {
 
     WaitState 1
     SetMessage [_ "Saving file '%s'" $file]...
+    
+    RamDebugger::VCS::ManageAutoSaveDo
 
     set filetype [GiveFileType $currentfile]
     
