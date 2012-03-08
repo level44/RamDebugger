@@ -1516,12 +1516,18 @@ proc RamDebugger::VCS::parse_timeline { timeline } {
 
 proc RamDebugger::VCS::parse_finfo { finfo } {
     
+    set fossil [auto_execok fossil]
+    
     lassign "" list line
     foreach l [split $finfo \n] {
 	if { [regexp {^\d} $l] } {
 	    if { $line ne "" } {
-		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
-		lappend list [list $date $checkin $comment $user $artifact]
+		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin \
+		    comment user artifact
+		set ret [parse_timeline [exec $fossil timeline $checkin -n 1]]
+		lassign [lindex $ret 0] date time - - - tags
+		set date [clock format [clock scan "$date $time" -timezone :UTC] -format "%Y-%m-%d %H:%M:%S"]
+		lappend list [list $date $checkin $comment $user $artifact $tags]
 	    }
 	    set line $l
 	} elseif { [regexp {^\s} $l] } {
@@ -1530,7 +1536,10 @@ proc RamDebugger::VCS::parse_finfo { finfo } {
     }
     if { $line ne "" } {
 	regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
-	lappend list [list $date $checkin $comment $user $artifact]
+	set ret [parse_timeline [exec $fossil timeline $checkin -n 1]] 
+	lassign [lindex $ret 0] date time - - - tags
+	set date [clock format [clock scan "$date $time" -timezone :UTC] -format "%Y-%m-%d %H:%M:%S"]
+	lappend list [list $date $checkin $comment $user $artifact $tags]
     }
     return $list
 }
@@ -1670,14 +1679,13 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	    set i [$tree insert end [list "$line"] $item]
 	    
 	    if { ![regexp {^(\w+)\s+(.*)} $line {} mode file] || $mode eq "UNCHANGED" } {
+		if { [regexp {^(\w+)\s+(.*)} [$tree item text $i 0] {} mode file] && $mode eq "UNCHANGED" } {
+		    $tree item element configure $i 0 e_text_sel -fill grey
+		} elseif { [regexp {^\s*\?} [$tree item text $i 0]] } {
+		    $tree item element configure $i 0 e_text_sel -fill brown
+		}
 		if { !$view_unchanged } {
 		    $tree item configure $i -visible 0
-		} else {
-		    if { [regexp {^(\w+)\s+(.*)} [$tree item text $i 0] {} mode file] && $mode eq "UNCHANGED" } {
-		        $tree item element configure $i 0 e_text_sel -fill grey
-		    } elseif { [regexp {^\s*\?} [$tree item text $i 0]] } {
-		        $tree item element configure $i 0 e_text_sel -fill brown
-		    }
 		}
 	    }
 	    update
@@ -1751,6 +1759,15 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	    $tree item configure $item -visible 0
 	}
     }
+    if { ![$w exists_uservar view_unchanged] } {
+	$w set_uservar_value view_unchanged 0
+    }
+    set view_unchanged [$w give_uservar_value view_unchanged]
+    if { !$view_unchanged && $item == 0 && [llength [$tree item children $item]] } {
+	set itemVU [$tree insert end [list [_ "View unchanged"]] $item]
+	$tree item_window_configure_button -text [_ "View unchanged"] -command \
+	    [list "update_recursive_cmd" $w toggle_view_unchanged $tree] $itemVU
+    }
     waitstate $w off
 }
 
@@ -1760,6 +1777,15 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
     set fossil [auto_execok fossil]
     
     switch $what {
+	toggle_view_unchanged {
+	    lassign $args tree
+	    if { [$w give_uservar_value view_unchanged] } {
+		$w set_uservar_value view_unchanged 0
+	    } else {
+		$w set_uservar_value view_unchanged 1
+	    }
+	    update_recursive_cmd $w view $tree 0
+	}
 	contextual {
 	    lassign $args tree menu id sel_ids
 	    lassign "0 0 0 0 0 0 0" has_cvs has_fossil cvs_active fossil_active can_be_added \
@@ -2397,7 +2423,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                }
 		                set found 0
 		                foreach i $finfo_list {
-		                    lassign $i date_in checkin_in comment_in user_in artifact
+		                    lassign $i date_in checkin_in comment_in user_in artifact tags
 		                    set len [string length $checkin_in]
 		                    if { [string equal -length $len $checkin $checkin_in] } {
 		                        set found 1
@@ -2617,11 +2643,12 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    set f [$wD giveframe]
 	    
 	    set columns [list \
-		    [list  12 [_ "Date"] left text 0] \
+		    [list  20 [_ "Date"] left text 0] \
 		    [list 12 [_ "Checkin"] left text 0] \
 		    [list  45 [_ "Text"] center text 0] \
 		    [list  9 [_ "User"] left text 0] \
 		    [list  12 [_ "Artifact"] left text 0] \
+		    [list  12 [_ "Tags"] left text 0] \
 		    ]
 	    fulltktree $f.lf -width 750 \
 		-columns $columns -expand 0 \
@@ -2634,8 +2661,8 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    
 	    set num 0
 	    foreach i $ret {
-		lassign $i date checkin comment user artifact
-		$f.lf insert end [list $date $checkin $comment $user $artifact]
+		lassign $i date checkin comment user artifact tags
+		$f.lf insert end [list $date $checkin $comment $user $artifact $tags]
 		incr num
 	    }
 	    if { $num } {
