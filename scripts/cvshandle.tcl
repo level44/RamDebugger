@@ -1482,7 +1482,7 @@ proc RamDebugger::VCS::update_recursive_do1 { w } {
     cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
     set tree [$w give_uservar_value tree]
     $tree item delete all
-    update_recursive_accept $w $what $dir $tree 0
+    update_recursive_accept $w $what $dir $tree 0 0
 }
 
 proc RamDebugger::VCS::parse_timeline { timeline } {
@@ -1551,7 +1551,7 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	{ -item item "" }
 	{ -cvs_and_fossil boolean 0 }
     }
-    set compulsory "w what dir tree itemP"
+    set compulsory "w what dir tree itemP level"
    parse_args $optional $compulsory $args
     
     if { $cvs_and_fossil } {
@@ -1561,7 +1561,9 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
     waitstate $w on $what 
     if { $item ne "" } {
 	foreach i [$tree item children $item] { $tree item delete $i }
-    }    
+    }
+    set curr_item $item
+    
     set olddir [pwd]
     set err [catch { cd $dir } ret]
     if { $err } { return }
@@ -1586,8 +1588,8 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	    return
 	}
 	cd $dirLocal
-	if { $item eq "" || [$tree item text $item 0] ne $dirLocal } {
-	    set item [$tree insert end [list $dirLocal] $itemP]
+	if { $curr_item eq "" || [$tree item text $curr_item 0] ne $dirLocal } {
+	    set curr_item [$tree insert end [list $dirLocal] $itemP]
 	}
 	if { $what eq "view" &&  [update_recursive_cmd $w give_fossil_sync $dir] } {
 	    set err [catch { exec $fossil remote } ret]
@@ -1646,7 +1648,7 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 		    append timeline_txt " (tags: $tags)"
 		}
 	    }
-	    set itemT [$tree insert end [list $timeline_txt] $item]
+	    set itemT [$tree insert end [list $timeline_txt] $curr_item]
 	    foreach i $ret {
 		lassign $i date time checkin comment user tags
 		set item_t [$tree insert end [list "$date $time \[$checkin\] $comment (user: $user tags: $tags)"] $itemT]
@@ -1673,10 +1675,10 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	    if { [regexp {^waiting for server} $line] } {  continue }
 	    if { [regexp {^(Autosync:|Sent:|processed:|Received:|\s*Bytes|\s*$)} $line] } {  continue }
 	    if { [regexp {^-{5,}} $line] } { break }
-	    if { $item eq "" } {
-		set item [$tree insert end [list $dir] $itemP]
+	    if { $curr_item eq "" } {
+		set curr_item [$tree insert end [list $dir] $itemP]
 	    }
-	    set i [$tree insert end [list "$line"] $item]
+	    set i [$tree insert end [list "$line"] $curr_item]
 	    
 	    if { ![regexp {^(\w+)\s+(.*)} $line {} mode file] || $mode eq "UNCHANGED" } {
 		if { [regexp {^(\w+)\s+(.*)} [$tree item text $i 0] {} mode file] && $mode eq "UNCHANGED" } {
@@ -1701,15 +1703,15 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	}
 	if { $has_vcs && ![$w give_uservar_value cvs_and_fossil] } {
 	    set found 0
-	    foreach i [$tree item children $item] {
+	    foreach i [$tree item children $curr_item] {
 		if { [$tree item text $i 0] eq [_ "Update CVS"] } {
 		    set found 1
 		    break
 		}
 	    }
 	    if { !$found } {
-		set itemCVS [$tree insert end [list [_ "Update CVS"]] $item]
-		set cmd [list update_recursive_accept -cvs_and_fossil 1 -item $item $w $what $dir $tree $itemP]
+		set itemCVS [$tree insert end [list [_ "Update CVS"]] $curr_item]
+		set cmd [list update_recursive_accept -cvs_and_fossil 1 -item $curr_item $w $what $dir $tree $itemP 0]
 		$tree item_window_configure_button -text [_ "Update CVS"] -command $cmd $itemCVS
 	    }
 	} else {
@@ -1740,31 +1742,31 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	    }
 	    set has_vcs 1
 	}
-	if { $item eq "" } { set item $itemD }
+	if { $curr_item eq "" } { set curr_item $itemD }
     }
     cd $olddir
 
     if { !$has_vcs } {
-	if { $item ne "" } { set itemP $item }
+	if { $curr_item ne "" } { set itemP $curr_item }
 	foreach d [glob -nocomplain -dir $dir -type d *] {
-	    update_recursive_accept $w $what $d $tree $itemP
+	    update_recursive_accept $w $what $d $tree $itemP [expr {$level+1}]
 	}
     }
-    if { $item ne "" } {
+    if { $curr_item ne "" } {
 	set num 0
-	foreach i [$tree item children $item] {
+	foreach i [$tree item children $curr_item] {
 	    if { [$tree item cget $i -visible] } { incr num }
 	}
 	if { !$num } {
-	    $tree item configure $item -visible 0
+	    $tree item configure $curr_item -visible 0
 	}
     }
     if { ![$w exists_uservar view_unchanged] } {
 	$w set_uservar_value view_unchanged 0
     }
     set view_unchanged [$w give_uservar_value view_unchanged]
-    if { !$view_unchanged && $item == 0 && [llength [$tree item children $item]] } {
-	set itemVU [$tree insert end [list [_ "View unchanged"]] $item]
+    if { !$view_unchanged && $item eq "" && $level == 0 && [llength [$tree item children $itemP]] } {
+	set itemVU [$tree insert end [list [_ "View unchanged"]] $itemP]
 	$tree item_window_configure_button -text [_ "View unchanged"] -command \
 	    [list "update_recursive_cmd" $w toggle_view_unchanged $tree] $itemVU
     }
@@ -1976,7 +1978,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    # toggle is already made by the menu checkbutton
 	    set dir [$w give_uservar_value dir]
 	    $tree item delete all
-	    update_recursive_accept $w view $dir $tree 0
+	    update_recursive_accept $w view $dir $tree 0 0
 	}
 	fossil_syncronize {
 	    lassign $args sync_type tree sel_ids dirs
@@ -1996,7 +1998,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    set dir [$w give_uservar_value dir]
 	    set tree [$w give_uservar_value tree]
 	    $tree item delete all
-	    update_recursive_accept $w view $dir $tree 0
+	    update_recursive_accept $w view $dir $tree 0 0
 	}
 	commit {
 	    lassign $args tree sel_ids
@@ -2297,7 +2299,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		    exec $fossil stat --sha1sum
 		}
 		cd $pwd
-		update_recursive_accept -item $item $w $what_in $dir $tree [$tree item parent $item]
+		update_recursive_accept -item $item $w $what_in $dir $tree [$tree item parent $item] 0
 	    }
 	}
 	apply_version {
@@ -2313,7 +2315,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    }
 	    set dir [$w give_uservar_value dir]
 	    $tree item delete all
-	    update_recursive_accept $w [list $what_in $version] $dir $tree 0
+	    update_recursive_accept $w [list $what_in $version] $dir $tree 0 0
 	}
 	view {
 	    lassign $args tree item
