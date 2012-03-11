@@ -556,7 +556,9 @@ proc RamDebugger::VCS::_showallfiles_update_fossil {} {
 
     foreach lfile [exec $fossil ls] {
 	set ret [exec $fossil finfo $lfile]
-	regexp {\"file://(.*?)\"} [lrange [split $ret \n] end-1 end] {} file
+	set txt [string trim [lindex [split $ret \n] end-1]]
+	append txt [string trim [lindex [split $ret \n] end]]
+	regexp {\"file://(.*?)\"} $txt {} file
 	set dirname [file dirname $file]
 	if { $dirname eq "." } { set dirname "" }
 

@@ -555,7 +555,7 @@ proc cu::text_entry_bindings { w } {
     # "backslash" and "c" are here to help with a problem in Android VNC
     bind $w <$::control-backslash> "[list cu::text_entry_insert $w];break"
     bind $w <$::control-less> "[list cu::text_entry_insert $w];break"
-    foreach "acc1 acc2 c" [list plus "" {[]} c "" {{}} 1 "" || 1 1 \\ 3 "" {#}] {
+    foreach "acc1 acc2 c" [list plus "" {[]} c "" {{}} ccedilla "" {{}} 1 "" || 1 1 \\ 3 "" {#}] {
 	set cmd "[list cu::text_entry_insert $w $c];break"
 	if { $acc2 eq "" } {
 	set k2 ""
@@ -564,6 +564,11 @@ proc cu::text_entry_bindings { w } {
     }
     bind $w <$::control-less><KeyPress-$acc1>$k2 $cmd
     bind $w <$::control-backslash><KeyPress-$acc1>$k2 $cmd
+    }
+    
+    foreach "ev k" [list braceleft \{ braceright \} bracketleft \[ bracketright \] backslash \\ \
+	    bar | at @ numbersign # asciitilde ~ EuroSign €] {
+	bind $w <$ev> "[list tk::TextInsert $w $k]"
     }
 }
 
