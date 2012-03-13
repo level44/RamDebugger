@@ -340,6 +340,7 @@ proc RamDebugger::VCS::OpenRevisionsDo { file lfile finfo } {
     variable cvs_or_fossil
 
     set w $RamDebugger::text._openrev
+    destroy $w
     dialogwin_snit $w -title [_ "Choose revision"] -class RamDebugger -entrytext \
 	[_ "Choose a revision for file '%s'" $file] -morebuttons [list [_ "Differences"]]
     set f [$w giveframe]
@@ -554,7 +555,7 @@ proc RamDebugger::VCS::_showallfiles_update_fossil {} {
     set pwd [pwd]
     cd $vcsworkdir
 
-    foreach lfile [exec $fossil ls] {
+    foreach lfile [split [exec $fossil ls] \n] {
 	set ret [exec $fossil finfo $lfile]
 	set txt [string trim [lindex [split $ret \n] end-1]]
 	append txt [string trim [lindex [split $ret \n] end]]
