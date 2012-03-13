@@ -1763,6 +1763,9 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	    $tree item configure $curr_item -visible 0
 	}
     }
+    if { ![winfo exists $w] } {
+	return
+    }
     if { ![$w exists_uservar view_unchanged] } {
 	$w set_uservar_value view_unchanged 0
     }
