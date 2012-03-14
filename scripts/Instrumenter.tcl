@@ -330,7 +330,7 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     set topdir $RamDebugger::topdir
     set AppDataDir $RamDebugger::AppDataDir
 
-    if { $::tcl_platform(machine) == "amd64" } {
+    if { $::tcl_platform(machine) in "amd64 x86_64"} {
 	set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
     } else {
 	set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
@@ -384,19 +384,18 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 
     switch $what {
 	debug {
-	    if { $::tcl_platform(machine) eq "amd64"} {
-		set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
-		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork6_x64.dll]
+	    if { $::tcl_platform(machine) in "amd64 x86_64"} {
+		set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
 	    } else {
-		set dynlib [file join {C:\Documents and Settings\ramsan\Mis documentos\myTclTk} \
-		        RamDebugger RDIDoWork Debug RamDebuggerInstrumenterDoWork6_x32.dll]
+		set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
 	    }
+	    set dynlib [file join $RamDebugger::topdir debug $dynlib_base]
 	    load $dynlib Ramdebuggerinstrumenter
 	    set FastInstrumenterLoaded 1
 	}
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
-		if { $::tcl_platform(machine) == "amd64"} {
+		if { $::tcl_platform(machine) in "amd64 x86_64"} {
 		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
 		} else {
 		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]

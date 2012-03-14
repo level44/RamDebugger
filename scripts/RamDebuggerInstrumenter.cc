@@ -928,6 +928,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	    Tcl_ListObjAppendElement(is->ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
 	  } else {
 	    if(is->wordtype==W_WT){
+	      is->currentword=Tcl_ResetString(is->currentword);
 	      is->wordtype=NONE_WT;
 	      if(strcmp(Tcl_GetStringFromObj(is->currentword,NULL),"\\")!=0) {
 		is->words=Tcl_CopyIfShared(is->words);
