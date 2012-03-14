@@ -1561,7 +1561,10 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	$w set_uservar_value cvs_and_fossil 1
     }
     
-    waitstate $w on $what 
+    waitstate $w on $what
+    
+    if { ![winfo exists $tree] } { return }
+    
     if { $item ne "" } {
 	foreach i [$tree item children $item] { $tree item delete $i }
     }
