@@ -80,6 +80,7 @@ proc RamDebugger::VCS::Init {} {
 	    exec $fossil settings repo-cksum 0
 	    exec $fossil settings mtime-changes 1
 	    exec $fossil settings autosync 0
+	    exec $fossil all ignore [file join $vcsrootdir rep.fossil]
 	    cd $pwd
 	}
     }
