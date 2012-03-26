@@ -7553,7 +7553,7 @@ proc RamDebugger::UpdateLineNum { command args } {
 
     if { [regexp {^(ins|del)} $command] && !$currentfileIsModified } {
 	wm title [winfo toplevel $text] [wm title [winfo toplevel $text]]*
-	set currentfileIsModified 1
+	incr currentfileIsModified
     }
     UpdateLineNumDo
 }
@@ -7564,7 +7564,7 @@ proc RamDebugger::SetIsModified {} {
 
     if { !$currentfileIsModified } {
 	wm title [winfo toplevel $text] [wm title [winfo toplevel $text]]*
-	set currentfileIsModified 1
+	incr currentfileIsModified
     }
     UpdateLineNumDo
 }

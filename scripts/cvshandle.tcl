@@ -243,7 +243,7 @@ proc RamDebugger::VCS::SaveRevisionDo { args } {
 	    exec $fossil add $lfile
 	    exec $fossil commit -m "\"file://$file\"" $lfile
 	} else {
-	    set d [exec $fossil diff -i $lfile]
+	    set d [exec $fossil diff -i -c 1 $lfile]
 	    lassign [list 0 0] plus less
 	    foreach line [split $d \n] {
 		if  { [regexp {^\+(?!\+)} $line] } {

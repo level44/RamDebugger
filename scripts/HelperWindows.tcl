@@ -3952,8 +3952,11 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
 	}
     }
     foreach i [array names Macros::macrodata *,accelerator] {
-	if { $Macros::macrodata($i) != "" } {
+	if { $Macros::macrodata($i) ne "" } {
 	    regexp {(.*),accelerator} $i {} name
+	    if { ![regexp {^<.*>$} $Macros::macrodata($i)] } {
+		tk_messageBox -message "Error. Accelerator for macro '$name' not ok (needs <...>): $Macros::macrodata($i)"
+	    }
 	    bind all $Macros::macrodata($i) [list RamDebugger::Macros::$name $text]
 	    bind $text $Macros::macrodata($i) "[list RamDebugger::Macros::$name $text];break"
 

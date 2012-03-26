@@ -436,10 +436,16 @@ proc activate_deactivate_debug_lines { w activate_deactivate_toggle } {
 	set replace 1
 	switch $activate_deactivate_toggle {
 	    activate {
-		if { ![regexp {(.*)_OFF} $name {} name] } { set replace 0 }
+                if { ![regexp {(.*)_OFF} $name] } { set replace 0 }
 	    }
 	    deactivate {
-		if { [regexp {(.*)_OFF} $name {} name] } { set replace 0 }
+                if { [regexp {(.*)_OFF} $name] } { set replace 0 }
+            }
+            toggle {
+                # nothing
+            }
+            default {
+                error "error in activate_deactivate_debug_lines"
 	    }
 	}
 	if { $replace } {
@@ -459,8 +465,8 @@ proc activate_deactivate_debug_lines { w activate_deactivate_toggle } {
 }
 
 set "macrodata(Activate debug lines,inmenu)" 1
-# recommended: <Shift-F8>
-set "macrodata(Activate debug lines,accelerator)" ""
+# recommended: <Control-Shift-F8>
+set "macrodata(Activate debug lines,accelerator)" "<Control-Shift-F8>"
 set "macrodata(Activate debug lines,help)" "convert C functions: printf_debug to printf_debug_OFF and viceversa"
 
 proc "Activate debug lines" { w } {
@@ -478,8 +484,8 @@ proc "Activate debug lines" { w } {
 }
 
 set "macrodata(Toggle debug lines,inmenu)" 1
-# recommended: <F8>
-set "macrodata(Toggle debug lines,accelerator)" ""
+# recommended: <Shift-F8>
+set "macrodata(Toggle debug lines,accelerator)" "<Shift-F8>"
 set "macrodata(Toggle debug lines,help)" "convert C functions: printf_debug to printf_debug_OFF and viceversa"
 
 proc "Toggle debug lines" { w } {
