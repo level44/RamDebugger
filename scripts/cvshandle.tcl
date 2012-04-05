@@ -241,7 +241,7 @@ proc RamDebugger::VCS::SaveRevisionDo { args } {
 	set err [catch { exec $fossil finfo $lfile } ret]
 	if { $err } {
 	    exec $fossil add $lfile
-	    exec $fossil commit -m "\"file://$file\"" $lfile
+	    SaveRevisionDoCommit commit "\"file://$file\"" $lfile
 	} else {
 	    set d [exec $fossil diff -i -c 1 $lfile]
 	    lassign [list 0 0] plus less
@@ -253,10 +253,31 @@ proc RamDebugger::VCS::SaveRevisionDo { args } {
 		} 
 	    }
 	    if { $plus != 0 || $less != 0 } {
-		exec $fossil commit -m "+$plus -$less" $lfile
+		SaveRevisionDoCommit commit "+$plus -$less" $lfile
 	    }
 	}
-	file delete $lfile
+    }
+}
+
+proc RamDebugger::VCS::SaveRevisionDoCommit { what comment file args } {
+    variable doing_commit
+    
+    set fossil [auto_execok fossil]
+    switch $what {
+	commit {
+	    if { [info exists doing_commit] } {
+		return
+	    }
+	    set doing_commit 1
+	    set fin [open "|[list $fossil commit -m $comment $file]" r]
+	    fileevent $fin readable [list RamDebugger::VCS::SaveRevisionDoCommit end "" $file $fin]
+	}
+	end {
+	    lassign $args fin
+	    catch { close $fin }
+	    file delete $file
+	    unset doing_commit
+	}
     }
 }
 
