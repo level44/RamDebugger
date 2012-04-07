@@ -82,6 +82,17 @@ proc RamDebugger::VCS::Init {} {
 	    exec $fossil settings autosync 0
 	    exec $fossil all ignore [file join $vcsrootdir rep.fossil]
 	    cd $pwd
+	} else {
+	    set pwd [pwd]
+	    cd $vcsworkdir
+	    set err [catch { exec $fossil info } ret]
+	    if { $err } {
+		set err [catch { exec $fossil rebuild } ret]
+		if { $err } {
+		    error "error: $ret"
+		}
+	    }
+	    cd $pwd
 	}
     }
 }
@@ -1599,6 +1610,13 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
     set has_vcs 0
 
     set fossil [auto_execok fossil]
+    
+    set glob "*incorrect repository schema version*"
+    if { $fossil ne "" && [catch { exec $fossil info } info] != 0 && [string match $glob $info] } {
+	set info "$dir: $info"
+	set item [$tree insert end [list $info]]
+	$tree item element configure $item 0 e_text_sel -fill red
+    }
     if { $fossil ne "" && [catch { exec $fossil info } info] == 0 } {
 	regexp -line {^local-root:\s*(.*)} $info {} dirLocal
 	set dirLocal [string trimright $dirLocal /]
