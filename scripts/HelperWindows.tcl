@@ -3012,6 +3012,12 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    foreach i [list F1 F2 F5 F6 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
 	    }
+	    if { $::tcl_platform(platform) ne "windows" } {                   
+		foreach "ev k" [list braceleft \{ braceright \} bracketleft \[ bracketright \] backslash \\ \
+		        bar | at @ numbersign # asciitilde ~ EuroSign €] {
+		    bind $w.search <$ev> "$w.search icursor end; [list tkEntryInsert $w.search $k]; break"
+		}
+	    }
 	    bind $w.search <Return> "destroy $w.search ; break"
 	    bind $w.search <$::control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <$::control-r> "RamDebugger::Search $w ibackward ; break"
