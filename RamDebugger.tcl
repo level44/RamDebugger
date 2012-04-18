@@ -133,6 +133,7 @@ namespace eval RamDebugger {
     variable grabStatus
     variable oldFocus
     variable big_icons 0
+    variable inside_gid 0
     
     ################################################################################
     # Handlers to save files. Array with names: filename
@@ -4493,7 +4494,7 @@ proc RamDebugger::SaveFileF { args } {
 
     WaitState 1
     SetMessage [_ "Saving file '%s'" $file]...
-    
+
     RamDebugger::VCS::ManageAutoSaveDo
 
     set filetype [GiveFileType $currentfile]
@@ -7347,7 +7348,7 @@ proc RamDebugger::SearchBraces { x y } {
 	set found [SearchBraces_cpp_defines $x $y]
 	if { $found } { return }
     }
-    
+
     set openL [list "\[" "\{" "("]
     set closeL [list "\]" "\}" ")"]
     
@@ -7779,7 +7780,7 @@ proc RamDebugger::InitOptions {} {
     #      option add *Entry*background thistle
     #      option add *DisabledForeground grey60
     #      option add *HighlightBackground AntiqueWhite3
-    
+
     if { $::tcl_platform(platform) != "windows" } {
 	option add *selectBackground \#48c96f
 	option add *selectForeground white
@@ -8328,6 +8329,13 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable pane3
     variable iswince
     variable big_icons
+    variable inside_gid
+
+    if { [ info exists ::GIDDEFAULT]} {
+	set inside_gid 1
+    } else {
+	set inside_gid 0
+    }
 
     if { !$iswince } {
 	proc ::bgerror { errstring } {
@@ -8375,21 +8383,24 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } else {
 	set ispocket 0
     }
-    if { [tk windowingsystem] eq "x11" || $ispocket } {
-	ttk::style theme use clam
-	ttk::style theme settings clam {
-	    ttk::style configure TButton -padding 1
-	    ttk::style configure TMenubutton -padding 1
-	    ttk::style map Toolbutton -background "focus grey [ttk::style map Toolbutton -background]"
-	}
 	
-    } else {
-	catch {
-	    ttk::style theme settings winnative {
-		ttk::style configure Toolbutton -padding 1
+    if { !$inside_gid } {
+	if { [tk windowingsystem] eq "x11" || $ispocket } {
+	    ttk::style theme use clam
+	    ttk::style theme settings clam {
+		ttk::style configure TButton -padding 1
+		ttk::style configure TMenubutton -padding 1
+		ttk::style map Toolbutton -background "focus grey [ttk::style map Toolbutton -background]"
+	    }
+	    
+	} else {
+	    catch {
+		ttk::style theme settings winnative {
+		    ttk::style configure Toolbutton -padding 1
+		}
 	    }
 	}
-    }
+    } ;# if !inside_gid
     #needed a catch for wince
     catch { package require tkdnd } ;# only if it is compiled
     package require fulltktree
