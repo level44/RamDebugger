@@ -998,6 +998,13 @@ proc cu::ps { args } {
     }
 }
 
+proc cu::file::correct_name { file } {
+    if { $::tcl_platform(platform) eq "windows" } {
+	regsub -all {[:*?""<>|]} $file {_} file
+    }
+    return [string trim $file]
+}
+
 proc cu::file::execute { args } {
     
     set optional {

@@ -2552,7 +2552,8 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                    return
 		                }
 		                set c [string range $checkin 0 9]
-		                exec $fossil artifact $artifact $file.$c.$date
+		                set afile [cu::file::correct_name $file.$c.$date]
+		                exec $fossil artifact $artifact $afile
 		                
 		                if { [winfo screenheight .] > 500 } {
 		                    set y [expr {[winfo screenheight .]-500+$num_open*40}]
@@ -2564,13 +2565,13 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                    set geom_opt ""
 		                }
 		                set err [catch { open_program -new_interp 1 tkdiff {*}$geom_opt {*}$ignore_blanks \
-		                            $file $file.$c.$date } ret]
+		                            $file $afile } ret]
 		                if { $err } {
 		                    lappend errList $ret
 		                } else {
 		                    incr num_open
 		                }
-		                file delete -force $file.$c.$date
+		                file delete -force $afile
 		            }
 		        }
 		    }
@@ -2801,21 +2802,25 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		set c1 [string range $checkin1 0 9]
 		get_cwd
 		cd $dir
-		exec $fossil artifact $artifact1 $file.$c1.$date1
+		set afile1 [cu::file::correct_name $file.$c1.$date1]
+		exec $fossil artifact $artifact1 $afile1
 		if { [llength $selecteditems] == 1 } {
-		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks $file $file.$c1.$date1 } ret]
+		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks \
+		                $file $afile1 } ret]
 		} else {
 		    lassign [lindex $selecteditems 1] date2 checkin2 - - artifact2
 		    set c2 [string range $checkin2 0 9]
-		    exec $fossil artifact $artifact2 $file.$c2.$date2
-		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks $file.$c1.$date1 $file.$c2.$date2 } ret]
+		    set afile2 [cu::file::correct_name $file.$c2.$date2]
+		    exec $fossil artifact $artifact2 $afile2
+		    set err [catch { open_program -new_interp 1 tkdiff {*}$ignore_blanks \
+		                $afile1 $afile2 } ret]
 		}
 		if { $err } {
 		    snit_messageBox -message $ret -parent $wD
 		}
-		file delete -force $file.$c1.$date1
+		file delete -force $afile1
 		if { [llength $selecteditems] == 2 } {
-		    file delete -force $file.$c2.$date2
+		    file delete -force $afile2
 		}
 		release_cwd
 	    }

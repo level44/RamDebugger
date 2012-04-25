@@ -176,7 +176,8 @@ foreach pNode $pNodes {
 	}
 	"vcs-ramdebugger" {
 	    set file0 cvshandle.tcl
-	    set files [list HelperWindows.tcl Images.tcl mini_compass_utils.tcl tclIndex ../help]
+	    set files [list HelperWindows.tcl Images.tcl mini_compass_utils.tcl tclIndex ../help \
+		    ../addons/tkcvs]
 	    set dir $topdir/scripts
 	    set ico ../addons/ramdebugger.ico
 	    set filesFT ""
