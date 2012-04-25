@@ -136,7 +136,7 @@ if { $::tcl_platform(platform) eq "windows" } {
 }
 foreach i $exeList {
     if { ![file exists [file join .. addons exe $i]] } {
-	error "file '[file normalize [file join .. addons exe]]' does not exist"
+	error "file '[file normalize [file join .. addons exe $i]]' does not exist"
     }
 }
 
@@ -149,7 +149,7 @@ set remove_packages0 [list {*}$createdistribution::remove_packages trf bwidget \
 	textutil::adjust textutil::repeat \
 	textutil::split textutil::tabify  textutil::trim  textutil::string tile \
 	tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread \
-	ncgi sha1 \
+	ncgi sha1 math::constants \
 	]
 
 foreach pNode $pNodes {
