@@ -8,7 +8,7 @@ namespace import createdistribution::*
 set optional {
     { -clean "" 0 }
     { -install "" 0 }
-    { -install_type local_tgz|system_tgz|deb local_tgz }
+    { -install_type local_tgz|system_tgz|deb deb }
     { -fossil "" 0 }
     { -copy_remote "" 0 }
 }
