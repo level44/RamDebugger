@@ -2825,6 +2825,8 @@ proc RamDebugger::SearchReplace { w what args } {
 proc RamDebugger::inline_replace { w search_entry } {
     variable text
     
+    destroy $w.searchl1
+    
     set focus [focus]
     set grab [grab current]
     
@@ -2943,6 +2945,8 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     variable text
     variable options
     variable text_secondary
+    
+    destroy $w.searchl1
 
     if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	set active_text $text_secondary
@@ -3007,7 +3011,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
-	    bind $w.search <1> "destroy $w.search"
+	    bind $w.search <1> "[list destroy $w.search]; break"
 	    bind $w.search <<Contextual>> "destroy $w.search"
 	    foreach i [list F1 F2 F5 F6 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
@@ -3042,11 +3046,12 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <Destroy> "+ [list bindtags $active_text [lreplace [bindtags $active_text] 0 0]] ; break"
 	    foreach i [bind Text] {
 		if { [lsearch -exact [list <Motion>] $i] != -1 } { continue }
-		if { [bind $w.search $i] == "" } {
+		if { [bind $w.search $i] eq "" } {
 		    if { [string match *nothing* [bind Text $i]] } {
 		        bind $w.search $i [bind Text $i]
 		    } else {
-		        bind $w.search $i "destroy $w.search" }
+		        bind $w.search $i [list destroy $w.search]
+		    }
 		}
 	    }
 	    if { $what eq "iforward_get_insert" } {
