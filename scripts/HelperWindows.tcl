@@ -2903,6 +2903,24 @@ proc RamDebugger::textPaste_insert_after { w } {
     }
 }
 
+proc RamDebugger::Search_add_open_brace {} {
+    
+    set save_traces [trace info variable RamDebugger::searchstring]
+    foreach i $save_traces {
+	trace remove variable RamDebugger::searchstring {*}$i
+    }
+    
+    set txt "[string trimright $RamDebugger::searchstring] \{"
+    
+    set RamDebugger::searchstring $txt
+    set RamDebugger::Lastsearchstring $txt
+    
+    foreach i $save_traces {
+	trace add variable RamDebugger::searchstring {*}$i
+	uplevel #0 [lindex $i 1]
+    }
+}
+
 proc RamDebugger::Search_get_selection { active_text } {
     
     lassign [GetSelOrWordInIndex -return_range 1 insert] idx1 idx2
@@ -3025,6 +3043,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <Return> "destroy $w.search ; break"
 	    bind $w.search <$::control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <$::control-r> "RamDebugger::Search $w ibackward ; break"
+	    bind $w.search <$::control-Right> "RamDebugger::Search_add_open_brace ; break"
 	    bind $w.search <$::control-g> "RamDebugger::Search $w stop ; break"
 	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
