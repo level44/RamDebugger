@@ -2931,6 +2931,11 @@ if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] &&
 	}
     }
     bind $w <Control-q> [list destroy $w]
+    
+    catch {
+	package require commR
+	comm::register vcs-ramdebugger 1
+    }
 }
 
 
