@@ -34,7 +34,7 @@ proc RamDebugger::VCS::get_cwd {} {
 	    if { $done } {
 		break
 	    }
-	    after 500 [list set ::wait_get_cwd 1]
+	    after 200 [list set ::wait_get_cwd 1]
 	    vwait ::wait_get_cwd
 	}
     }
@@ -919,6 +919,11 @@ proc RamDebugger::VCS::indicator_update {} {
     }
     get_cwd
     cd [file dirname $currentfile]
+    
+    if { [info exists fossil_indicator_fileid] } { 
+	release_cwd
+	return
+    }
     set cvs_indicator_data ""
     if { [auto_execok cvs] ne "" && [file isdirectory CVS] } {
 	set cvs_indicator_fileid [open "|cvs -n update" r]
