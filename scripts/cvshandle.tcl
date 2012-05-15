@@ -21,30 +21,33 @@ namespace eval RamDebugger::VCS {
 
 proc RamDebugger::VCS::get_cwd {} {
     variable pwd
-    variable mutex
     
     if { [info command ::tsv::set] ne "" } {
-	if { ![info exists mutex] } {
+	while 1 {
+	    set done 0
 	    tsv::lock ::VCS {
-		if { ![tsv::exists ::VCS mutex]} {
-		    tsv::set ::VCS mutex [thread::mutex create -recursive]
+		if { ![tsv::exists ::VCS lock] || [tsv::lindex ::VCS lock 0] in [list "" [thread::id]] } {
+		    tsv::lpush ::VCS lock [thread::id]
+		    set done 1
 		}
-		set mutex [tsv::get ::VCS mutex]
 	    }
+	    if { $done } {
+		break
+	    }
+	    after 500 [list set ::wait_get_cwd 1]
+	    vwait ::wait_get_cwd
 	}
-	thread::mutex lock $mutex
     }
     set pwd [pwd]
 }
 
 proc RamDebugger::VCS::release_cwd {} {
     variable pwd
-    variable mutex
 
     cd $pwd
     
     if { [info command ::tsv::set] ne "" } {
-	thread::mutex unlock $mutex
+	tsv::lpop ::VCS lock
     }
 }
 
