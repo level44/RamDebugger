@@ -868,6 +868,7 @@ proc RamDebugger::VCS::indicator_init { f } {
 proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
     
     set currentfileL $RamDebugger::currentfile
+    set dir [file dirname $currentfileL]
     
     destroy $cvs_indicator_frame.menu
     set menu [menu $cvs_indicator_frame.menu -tearoff 0]
@@ -875,14 +876,17 @@ proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
 	[list RamDebugger::VCS::update_recursive $cvs_indicator_frame last]
     $menu add command -label [_ "Open - current directory"] -accelerator "Ctrl+Shift-7" -command \
 	[list RamDebugger::VCS::update_recursive $cvs_indicator_frame current]
+    $menu add command -label [_ "Open fossil"] -command \
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_ui "" $dir]
+    
     $menu add separator
     $menu add command -label [_ "Differences"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff "" "" [list $RamDebugger::currentfile]]
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff "" "" [list $currentfileL]]
     $menu add command -label [_ "Differences (ignore blanks)"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $RamDebugger::currentfile]]
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $currentfileL]]
 
     $menu add command -label [_ "Differences window"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" diff_window "" "" [list $RamDebugger::currentfile]]
+	[list RamDebugger::VCS::update_recursive_cmd "" diff_window "" "" [list $currentfileL]]
 
     tk_popup $menu $x $y
 }
@@ -2597,65 +2601,85 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		    open_program tkcvs -dir [$w give_uservar_value dir]
 		}
 		fossil_ui {
-		    if { [llength $sel_ids] == 0 } {
-		        set sel_ids [$tree selection get]
-		    }
 		    set dirs ""
-		    foreach item $sel_ids {
-		        set itemL $item
-		        while { $itemL != 0 } {
-		            if { [file isdirectory [$tree item text $itemL 0]] } {
-		                lappend dirs [$tree item text $itemL 0]
-		            }
-		            set itemL [$tree item parent $itemL]
+		    if { $tree eq "" } {
+		        lappend dirs $sel_ids   
+		    } else {
+		        if { [llength $sel_ids] == 0 } {
+		            set sel_ids [$tree selection get]
 		        }
+		        foreach item $sel_ids {
+		            set itemL $item
+		            while { $itemL != 0 } {
+		                if { [file isdirectory [$tree item text $itemL 0]] } {
+		                    lappend dirs [$tree item text $itemL 0]
+		                }
+		                set itemL [$tree item parent $itemL]
+		            }
+		        }
+		        lappend dirs [$w give_uservar_value dir]
 		    }
-		    lappend dirs [$w give_uservar_value dir]
 		    set url_suffix $files
 		    get_cwd
 		    foreach dir $dirs {
 		        cd $dir
 		        if { [catch { exec $fossil info }] } { continue }
 		        
-		        if { ![$w exists_uservar local_remote_web_browser] } {
+		        if { $w eq "" || ![$w exists_uservar local_remote_web_browser] } {
 		            set err [catch {
 		                    set remote [exec $fossil remote]
 		                    set autosync 0
 		                    regexp {\d\s*$} [exec $fossil settings autosync] autosync
 		                }]
 		            if { !$err && $remote ne "off" } {
-		                set w_lr [dialogwin_snit $w.lr -title [_ "Open local or remote"] -class RamDebugger -entrytext \
-		                        [_ "open local or remote web page?"]]
+		                if { $w ne "" } {
+		                    set w_lr $w.lr
+		                } else {
+		                    set w_lr .lr
+		                }
+		                destroy $w_lr
+		                dialogwin_snit $w_lr -title [_ "Open local or remote"] -class RamDebugger -entrytext \
+		                    [_ "open local or remote web page?"]
 		                set f [$w_lr giveframe]
 		                ttk::radiobutton $f.r1 -text [_ "Open local web page"] -variable \
-		                    [$w give_uservar local_remote_web_browser] -value local
+		                    [$w_lr give_uservar local_remote_web_browser] -value local
 		                ttk::radiobutton $f.r2 -text [_ "Open remote web page"] -variable \
-		                    [$w give_uservar local_remote_web_browser] -value remote
+		                    [$w_lr give_uservar local_remote_web_browser] -value remote
 		                grid $f.r1 -padx 20 -pady 2 -sticky w
 		                grid $f.r2 -padx 20 -pady 2 -sticky w
 
-		                $w set_uservar_value remote_web_browser $remote
 		                if { $autosync } {
-		                    $w set_uservar_value local_remote_web_browser remote
+		                    $w_lr set_uservar_value local_remote_web_browser remote
 		                } else {
-		                    $w set_uservar_value local_remote_web_browser local
+		                    $w_lr set_uservar_value local_remote_web_browser local
 		                }
 		                tk::TabToWindow $f.r1
 		                bind $w_lr <Return> [list $w invokeok]
 		                set action [$w_lr createwindow]
+		                set local_remote_web_browser [$w_lr give_uservar_value local_remote_web_browser]
 		                destroy $w_lr
 		                if { $action < 1 } {
 		                    release_cwd
 		                    $w unset_uservar local_remote_web_browser
 		                    return
 		                }
+		                if { $w ne "" } {
+		                    $w set_uservar_value remote_web_browser $remote
+		                    $w set_uservar_value local_remote_web_browser $local_remote_web_browser
+		                }
 		                update
 		            } else {
 		                $w set_uservar_value local_remote_web_browser local
+		                set local_remote_web_browser local
+		            }
+		        } else {
+		            set local_remote_web_browser [$w give_uservar_value local_remote_web_browser]
+		            if { $local_remote_web_browser eq "remote" } {
+		                set remote [$w give_uservar_value remote_web_browser]
 		            }
 		        }
-		        if { [$w give_uservar_value local_remote_web_browser] eq "remote" } {
-		            set url [$w give_uservar_value remote_web_browser]$url_suffix
+		        if { $local_remote_web_browser eq "remote" } {
+		            set url $remote$url_suffix
 		            cu::file::execute url $url
 		        } else {
 		            set port ""
