@@ -565,10 +565,11 @@ proc cu::text_entry_bindings { w } {
     bind $w <$::control-less><KeyPress-$acc1>$k2 $cmd
     bind $w <$::control-backslash><KeyPress-$acc1>$k2 $cmd
     }
-    
-    foreach "ev k" [list braceleft \{ braceright \} bracketleft \[ bracketright \] backslash \\ \
-	    bar | at @ numbersign # asciitilde ~ EuroSign €] {
-	bind $w <$ev> "[list tk::TextInsert $w $k]"
+    if { $::tcl_platform(platform) ne "windows" } {
+	foreach "ev k" [list braceleft \{ braceright \} bracketleft \[ bracketright \] backslash \\ \
+		bar | at @ numbersign # asciitilde ~ EuroSign €] {
+	    bind $w <$ev> "[list tk::TextInsert $w $k]"
+	}
     }
 }
 
@@ -800,6 +801,45 @@ proc cu::give_widget_background { w } {
    return $bgcolor
 }
 
+################################################################################
+#    add_down_arrow_to_image
+################################################################################
+
+proc cu::add_down_arrow_to_image { args } {
+    variable add_down_arrow_to_image_delta
+    
+    set optional {
+	{ -color color black }
+	{ -w widget "" }
+    }
+    set compulsory "img"
+    parse_args $optional $compulsory $args
+
+    if {![info exists add_down_arrow_to_image_delta] } {
+	set add_down_arrow_to_image_delta 7
+    }
+    if { $img ne "" } {
+	set width [image width $img]
+	set height [image height $img]
+    } else {
+	lassign [list 0 16] width height
+    }
+    set new_img [image create photo -width [expr {$width+$add_down_arrow_to_image_delta}] -height $height]
+    if { $img ne "" } { $new_img copy $img -to 0 0 }
+    set coords {
+	-3 -1
+	-4 -2 -3 -2 -2 -2
+	-5 -3 -4 -3 -3 -3 -2 -3 -1 -3
+    }
+    foreach "x y" $coords {
+	$new_img put $color -to [expr {$width+$add_down_arrow_to_image_delta+$x}] [expr {$height+$y}]
+    }
+    if { $w ne "" } {
+	$w configure -image $new_img
+	bind $w <Destroy> +[list image delete $new_img]
+    }
+    return $new_img
+}
 
 ################################################################################
 #    XML & xpath utilities
