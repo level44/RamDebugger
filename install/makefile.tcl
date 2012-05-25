@@ -91,11 +91,12 @@ if { $copy_remote } {
 	if { $tcl_platform(platform) eq "windows" } {
 	    lappend filesList [list $program_name$version-$dist.zip $program_name-current-$dist.zip]
 	    #lappend filesList [list setup-$program_name$version-$dist.exe setup-$program_name-current-$dist.exe]
+	    lappend filesList [list ${program_name}-source$version.zip ${program_name}-source-current.zip]
 	} elseif { $tcl_platform(os) ne "Darwin" } {
 	    set exe [string tolower $program_name]
 	    lappend filesList [list ${exe}$version-linux_$architecture.tar.gz ${exe}-current-linux_$architecture.tar.gz]
 	    lappend filesList [list ${exe}_$version-1_$architecture.deb ${exe}_current_$architecture.deb]
-	    lappend filesList [list ${program_name}-source$version.zip ${program_name}-source-current.zip]
+	    #lappend filesList [list ${program_name}-source$version.zip ${program_name}-source-current.zip]
 	    ## RPM ???
 	} else {
 	    lappend filesList [list $program_name$version-macosx.dmg $program_name-current-macosx.dmg]
@@ -235,7 +236,7 @@ foreach pNode $pNodes {
     }
     file delete $exe
 
-    if { $tcl_platform(platform) eq "unix" && $pname eq "ramdebugger" } {
+    if { $tcl_platform(platform) ne "unix" && $pname eq "ramdebugger" } {
 	create_README -architecture $architecture  -tcl_source_dist RamDebugger.tcl $pNode README
 	set files [list addons scripts Examples help pkgIndex.tcl]
 	#lappend files [file normalize README]
@@ -253,7 +254,7 @@ foreach pNode $pNodes {
 	    if { ![file exists $topdir/libs/RamDebuggerInstrumenter6_x32$ext] } { continue }
 	    file copy -force $topdir/libs/RamDebuggerInstrumenter6_x32$ext $topdir/scripts
 	}
-	CreateDistribution zip $program_name-source  $topdir RamDebugger.tcl \
+	CreateDistribution zip $program_name-source $topdir RamDebugger.tcl \
 	    $files $topdir/addons/ramdebugger.ico $version
 	
 	foreach ext $exts {

@@ -2,7 +2,7 @@
 <Infoproblemtype version="1.0">
   <Program n="ramdebugger">
     <Name>RamDebugger</Name>
-    <Version>8.1</Version>
+    <Version>8.2</Version>
     <Section>contrib/devel</Section>
     <Categories>Development;Debugger;IDE;Application</Categories>
     <Dependencies>libc6 (&gt;= 2.3.6-6), 
@@ -28,6 +28,12 @@
 	* It supports editing XML code
 	* It contains a GUI for version control system (cvs or fossil)
     </Description>
+    <NewsInVersion version="8.2" date="2012-05-25"> 
+      *  Fixed details in isearch and replace
+      *  control-Right in search appends " {"
+      *  Changes in the locks when setting "pwd" for vcs handle
+      *  Added "Open fossil" to RamDebugger bottom menu
+    </NewsInVersion>
     <NewsInVersion version="8.1" date="2012-04-25"> 
       *  Substituted cvs by fossil for dealing with internal RamDebugger revisions
       *  Added show processes window
