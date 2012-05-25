@@ -2903,7 +2903,12 @@ proc RamDebugger::textPaste_insert_after { w } {
     }
 }
 
-proc RamDebugger::Search_add_open_brace {} {
+proc RamDebugger::Search_add_open_brace { w } {
+    
+    if { [regexp {\{\s*$} $RamDebugger::searchstring] } {
+	RamDebugger::Search $w iforward
+	return
+    }
     
     set save_traces [trace info variable RamDebugger::searchstring]
     foreach i $save_traces {
@@ -3043,7 +3048,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <Return> "destroy $w.search ; break"
 	    bind $w.search <$::control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <$::control-r> "RamDebugger::Search $w ibackward ; break"
-	    bind $w.search <$::control-Right> "RamDebugger::Search_add_open_brace ; break"
+	    bind $w.search <$::control-Right> "RamDebugger::Search_add_open_brace $w ; break"
 	    bind $w.search <$::control-g> "RamDebugger::Search $w stop ; break"
 	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
