@@ -877,7 +877,7 @@ proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
     $menu add command -label [_ "Open - current directory"] -accelerator "Ctrl+Shift-7" -command \
 	[list RamDebugger::VCS::update_recursive $cvs_indicator_frame current]
     $menu add command -label [_ "Open fossil"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_ui "" $dir]
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_ui "" $dir -file $currentfileL]
     
     $menu add separator
     $menu add command -label [_ "Differences"] -command \
@@ -2448,12 +2448,13 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    }
 	}
 	open_program {
-	    lassign $args what_in tree sel_ids files
+	    set args [lassign $args what_in tree sel_ids]
 	    if { $sel_ids eq "" && $tree ne "" } {
 		set sel_ids [$tree selection get]
 	    }
 	    switch $what_in {
 		tkdiff - tkdiff_ignore_blanks {
+		    set files [lindex $args 0]
 		    set files_list ""
 		    set fileF ""
 		    get_cwd
@@ -2601,9 +2602,28 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		    open_program tkcvs -dir [$w give_uservar_value dir]
 		}
 		fossil_ui {
+		    set optional {
+		        { -file file "" }
+		    }
+		    set compulsory "url_suffix"
+		    parse_args -raise_compulsory_error 0  $optional $compulsory $args
+		    
+		    if { $file ne "" } {
+		        get_cwd
+		        cd [file dirname $file]
+		        set err [catch { exec $fossil finfo --limit 0 $file } ret]
+		        if { !$err } {
+		            set ret [regexp {History of\s+(\S.*)$} $ret {} sfile]
+		            if { $ret } {
+		                set url_suffix "/finfo?name=$sfile"
+		            }
+		        }
+		        release_cwd
+		    }
+		    
 		    set dirs ""
 		    if { $tree eq "" } {
-		        lappend dirs $sel_ids   
+		        lappend dirs $sel_ids
 		    } else {
 		        if { [llength $sel_ids] == 0 } {
 		            set sel_ids [$tree selection get]
@@ -2619,7 +2639,6 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		        }
 		        lappend dirs [$w give_uservar_value dir]
 		    }
-		    set url_suffix $files
 		    get_cwd
 		    foreach dir $dirs {
 		        cd $dir
@@ -2660,7 +2679,9 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                destroy $w_lr
 		                if { $action < 1 } {
 		                    release_cwd
-		                    $w unset_uservar local_remote_web_browser
+		                    if { $w ne "" } {
+		                        $w unset_uservar local_remote_web_browser
+		                    }
 		                    return
 		                }
 		                if { $w ne "" } {
@@ -2669,7 +2690,9 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                }
 		                update
 		            } else {
-		                $w set_uservar_value local_remote_web_browser local
+		                if { $w ne "" } {
+		                    $w set_uservar_value local_remote_web_browser local
+		                }
 		                set local_remote_web_browser local
 		            }
 		        } else {

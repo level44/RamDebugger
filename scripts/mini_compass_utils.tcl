@@ -558,17 +558,21 @@ proc cu::text_entry_bindings { w } {
     foreach "acc1 acc2 c" [list plus "" {[]} c "" {{}} ccedilla "" {{}} 1 "" || 1 1 \\ 3 "" {#}] {
 	set cmd "[list cu::text_entry_insert $w $c];break"
 	if { $acc2 eq "" } {
-	set k2 ""
-    } else {
-	set k2 <KeyPress-$acc2>
+	    set k2 ""
+	} else {
+	    set k2 <KeyPress-$acc2>
+	}
+	bind $w <$::control-less><KeyPress-$acc1>$k2 $cmd
+	bind $w <$::control-backslash><KeyPress-$acc1>$k2 $cmd
     }
-    bind $w <$::control-less><KeyPress-$acc1>$k2 $cmd
-    bind $w <$::control-backslash><KeyPress-$acc1>$k2 $cmd
-    }
+    
     if { $::tcl_platform(platform) ne "windows" } {
 	foreach "ev k" [list braceleft \{ braceright \} bracketleft \[ bracketright \] backslash \\ \
 		bar | at @ numbersign # asciitilde ~ EuroSign €] {
-	    bind $w <$ev> "[list tk::TextInsert $w $k]"
+	    # they are class bindings so as search in text widgets can continue working
+	    bind Text <$ev> "[list tk::TextInsert %W $k]; break"
+	    bind TEntry <$ev> "[list ttk::entry::Insert %W $k]; break"
+	    bind Entry <$ev> "[list tk::EntryInsert %W $k]; break"
 	}
     }
 }
