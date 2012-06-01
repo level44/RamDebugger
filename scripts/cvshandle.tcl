@@ -2673,7 +2673,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                    $w_lr set_uservar_value local_remote_web_browser local
 		                }
 		                tk::TabToWindow $f.r1
-		                bind $w_lr <Return> [list $w invokeok]
+		                bind $w_lr <Return> [list $w_lr invokeok]
 		                set action [$w_lr createwindow]
 		                set local_remote_web_browser [$w_lr give_uservar_value local_remote_web_browser]
 		                destroy $w_lr

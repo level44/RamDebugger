@@ -9638,18 +9638,23 @@ proc RamDebugger::insert_translation_cmd {} {
 	    if { $s1 ne $s1_save && [$text get $s1] eq {"} } { break }
 	    set s1 [$text index "$s1-1c"]
 	}
-	if { [$text get "$s1"] ne {"} } {
-		set s1 $s1_save
-		while { [$text compare $s1 > "$s1 linestart"] && [regexp {[\w\"%]} [$text get "$s1-1c"]] } {
-		    set s1 [$text index "$s1-1c"]
-		}
-		set rex {[\w%]}
-	    } else {
-		set rex {[\w\s%\"]}
+	if { [$text get $s1] ne {"} } {
+	    set s1 $s1_save
+	    while { [$text compare $s1 > "$s1 linestart"] && [regexp {[\w\"%]} [$text get "$s1-1c"]] } {
+		set s1 [$text index "$s1-1c"]
 	    }
-	    while { [$text compare $s2 < "$s2 lineend"] && [regexp $rex [$text get "$s2+1c"]] } {
+	    set rex {[\w%]}
+	} else {
+	    set rex {[\w\s%\"]}
+	}
+	while { [$text compare $s2 < "$s2 lineend"] && [regexp $rex [$text get "$s2"]] } {
 	    if { [$text get $s2] eq {"} } { break }
 	    set s2 [$text index "$s2+1c"]
+	}
+	if { [$text get $s1] eq {"} && [$text get $s2] ne {"} } {
+	    lassign [list $i $i] s1 s2
+	} elseif { [$text get $s2] eq {"} && [$text get $s1] ne {"} } {
+	    lassign [list $i $i] s1 s2
 	}
     }
     if { [$text get "$s1"] ne {"} } {
