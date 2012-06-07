@@ -757,13 +757,28 @@ proc cu::set_window_geometry { w geometry } {
     if { $y < 0 } { set y 0 }
     if { $x > [winfo screenwidth $w]-100 } { set x [expr {[winfo screenwidth $w]-100}] }
     if { $y > [winfo screenheight $w]-100 } { set y [expr {[winfo screenheight $w]-100}] }
-
+    
+    if { $m2 eq "+" && $y+$height > [winfo screenheight $w] } {
+	if { $y > 0.5*[winfo screenheight $w] } {
+	    set y [expr {round(0.5*[winfo screenheight $w])}]
+	}
+	set height [expr {[winfo screenheight $w]-$y}]
+    }
     wm geometry $w ${width}x$height$m1$x$m2$y
 }
 
-proc cu::create_tooltip_toplevel { b } {
+proc cu::create_tooltip_toplevel { args } {
+
+    set optional {
+	{ -withdraw "" 0 }
+    }
+    set compulsory "b"
+    parse_args $optional $compulsory $args
 
     toplevel $b -class Tooltip
+    if { $withdraw } {
+	wm withdraw $b
+    }
     if {[tk windowingsystem] eq "aqua"} {
 	::tk::unsupported::MacWindowStyle style $b help none
     } else {
@@ -778,9 +793,10 @@ proc cu::create_tooltip_toplevel { b } {
 	focus -force $b
 	raise $b
 	if { $focus ne "" } {
-	    after 100 [list focus $focus]
+	    after 100 [list focus -force $focus]
 	}
     }
+    return $b
 }
 
 proc cu::give_widget_background { w } {
