@@ -8575,7 +8575,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[_ "Toggle between activating the main or the secondary view"] "Ctrl 4" \
 		-command "RamDebugger::FocusSecondTextToggle"] \
 		[list command &[_ "Toggle views"] {} \
-		[_ "Toggle files between the main and the secondary view"] "Ctrl 5" \
+		[_ "Toggle files between the main and the secondary view"] "" \
 		-command "RamDebugger::ToggleViews"] \
 		separator \
 		[list checkbutton [_ "Status bar"] {} \
@@ -9346,12 +9346,18 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-Key-2> [list RamDebugger::PositionsStack go]
 
     bind $text <$::control-Key-6> "RamDebugger::CommentSelection toggle"
-    bind $text <$::control-Key-9> "[list tk::TextInsert $text {()}];$c"
+    #bind $text <$::control-Key-9> "[list tk::TextInsert $text {()}];$c"
     bind $text <$::control-plus> "[list tk::TextInsert $text {[]}];$c"
     bind $text <$::control-bracketright> "[list tk::TextInsert $text {[]}];$c"
     bind $text <$::control-Shift-plus> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-asterisk> [list RamDebugger::insert_translation_cmd]
     bind $text <$::control-ccedilla> "[list tk::TextInsert $text {{}}];$c"
+
+    # some of these keys are for Ubuntu on Asus transformer
+    bind $text <$::control-Key-5> [list RamDebugger::ContNextGUI rcont]
+    bind $text <$::control-Key-9> [list RamDebugger::SetGUIBreakpoint]
+    bind $text <$::control-Key-0> [list RamDebugger::ContNextGUI rnext]
+    bind $text <$::control-Key-minus> [list RamDebugger::ContNextGUI rstep]
     
     cu::text_entry_bindings $text
 

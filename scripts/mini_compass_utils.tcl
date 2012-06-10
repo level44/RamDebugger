@@ -572,6 +572,7 @@ proc cu::text_entry_bindings { w } {
 	    # they are class bindings so as search in text widgets can continue working
 	    bind Text <$ev> "[list tk::TextInsert %W $k]; break"
 	    bind TEntry <$ev> "[list ttk::entry::Insert %W $k]; break"
+	    bind TCombobox <$ev> "[list ttk::entry::Insert %W $k]; break"
 	    bind Entry <$ev> "[list tk::EntryInsert %W $k]; break"
 	}
     }
