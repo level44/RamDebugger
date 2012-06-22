@@ -3950,7 +3950,7 @@ proc RamDebugger::OpenFileF { args } {
     set compulsory "file"
     parse_args $optional $compulsory $args  
     
-    if { $file == "" } { return }
+    if { $file == "" } { return 1 }
     set file [filenormalize $file]
 
     if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
@@ -3960,7 +3960,7 @@ proc RamDebugger::OpenFileF { args } {
     if { $force == -1 } {
 	set force 0
     } else {
-	if { [SaveFile ask] == -1 } { return }
+	if { [SaveFile ask] == -1 } { return 1 }
     }
 
     WaitState 1

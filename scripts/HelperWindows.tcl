@@ -3822,7 +3822,10 @@ proc RamDebugger::PositionsStack { what args } {
 		return
 	    }
 	    if { ![AreFilesEqual $file_new $file] } {
-		RamDebugger::OpenFileF $file_new
+		set ret [RamDebugger::OpenFileF $file_new]
+		if { $ret != 0 } {
+		    return
+		}
 	    }
 	    $curr_text mark set insert $line.0
 	    $curr_text see $line.0
