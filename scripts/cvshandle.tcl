@@ -1057,7 +1057,8 @@ proc RamDebugger::VCS::update_recursive { wp current_or_last_or_this args } {
 
     if { $try_threaded eq "debug" } {
 	uplevel #0 $script
-    } elseif { $try_threaded && $::tcl_platform(os) ne "Darwin" && $::tcl_platform(threaded) } {
+    } elseif { $try_threaded && $::tcl_platform(os) ne "Darwin" && \
+	[info exists ::tcl_platform(threaded)] && $::tcl_platform(threaded) } {
 	package require Thread
 	append script "thread::wait\n"
 	thread::create $script

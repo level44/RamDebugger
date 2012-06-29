@@ -356,6 +356,7 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     lappend OPTS -I[file join $basedir include] \
 	-I[file join $AppDataDir compile]
     set libs [glob -nocomplain -dir [file join $basedir lib] *tclstub*]
+    lappend libs {*}[glob -nocomplain -dir /usr/lib64 *tclstub*]
     switch [llength $libs] {
 	0 { set lib [file join $AppDataDir compile libtclstub.a] }
 	1 { set lib [lindex $libs 0] }
@@ -369,8 +370,10 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     }
     set LOPTS [list $lib]
 
-    set err [catch {eval exec g++ $OPTS [list $sourcefile -o $dynlib] $LOPTS} errstring]
+    set cmd [list exec g++ {*}$OPTS $sourcefile -o $dynlib {*}$LOPTS]
+    set err [catch $cmd errstring]
     if { $err && $raiseerror } {
+	puts $cmd---$errstring
 	WarnWin $::errorInfo
     }
 }
