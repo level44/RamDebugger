@@ -171,7 +171,7 @@ void RamDebuggerInstrumenterInitState(InstrumenterState* is)
 	     "foreach i [list #ifdef #ifndef #define #undef] {\n"
 	     "set ::RamDebugger::Instrumenter::colors_cpp($i) magenta2\n"
 	     "}\n"
-	     "foreach i [list char int double void] {\n"
+	     "foreach i [list char int long double void] {\n"
 	     "set ::RamDebugger::Instrumenter::colors_cpp($i) green\n"
 	     "}",-1,0);
 

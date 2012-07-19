@@ -875,7 +875,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++_do { block blockinfoname "progress 
     foreach i [list \#ifdef \#ifndef \#define \#undef] {
 	set colors($i) magenta2
     }
-    foreach i [list char int double void ] {
+    foreach i [list char int long double void ] {
 	set colors($i) green
     }
 

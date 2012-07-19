@@ -133,7 +133,7 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 		            append comm "whatis $varn\n"
 		            set isinit 1
 		        }
-		        append comm "printf \"\\n$varn=\"\noutput $varn\nprintf \"\\n\"\n"
+		        append comm "printf \"$varn=\"\noutput $varn\nprintf \"\\n\"\n"
 		    }
 		}
 	    }

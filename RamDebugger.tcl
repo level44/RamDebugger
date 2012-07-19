@@ -146,6 +146,7 @@ namespace eval RamDebugger {
     ################################################################################
 
     variable readwriteprefs
+    variable prefs_group ""
     variable options
     variable options_def
     
@@ -165,7 +166,7 @@ namespace eval RamDebugger {
 #   Init proc
 ################################################################################
 
-proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } { _big_icons 0 } } {
+proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _big_icons 0 } } {
     variable debuggerserver
     variable debuggerserverNum
     variable topdir
@@ -175,6 +176,7 @@ proc RamDebugger::Init { _readwriteprefs { registerasremote 1 } { _big_icons 0 }
     variable options_def
     variable options
     variable readwriteprefs $_readwriteprefs
+    variable prefs_group $_prefs_group
     variable iswince
     variable info_script
     variable usecommR
@@ -3559,8 +3561,14 @@ proc RamDebugger::ExitGUI {} {
     if { $zoomed } {
 	set options($geomkey) zoomed
     } else {
-	regexp {(\d+)x(\d+)\+([-\d]+)\+([-\d]+)} [cu::give_window_geometry $w] \
-	    {} width height x y
+	regexp {(\d+)x(\d+)([+-])([-\d]+)([+-])([-\d]+)} [cu::give_window_geometry $w] \
+	    {} width height xrel x yrel y
+	if {$xrel eq "-" } {
+	    set x [expr {[winfo screenwidth $text]-$x}]
+	}
+	if {$yrel eq "-" } {
+	    set y [expr {[winfo screenheight $text]-$y}]
+	}
 	if { $x < -20 } { set x -20 }
 	if { $y < -20 } { set y -20 }
 	if { $x > [winfo screenwidth $text]-20 } { set x [expr {[winfo screenwidth $text]-20}] }
@@ -3587,16 +3595,26 @@ proc RamDebugger::ReadPreferences {} {
     variable options
     variable AppDataDir
     variable iswince
+    variable prefs_group
     
     catch {
 	if { $iswince } {
 	    set fin [open [file join $AppDataDir ramdebugger_prefs] r]
 	    set data [read $fin]
 	    close $fin
-	} elseif { $::tcl_platform(platform) == "windows" } {
-	    set data [registry get {HKEY_CURRENT_USER\Software\RamDebugger} IniData]
+	} elseif { $::tcl_platform(platform) eq "windows" } {
+	    set key {HKEY_CURRENT_USER\Software\RamDebugger}
+	    if { $prefs_group ne "" } {
+		append key "_$prefs_group"
+	    }
+	    set data [registry get $key IniData]
 	} else {
-	    set fin [open ~/.ramdebugger_prefs r]
+	    if { $prefs_group ne "" } {
+		set file ~/.ramdebugger_${prefs_group}_prefs
+	    } else {
+		set file ~/.ramdebugger_prefs
+	    }
+	    set fin [open $file r]
 	    set data [read $fin]
 	    close $fin
 	}
@@ -3608,6 +3626,7 @@ proc RamDebugger::SavePreferences { { raise_error 0 } } {
     variable options
     variable AppDataDir
     variable iswince
+    variable prefs_group
     
     set err [catch {
 	    if { $iswince } {
@@ -3615,10 +3634,18 @@ proc RamDebugger::SavePreferences { { raise_error 0 } } {
 		puts -nonewline $fout [array get options]
 		close $fout
 	    } elseif { $::tcl_platform(platform) eq "windows" } {
-		registry set {HKEY_CURRENT_USER\Software\RamDebugger} IniData \
-		    [array get options]
+		set key {HKEY_CURRENT_USER\Software\RamDebugger}
+		if { $prefs_group ne "" } {
+		    append key "_$prefs_group"
+		}
+		registry set $key IniData [array get options]
 	    } else {
-		set fout [open ~/.ramdebugger_prefs w]
+		if { $prefs_group ne "" } {
+		    set file ~/.ramdebugger_${prefs_group}_prefs
+		} else {
+		    set file ~/.ramdebugger_prefs
+		}
+		set fout [open $file w]
 		puts -nonewline $fout [array get options]
 		close $fout
 	    }
@@ -6455,16 +6482,20 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     
     set patternList [list {((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+)} \
 	    {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)}]
-    #set rex {^\#([0-9]+)}
-    set rex [join $patternList "|"]
-    while { ![regexp $rex $data] && [$textstack compare "$idx linestart" > 1.0] } {
+    set rex1 {^\#([0-9]+)}
+    set rex2 [join $patternList "|"]
+    set data0 $data
+    while { ![regexp $rex1 $data] && [$textstack compare "$idx linestart" > 1.0] } {
 	set prevline [$textstack get "$idx -1 line linestart" "$idx -1 line lineend"]
 	set data "$prevline $data"
 	set idx [$textstack index "$idx -1 line linestart"]
     }
-    while { [regexp $rex $data] && [$textstack compare "$idx lineend" < "end-1l"] } {
+    if { $idx eq "1.0" } {
+	set data $data0
+    }
+    while { [regexp $rex1 $data] && [$textstack compare "$idx lineend" < "end-1l"] } {
 	set nextline [$textstack get "$idx +1 line linestart" "$idx +1 line lineend"]
-	if { ![regexp $rex $nextline] } {
+	if { ![regexp $rex1 $nextline] } {
 	    set data "$data $nextline"
 	    set idx [$textstack index "$idx +1 line linestart"]
 	} else {
@@ -8984,7 +9015,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     set pwin [panedwindow $pane2.pw -orient vertical -grid 0]
 
-    foreach "weight1in weight2in" [ManagePanes $pwin v "300 50"] break
+    foreach "weight1in weight2in" [ManagePanes $pwin v "300 100"] break
 
     #set pane2in1 [$pwin add -weight $weight1in]
     set pane2in1 [frame $pwin.pane2in1]
@@ -9795,6 +9826,11 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set readwriteprefs nowrite
 	set argv [lreplace $argv $ipos $ipos]
     }
+    set prefs_group ""
+    if { [set ipos [lsearch $argv "-prefs_group"]] != -1 } {
+	set prefs_group [lindex $argv $ipos+1]
+	set argv [lreplace $argv $ipos $ipos+1]
+    }
     if { [set ipos [lsearch $argv "-onlytext"]] != -1 } {
 	set ViewOnlyTextOrAll OnlyText
 	set argv [lreplace $argv $ipos $ipos]
@@ -9825,7 +9861,7 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set big_icons 0
     }
 
-    RamDebugger::Init $readwriteprefs $registerasremote $big_icons
+    RamDebugger::Init $readwriteprefs $prefs_group $registerasremote $big_icons
     
     ################################################################################
     #     Init the GUI part
