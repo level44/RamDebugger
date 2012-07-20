@@ -287,7 +287,7 @@ proc RamDebugger::VCS::SaveRevisionDo { args } {
 	exec cvs commit -m "" $lfile
     } else {
 	set fossil [auto_execok fossil]
-	set err [catch { exec $fossil finfo $lfile } ret]
+	set err [catch { exec $fossil finfo --limit 1 $lfile } ret]
 	if { $err } {
 	    exec $fossil add $lfile
 	    SaveRevisionDoCommit commit "\"file://$file\"" $lfile
@@ -299,7 +299,7 @@ proc RamDebugger::VCS::SaveRevisionDo { args } {
 		        incr plus
 		} elseif  { [regexp {^\-(?!\-)} $line] } {
 		        incr less
-		} 
+		}
 	    }
 	    if { $plus != 0 || $less != 0 } {
 		SaveRevisionDoCommit commit "+$plus -$less" $lfile
