@@ -295,7 +295,7 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
     set options_def(instrument_source) auto
     set options_def(instrument_proc_last_line) 0
     set options_def(ConfirmModifyVariable) 1
-    set options_def(openfile_browser) 1
+    set options_def(openfile_browser) 0
     set options_def(LocalDebuggingType) tk
     set options_def(executable_dirs) ""
     set options_def(debugrelease) debug
