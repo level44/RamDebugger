@@ -365,6 +365,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	
 	*  variablename: Enter the name of a variable 
 	*  $variablename+4: Enter any expression that gdb accepts
+	*  $variablename@10: print expression and the next 10 similar values
 	*  $variablename[4:2][6::8]: One extension to the gdb expressions. Permmits to
 	   print part of a string or vector
 	*  gdb set print elements 1000 (to send a literal gdb command to debugger, prefix it with "gdb ...")

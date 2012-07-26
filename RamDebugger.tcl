@@ -9416,6 +9416,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Escape><i> "[list RamDebugger::Search $w iforward_get_insert] ;break"
     bind $w <$::control-slash> [list RamDebugger::VCS::update_recursive . current] ;# control-shift-7
 
+    for { set i 0 } { $i <=9 } { incr i } {
+	bind $text <$::control-u><$::control-Key-$i> "[list event generate $text <F$i>]; break"
+	bind $text <$::control-u><$::control-s><$::control-Key-$i> \
+	    "[list event generate $text <Shift-F$i>]; break"
+    }
+    
     set menu [$mainframe getmenu edit]
     $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift+I"
 
