@@ -2217,6 +2217,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		            set comment [lindex $values $ipos_comment]
 		            lappend ticketList [list "\[[string range $ticket 0 9]\]" $ticket $comment]
 		        }
+		        set num_tickets 0
 		        foreach ticket [split $tickets ", ;"] {
 		            set ipos [lsearch -exact -index 0 $ticketList $ticket]
 		            if { $ipos == -1 } {
@@ -2227,6 +2228,17 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		            lassign [lindex $ticketList $ipos] - ticketF comment
 		            append comment "\ncommit: $new_commit. Change status to: $ticket_status"
 		            exec $fossil ticket change $ticketF status $ticket_status comment $comment
+		            incr num_tickets
+		        }
+		        if { $num_tickets } {
+		            set autosync 0
+		            set err_autosync [catch { exec $fossil settings autosync } ret]
+		            if { !$err_autosync } {
+		                regexp {(\d)\s*$} $ret {} autosync
+		            }
+		            if { $autosync == 1 } {
+		                exec $fossil sync
+		            }
 		        }
 		    }
 		    if { $err } { break }
