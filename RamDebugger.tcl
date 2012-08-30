@@ -5536,7 +5536,12 @@ proc RamDebugger::StopAtGUI { file line { condinfo "" } } {
     }
 
     if { ![AreFilesEqual $file $currentfile] } {
-	OpenFileF $file 
+	set err [catch { OpenFileF -raise_error 1 $file } ret]
+	if { $err } {
+	    WarnWin $ret $text
+	    rstack -handler RamDebugger::UpdateGUIStack
+	    return
+	}
     }
     UpdateArrowAndBreak $line "" 1 $forceraise
 
@@ -9295,7 +9300,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     ################################################################################
 
     if {[string equal "unix" $::tcl_platform(platform)]} {
-	foreach "but units" [list 4 -5 5 5] {
+	foreach "but units" [list 4 -2 5 2] {
 	    set comm {
 		set w %W
 		while { $w != [winfo toplevel $w] } {
