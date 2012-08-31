@@ -105,7 +105,7 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 	[$w give_uservar_value combo] configure -values $options(old_expressions)
 
 	if { $remoteserverType eq "gdb" } {
-	    set remoteserver [lreplace $remoteserver 2 2 [list getdata \
+	    set remoteserver [lreplace $remoteserver 3 3 [list getdata \
 		        [list RamDebugger::DisplayVarWindowEval res $w]]]
 	    
 	    if { [regexp {^\s*gdb\s+(.*)} $var] } {

@@ -576,10 +576,10 @@ proc RamDebugger::rdebug { args } {
 	    catch { interp delete local }
 	} elseif { $remoteserverType == "gdb" } {
 	    catch {
-		lassign $remoteserver fid
+		lassign $remoteserver fid pid
 		#puts -nonewline [lindex $remoteserver 0] {\x03}
 		if { $::tcl_platform(platform) eq "unix" } {
-		    exec kill -s INT [lindex [pid $fid] 0]
+		    exec kill -s INT $pid
 		}
 		puts $fid quit
 		close $fid
@@ -766,8 +766,9 @@ proc RamDebugger::rdebug { args } {
 	    cd $dir        
 	}
 	set fid [open "|gdb -q |& cat" r+]
+	set pid [lindex [pid $fid] 0]
 	cd $pwd
-	set remoteserver [list $fid $opts(program) start]
+	set remoteserver [list $fid $pid $opts(program) start]
 	fconfigure $fid -blocking 0 -buffering line
 	fileevent $fid readable RamDebugger::RecieveFromGdb
 	TakeArrowOutFromText
@@ -1135,7 +1136,7 @@ proc RamDebugger::reval { args } {
 	if { $remoteserverType != "gdb" } {
 	    EvalRemote [list ::RDC::Eval $opts(arg) $opts(-handler)]
 	} else {
-	    set remoteserver [lreplace $remoteserver 2 2 [list print $opts(-handler)]]
+	    set remoteserver [lreplace $remoteserver 3 3 [list print $opts(-handler)]]
 	    EvalRemote "print $opts(arg)"
 	}
 	return ""
@@ -1143,7 +1144,7 @@ proc RamDebugger::reval { args } {
     if { $remoteserverType != "gdb" } {
 	EvalRemote [list ::RDC::Eval $opts(arg)]
     } else {
-	set remoteserver [lreplace $remoteserver 2 2 print]
+	set remoteserver [lreplace $remoteserver 3 3 print]
 	EvalRemote "print $opts(arg)"
     }
     if { $ExpressionResult == "" } { vwait RamDebugger::ExpressionResult }
@@ -1178,7 +1179,7 @@ proc RamDebugger::rstack { args } {
     ParseArgs $args $usagestring opts
 
     if { $remoteserverType == "gdb" } {
-	set remoteserver [lreplace $remoteserver 2 2 backtrace]
+	set remoteserver [lreplace $remoteserver 3 3 backtrace]
 	set ExpressionResult ""
 	EvalRemote "backtrace\nprintf \"FINISHED BACKTRACE\\n\""
 	if { $ExpressionResult == "" } { vwait RamDebugger::ExpressionResult }
@@ -1268,7 +1269,7 @@ proc RamDebugger::rcont { args } {
 	EvalRemote ::RDC::Continue
     } else {
 	if { $opts(line) != "" } {
-	    set remoteserver [lreplace $remoteserver 2 2 setbreakpoints]
+	    set remoteserver [lreplace $remoteserver 3 3 setbreakpoints]
 	    EvalRemote "tbreak [file tail $currentfile]:$currentline"
 	    EvalRemote "printf \"FINISHED SET BREAKPOINTS\\n\""
 	}
@@ -1306,10 +1307,10 @@ proc RamDebugger::rnext { args } {
 	}
 	EvalRemote ::RDC::Continue
     } else {
-	set remoteserver [lreplace $remoteserver 2 2 next]
-	lassign $remoteserver fid
+	set remoteserver [lreplace $remoteserver 3 3 next]
+	lassign $remoteserver fid pid
 	if { $::tcl_platform(platform) eq "unix" } {
-	    exec kill -s INT [lindex [pid $fid] 0]
+	    exec kill -s INT $pid
 	}
 	#EvalRemote \003
 	EvalRemote next
@@ -1338,7 +1339,7 @@ proc RamDebugger::rstep { args } {
 	EvalRemote [list set ::RDC::stopnext 2]
 	EvalRemote ::RDC::Continue
     } else {
-	set remoteserver [lreplace $remoteserver 2 2 step]
+	set remoteserver [lreplace $remoteserver 3 3 step]
 	EvalRemote step
     }
 }
@@ -2637,7 +2638,7 @@ proc RamDebugger::EvalRemote { comm } {
     } elseif { $remoteserverType == "master" } {
 	master after idle [list $comm]
     } elseif { $remoteserverType == "gdb" } {
-	foreach "fid program state" $remoteserver break
+	lassign $remoteserver fid pid program state
 	regsub -all {(^|\n)(.)} $comm\n {\1-->\2} commlog
 	append gdblog $commlog
 	puts $fid $comm
@@ -2670,7 +2671,7 @@ proc RamDebugger::EvalRemoteAndReturn { comm } {
     } elseif { $remoteserverType == "master" } {
 	set ret [master $comm]
     } elseif { $remoteserverType == "gdb" } {
-	foreach "fid program state" $remoteserver break
+	lassign $remoteserver fid pid program state
 	regsub -all {(^|\n)(.)} $comm\n {\1-->\2} commlog
 	append gdblog $commlog
 	puts $fid $comm
@@ -2720,7 +2721,7 @@ proc RamDebugger::UpdateRemoteBreaks {} {
 
 
     if { $remoteserverType == "gdb" } {
-	set remoteserver [lreplace $remoteserver 2 2 setbreakpoints]
+	set remoteserver [lreplace $remoteserver 3 3 setbreakpoints]
 	EvalRemote "delete"
 	foreach i $breakpoints {
 	    lassign $i num enable_disable file line cond
@@ -2770,7 +2771,7 @@ proc RamDebugger::RecieveFromGdb {} {
     variable options
     variable WindowFilesList
 
-    foreach "fid program state" $remoteserver break
+    lassign $remoteserver fid pid program state
 
     if { [eof $fid] } {
 	set err [catch { close $fid } errstring]
@@ -2788,7 +2789,7 @@ proc RamDebugger::RecieveFromGdb {} {
     append gdblog $aalog
 
     #if { [string trim $aa] == "" } { return }
-
+    
     switch -glob -- $state {
 	start {
 	    if { [string match "*No symbol table is loaded*" $aa] || \
@@ -2801,15 +2802,15 @@ proc RamDebugger::RecieveFromGdb {} {
 		WarnWin [_ "Program exited (%s)" $aa]
 		return
 	    } 
-	    set remoteserver [lreplace $remoteserver 2 2 ""]
+	    set remoteserver [lreplace $remoteserver 3 3 ""]
 	}
 	getdata* {
 	    set handler [lindex $state 1]
 	    set aa [lindex $state 2]\n$aa
 	    if { ![regexp {FINISHED GETDATA\s*$} $aa] } {
-		set remoteserver [lreplace $remoteserver 2 2 [list getdata $handler $aa]]
+		set remoteserver [lreplace $remoteserver 3 3 [list getdata $handler $aa]]
 	    } else {
-		set remoteserver [lreplace $remoteserver 2 2 ""]
+		set remoteserver [lreplace $remoteserver 3 3 ""]
 		regexp {(.*)FINISHED GETDATA\s*$} $aa {} block
 		uplevel \#0 $handler [list [string trimleft $block \n]]
 	    }
@@ -2823,7 +2824,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	    } else { return }
 
 	    set handler [lindex $state 1]
-	    set remoteserver [lreplace $remoteserver 2 2 ""]
+	    set remoteserver [lreplace $remoteserver 3 3 ""]
 
 	    if { $handler != "" } {
 		uplevel \#0 $handler [list $ExpressionResult]
@@ -2833,9 +2834,9 @@ proc RamDebugger::RecieveFromGdb {} {
 	backtrace* {
 	    set aa [lindex $state 1]$aa
 	    if { ![regexp {FINISHED BACKTRACE\s*$} $aa] } {
-		set remoteserver [lreplace $remoteserver 2 2 [list backtrace $aa]]
+		set remoteserver [lreplace $remoteserver 3 3 [list backtrace $aa]]
 	    } else {
-		set remoteserver [lreplace $remoteserver 2 2 ""]
+		set remoteserver [lreplace $remoteserver 3 3 ""]
 		regexp {(.*)FINISHED BACKTRACE\s*$} $aa {} block
 		set ExpressionResult [list 0 "STACK TRACE\n$block"]
 	    }
@@ -2871,7 +2872,7 @@ proc RamDebugger::RecieveFromGdb {} {
 		}
 	    }
 	    if { $line ne "" } {
-		set remoteserver [lreplace $remoteserver 2 2 ""]
+		set remoteserver [lreplace $remoteserver 3 3 ""]
 		set filenum [lsearch -exact $fileslist $file]
 		if { $filenum == -1 } {
 		    set err [catch {OpenFileF -raise_error 1 $file} errstring]
@@ -2888,9 +2889,9 @@ proc RamDebugger::RecieveFromGdb {} {
 	infolocals* {
 	    set aa [lindex $state 1]$aa
 	    if { ![regexp {FINISHED INFO LOCALS\s*$} $aa] } {
-		set remoteserver [lreplace $remoteserver 2 2 [list infolocals $aa]]
+		set remoteserver [lreplace $remoteserver 3 3 [list infolocals $aa]]
 	    } else {
-		set remoteserver [lreplace $remoteserver 2 2 ""]
+		set remoteserver [lreplace $remoteserver 3 3 ""]
 		regexp {(.*)FINISHED INFO LOCALS\s*$} $aa {} block
 		set list ""
 		set line ""
@@ -2910,9 +2911,9 @@ proc RamDebugger::RecieveFromGdb {} {
 	multipleprint* {
 	    set aa [lindex $state 1]$aa
 	    if { ![regexp {FINISHED MULTIPLEPRINT\s*$} $aa] } {
-		set remoteserver [lreplace $remoteserver 2 2 [list multipleprint $aa]]
+		set remoteserver [lreplace $remoteserver 3 3 [list multipleprint $aa]]
 	    } else {
-		set remoteserver [lreplace $remoteserver 2 2 ""]
+		set remoteserver [lreplace $remoteserver 3 3 ""]
 		regexp {(.*)FINISHED MULTIPLEPRINT\s*$} $aa {} block
 		set list ""
 		set line ""
@@ -2934,7 +2935,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	}
 	setbreakpoints {
 	    if { [regexp {FINISHED SET BREAKPOINTS\s*(.*)$} $aa {} rest] } {
-		set remoteserver [lreplace $remoteserver 2 2 ""]
+		set remoteserver [lreplace $remoteserver 3 3 ""]
 		if { [string trim $rest] == "" } { return }
 	    } else { return }
 	}
@@ -3016,6 +3017,9 @@ proc RamDebugger::RecieveFromGdb {} {
 	#         return
     }
 
+#     if { [regexp {\[New Thread \S+ \(LWP (\d+)\)\]} $aa {} pid] } {
+#         lset remoteserver 1 $pid
+#     }
     if { [regexp {Program exited[^\n]*} $aa mess] } {
 	set err [catch { close $fid } errstring]
 	set debuggerstate ""
@@ -5733,10 +5737,10 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		incr i
 	    }
 	    if { $remoteserverType == "gdb" } {
-		while { [lindex $remoteserver 2] != "" } {
+		while { [lindex $remoteserver 3] != "" } {
 		    vwait RamDebugger::remoteserver
 		}
-		set remoteserver [lreplace $remoteserver 2 2 multipleprint]
+		set remoteserver [lreplace $remoteserver 3 3 multipleprint]
 		set command ""
 		foreach i $vars {
 		    append command "print $i\n"
@@ -5797,7 +5801,7 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 		return
 	    }
 	    if { $remoteserverType == "gdb" } {
-		set remoteserver [lreplace $remoteserver 2 2 [list getdata \
+		set remoteserver [lreplace $remoteserver 3 3 [list getdata \
 		                                                  "RamDebugger::CheckEvalEntries res $name"]]
 		set comm "output $var\n"
 		append comm "printf \"FINISHED GETDATA\\n\""
@@ -5855,7 +5859,7 @@ proc RamDebugger::CheckEvalEntries { what { name "" } { res "" } } {
 	    }
 
 	    if { $remoteserverType == "gdb" } {
-		set remoteserver [lreplace $remoteserver 2 2 setvariable]
+		set remoteserver [lreplace $remoteserver 3 3 setvariable]
 		EvalRemote "set variable $var=$value"
 		return
 	    }
@@ -5895,10 +5899,10 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
     if { $name == "" } {
 	if { $what == "do" } {
 	    if { $remoteserverType == "gdb" } {
-		while { [lindex $remoteserver 2] != "" } {
+		while { [lindex $remoteserver 3] != "" } {
 		    vwait RamDebugger::remoteserver
 		}
-		set remoteserver [lreplace $remoteserver 2 2 infolocals]
+		set remoteserver [lreplace $remoteserver 3 3 infolocals]
 		EvalRemote "info locals\nprintf \"\\nFINISHED INFO LOCALS\\n\""
 		return
 	    }
@@ -5955,7 +5959,7 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 		return
 	    }
 	    if { $remoteserverType == "gdb" } {
-		set remoteserver [lreplace $remoteserver 2 2 [list getdata \
+		set remoteserver [lreplace $remoteserver 3 3 [list getdata \
 		                                                  "RamDebugger::CheckEvalEntriesL res $name"]]
 		set comm "output $var\n"
 		append comm "printf \"FINISHED GETDATA\\n\""
@@ -6020,7 +6024,7 @@ proc RamDebugger::CheckEvalEntriesL { what { name "" } { res "" } } {
 	    }
 	    
 	    if { $remoteserverType == "gdb" } {
-		set remoteserver [lreplace $remoteserver 2 2 setvariable]
+		set remoteserver [lreplace $remoteserver 3 3 setvariable]
 		EvalRemote "set variable $var=$value"
 		return
 	    }
