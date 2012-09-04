@@ -9430,6 +9430,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	bind $text <$::control-u><$::control-s><$::control-Key-$i> \
 	    "[list event generate $text <Shift-F$i>]; break"
     }
+    bind $text <$::control-u><$::control-Key-1> "[list event generate $text <F11>]; break"
+    bind $text <$::control-u><$::control-s><$::control-Key-1> \
+	"[list event generate $text <Shift-F11>]; break"
     
     set menu [$mainframe getmenu edit]
     $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift+I"
