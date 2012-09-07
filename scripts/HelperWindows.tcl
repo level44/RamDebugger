@@ -2905,18 +2905,27 @@ proc RamDebugger::textPaste_insert_after { w } {
 }
 
 proc RamDebugger::Search_add_open_brace { w } {
+    variable currentfile
+
+    if { [GiveFileType $currentfile] eq "C/C++" } {
+	set openb "("
+	set closeb ")"
+	set txt " [string trimright $RamDebugger::searchstring]$openb"
+    } else {
+	set openb "{"
+	set closeb "}"
+	set txt "[string trimright $RamDebugger::searchstring] $openb"
+    }
+    set rex "\\$openb\\s*\$"
     
-    if { [regexp {\{\s*$} $RamDebugger::searchstring] } {
+    if { [regexp $rex $RamDebugger::searchstring] } {
 	RamDebugger::Search $w iforward
 	return
     }
-    
     set save_traces [trace info variable RamDebugger::searchstring]
     foreach i $save_traces {
 	trace remove variable RamDebugger::searchstring {*}$i
     }
-    
-    set txt "[string trimright $RamDebugger::searchstring] \{"
     
     set RamDebugger::searchstring $txt
     set RamDebugger::Lastsearchstring $txt
