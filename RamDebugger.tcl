@@ -1309,7 +1309,7 @@ proc RamDebugger::rnext { args } {
     } else {
 	set remoteserver [lreplace $remoteserver 3 3 next]
 	lassign $remoteserver fid pid
-	if { $::tcl_platform(platform) eq "unix" } {
+	if { $opts(-full) && $::tcl_platform(platform) eq "unix" } {
 	    exec kill -s INT $pid
 	}
 	#EvalRemote \003
@@ -3017,9 +3017,9 @@ proc RamDebugger::RecieveFromGdb {} {
 	#         return
     }
 
-#     if { [regexp {\[New Thread \S+ \(LWP (\d+)\)\]} $aa {} pid] } {
-#         lset remoteserver 1 $pid
-#     }
+    if { [regexp {\[New Thread \S+ \(LWP (\d+)\)\]} $aa {} pid] } {
+	lset remoteserver 1 $pid
+    }
     if { [regexp {Program exited[^\n]*} $aa mess] } {
 	set err [catch { close $fid } errstring]
 	set debuggerstate ""
