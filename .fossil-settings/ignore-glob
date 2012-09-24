@@ -1,0 +1,3 @@
+*/debug/*,*/release/*,*.o,*.d,*.xml.bak,*.log,*.so,*.dll
+*/CVS/*
+

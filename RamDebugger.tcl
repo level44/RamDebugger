@@ -7617,13 +7617,14 @@ proc RamDebugger::UpdateLineNumDo {} {
     variable currentfile
     variable currentfileIsModified
     variable CheckExternalFileModification
-
+    variable LineNum_label
+    
     set idx [$text index insert]
-    set line ""
-    foreach "line col" [scan $idx "%d,%d"] break
-    if { $line == "" } { return }
+    lassign [scan $idx "%d.%d"] line col
+    if { $line eq "" } { return }
     set LineNum "L: $line"
-
+    tooltip::tooltip $LineNum_label "L: $line C: $col"
+    
     if { $currentfile ne "" && [string index $currentfile 0] != "*" } {
 	if { [lindex [file system $currentfile] 0] eq "native" } {
 	    set exists [file exists $currentfile]
@@ -8370,6 +8371,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     variable iswince
     variable big_icons
     variable inside_gid
+    variable LineNum_label
 
     if { [ info exists ::GIDDEFAULT]} {
 	set inside_gid 1
@@ -8842,6 +8844,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
     set label [$mainframe addindicator -textvariable RamDebugger::LineNum -width 6 \
 	    -anchor e -padx 3]
+    set LineNum_label $label
 
     bind $label <1> RamDebugger::GotoLine
     set label [$mainframe addindicator -textvariable RamDebugger::remoteserver -width 15 \

@@ -1703,7 +1703,7 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 	    set err [catch { exec $fossil ls -l 2>@1 } list_files]
 	}
 	if { !$err } {
-	    set err [catch { exec $fossil extras 2>@1 } list_files2]
+	    set err [catch { exec $fossil extras --dotfiles 2>@1 } list_files2]
 	    foreach line [split $list_files2 \n] {
 		append list_files "\n? $line"
 	    }
