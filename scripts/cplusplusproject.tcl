@@ -860,10 +860,14 @@ proc cproject::Create { par } {
     grid columnconfigure $nf31 0 -weight 1
 
     set nf32 [ttk::labelframe $nf3.f2 -text [_  "working directory"]]
+    
 
     ttk::entry $nf32.e -textvariable cproject::thisdataE(execdir)
     ttk::button $nf32.b -image [Bitmap::get file] -style Toolbutton -command \
 	[list cproject::select_executable_dir $w]
+    
+    set vars {$HOME, $ProjectDir, $ObjectsDir}
+    tooltip::tooltip $nf32.e [_ "Current directory for executing program. Use variables: %s" $vars]
     
     grid $nf32.e $nf32.b -sticky ew -padx 2 -pady 2
     grid columnconfigure $nf32 0 -weight 1
@@ -1617,12 +1621,23 @@ proc cproject::GiveDebugData {} {
     if { [info exists dataE($dr,exe)] } {
 	if { $dataM($dr,has_userdefined_makefile)  } {
 	    set base_dir [file dirname $project]
-	    set exe [file join $base_dir $dataE($dr,exe)]
+	    if { [file exists [file join $base_dir $dataE($dr,exe)]] } {
+		set exe [file join $base_dir $dataE($dr,exe)]
+	    } else {
+		set exe $dataE($dr,exe)
+	    }
 	} else {
 	    set objdir [file root $project]_$dr
 	    set exe [file join $objdir $dataE($dr,exe)]
 	}
-	return [list $exe $dataE($dr,execdir) $dataE($dr,exeargs)]
+	set HOME ""
+	catch { set HOME $::env(HOME) }
+	set ProjectDir [file dirname $project]
+	set ObjectsDir [file tail [file root $project]]_$dr
+
+	set execdir [string map [list {$HOME} $HOME {$ProjectDir} $ProjectDir {$ObjectsDir} $ObjectsDir] \
+		$dataE($dr,execdir)]
+	return [list $exe $execdir $dataE($dr,exeargs)]
     }
     return ""
 }

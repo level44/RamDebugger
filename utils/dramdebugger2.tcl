@@ -1,6 +1,11 @@
 
-set g1 720x845+0+0
-set g2 750x600-0+0
+if { [winfo screenheight .] < 1024 } {
+    set g1 720x845+0+0
+    set g2 750x600-0+0
+} else {
+    set g1 699x970+0+0
+    set g2 550x600-0+0
+}
 set big_icons 0
 
 if { [lindex $argv 0] eq "-b" } {
