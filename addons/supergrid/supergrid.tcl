@@ -82,7 +82,7 @@
 
 package require Tcl 8.3
 package require Tk 8.3
-package provide supergrid 1.0
+package provide supergrid 1.2
 
 namespace eval supergrid {
     variable UseGPrefix ""
@@ -91,12 +91,21 @@ namespace eval supergrid {
     variable widgets2 [list panedwindow TitleFrame SpinBox ComboBox date::datefield \
 		           ScrolledWindow PanedWindow ButtonBox MainFrame Button Label NoteBook \
 		           Separator Entry treectrl hugecombo labelframe spinbox]
-    variable SubGridClasses [list Frame Labelframe]
-    variable HorizontalClasses [list Entry Text Canvas  Listbox PanedWindow TitleFrame ComboBox \
-	NoteBook MainFrame ScrolledWindow Panedwindow TreeCtrl Labelframe Spinbox Hugecombo]
-    variable VerticalClasses [list Text Canvas Listbox PanedWindow TitleFrame NoteBook MainFrame \
-	ScrolledWindow panedwindow Panedwindow TreeCtrl Labelframe]
-    variable ScrollClasses [list Scrollbar]
+    variable widgets3 [list ttk::button ttk::checkbutton ttk::combobox ttk::entry \
+		           ttk::frame ttk::label ttk::labelframe ttk::menubutton ttk::notebook \
+		           ttk::panedwindow ttk::progressbar ttk::radiobutton ttk::scale ttk::scrollbar \
+		           ttk::separator ttk::sizegrip ttk::treeview]
+    if { [info command ttk::spinbox] ne "" } {
+	lappend widgets3 ttk::spinbox
+    }
+    variable SubGridClasses [list Frame TFrame Labelframe TLabelframe] 
+    variable HorizontalClasses [list Entry TEntry Text Canvas Listbox PanedWindow TPanedwindow \
+	    TitleFrame ComboBox TCombobox NoteBook TNotebook MainFrame ScrolledWindow \
+	    Panedwindow TPanedwindow TreeCtrl Treeview Labelframe TLabelframe Spinbox TSpinbox Hugecombo]
+    variable VerticalClasses [list Text Canvas Listbox PanedWindow TPanedwindow TitleFrame \
+	    NoteBook TNotebook MainFrame ScrolledWindow panedwindow Panedwindow TPanedwindow \
+	    TreeCtrl Treeview Labelframe TLabelframe NoteBook TNotebook]
+    variable ScrollClasses [list Scrollbar TScrollbar]
     variable DiscardClasses [list Toplevel Menu]
     variable DiscardWidgets {^\.#BWidget}
 
@@ -106,11 +115,12 @@ namespace eval supergrid {
 proc supergrid::init {} {
     variable widgets
     variable widgets2
+    variable widgets3
     variable data
     variable UseGPrefix
 
     if { $UseGPrefix != "" } {
-	if { [info command ::$UseGPrefix[lindex $widgets 0]] != "" } { return }
+	if { [info commands ::$UseGPrefix[lindex $widgets 0]] != "" } { return }
 	set prefix ::$UseGPrefix
 	set body {
 	    set ipos [lsearch $args -grid]
@@ -123,7 +133,7 @@ proc supergrid::init {} {
 	}
 	regsub LENGTH $body [string length $UseGPrefix] body
     } else {
-	if { [info command ::[lindex $widgets 0]_supergrid] != "" } { return }
+	if { [info commands ::[lindex $widgets 0]_supergrid] != "" } { return }
 	set prefix ::
 	set body {
 	    set ipos [lsearch $args -grid]
@@ -135,14 +145,20 @@ proc supergrid::init {} {
 	}
     }
     foreach i $widgets {
-	if { [info command ::$i] == "" } { auto_load ::$i }
-	if { [info command ::$i] == "" } { error "command ::$i does not exists" }
+	if { [info commands ::$i] == "" } { auto_load ::$i }
+	if { [info commands ::$i] == "" } { error "command ::$i does not exist" }
 	if { $UseGPrefix == "" } { rename $prefix$i $prefix${i}_supergrid }
 	proc $prefix$i { w args } $body
     }
     foreach i $widgets2 {
-	if { [info command ::$i] == "" } { auto_load ::$i }
-	if { [info command ::$i] == "" } { continue }
+	if { [info commands ::$i] == "" } { auto_load ::$i }
+	if { [info commands ::$i] == "" } { continue }
+	if { $UseGPrefix == "" } { rename $prefix$i $prefix${i}_supergrid }
+	proc $prefix$i { w args } $body
+    }
+    foreach i $widgets3 {
+	if { [info commands ::$i] == "" } { auto_load ::$i }
+	if { [info commands ::$i] == "" } { error "command ::$i does not exist" }
 	if { $UseGPrefix == "" } { rename $prefix$i $prefix${i}_supergrid }
 	proc $prefix$i { w args } $body
     }
