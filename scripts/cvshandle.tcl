@@ -957,6 +957,9 @@ proc RamDebugger::VCS::indicator_update_do { cvs_or_fossil } {
     set cfile [file tail $currentfile]
     set cdir [file tail [file dirname $currentfile]]
    
+    if { ![info exists fossil_indicator_fileid] } {
+	return
+    }
     if { $cvs_or_fossil eq "cvs" } {
 	append cvs_indicator_data "[gets $cvs_indicator_fileid]\n"
     } else {
@@ -1606,7 +1609,7 @@ proc RamDebugger::VCS::parse_finfo { finfo } {
     foreach l [split $finfo \n] {
 	if { [regexp {^\d} $l] } {
 	    if { $line ne "" } {
-		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin \
+		regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\].*\)} $line {} date checkin \
 		    comment user artifact
 		set ret [parse_timeline [exec $fossil timeline $checkin -n 1]]
 		lassign [lindex $ret 0] date time - - - tags
