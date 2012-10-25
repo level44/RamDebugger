@@ -8163,7 +8163,7 @@ proc RamDebugger::RegisterExtension {} {
     }
 
     if { $val(1) eq $rval(1) && $val(2) eq $rval(2) && $val(3) eq $rval(3) } {
-	dialogwin_snit $text._ask -title [_ "Unassociate extension"] -class RamDebugger
+	dialogwin_snit $text._ask -title [_ "Unassociate extension"] -class $::className
 	set f [$text._ask giveframe]
 	label $f.l1 -text [_ "Do you want to unassociate command 'RamDebugger from extension .tcl?"]
 	set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
@@ -8185,7 +8185,7 @@ proc RamDebugger::RegisterExtension {} {
 	}
 	return
     }
-    dialogwin_snit $text._ask -title [_ "Associate extension"] -class RamDebugger
+    dialogwin_snit $text._ask -title [_ "Associate extension"] -class $::className
     set f [$text._ask giveframe]
     label $f.l1 -text [_ "Do you want to associate command 'RamDebugger to extension .tcl?"]
     set smallfontsize [expr {[font actual [$f.l1 cget -font] -size]-1}]
@@ -8471,7 +8471,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     if { $iswince } { pocketpc::init }
 
     if { $topleveluse == "" } {
-	toplevel $w -class RamDebugger
+	toplevel $w -class $::className
     } else {
 	toplevel $w -use $topleveluse
 	update idletasks ;# doesn't work if this is removed; does not work with it either
@@ -9881,7 +9881,13 @@ if { ![info exists SkipRamDebuggerInit] } {
     } else {
 	set big_icons 0
     }
-
+    if { [set ipos [lsearch $argv "-class_name"]] != -1 } {
+	set iposm1 [expr {$ipos+1}]
+	set className [lindex $argv $iposm1]
+	set argv [lreplace $argv $ipos $iposm1]
+    } else {
+	set className RamDebugger
+    }
     RamDebugger::Init $readwriteprefs $prefs_group $registerasremote $big_icons
     
     ################################################################################

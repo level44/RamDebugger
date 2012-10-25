@@ -854,7 +854,7 @@ proc profileprocs::OpenGUI { { w .profileprocs } } {
     }
 
     catch { destroy $w }
-    set w [dialogwin_snit $w -title [_ "Profile procs"] -class RamDebugger \
+    set w [dialogwin_snit $w -title [_ "Profile procs"] -class $::className \
 	    -okname - -morebuttons [list [_ "Start"] [_ "Update"] [_ "Stop"]] \
 	    -grab 0 -callback profileprocs::OpenGUI_do]
     set f [$w giveframe]

@@ -598,7 +598,7 @@ proc cproject::CreateModifyGroup { w what } {
 	}
     }
     
-    set wd [dialogwin_snit $w._ask -title $title -class RamDebugger -entrylabel $label: -entryvalue $group]
+    set wd [dialogwin_snit $w._ask -title $title -class $::className -entrylabel $label: -entryvalue $group]
     set action [$wd createwindow]
     while 1 {
 	if { $action <= 0 } { 
@@ -671,7 +671,7 @@ proc cproject::Create { par } {
 	set RamDebugger::options(recentprojects) ""
     }
     destroy $par.mpt
-    set w [dialogwin_snit $par.mpt -title [_ "C++ compilation project"] -class RamDebugger -grab 0 \
+    set w [dialogwin_snit $par.mpt -title [_ "C++ compilation project"] -class $::className -grab 0 \
 	    -morebuttons [list [_ "Apply"]]  -callback [list cproject::CreateDo]]
     set f [$w giveframe]
 
@@ -2289,7 +2289,7 @@ proc RamDebugger::DebugCplusPlusWindow { { tryautomatic 0 } } {
     }
     
     destroy $text.cmp
-    set w [dialogwin_snit $text.cmp -title [_ "Debug c++"] -class RamDebugger]
+    set w [dialogwin_snit $text.cmp -title [_ "Debug c++"] -class $::className]
     set f [$w giveframe]
     
     ttk::label $f.l1 -text [_ "Program to debug"];
@@ -2415,7 +2415,7 @@ proc RamDebugger::show_processes_window { args } {
     }
     set w $text.debugatt
     destroy $w
-    dialogwin_snit $w -title $title -grab $grab -okname $okname -class RamDebugger \
+    dialogwin_snit $w -title $title -grab $grab -okname $okname -class $::className \
 	-callback [list RamDebugger::show_processes_window_accept $callback]
     set f [$w giveframe]
     

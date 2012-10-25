@@ -274,7 +274,7 @@ proc RamDebugger::GetFile_CheckMounts { combo } {
 
 	if { $options(getFile_askpassword) || $username eq "" || \
 	    [regexp {^ftp|telnet|rlogin$} $protocol] } {
-	    set w [dialogwin_snit $combo._ask -title "Enter user name and password"] -class RamDebugger
+	    set w [dialogwin_snit $combo._ask -title "Enter user name and password"] -class $::className
 	    set f [$w giveframe]
 	    
 	    label $f.l01 -text "Protocol:"
