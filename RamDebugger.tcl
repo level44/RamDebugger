@@ -3291,8 +3291,14 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
     if { $zoomed } {
 	set options($geomkey) zoomed
     } elseif { [wm state $w] eq "normal" && [winfo width $w] > 1 } {
-	regexp {(\d+)x(\d+)\+([-\d][\d]*)\+?([-\d]+)} [cu::give_window_geometry $w] \
-	    {} width height x y
+	regexp {(\d+)x(\d+)([-+])([-\d][\d]*)([-+])?([-\d]+)} [cu::give_window_geometry $w] \
+	    {} width height sign_x x sign_y y
+	if { $sign_x eq "-" } {
+	    set x [expr {[winfo screenwidth $text]-$x}]
+	}
+	if { $sign_y eq "-" } {
+	    set y [expr {[winfo screenheight $text]-$y}]
+	}
 	if { $x < -20 } { set x -20 }
 	if { $y < -20 } { set y -20 }
 	if { $x > [winfo screenwidth $text]-20 } { set x [expr {[winfo screenwidth $text]-20}] }
