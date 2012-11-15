@@ -2973,6 +2973,13 @@ proc RamDebugger::Search_goHome { active_text } {
 #     } else { set ::RamDebugger::lastwascreation "" }
     set ::RamDebugger::Lastsearchstring $RamDebugger::searchstring
 }    
+ 
+proc RamDebugger::_search_BP1 { w w_press } {
+    destroy $w.search
+    if { $w_press eq "$w.search" } {
+	return -code break
+    }
+}
 
 proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     variable text
@@ -3044,7 +3051,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 		"destroy $w.search ; break"]
 	    bind $w.search <Delete> "$w.search icursor end; $w.search delete insert ; break"
 	    bind $w.search <BackSpace> "$w.search icursor end; tkEntryBackspace $w.search ; break"
-	    bind $w.search <1> "[list destroy $w.search]; break"
+	    bind $w.search <1> [list RamDebugger::_search_BP1 $w %W]
 	    bind $w.search <<Contextual>> "destroy $w.search"
 	    foreach i [list F1 F2 F5 F6 F7 F9 F10 F11] {
 		bind $w.search <$i> "destroy $w.search"
