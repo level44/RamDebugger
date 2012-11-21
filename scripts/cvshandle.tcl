@@ -1638,6 +1638,7 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
     set optional {
 	{ -item item "" }
 	{ -cvs_and_fossil boolean 0 }
+	{ -open_time_line boolean 0 }
     }
     set compulsory "w what dir tree itemP level"
    parse_args $optional $compulsory $args
@@ -1757,7 +1758,9 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 		    $tree item element configure $item_t 0 e_text_sel -fill orange
 		}
 	    }
-	    $tree item collapse $itemT
+	    if { !$open_time_line } {
+		$tree item collapse $itemT
+	    }
 	}
 	
 	if { ![$w exists_uservar view_unchanged] } {
@@ -1975,7 +1978,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    if { $is_timeline != 0 } {
 		$menu add checkbutton -label [_ "View more timeline"] -variable \
 		    [$w give_uservar fossil_timeline_view_more] -command \
-		    [list "update_recursive_cmd" $w toggle_fossil_timeline_view_more $tree]
+		    [list "update_recursive_cmd" $w toggle_fossil_timeline_view_more $tree $sel_ids]
 		if { ![$w exists_uservar fossil_timeline_view_more] } {
 		    $w set_uservar_value fossil_timeline_view_more 0
 		}
@@ -2082,11 +2085,9 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    $w set_uservar_value fossil_autosync [update_recursive_cmd $w give_fossil_sync]
 	}
 	toggle_fossil_timeline_view_more {
-	    lassign $args tree
+	    lassign $args tree sel_ids
 	    # toggle is already made by the menu checkbutton
-	    set dir [$w give_uservar_value dir]
-	    $tree item delete all
-	    update_recursive_accept $w view $dir $tree 0 0
+	    update_recursive_cmd  $w update -open_time_line 1 view $tree $sel_ids
 	}
 	fossil_syncronize {
 	    lassign $args sync_type tree sel_ids dirs
@@ -2125,46 +2126,46 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    if { [llength $sel_ids] == 0 } {
 		set sel_ids [$tree selection get]
 		if { [llength $sel_ids] == 0 } { return }
-		set files ""
-		foreach item $sel_ids {
-		    if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
-		        lappend files $file
-		    } elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
-		        lappend files $file
-		    }
+	    }
+	    set files ""
+	    foreach item $sel_ids {
+		if { [regexp {^[MA]\s(\S+)} [$tree item text $item 0] {} file] } { 
+		    lappend files $file
+		} elseif { [regexp {(\w{2,})\s+(.*)} [$tree item text $item 0] {} mode file] && $mode ne "UNCHANGED" } {
+		    lappend files $file
 		}
-		if { [llength $files] > 8 } {
-		    set files_p [join [lrange $files 0 7] ","]...
-		} else {
-		    set files_p [join $files ","]
-		}
-		set txt [_ "Are you sure to commit %d files? (%s)" [llength $files] $files_p]
-		set wd [dialogwin_snit $w.ask -title [_ "commit"] -class $::className -entrytext \
-		        $txt]
-		set f [$wd giveframe]
-
-		set values ""
-		set fossil [auto_execok fossil]
-		foreach line [split [exec $fossil branch list] \n] {
-		    regsub {^\s*\*\s+} $line {} line
-		    lappend values [string trim $line]
-		}
-		ttk::label $f.l1 -text [_ "New branch"]:
-		ttk::combobox $f.cb1 -textvariable [$wd give_uservar branch ""] -values $values
-		
-		grid $f.l1 $f.cb1 -sticky w -padx 2 -pady "20 2"
-		
-		tk::TabToWindow $f.cb1
-		bind $wd <Return> [list $wd invokeok]
-		set action [$wd createwindow]
-		set branch [string trim [$wd give_uservar_value branch]]
-		if { $branch ne "" } {
-		    set branchCmd [list --branch $branch]
-		}
-		destroy $wd
-		if { $action < 1 } {
-		    return
-		}
+	    }
+	    if { [llength $files] > 8 } {
+		set files_p [join [lrange $files 0 7] ","]...
+	    } else {
+		set files_p [join $files ","]
+	    }
+	    set txt [_ "Are you sure to commit %d files? (%s)" [llength $files] $files_p]
+	    set wd [dialogwin_snit $w.ask -title [_ "commit"] -class $::className -entrytext \
+		    $txt]
+	    set f [$wd giveframe]
+	    
+	    set values ""
+	    set fossil [auto_execok fossil]
+	    foreach line [split [exec $fossil branch list --all] \n] {
+		regsub {^\s*\*\s+} $line {} line
+		lappend values [string trim $line]
+	    }
+	    ttk::label $f.l1 -text [_ "New branch"]:
+	    ttk::combobox $f.cb1 -textvariable [$wd give_uservar branch ""] -values $values
+	    
+	    grid $f.l1 $f.cb1 -sticky w -padx 2 -pady "20 2"
+	    
+	    tk::TabToWindow $f.cb1
+	    bind $wd <Return> [list $wd invokeok]
+	    set action [$wd createwindow]
+	    set branch [string trim [$wd give_uservar_value branch]]
+	    if { $branch ne "" } {
+		set branchCmd [list --branch $branch]
+	    }
+	    destroy $wd
+	    if { $action < 1 } {
+		return
 	    }
 	    get_cwd
 	    lassign "" cvs_files_dict fossil_files_dict items
@@ -2425,7 +2426,12 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    waitstate $w off
 	}
 	update {
-	    lassign $args what_in tree sel_ids
+	    set optional {
+		{ -open_time_line boolean 0 }
+	    }
+	    set compulsory "what_in tree sel_ids"
+	    parse_args $optional $compulsory $args
+
 	    set ids ""
 	    foreach item $sel_ids {
 		if { [$tree item children $item] ne "" } {
@@ -2435,15 +2441,17 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		}
 	    }
 	    foreach item [lsort -unique $ids] {
-		set dir [$tree item text $item 0]
+		set dir_item [lindex [$tree item ancestors $item] end-1]
+		set dir [$tree item text $dir_item 0]
 		get_cwd
-		catch { 
+		catch {
 		    cd $dir
-		    # if there is a problem with tme modification time, fossil seem to remember this checking later
+		    # if there is a problem with the modification time, fossil seem to remember this checking later
 		    exec $fossil stat --sha1sum
 		}
 		release_cwd
-		update_recursive_accept -item $item $w $what_in $dir $tree [$tree item parent $item] 0
+		update_recursive_accept -item $dir_item -open_time_line $open_time_line \
+		    $w $what_in $dir $tree [$tree item parent $item] 0
 	    }
 	}
 	apply_version {
@@ -2991,6 +2999,7 @@ if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] &&
 	set ::control_txt Ctrl
     }
     
+    set className vcs
     #package require compass_utils
     set RamDebugger::currentfile ""
     set RamDebugger::topdir [file dirname [file dirname [file normalize [info script]]]]

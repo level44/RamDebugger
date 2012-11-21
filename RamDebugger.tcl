@@ -317,8 +317,8 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
     set options_def(colors,varnames) \#b8860b
 
     set options_def(listfilespane) 0
-    set options_def(viewvariablespane) 0
-    set options_def(auto_raise_stack_trace) 1
+    set options_def(viewvariablespaneV2) 0
+    set options_def(auto_raise_stack_trace) 0
     
     set options_def(filetype) auto
     set options_def(filetype_only_this_file) 1
@@ -3221,7 +3221,7 @@ proc RamDebugger::CheckViewVariablesPane {} {
 
     set pw [FindPanedWindowFromPane $pane3]
 
-    if { $options(viewvariablespane) } {
+    if { $options(viewvariablespaneV2) } {
 	if { [lsearch [$pw panes] $pane3] == -1 } {
 	    $pw add $pane3 -sticky nsew -after $pane2 -width 100 -minsize 100
 	    ViewOnlyTextOrAll -force_all
@@ -3249,7 +3249,7 @@ proc RamDebugger::ViewOnlyTextOrAll { args } {
     set compulsory ""
     parse_args $optional $compulsory $args
     
-    if { $options(listfilespane) || $options(viewvariablespane) } {
+    if { $options(listfilespane) || $options(viewvariablespaneV2) } {
 	set view_all_simple 0
     } else {
 	set view_all_simple 1
@@ -8611,10 +8611,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[_ "Toggle between viewing the file list pane"] "" \
 		-command "RamDebugger::CheckListFilesPane" \
 		-variable RamDebugger::options(listfilespane)] \
-		[list checkbutton &[_ "View variables pane"] {} \
-		[_ "Toggle between viewing theview variables pane"] "" \
-		-command "RamDebugger::CheckViewVariablesPane" \
-		-variable RamDebugger::options(viewvariablespane)] \
 		separator \
 		[list command &[_ "Secondary view"] {} \
 		[_ "Toggle between activating a secondary view for files"] "Ctrl 3" \
@@ -8793,6 +8789,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command &[_ "About"] {} [_ "Information about the program"] "" \
 		-command "RamDebugger::AboutWindow"] \
 		]
+    
+#     [list checkbutton &[_ "View variables pane"] {} \
+#                 [_ "Toggle between viewing theview variables pane"] "" \
+#                 -command "RamDebugger::CheckViewVariablesPane" \
+#                 -variable RamDebugger::options(viewvariablespaneV2)] \
+
     
     if { [ tk windowingsystem] eq "aqua"} {
 	set descmenu_old $descmenu
@@ -9147,6 +9149,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     $sw2 setwidget $textCOMP
 
     supergrid::go $f3
+    
+    set f4 [$pane2in2.nb insert end variables -text [_ "Variables"]]
 
     #$pane2in2.nb compute_size
     $pane2in2.nb raise stacktrace
@@ -9193,7 +9197,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     #set pane3 [$pw add -weight $weight3]
     set pane3 [frame $pw.pane3]
     
-    if { $options(viewvariablespane) } {
+    if { $options(viewvariablespaneV2) } {
 	$pw add $pane3 -sticky nsew -width $weight3
     }
     
@@ -9201,7 +9205,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # the vertical user defined - local
     ################################################################################
 
-    set pw1 [panedwindow $pane3.pw -orient vertical -grid "0"]
+    #set pw1 [panedwindow $pane3.pw -orient vertical -grid "0"]
+    
+    set pw1 [panedwindow $f4.pw -orient horizontal]
+    grid $pw1 -sticky nsew
+    grid columnconfigure $f4 0 -weight 1
+    grid rowconfigure $f4 0 -weight 1
 
     foreach "weight3in1 weight3in2" [ManagePanes $pw1 h "100 100"] break
 
