@@ -2442,6 +2442,9 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    }
 	    foreach item [lsort -unique $ids] {
 		set dir_item [lindex [$tree item ancestors $item] end-1]
+		if { $dir_item eq "" } {
+		    set dir_item $item
+		}
 		set dir [$tree item text $dir_item 0]
 		get_cwd
 		catch {
