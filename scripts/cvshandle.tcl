@@ -2121,6 +2121,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		        -default cancel -parent $w -message $txt]
 		if { $ret eq "cancel" } { return }
 	    }
+	    set branchCmd ""
 	    if { [llength $sel_ids] == 0 } {
 		set sel_ids [$tree selection get]
 		if { [llength $sel_ids] == 0 } { return }
@@ -2138,9 +2139,32 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		    set files_p [join $files ","]
 		}
 		set txt [_ "Are you sure to commit %d files? (%s)" [llength $files] $files_p]
-		set ret [snit_messageBox -icon question -title [_ "commit"] -type okcancel \
-		        -default ok -parent $w -message $txt]
-		if { $ret eq "cancel" } { return }
+		set wd [dialogwin_snit $w.ask -title [_ "commit"] -class $::className -entrytext \
+		        $txt]
+		set f [$wd giveframe]
+
+		set values ""
+		set fossil [auto_execok fossil]
+		foreach line [split [exec $fossil branch list] \n] {
+		    regsub {^\s*\*\s+} $line {} line
+		    lappend values [string trim $line]
+		}
+		ttk::label $f.l1 -text [_ "New branch"]:
+		ttk::combobox $f.cb1 -textvariable [$wd give_uservar branch ""] -values $values
+		
+		grid $f.l1 $f.cb1 -sticky w -padx 2 -pady "20 2"
+		
+		tk::TabToWindow $f.cb1
+		bind $wd <Return> [list $wd invokeok]
+		set action [$wd createwindow]
+		set branch [string trim [$wd give_uservar_value branch]]
+		if { $branch ne "" } {
+		    set branchCmd [list --branch $branch]
+		}
+		destroy $wd
+		if { $action < 1 } {
+		    return
+		}
 	    }
 	    get_cwd
 	    lassign "" cvs_files_dict fossil_files_dict items
@@ -2175,13 +2199,13 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		regexp -line {^local-root:\s*(.*)} $info {} dirF
 		cd $dirF
 		if { $message eq "" } { set message " " }
-		set err [catch { exec $fossil commit --nosign -m $message {*}$fs 2>@1 } ret]
+		set err [catch { exec $fossil commit --nosign -m $message {*}$branchCmd {*}$fs 2>@1 } ret]
 		if { $err && [regexp {cannot do a partial commit of a merge} $ret] } {
 		    set txt [_ "Cannot do a partial commit of a merge. Do you want to make a full commit?"]
 		    set ret_in [snit_messageBox -icon question -type okcancel \
 		            -default ok -parent $w -message $txt]
 		    if { $ret_in eq "ok" } {
-		        set err [catch { exec $fossil commit --nosign -m $message 2>@1 } ret]
+		        set err [catch { exec $fossil commit --nosign -m $message {*}$branchCmd 2>@1 } ret]
 		        if { !$err } {
 		           set needs_update_view 1
 		        }
