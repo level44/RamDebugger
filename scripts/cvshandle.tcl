@@ -2151,15 +2151,22 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		regsub {^\s*\*\s+} $line {} line
 		lappend values [string trim $line]
 	    }
-	    ttk::label $f.l1 -text [_ "New branch"]:
+	    ttk::checkbutton $f.l1 -text [_ "New branch"]: -variable [$wd give_uservar branch_active 0]
 	    ttk::combobox $f.cb1 -textvariable [$wd give_uservar branch ""] -values $values
 	    
 	    grid $f.l1 $f.cb1 -sticky w -padx 2 -pady "20 2"
 	    
+	    set d [dict create 1 $f.cb1]
+	    $wd enable_disable_on_key branch_active $d
+	    
 	    tk::TabToWindow $f.cb1
 	    bind $wd <Return> [list $wd invokeok]
 	    set action [$wd createwindow]
-	    set branch [string trim [$wd give_uservar_value branch]]
+	    if { [$wd give_uservar_value branch_active] } {
+		set branch [string trim [$wd give_uservar_value branch]]
+	    } else {
+		set branch ""
+	    }
 	    if { $branch ne "" } {
 		set branchCmd [list --branch $branch]
 	    }
