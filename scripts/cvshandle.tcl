@@ -2141,16 +2141,30 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		set files_p [join $files ","]
 	    }
 	    set txt [_ "Are you sure to commit %d files? (%s)" [llength $files] $files_p]
+	    destroy $w.ask
 	    set wd [dialogwin_snit $w.ask -title [_ "commit"] -class $::className -entrytext \
 		    $txt]
 	    set f [$wd giveframe]
 	    
-	    set values ""
-	    set fossil [auto_execok fossil]
-	    foreach line [split [exec $fossil branch list --all] \n] {
-		regsub {^\s*\*\s+} $line {} line
-		lappend values [string trim $line]
+	    lassign "" values dir
+	    set item [lindex $sel_ids 0]
+	    if { $item ne "" } {
+		set dir [$tree item text [$tree item parent $item] 0]
+		if { ![file exists $dir] } {
+		    set dir ""
+		}
+	    }            
+	    if { $dir ne "" } {
+		get_cwd
+		cd $dir
+		set fossil [auto_execok fossil]
+		foreach line [split [exec $fossil branch list --all] \n] {
+		    regsub {^\s*\*\s+} $line {} line
+		    lappend values [string trim $line]
+		}
+		release_cwd
 	    }
+	    
 	    ttk::checkbutton $f.l1 -text [_ "New branch"]: -variable [$wd give_uservar branch_active 0]
 	    ttk::combobox $f.cb1 -textvariable [$wd give_uservar branch ""] -values $values
 	    
