@@ -2579,12 +2579,15 @@ proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
     switch $channelId {
 	stdout {
 	    TextOutInsert $string
+	    if { ![regexp {(?i)^continuing[.\s]*$} $string] } {
+		TextOutRaise   
+	    }
 	}
 	stderr {
 	    TextOutInsertRed $string
+	    TextOutRaise
 	}
     }
-    TextOutRaise
     update
 }
 
@@ -3041,7 +3044,9 @@ proc RamDebugger::RecieveFromGdb {} {
 	WarnWin [_ "Error defining the debugged executable. Use 'Utilities->gdb log' for details"]
     }
     TextOutInsert $aa
-    TextOutRaise
+    if { ![regexp {(?i)^(continuing)?[.\s]*$} $aa] } {
+	TextOutRaise
+    }
 }
 
 ################################################################################
@@ -6141,6 +6146,10 @@ proc RamDebugger::TextOutInsertBlue { data } {
     if { $yend == 1 } { $textOUT yview moveto 1 }
 }
 
+proc RamDebugger::TextOutRaiseDo { pane } {
+    catch { $pane raise output }
+}
+
 proc RamDebugger::TextCompGet {} {
     variable textCOMP
 
@@ -9190,7 +9199,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 
 
     proc TextStackTraceRaise {} "catch { $pane2in2.nb raise stacktrace }"
-    proc TextOutRaise {} "catch { $pane2in2.nb raise output }"
+    proc TextOutRaise {} [list TextOutRaiseDo $pane2in2.nb]
     proc TextCompRaise {} "catch { $pane2in2.nb raise compile }"
 
 
