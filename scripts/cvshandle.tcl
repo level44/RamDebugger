@@ -2863,7 +2863,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    destroy $wD
 	    dialogwin_snit $wD -title [_ "Choose version"] -class $::className -entrytext \
 		[_ "Choose one or two versions for file '%s'" $file] -okname [_ View] -cancelname [_ Close] \
-		-grab 1 -transient 1 -callback [namespace code [list "update_recursive_cmd" $w diff_window_accept $dir $file]]
+		-grab 0 -transient 1 -callback [namespace code [list "update_recursive_cmd" $w diff_window_accept $dir $file]]
 	    set f [$wD giveframe]
 	    
 	    set columns [list \
