@@ -2173,7 +2173,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    set d [dict create 1 $f.cb1]
 	    $wd enable_disable_on_key branch_active $d
 	    
-	    tk::TabToWindow $f.cb1
+	    $wd focusok
 	    bind $wd <Return> [list $wd invokeok]
 	    set action [$wd createwindow]
 	    if { [$wd give_uservar_value branch_active] } {
