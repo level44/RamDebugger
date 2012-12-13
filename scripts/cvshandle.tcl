@@ -1775,6 +1775,7 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 		waitstate $w off
 		return
 	    }
+	    if { [regexp {^Pull finished with} $line] } {  continue }
 	    if { [regexp {^Total network traffic:} $line] } {  continue }
 	    if { [regexp {^waiting for server} $line] } {  continue }
 	    if { [regexp {^(Autosync:|Sent:|processed:|Received:|\s*Bytes|\s*$)} $line] } {  continue }
