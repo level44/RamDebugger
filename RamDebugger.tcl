@@ -6147,7 +6147,11 @@ proc RamDebugger::TextOutInsertBlue { data } {
 }
 
 proc RamDebugger::TextOutRaiseDo { pane } {
-    catch { $pane raise output }
+    variable options
+    
+    if { [set! options(auto_raise_stack_trace)] == 1 } {
+	catch { $pane raise output }
+    }
 }
 
 proc RamDebugger::TextCompGet {} {
