@@ -9893,7 +9893,12 @@ if { ![info exists SkipRamDebuggerInit] } {
 	set iposm1 [expr {$ipos+1}]
 	set geometry [lindex $argv $iposm1]
 	set argv [lreplace $argv $ipos $iposm1]
-    } else { set geometry "" }
+	if { $geometry eq "-" } {
+	    set geometry ""
+	}
+    } else {
+	set geometry ""
+    }
     
     if { [set ipos [lsearch $argv "-ruse"]] != -1 } {
 	set iposm1 [expr {$ipos+1}]
