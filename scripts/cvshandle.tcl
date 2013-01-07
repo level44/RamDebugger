@@ -318,7 +318,7 @@ proc RamDebugger::VCS::SaveRevisionDoCommit { what comment file args } {
 		return
 	    }
 	    set doing_commit 1
-	    set fin [open "|[list $fossil commit -m $comment $file]" r]
+	    set fin [open "|[list $fossil commit --no-warnings -m $comment $file]" r]
 	    fileevent $fin readable [list RamDebugger::VCS::SaveRevisionDoCommit end "" $file $fin]
 	}
 	end {
@@ -2222,19 +2222,21 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		regexp -line {^local-root:\s*(.*)} $info {} dirF
 		cd $dirF
 		if { $message eq "" } { set message " " }
-		set err [catch { exec $fossil commit --nosign -m $message {*}$branchCmd {*}$fs 2>@1 } ret]
+		set err [catch { exec $fossil commit --no-warnings --nosign -m $message {*}$branchCmd {*}$fs 2>@1 } ret]
 		if { $err && [regexp {cannot do a partial commit of a merge} $ret] } {
 		    set txt [_ "Cannot do a partial commit of a merge. Do you want to make a full commit?"]
 		    set ret_in [snit_messageBox -icon question -type okcancel \
 		            -default ok -parent $w -message $txt]
 		    if { $ret_in eq "ok" } {
-		        set err [catch { exec $fossil commit --nosign -m $message {*}$branchCmd 2>@1 } ret]
+		        set err [catch { exec $fossil commit --no-warnings --nosign -m $message {*}$branchCmd 2>@1 } ret]
 		        if { !$err } {
 		           set needs_update_view 1
 		        }
 		    }
 		}
 		regsub -all {processed:\s*\d+%\s*} [string trim $ret] {} ret
+		regsub -all -line {Round-trips:\s*\d+\s.*} [string trim $ret] {} ret
+
 		if { $err } { set color red } else { set color blue }
 		foreach file $fs {
 		    set item [dict get $items fossil $dir $file]
