@@ -317,8 +317,13 @@ proc RamDebugger::VCS::SaveRevisionDoCommit { what comment file args } {
 	    if { [info exists doing_commit] } {
 		return
 	    }
+	    if { [is_fossil_version_newer 1.25] } {
+		set commit_no_warnings [list --no-warnings]
+	    } else {
+		set commit_no_warnings ""
+	    }
 	    set doing_commit 1
-	    set fin [open "|[list $fossil commit --no-warnings -m $comment $file]" r]
+	    set fin [open "|[list $fossil commit {*}$commit_no_warnings -m $comment $file]" r]
 	    fileevent $fin readable [list RamDebugger::VCS::SaveRevisionDoCommit end "" $file $fin]
 	}
 	end {
@@ -1048,7 +1053,7 @@ proc RamDebugger::VCS::update_recursive { wp current_or_last_or_this args } {
 
     foreach cmd [list update_recursive_do0 select_directory messages_menu clear_entry insert_in_entry \
 	    insert_ticket update_recursive_do1 update_recursive_accept update_recursive_cmd \
-	    waitstate parse_timeline parse_finfo open_program show_help get_cwd release_cwd] {
+	    waitstate parse_timeline parse_finfo open_program show_help get_cwd release_cwd is_fossil_version_newer] {
 	set full_cmd RamDebugger::VCS::$cmd
 	append script "[list proc $cmd [info_fullargs $full_cmd] [info body $full_cmd]]\n"
     }
@@ -1538,6 +1543,20 @@ proc RamDebugger::VCS::insert_in_entry { w entry txt } {
     update
     tk::TextInsert $entry $txt
     tk::TabToWindow $entry
+}
+
+proc RamDebugger::VCS::is_fossil_version_newer { version } {
+    variable fossil_version_cache
+    
+    if { ![info exists fossil_version_cache] } {
+	set fossil [auto_execok fossil]
+	set fossil_version_cache ""
+	regexp {This is fossil version\s+(\S+)} [exec $fossil version] {} fossil_version_cache
+	if { ![string is double -strict $fossil_version_cache] } {
+	    set fossil_version_cache 1.0
+	}
+    }
+    return [expr {$version >= $fossil_version_cache }]
 }
 
 proc RamDebugger::VCS::insert_ticket { w entry ticket txt } {
@@ -2222,13 +2241,20 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		regexp -line {^local-root:\s*(.*)} $info {} dirF
 		cd $dirF
 		if { $message eq "" } { set message " " }
-		set err [catch { exec $fossil commit --no-warnings --nosign -m $message {*}$branchCmd {*}$fs 2>@1 } ret]
+		
+		if { [is_fossil_version_newer 1.25] } {
+		    set commit_no_warnings [list --no-warnings]
+		} else {
+		    set commit_no_warnings ""
+		}
+		
+		set err [catch { exec $fossil commit {*}$commit_no_warnings --nosign -m $message {*}$branchCmd {*}$fs 2>@1 } ret]
 		if { $err && [regexp {cannot do a partial commit of a merge} $ret] } {
 		    set txt [_ "Cannot do a partial commit of a merge. Do you want to make a full commit?"]
 		    set ret_in [snit_messageBox -icon question -type okcancel \
 		            -default ok -parent $w -message $txt]
 		    if { $ret_in eq "ok" } {
-		        set err [catch { exec $fossil commit --no-warnings --nosign -m $message {*}$branchCmd 2>@1 } ret]
+		        set err [catch { exec $fossil commit {*}$commit_no_warnings --nosign -m $message {*}$branchCmd 2>@1 } ret]
 		        if { !$err } {
 		           set needs_update_view 1
 		        }
