@@ -770,7 +770,7 @@ proc RamDebugger::rdebug { args } {
 	cd $pwd
 	set remoteserver [list $fid $pid $opts(program) start]
 	fconfigure $fid -blocking 0 -buffering line
-	fileevent $fid readable RamDebugger::RecieveFromGdb
+	fileevent $fid readable RamDebugger::ReceiveFromGdb
 	TakeArrowOutFromText
     } else {
 	if { $opts(program) == "" } {
@@ -816,7 +816,7 @@ proc RamDebugger::rdebug { args } {
 	    SENDDEVBODY
 	}
 	proc RDC::MeasureTime { name level timestr } {
-	    SendDev [list RamDebugger::RecieveTimeFromProgram $name $level [lindex $timestr 0]]
+	    SendDev [list RamDebugger::ReceiveTimeFromProgram $name $level [lindex $timestr 0]]
 	}
 	proc RDC::Continue {} {
 	    set ::RDC::code ""
@@ -947,7 +947,7 @@ proc RamDebugger::rdebug { args } {
 	    if { !$stop } {
 		if { $outputline } {
 		    set procname [lindex [info level -1] 0]
-		    SendDev [list RamDebugger::RecieveFromProgram output \
+		    SendDev [list RamDebugger::ReceiveFromProgram output \
 		                 $filenum $line $procname "" ""]
 		    
 		}
@@ -963,7 +963,7 @@ proc RamDebugger::rdebug { args } {
 	    }]
 	    if { $::RDC::err } { set ::errorInfo $::RDC::errorInfo }
 
-	    RDC::SendDev [list RamDebugger::RecieveFromProgram $breaknum $filenum \
+	    RDC::SendDev [list RamDebugger::ReceiveFromProgram $breaknum $filenum \
 		              $line $procname $textline $condinfo]
 	    while 1 {
 		if { $code == "" } { vwait ::RDC::code }
@@ -979,7 +979,7 @@ proc RamDebugger::rdebug { args } {
 		if { $evalhandler != "" } {
 		    RDC::SendDev "$evalhandler [list [list $err $returnvalue]]"
 		} else {
-		    RDC::SendDev [list RamDebugger::RecieveFromProgramExpr $err $returnvalue]
+		    RDC::SendDev [list RamDebugger::ReceiveFromProgramExpr $err $returnvalue]
 		}
 	    }
 	}
@@ -989,7 +989,7 @@ proc RamDebugger::rdebug { args } {
 		rename ::bgerror ::RDC::bgerror_base
 	    }
 	    proc ::bgerror err {
-		RDC::SendDev [list RamDebugger::RecieveErrorFromProgram $err $::errorInfo]
+		RDC::SendDev [list RamDebugger::ReceiveErrorFromProgram $err $::errorInfo]
 	    }
 	}
 	if { [info commands ::RDC::puts_base] == "" } {
@@ -1007,7 +1007,7 @@ proc RamDebugger::rdebug { args } {
 		    set argsN [lrange $argsN 1 end]
 		}
 		if { [llength $argsN] == 1 && [regexp {stdout|stderr} $channelId] } {
-		    RDC::SendDev [list RamDebugger::RecieveOutputFromProgram $channelId \
+		    RDC::SendDev [list RamDebugger::ReceiveOutputFromProgram $channelId \
 		                      [lindex $argsN 0] $hasnewline]
 		} else {
 		    eval ::RDC::puts_base $args
@@ -1030,7 +1030,7 @@ proc RamDebugger::rdebug { args } {
 		set file [file join [pwd] [lindex $args end]]
 		set args [lreplace $args end end $file]
 
-		set retval [RDC::SendDev "RamDebugger::RecieveFromProgramSource $args"]
+		set retval [RDC::SendDev "RamDebugger::ReceiveFromProgramSource $args"]
 		if { $retval != "" } {
 		    if { ![string match "::RDC::sourceproc*" $retval] } {
 		        set oldfile [info script]
@@ -2481,7 +2481,7 @@ proc RamDebugger::FindActivePrograms { force } {
     }
 }
 
-proc RamDebugger::RecieveTimeFromProgram { name level time } {
+proc RamDebugger::ReceiveTimeFromProgram { name level time } {
     variable TimeMeasureData
 
     set ipos 0
@@ -2506,10 +2506,10 @@ proc RamDebugger::RecieveTimeFromProgram { name level time } {
 	}
 	incr ipos
     }
-    error [_ "Error recieving from program. Time measure block '%s' does not exists" $name] 
+    error [_ "Error receiving from program. Time measure block '%s' does not exists" $name] 
 }
 
-proc RamDebugger::RecieveFromProgramExpr { err val } {
+proc RamDebugger::ReceiveFromProgramExpr { err val } {
     variable ExpressionResult
 
     after 0 [list set RamDebugger::ExpressionResult [list $err $val]]
@@ -2533,7 +2533,7 @@ proc RamDebugger::lsearchfile { list file } {
     }
 }
 
-proc RamDebugger::RecieveFromProgram { breaknum filenum line procname textline condinfo } {
+proc RamDebugger::ReceiveFromProgram { breaknum filenum line procname textline condinfo } {
     variable fileslist
     variable text
 
@@ -2563,18 +2563,18 @@ proc RamDebugger::RecieveFromProgram { breaknum filenum line procname textline c
     return ""
 }
 
-proc RamDebugger::RecieveErrorFromProgram { err errInfo args } {
-    TextOutInsertRed "------RECIEVED ERROR FROM DEBUGGED PROGRAM-------------\n"
+proc RamDebugger::ReceiveErrorFromProgram { err errInfo args } {
+    TextOutInsertRed "------RECEIVED ERROR FROM DEBUGGED PROGRAM-------------\n"
     TextOutInsertRed $errInfo\n
     TextOutInsertRed "-------------------------------------------------------\n"
     TextOutRaise
     after idle [string map [list %e [list $err] %n \n] {
-	WarnWin {Recieved Error from Debugged program:%n%e%nCheck Output for details}
+	WarnWin {Received Error from Debugged program:%n%e%nCheck Output for details}
 	#RamDebugger::StopAtGUI "" -1
     }]
 }
 
-proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
+proc RamDebugger::ReceiveOutputFromProgram { channelId string hasnewline } {
     if { $hasnewline } { append string \n }
     switch $channelId {
 	stdout {
@@ -2591,7 +2591,7 @@ proc RamDebugger::RecieveOutputFromProgram { channelId string hasnewline } {
     update
 }
 
-proc RamDebugger::RecieveFromProgramSource { args } {
+proc RamDebugger::ReceiveFromProgramSource { args } {
     variable currentfile
     variable currentfile_endline
 
@@ -2762,7 +2762,7 @@ proc RamDebugger::UpdateRemoteBreaks {} {
     }
 }
 
-proc RamDebugger::RecieveFromGdb {} {
+proc RamDebugger::ReceiveFromGdb {} {
     variable debuggerstate
     variable remoteserverType
     variable remoteserver
@@ -2792,7 +2792,7 @@ proc RamDebugger::RecieveFromGdb {} {
     append gdblog $aalog
 
     #if { [string trim $aa] == "" } { return }
-    
+
     switch -glob -- $state {
 	start {
 	    if { [string match "*No symbol table is loaded*" $aa] || \
@@ -2885,7 +2885,7 @@ proc RamDebugger::RecieveFromGdb {} {
 		    }
 		    set filenum [lsearch -exact $fileslist $file]
 		}
-		RecieveFromProgram "" $filenum $line "" "" ""
+		ReceiveFromProgram "" $filenum $line "" "" ""
 		return
 	    }
 	}
@@ -2988,7 +2988,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	    }
 	    set filenum [lsearch -exact $fileslist $file]
 	}
-	RecieveFromProgram "" $filenum $line $procname "" ""
+	ReceiveFromProgram "" $filenum $line $procname "" ""
 	return
 
 	#         set found 0
@@ -3012,7 +3012,7 @@ proc RamDebugger::RecieveFromGdb {} {
 	#                 }
 	#                 set filenum [lsearch -exact $fileslist $file]
 	#             }
-	#             RecieveFromProgram $breaknum $filenum $line $procname "" ""
+	#             ReceiveFromProgram $breaknum $filenum $line $procname "" ""
 	#             return
 	#         } else {
 	#             WarnWin "Problems finding breakpoint in file $file ($aa)"
@@ -7637,13 +7637,13 @@ proc RamDebugger::UpdateLineNumDo {} {
     variable currentfileIsModified
     variable CheckExternalFileModification
     variable LineNum_label
-    
+
     set idx [$text index insert]
     lassign [scan $idx "%d.%d"] line col
     if { $line eq "" } { return }
     set LineNum "L: $line"
     tooltip::tooltip $LineNum_label "L: $line C: $col"
-    
+
     if { $currentfile ne "" && [string index $currentfile 0] != "*" } {
 	if { [lindex [file system $currentfile] 0] eq "native" } {
 	    set exists [file exists $currentfile]
@@ -9162,7 +9162,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     $sw2 setwidget $textCOMP
 
     supergrid::go $f3
-    
+
     set f4 [$pane2in2.nb insert end variables -text [_ "Variables"]]
 
     #$pane2in2.nb compute_size
@@ -9464,7 +9464,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-u><$::control-Key-1> "[list event generate $text <F11>]; break"
     bind $text <$::control-u><$::control-s><$::control-Key-1> \
 	"[list event generate $text <Shift-F11>]; break"
-    
+
     set menu [$mainframe getmenu edit]
     $menu entryconfigure [_ "Isearch forward selected"] -acc "Ctrl+Shift+I"
 
