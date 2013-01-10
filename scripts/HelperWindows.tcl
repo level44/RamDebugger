@@ -524,7 +524,7 @@ proc RamDebugger::DisplayBreakpointsWindow {} {
 	update idletasks
 	$f.lf see $see
     }
-    
+
     set action [$w createwindow]
     while 1 {
 	switch $action {
@@ -2912,7 +2912,7 @@ proc RamDebugger::textPaste_insert_after { w } {
 
 proc RamDebugger::Search_add_open_brace { w } {
     variable currentfile
-
+    
     if { [GiveFileType $currentfile] eq "C/C++" } {
 	set openb "("
 	set closeb ")"
@@ -2985,7 +2985,7 @@ proc RamDebugger::_search_BP1 { w w_press } {
     if { $w_press eq "$w.search" } {
 	return -code break
     }
-}
+}    
 
 proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     variable text
@@ -3308,7 +3308,7 @@ proc RamDebugger::_OpenProgram_puts { args } {
 	}
     } 
     if { [info exists textOUT] && [winfo exists $textOUT] } {
-	RamDebugger::RecieveOutputFromProgram $channelId $string $hasnewline
+	RamDebugger::ReceiveOutputFromProgram $channelId $string $hasnewline
     } elseif { $channelId eq "stderr" } {
 	#tk_messageBox -message $string
     }
