@@ -230,7 +230,7 @@ proc RamDebugger::Wizard::ModCondMatPage2 { what f } {
 	}
 	localaxes {
 	    set ic 0
-	    foreach i [list global automatic automatic_alt] {
+	    foreach i [list global automatic automatic_alt automatic_main] {
 		checkbutton $f.l$ic -text "$i axes:" -grid "0 w" -variable DialogWin::user(AXESTYPE,$i,$n) \
 		    -command [string map [list %i $i %n $n %e $f.e$ic %c $f.cb4] {
 		        if { $DialogWin::user(AXESTYPE,%i,%n) } {
@@ -252,7 +252,7 @@ proc RamDebugger::Wizard::ModCondMatPage2 { what f } {
 	    }
 	    label $f.l4 -text "Default value:" -grid 0
 	    set values ""
-	    foreach i [list global automatic automatic_alt] {
+	    foreach i [list global automatic automatic_alt automatic_main] {
 		if { $DialogWin::user(AXESTYPE,$i,$n) } { lappend values $i }
 	    }
 	    ComboBox $f.cb4 -textvariable DialogWin::user(DEFAULTVALUE,$n) -values $values -grid 1
@@ -331,7 +331,7 @@ proc RamDebugger::Wizard::CondMatPage3 { what f } {
 	    }
 	    localaxes {
 		set values ""
-		foreach "j post" [list global "#G#" automatic "#A#" automatic_alt "#L#"] {
+		foreach "j post" [list global "#G#" automatic "#A#" automatic_alt "#L#" automatic_main "#M#"] {
 		    if { $DialogWin::user(AXESTYPE,$j,$i) } {
 		        lappend values $DialogWin::user(AXESNAME,$j,$i)$post
 		    }
@@ -488,7 +488,7 @@ proc RamDebugger::Wizard::CondMatWizard { text filename } {
 		            }
 		            localaxes {
 		                set values ""
-		                foreach i [list global automatic automatic_alt] {
+		                foreach i [list global automatic automatic_alt automatic_main] {
 		                    if { $DialogWin::user(AXESTYPE,$i,$n) } { lappend values $i }
 		                }
 		                if { [llength $values] == 0 } {
