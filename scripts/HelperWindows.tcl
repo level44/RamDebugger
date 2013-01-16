@@ -63,6 +63,8 @@ proc RamDebugger::DisplayVar2 { var X Y x y res } {
 	set w $text.help
 	if { [winfo exists $w] } { destroy $w }
 	cu::create_tooltip_toplevel $w
+	incr X 10
+	incr Y -20
 	wm geometry $w +$X+$Y
 	$w configure -highlightthicknes 1 -highlightbackground grey \
 	    -highlightcolor grey
