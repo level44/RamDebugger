@@ -2824,8 +2824,29 @@ proc RamDebugger::ReceiveFromGdb {} {
 		set ExpressionResult [list 0 $res]
 	    } elseif { [regexp {No symbol .* in current context} $aa] } {
 		set ExpressionResult [list 1 $aa]
-	    } else { return }
-
+	    } else {
+		lassign $ExpressionResult val txt
+		append txt $aa
+		set ExpressionResult [list 0 $txt]
+	    }
+	    
+	    lassign $ExpressionResult val txt
+	    if { $val == 0 } {
+		set num 0
+		for  { set i 0 } { $i < [string length $txt] } { incr i } {
+		    switch -- [string index $txt $i] {
+		        \{ {
+		            incr num
+		        }
+		        \} {
+		            incr num -1
+		        }
+		    }
+		}
+		if { $num!= 0 } {
+		    return
+		}
+	    }
 	    set handler [lindex $state 1]
 	    set remoteserver [lreplace $remoteserver 3 3 ""]
 
