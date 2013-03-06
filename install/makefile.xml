@@ -6,7 +6,7 @@
     <Section>contrib/devel</Section>
     <Categories>Development;Debugger;IDE;Application</Categories>
     <Dependencies>libc6 (&gt;= 2.3.6-6), 
-      libx11-6, libxext6</Dependencies>
+    libx11-6, libxext6,libxss1,libxft2,libfreetype,zlib1g,libfontconfig,libxrender1</Dependencies>
     <Maintainer>Compass Engineering &lt;info@compassis.com&gt;</Maintainer>
     <Homepage>http://www.compassis.com</Homepage>
     <Languages>
