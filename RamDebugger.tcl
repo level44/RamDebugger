@@ -8702,7 +8702,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		-command "profileprocs::OpenGUI"] \
 		separator \
 		[list command &[_ "Reinstrument"] debugentry \
-		    [_ "Reinstrument and recolorize a file"] "Alt R" \
+		[_ "Reinstrument and recolorize a file"] "ShiftCtrl R" \
 		-command "RamDebugger::ReinstrumentCurrentFile"] \
 		] \
 		&[_ "C++ project"] all c++ 0 [list \
