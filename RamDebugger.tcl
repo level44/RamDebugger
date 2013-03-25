@@ -8982,25 +8982,30 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    lappend data "" [_ "Activate mouse drag for touchscreens"] ""
 	}
     }
+    if {$big_icons } {
+	set style ""
+    } else {
+	set style "Toolbutton"
+    }
     set idx 0
     foreach "img help cmd" $data {
 	if { $big_icons && $img ne "-" && $img ne "" } {
 	    package require compass_utils::img
 	    set img0 $img
-	    set img [image create photo -width 32 -height 32]
-	    $img copy $img0 -to 8 8
+	    set img [image create photo -width 48 -height 48]
+	    $img copy $img0 -to 16 16
 	    #cu::img::zoom $img $img0 Lanczos3
 	    image delete $img0
 	}        
 	if { [string match "menubutton_button *" $cmd] } {
-	    cu::menubutton_button $toolbar.bbox$idx -image $img -style Toolbutton \
+	    cu::menubutton_button $toolbar.bbox$idx -image $img -style $style \
 		-command [lindex $cmd 1] -menu $toolbar.bbox$idx.m \
 		-takefocus 0
 	    set c [string map [list %W $toolbar.bbox$idx.m] [lindex $cmd 2]]
 	    menu $toolbar.bbox$idx.m -tearoff 0 -postcommand $c
 	    tooltip::tooltip $toolbar.bbox$idx $help
 	} elseif { $img ne "-" } {
-	    ttk::button $toolbar.bbox$idx -image $img -style Toolbutton -command $cmd \
+	    ttk::button $toolbar.bbox$idx -image $img -style $style -command $cmd \
 		-takefocus 0
 	    tooltip::tooltip $toolbar.bbox$idx $help
 	} else {
