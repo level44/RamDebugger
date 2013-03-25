@@ -9149,7 +9149,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
 
     if { $tktablet_ok && [info exists tabletPC_drag_button] } {
-	tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) $res
+	tktablet::drag_mode $text $tabletPC_drag_button RamDebugger::options(TabletPCmode) \
+	    $res $big_icons
     }
 
     #set pane2in2 [$pwin add -weight $weight2in]
