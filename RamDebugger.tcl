@@ -9112,6 +9112,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } else {
 	event add <<ContextualPress>> <ButtonPress-3>
 	event add <<Contextual>> <ButtonRelease-3>
+	event add <<ContextualPress>> <KeyPress-Menu>
+	event add <<Contextual>> <KeyRelease-Menu>
 	set ::control Control
 	set ::control_txt Ctrl
 	set ::alt Alt
