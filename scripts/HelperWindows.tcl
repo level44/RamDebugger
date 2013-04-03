@@ -239,6 +239,14 @@ proc RamDebugger::GetSelOrWordInIndex { args } {
 	    set var ""
 	    set idx0 $idx
 	    set char [$text get $idx0]
+	    if { [string is space $char] } {
+		set c [$text get "$idx0-1c"]
+		if { [string is wordchar $c] } {
+		    set idx [$text index "$idx0-1c"]
+		    set idx0 $idx
+		    set char [$text get $idx0]
+		}
+	    }
 	    while { [string is wordchar $char] } {
 		#  || $char == "(" || $char == ")"
 		set var $char$var
@@ -2918,7 +2926,7 @@ proc RamDebugger::Search_add_open_brace { w } {
     if { [GiveFileType $currentfile] eq "C/C++" } {
 	set openb "("
 	set closeb ")"
-	set txt " [string trimright $RamDebugger::searchstring]$openb"
+	set txt "[string trimright $RamDebugger::searchstring]$openb"
     } else {
 	set openb "{"
 	set closeb "}"
@@ -3073,7 +3081,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <Return> "destroy $w.search ; break"
 	    bind $w.search <$::control-i> "RamDebugger::Search $w iforward ; break"
 	    bind $w.search <$::control-r> "RamDebugger::Search $w ibackward ; break"
-	    bind $w.search <$::control-Right> "RamDebugger::Search_add_open_brace $w ; break"
+	    bind $w.search <$::control-p> "RamDebugger::Search_add_open_brace $w ; break"
 	    bind $w.search <$::control-g> "RamDebugger::Search $w stop ; break"
 	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
