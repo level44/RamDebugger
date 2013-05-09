@@ -855,6 +855,23 @@ proc RamDebugger::_update_pref_font { w label fontname } {
     $label configure -font $font
 }
 
+proc RamDebugger::increase_decrease_text_font { increase_decrease } {
+    variable options
+
+    set font ""
+    foreach i [list family weight slant underline] {
+	lappend font -$i [font configure FixedFont -$i]
+    }
+    switch $increase_decrease {
+	increase { set delta 1 }
+	decrease { set delta -1 }
+    }
+    lappend font -size [expr {[font configure FixedFont -size]+$delta}]
+    
+    set options(FixedFont) $font
+    CreateModifyFonts
+}
+
 proc RamDebugger::PreferencesWindow {} {
     variable text
     variable text_secondary

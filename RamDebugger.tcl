@@ -8655,8 +8655,15 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command &[_ "Toggle views"] {} \
 		[_ "Toggle files between the main and the secondary view"] "" \
 		-command "RamDebugger::ToggleViews"] \
-		separator \
-		[list checkbutton [_ "Status bar"] {} \
+	    separator \
+	    [list command &[_ "Decrease font"] {} \
+		[_ "Decrease main text font"] "" \
+		-command "RamDebugger::increase_decrease_text_font decrease"] \
+	    [list command &[_ "Increase font"] {} \
+		[_ "Increase main text font"] "" \
+		-command "RamDebugger::increase_decrease_text_font increase"] \
+	    separator \
+	    [list checkbutton [_ "Status bar"] {} \
 		 [_ "View/hide status bar"] "" \
 		-variable RamDebugger::options(showstatusbar) -command RamDebugger::ShowStatusBar] \
 		[list checkbutton [_ "Buttons toolbar"] {} \
@@ -8875,6 +8882,16 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	$mainframe setmenustate extractexamples disabled
     }
     
+    set view_menu [$mainframe getmenu view]
+    set ipos [$view_menu index [_ "Decrease font"]]
+    if { $ipos != -1 } {
+	$view_menu entryconfigure $ipos -accelerator "Ctrl-u Ctrl--"
+    }
+    set ipos [$view_menu index [_ "Increase font"]]
+    if { $ipos != -1 } {
+	$view_menu entryconfigure $ipos -accelerator "Ctrl-u Ctrl-+"
+    }
+
     set cvs_indicator_frame [$mainframe addindicator -width 10 \
 	    -anchor e -padx 3]
     RamDebugger::VCS::indicator_init $cvs_indicator_frame
@@ -9457,7 +9474,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-Key-5> [list RamDebugger::ContNextGUI rcont]
     bind $text <$::control-Key-9> [list RamDebugger::SetGUIBreakpoint]
     bind $text <$::control-Key-0> [list RamDebugger::ContNextGUI rnext]
-    bind $text <$::control-Key-minus> [list RamDebugger::ContNextGUI rstep]
+    #bind $text <$::control-Key-minus> [list RamDebugger::ContNextGUI rstep]
     
     cu::text_entry_bindings $text
 
@@ -9484,6 +9501,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-I> [list RamDebugger::Search $w iforward_get_insert]
     bind $text <Escape><i> "[list RamDebugger::Search $w iforward_get_insert] ;break"
     bind $w <$::control-slash> [list RamDebugger::VCS::update_recursive . current] ;# control-shift-7
+    bind $text <Control-u><Control-minus> [list RamDebugger::increase_decrease_text_font decrease]
+    bind $text <Control-u><Control-plus> [list RamDebugger::increase_decrease_text_font increase]
 
     for { set i 0 } { $i <=9 } { incr i } {
 	bind $text <$::control-u><$::control-Key-$i> "[list event generate $text <F$i>]; break"
