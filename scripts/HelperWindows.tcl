@@ -4071,6 +4071,12 @@ proc RamDebugger::_AddActiveMacrosToMenu { mainframe menu } {
     }
 }
 
+proc RamDebugger::give_currentfile {} {
+    variable currentfile
+    
+    return $currentfile 
+}
+
 proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
     variable options
     variable topdir
@@ -4094,6 +4100,8 @@ proc RamDebugger::AddActiveMacrosToMenu { mainframe menu } {
     
     interp alias "" Macros::mc::give_active_file_type "" RamDebugger::GiveActiveFileType
     interp alias "" Macros::mc::set_is_modified "" RamDebugger::SetIsModified
+    interp alias "" Macros::mc::give_currentfile "" RamDebugger::give_currentfile
+    interp alias "" Macros::mc::execute "" cu::file::execute
 
     if { [catch {_AddActiveMacrosToMenu $mainframe $menu} errstring] } {
 	WarnWin "There is an error when trying to use Macros ($::errorInfo). Correct it please"

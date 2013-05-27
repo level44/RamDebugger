@@ -436,16 +436,16 @@ proc activate_deactivate_debug_lines { w activate_deactivate_toggle } {
 	set replace 1
 	switch $activate_deactivate_toggle {
 	    activate {
-                if { ![regexp {(.*)_OFF} $name] } { set replace 0 }
+		if { ![regexp {(.*)_OFF} $name] } { set replace 0 }
 	    }
 	    deactivate {
-                if { [regexp {(.*)_OFF} $name] } { set replace 0 }
-            }
-            toggle {
-                # nothing
-            }
-            default {
-                error "error in activate_deactivate_debug_lines"
+		if { [regexp {(.*)_OFF} $name] } { set replace 0 }
+	    }
+	    toggle {
+		# nothing
+	    }
+	    default {
+		error "error in activate_deactivate_debug_lines"
 	    }
 	}
 	if { $replace } {
@@ -615,7 +615,54 @@ proc "Debug point GiD Post" { w } {
     send_draw_point_to_gidpost $ev
 }
 
+################################################################################
+#    proc Open comment file
+################################################################################
 
+set "macrodata(Open comment file,inmenu)" 1
+set "macrodata(Open comment file,accelerator)" <Control-u><Control-o>
+set "macrodata(Open comment file,help)" "Get the text under the cursor and try to open this file name"
+
+proc "Open comment file" { w } {
+
+    set line1 [$w get "insert linestart" insert]
+    set line2 [$w get insert "insert lineend"]
+    
+    lassign "" txt1 txt2
+    if { ![regexp {"([^"]*)$} $line1 {} txt1] || ![regexp {^([^"]*)"} $line2 {} txt2] } {
+	regexp {\S*$} $line1 txt1
+	regexp {^\S*} $line2 txt2
+    }
+    set file "$txt1$txt2"
+    if { $file eq "" } {
+	WarnWin "there is no file name under the cursor"
+	return
+    }
+    set currentfile [mc::give_currentfile]
+    
+    if { ![file exists $file] && [file exists [file join [file dirname $currentfile] $file]] } {
+	set file [file join [file dirname $currentfile] $file]
+    }
+    if { ![file exists $file] } {
+	set pwd [pwd]
+	cd [file dirname $currentfile]
+	set err [catch { exec fossil info } ret]
+	cd $pwd
+	if { !$err && [regexp -line {local-root:\s+(.*)} $ret {} dir] } {
+	    if { [file exists [file join [string trim $dir] $file]] } {
+		set file [file join [string trim $dir] $file]
+	    }
+	}
+    }
+    if { ![file exists $file] } {
+	WarnWin "'$file' does not exist"
+	return
+    }
+    set err [catch { mc::execute start $file } ret]
+    if { $err } {
+	WarnWin "Failed executing '$file' ($ret)"
+    }
+}
 
 
 
