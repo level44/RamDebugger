@@ -638,6 +638,9 @@ proc "Open comment file" { w } {
 	WarnWin "there is no file name under the cursor"
 	return
     }
+    set page ""
+    regexp {([^#]*)#(.*)} $file {} file page
+    
     set currentfile [mc::give_currentfile]
     
     if { ![file exists $file] && [file exists [file join [file dirname $currentfile] $file]] } {
@@ -658,9 +661,22 @@ proc "Open comment file" { w } {
 	WarnWin "'$file' does not exist"
 	return
     }
-    set err [catch { mc::execute start $file } ret]
-    if { $err } {
-	WarnWin "Failed executing '$file' ($ret)"
+    if { [string tolower [file extension $file]] eq ".wnl" && $page ne "" } {
+	foreach exe [list lognoter dlognoter] {
+	    if { [auto_execok $exe] ne "" } {
+		set err [catch { mc::execute exec $exe -notebookname $file -page $page & } ret]
+		if { $err } {
+		    WarnWin "Failed executing '$exe -notebookname $file -page $page' ($ret)"
+		}
+		return
+	    }
+	}
+	WarnWin "Failed executing lognoter"
+    } else {
+	set err [catch { mc::execute start $file } ret]
+	if { $err } {
+	    WarnWin "Failed executing '$file' ($ret)"
+	}
     }
 }
 
