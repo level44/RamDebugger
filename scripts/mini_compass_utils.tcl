@@ -357,18 +357,25 @@ snit::widget cu::multiline_entry {
     option -takefocus 0 ;# option used by the tab standard bindings
     option -values ""
     option -valuesvariable ""
+    option -state ""
+    option -justify ""
+    option -height ""
 
     hulltype frame
 
     variable text
-
+    variable updating 0
+    
     delegate method * to text
+    delegate method _insert to text as insert
     delegate option * to text
+    delegate option -_state to text as -state
+    delegate option -_height to text as -height
 
     constructor args {
 
 	$hull configure -background #a4b97f -bd 0
-	install text using text $win.t -wrap word -bd 0 -width 40 -height 3
+	install text using text $win.t -wrap word -width 40 -height 3 -borderwidth 0 -highlightthickness 0
 	
 	cu::add_contextual_menu_to_entry $text init
 
@@ -376,14 +383,25 @@ snit::widget cu::multiline_entry {
 	grid columnconfigure $win 0 -weight 1
 	grid rowconfigure $win 0 -weight 1
 
+	bind $self <Configure> [mymethod _check_configure]
 	bind $text <Tab> "[bind all <Tab>] ; break"
 	bind $text <<PrevWindow>> "[bind all <<PrevWindow>>] ; break"
+	bind $text <KeyPress> [mymethod keypress]
 	bindtags $text [list $win $text [winfo class $win] [winfo class $text] [winfo toplevel $text] all]
 	bind $win <FocusIn> [list focus $text]
 	$self configurelist $args
     }
     destructor {
 	$self _clean_traces
+    }
+    onconfigure -state {value} {
+	set options(-state) $value
+	$self _update_state
+    }
+    onconfigure -height {value} {
+	set options(-height) $value
+	
+	$self configure -_height [lindex $value 0]
     }
     onconfigure -textvariable {value} {
 	$self _clean_traces
@@ -393,6 +411,7 @@ snit::widget cu::multiline_entry {
 	trace add variable $options(-textvariable) read $cmd
 	set cmd "[mymethod _check_textvariable_write] ;#"
 	trace add variable $options(-textvariable) write $cmd
+	$self _check_textvariable_write
     }
     onconfigure -values {value} {
 	set options(-values) $value
@@ -435,11 +454,46 @@ snit::widget cu::multiline_entry {
 	}
 	trace add variable v write "[mymethod _changed_values_var];#"
     }
+    method give_win {} {
+	return $text
+    }
     method set_text { txt } {
+	focus $text
 	$text delete 1.0 end
 	$text insert end $txt
 	$text tag add sel 1.0 end-1c
-	focus $text
+	$self _check_configure
+	$self _update_state
+    }
+    method insert { args } {
+	$self _insert {*}$args
+	$self _check_configure
+	$self _update_state
+    }
+    method keypress {} {
+	after idle [mymethod _check_configure]
+	after idle [mymethod _update_state]
+    }
+    method _update_state {} {
+	
+	switch $options(-state) {
+	    disabled {
+		$self configure -_state disabled -foreground grey -highlightthickness 0
+		grid configure $text -padx 1 -pady 1
+	    }
+	    readonly {
+		$self configure -_state disabled -foreground black -highlightthickness 0
+		grid  configure $text -padx 0 -pady 0
+	    }
+	    default {
+		$self configure -_state normal -foreground black -highlightthickness 1
+		grid  configure $text -padx 1 -pady 1
+	    }
+	}
+	if { $options(-justify) ne "" } {
+	    $self tag configure justify -justify $options(-justify)
+	    $self tag add justify 1.0 end
+	}
     }
     method _clean_traces {} {
 	if { $options(-textvariable) ne "" } {
@@ -454,18 +508,35 @@ snit::widget cu::multiline_entry {
 	}
     }
     method _check_textvariable_read {} {
+	if { $updating } { return }
 	upvar #0 $options(-textvariable) v
 	set v [$text get 1.0 end-1c]
     }
     method _check_textvariable_write {} {
 	upvar #0 $options(-textvariable) v
 	$text delete 1.0 end
+	set updating 1
 	$text insert end $v
+	set updating 0
+	$self _check_configure
+	$self _update_state
     }
     method _changed_values_var {} {
 	if { $options(-valuesvariable) ne "" } {
 	    upvar #0 $options(-valuesvariable) v
 	    $self configure -values $v
+	}
+    }
+    method _check_configure {} {
+	
+	if { [winfo width $win] <= 1 } { return }
+	if { [llength $options(-height)] < 2 } { return }
+	set ds [$win count -displaylines 1.0 end]
+	lassign $options(-height) min max
+	if { $ds < $min } { set ds $min }
+	if { $ds > $max } { set ds $max }
+	if { $ds != [$win cget -_height] } {
+	    $win configure -_height $ds
 	}
     }
 }

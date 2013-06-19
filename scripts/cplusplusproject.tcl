@@ -95,6 +95,9 @@ proc cproject::syncfromUI {} {
     variable debugreleasebefore
 
     if { $debugreleasebefore == "" } { return }
+    
+    set thisdataE(exeargsList) [linsert0 -max_len 10 $thisdataE(exeargsList) \
+	    $thisdataE(exeargs)]
 
     foreach i [array names dataC $groupbefore,$debugreleasebefore,*] {
 	regexp {^[^,]+,[^,]+,(.*)} $i {} prop
@@ -384,6 +387,7 @@ proc cproject::NewData {} {
 		
 	    }
 	    set dataE($i,exeargs) ""
+	    set dataE($i,exeargsList) ""
 	}
 	foreach scripttab $scripttabs {
 	    set dataS($i,$scripttab,script) help
@@ -874,7 +878,8 @@ proc cproject::Create { par } {
 
     set nf33 [ttk::labelframe $nf3.f3 -text [_  "arguments"]]
 
-    ttk::entry $nf33.e -textvariable cproject::thisdataE(exeargs)
+    cu::multiline_entry $nf33.e -textvariable ::cproject::thisdataE(exeargs) -valuesvariable \
+	cproject::thisdataE(exeargsList) -height 4
     
     grid $nf33.e -sticky ew -padx "2 22" -pady 2
     grid columnconfigure $nf33 0 -weight 1
@@ -1637,6 +1642,7 @@ proc cproject::GiveDebugData {} {
 
 	set execdir [string map [list {$HOME} $HOME {$ProjectDir} $ProjectDir {$ObjectsDir} $ObjectsDir] \
 		$dataE($dr,execdir)]
+		
 	return [list $exe $execdir $dataE($dr,exeargs)]
     }
     return ""
