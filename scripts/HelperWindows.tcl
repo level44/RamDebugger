@@ -320,10 +320,10 @@ proc RamDebugger::InvokeAllDisplayVarWindows {} {
 proc RamDebugger::DisplayVarWindow_contextual { text x y } {
     destroy $text.menu
     set menu [menu $text.menu]
-    $menu add command -label [_ "Copy"] -command \
+    $menu add command -label [_ "Copy"] -acc Ctrl-c -command \
 	[list RamDebugger::DisplayVarWindow_contextual_do $text copy]
     $menu add separator
-    $menu add command -label [_ "Select all"] -command \
+    $menu add command -label [_ "Select all"] -acc Ctrl-a -command \
 	[list RamDebugger::DisplayVarWindow_contextual_do $text selectall]
     tk_popup $menu $x $y
 }
@@ -332,6 +332,11 @@ proc RamDebugger::DisplayVarWindow_contextual_do { text what } {
 
     switch $what {
 	copy {
+	    set range [$text tag nextrange sel 1.0 end]
+	    if { $range eq "" } { 
+		$text tag add sel 1.0 end-1c
+		focus $text
+	    }
 	    event generate $text <<Copy>>
 	}
 	selectall {
@@ -402,8 +407,10 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 		                       -exportselection 0 -font FixedFont -highlightthickness 0]
 
     bind $f.l1 <1> [list $w invokeok]
+    bind $sw.text <1> [list focus $sw.text]
     bind $sw.text <<Contextual>> [list RamDebugger::DisplayVarWindow_contextual %W %X %Y]
-
+    bind $sw.text <Control-c> "[list RamDebugger::DisplayVarWindow_contextual_do %W copy]; break"
+    bind $sw.text <Control-a> "[list RamDebugger::DisplayVarWindow_contextual_do %W selectall]; break"
     $sw setwidget $sw.text
 
     if { $::tcl_platform(platform) != "windows" } {
