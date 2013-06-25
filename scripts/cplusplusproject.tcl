@@ -880,6 +880,11 @@ proc cproject::Create { par } {
 
     cu::multiline_entry $nf33.e -textvariable ::cproject::thisdataE(exeargs) -valuesvariable \
 	cproject::thisdataE(exeargsList) -height 4
+    set tree [$nf33.e give_tree]
+    $tree element configure e_text_sel -lines 3 -justify left
+    $tree style layout imagetextimage e_text_sel -sticky wn
+    $tree column configure 0 -itembackground [list white #edccfb]
+    $tree configure -showlines 0
     
     grid $nf33.e -sticky ew -padx "2 22" -pady 2
     grid columnconfigure $nf33 0 -weight 1

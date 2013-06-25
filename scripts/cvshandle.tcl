@@ -1279,6 +1279,12 @@ proc RamDebugger::VCS::update_recursive_do0 { directory current_or_last } {
     ttk::label $f.l2 -text [_ "Commit messages"]:
     cu::multiline_entry $f.e2 -textvariable [$w give_uservar message ""] -valuesvariable \
 	[$w give_uservar messages] -width 60
+    set tree [$f.e2 give_tree]
+    $tree element configure e_text_sel -lines 3 -justify left
+    $tree style layout imagetextimage e_text_sel -sticky wn
+    $tree column configure 0 -itembackground [list white #edccfb]
+    $tree configure -showlines 0
+    
     bind $f.e2 <Return> "[bind Text <Return>] ; break"
     
     label $f.sem -image RamDebugger::VCS::::semaphore_green -compound left -height 35 \
@@ -2332,8 +2338,10 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    waitstate $w off
 	    if { ![winfo exists $w] } { return }
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
-	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
-	    dict set dict messages [$w give_uservar_value messages]
+	    
+	    set messages [linsert0 -max_len 20 [$w give_uservar_value messages] $message]
+	    $w set_uservar_value messages $messages
+	    dict set dict messages $messages
 	    dict set dict ticket_status [$w give_uservar_value ticket_status]
 	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
 	    
@@ -2392,15 +2400,18 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    release_cwd
 	    waitstate $w off
 	    set dict [cu::get_program_preferences -valueName cvs_update_recursive RamDebugger]
-	    $w set_uservar_value messages [linsert0 -max_len 20 [dict_getd $dict messages ""] $message]
-	    dict set dict messages [$w give_uservar_value messages]
+	    set messages [linsert0 -max_len 20 [$w give_uservar_value messages] $message]
+	    $w set_uservar_value messages $messages
+	    dict set dict messages $messages
 	    cu::store_program_preferences -valueName cvs_update_recursive RamDebugger $dict
 	}
 	remove {
 	    lassign $args tree sel_ids
 	    set files ""
 	    foreach item $sel_ids {
-		if { ![regexp {^(?:UNCHANGED|DELETED|MISSING|UPDATE)\s+(\S+)} [$tree item text $item 0] {} file] } { continue }
+		if { ![regexp {^(?:UNCHANGED|DELETED|MISSING|UPDATE)\s+(\S+)} [$tree item text $item 0] {} file] } {
+		    continue
+		}
 		lappend files $file
 	    }
 	    if { [string length $files] < 100 } {

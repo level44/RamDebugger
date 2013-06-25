@@ -366,12 +366,21 @@ snit::widget cu::multiline_entry {
     variable text
     variable updating 0
     
+    variable toctree
+    variable fnames ""
+    variable no_active_items ""
+    variable no_active_values ""
+    variable cmd_items ""
+    
     delegate method * to text
     delegate method _insert to text as insert
     delegate option * to text
     delegate option -_state to text as -state
     delegate option -_height to text as -height
-
+    
+    delegate method tree_item to toctree as item
+    delegate option -columns_list to toctree
+    
     constructor args {
 
 	$hull configure -background #a4b97f -bd 0
@@ -417,28 +426,12 @@ snit::widget cu::multiline_entry {
 	set options(-values) $value
 	
 	if { $options(-values) ne "" || $options(-valuesvariable) ne "" } {
-	    if { ![winfo exists $win.b] } {
-		image create photo cu::multiline_entry::nav1downarrow16 -data {
-		    R0lGODlhEAAQAIAAAPwCBAQCBCH5BAEAAAAALAAAAAAQABAAAAIYhI+py+0PUZi0zmTtypflV0Vd
-		    RJbm6fgFACH+aENyZWF0ZWQgYnkgQk1QVG9HSUYgUHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29y
-		    IDE5OTcsMTk5OC4gQWxsIHJpZ2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2ZWxjb3IuY29t
-		    ADs=
-		}
-		ttk::menubutton $win.b -image cu::multiline_entry::nav1downarrow16 -style Toolbutton -menu $win.b.m
-		menu $win.b.m -tearoff 0
-		grid $win.b -row 0 -column 1 -padx "0 1" -pady 1 -sticky wns
-	    } else {
-		$win.b.m delete 0 end
-	    }
-	    $win.b.m add command -label [_ "(Clear)"] -command [mymethod set_text ""]
-	    $win.b.m add separator
-	    foreach v $value {
-		if { [string length $v] > 60 } {
-		    set l [string range $v 0 56]...
-		} else {
-		    set l $v
-		}
-		$win.b.m add command -label $l -command [mymethod set_text $v]
+	    $self activate_menubutton
+
+	    $self tree_item delete all
+	    $self tree_insert end [_ "(Clear)"] "" 0
+	    foreach i $value {
+		$self tree_insert end $i $i 0
 	    }
 	} elseif { ![winfo exists $win.b] } {
 	    destroy $win.b
@@ -447,18 +440,57 @@ snit::widget cu::multiline_entry {
     onconfigure -valuesvariable {value} {
 	set options(-valuesvariable) $value
 
+	
+	if { $options(-values) ne "" || $options(-valuesvariable) ne "" } {
+	    $self activate_menubutton
+	}
 	upvar #0 $options(-valuesvariable) v
 
 	if { [info exists v] } {
-	    $self configure -values $v
+	    $self _changed_values_var
+	    trace add variable v write "[mymethod _changed_values_var];#"
+	} elseif { ![winfo exists $win.b] } {
+	    destroy $win.b
 	}
-	trace add variable v write "[mymethod _changed_values_var];#"
+    }
+    method activate_menubutton {} {
+
+	if { [winfo exists $win.b] } { return }
+
+	if { [info command ::cu::multiline_entry::nav1downarrow16] eq "" } {
+	    image create photo ::cu::multiline_entry::nav1downarrow16 -data {
+		R0lGODlhEAAQAIAAAPwCBAQCBCH5BAEAAAAALAAAAAAQABAAAAIYhI+py+0PUZi0zmTtypflV0Vd
+		RJbm6fgFACH+aENyZWF0ZWQgYnkgQk1QVG9HSUYgUHJvIHZlcnNpb24gMi41DQqpIERldmVsQ29y
+		IDE5OTcsMTk5OC4gQWxsIHJpZ2h0cyByZXNlcnZlZC4NCmh0dHA6Ly93d3cuZGV2ZWxjb3IuY29t
+		ADs=
+	    }
+	}
+	ttk::menubutton $win.b -image ::cu::multiline_entry::nav1downarrow16 -style Toolbutton
+	
+	bind $win.b <ButtonPress-1> [mymethod BP1 %x %y]
+	bind $win.b <ButtonRelease-1> [mymethod BR1 %x %y]
+	
+	set toctree $win.b.m
+	cu::_menubutton_tree_helper $toctree -parent $win \
+	    -button1handler [mymethod press] -returnhandler [mymethod press_return]
+	wm withdraw $toctree
+	
+	bind  $win.b.m <space> [mymethod post]
+	bind  $win.b.m <Return> [mymethod post]
+	
+	bind $toctree <<ComboboxSelected>> [mymethod endpost]
+	
+	grid $win.b -row 0 -column 1 -padx "0 1" -pady 1 -sticky wns
     }
     method give_win {} {
 	return $text
     }
+    method give_tree {} {
+	return $toctree
+    }
     method set_text { txt } {
 	focus $text
+	update idletasks
 	$text delete 1.0 end
 	$text insert end $txt
 	$text tag add sel 1.0 end-1c
@@ -507,6 +539,66 @@ snit::widget cu::multiline_entry {
 	    trace remove variable v write "[mymethod _changed_values_var];#"
 	}
     }
+    method BP1 { x y } {
+       $self post
+    }
+    method BR1 { x y } {
+	$win.b instate {pressed !disabled} {
+	    $win.b state !pressed
+	}
+	return -code break
+    }
+    method press_return { t ids } {
+	$self press $t $ids [list item [lindex $ids 0] column 0 elem e_text_sel] "" ""
+    }
+    method press { t ids identify x y } {
+	set id [lindex $ids 0]
+	
+	if { ![regexp {item \S+ column \S+ elem (\S+)} $identify {} elem] } {
+	    return
+	}
+	if { $elem eq "e_image_r" } {
+	    return [$self clear_tree_entry $id]
+	}
+	if { [dict exists $cmd_items $id] } {
+	    if { ![dict exists $no_active_items $id] } { 
+		$self action LBCancel
+	    }
+	    uplevel #0 [dict get $cmd_items $id] $id
+	    return
+	}
+	if { [dict exists $no_active_items $id] } { return }
+	
+	$self set_text [dict get $fnames $id]
+	#uplevel #0 $options(-command) [list [dict get $fnames $id]]
+	$toctree unpost
+    }
+    method clear_tree_entry { id } {
+	set txt [dict get $fnames $id]
+	if { $options(-textvariable) ne "" } {
+	    upvar #0 $options(-valuesvariable) v
+	    set ipos [lsearch -exact $v $txt]
+	    set v [lreplace $v $ipos $ipos]
+	} else {
+	    error "error in clear_tree_entry. not implemented"
+	}
+    }
+    method post {} {
+	$win.b instate !disabled {
+	    catch { tile::clickToFocus $win.b }
+	    catch { ttk::clickToFocus $win.b }
+	    $win.b state pressed
+	    set x [winfo rootx $win]
+	    set y [expr {[winfo rooty $win]+[winfo height $win]}]
+	    $toctree deiconify $x $y [expr {[winfo width $win]-0}]
+	}
+    }
+    method endpost {} {
+	$win.b instate {pressed !disabled} {
+	    $win.b state !pressed
+	}
+	event generate $win.b <<ComboboxSelected>>
+    }
     method _check_textvariable_read {} {
 	if { $updating } { return }
 	upvar #0 $options(-textvariable) v
@@ -516,7 +608,9 @@ snit::widget cu::multiline_entry {
 	upvar #0 $options(-textvariable) v
 	$text delete 1.0 end
 	set updating 1
-	$text insert end $v
+	if { [info exists v] } {
+	    $text insert end $v
+	}
 	set updating 0
 	$self _check_configure
 	$self _update_state
@@ -524,7 +618,12 @@ snit::widget cu::multiline_entry {
     method _changed_values_var {} {
 	if { $options(-valuesvariable) ne "" } {
 	    upvar #0 $options(-valuesvariable) v
-	    $self configure -values $v
+	    
+	    $self tree_item delete all
+	    $self tree_insert end [_ "(Clear)"] "" 0
+	    foreach i $v {
+		$self tree_insert end $i $i 0
+	    }
 	}
     }
     method _check_configure {} {
@@ -538,6 +637,147 @@ snit::widget cu::multiline_entry {
 	if { $ds != [$win cget -_height] } {
 	    $win configure -_height $ds
 	}
+    }
+    method tree_insert { args } {
+	set optional {
+	    { -image image "" }
+	    { -collapse boolean 0 }
+	    { -active boolean 1 }
+	    { -command cmd "" }
+	}
+	set compulsory "idx name fullname parent"
+	parse_args $optional $compulsory $args
+
+	if { $image eq "" } {
+	    set image appbook16
+	} elseif { $image eq "-" } {
+	    set image ""
+	}
+	if { [$self cget -columns_list] eq "" } {
+	    set data [list [list $image $name]]
+	} else {
+	    set data [list [list $image [lindex $name 0]]]
+	    lappend data {*}[lrange $name 1 end]
+	}
+	set id [$toctree insert $idx $data $parent]
+	if { $collapse } {
+	    $toctree item collapse $id
+	}
+	if { !$active } {
+	    dict set no_active_items $id ""
+	    dict set no_active_values $fullname ""
+	}
+	if { ![info exists cmd_items] } {
+	    set cmd_items ""
+	}
+	if { $command ne "" } {
+	    dict set cmd_items $id $command
+	}
+	dict set fnames $id $fullname
+	
+	$toctree item style set $id 0 imagetextimage
+	$toctree item element configure $id 0 e_text_sel -text $name
+	$toctree item element configure $id 0 e_image -image $image
+	$toctree item element configure $id 0 e_image_r -image [cu::get_image actitemdelete16]
+	
+	return $id
+    }
+}
+
+################################################################################
+#    menubutton_tree
+################################################################################
+
+snit::widget cu::_menubutton_tree_helper {
+    option -parent ""
+    option -columns_list ""
+    hulltype toplevel
+    
+    delegate method * to tree
+    delegate option * to tree
+
+    variable tree
+    variable marker_resize_xy0
+
+    constructor args {
+	wm overrideredirect $win 1
+
+	package require fulltktree
+	set columns [list [list 20 "" left imagetext 1]]
+	set tree [fulltktree $win.tree -height 50 -has_sizegrip 1 \
+		-columns $columns -expand 1]
+	
+	grid $tree -sticky nsew
+	grid columnconfigure $win 0 -weight 1
+	grid rowconfigure $win 0 -weight 1
+	
+	$self configure -bd 1 -relief solid -background white
+	$self configurelist $args
+
+	grid configure $tree.t -rowspan 2
+
+	bind $win <ButtonPress-1> [mymethod check_unpost %x %y]
+	bind $win <Escape> "[mymethod unpost] ; break"
+    }
+    onconfigure -columns_list { value } {
+	if { $value eq $options(-columns_list) } { return }
+	set options(-columns_list) $value
+
+	set columns ""
+	set idx 0
+	foreach i $options(-columns_list) {
+	    lassign $i name dict
+	    if { $idx == 0 } {
+		set type imagetext
+	    } else {
+		set type text
+	    }
+	    foreach "opt default" [list len 10 justify left is_editable 1 expand ""] {
+		set $opt [dict_getd $dict $opt $default]
+	    }
+	    lappend columns [list $len $name $justify $type $is_editable $expand]
+	    incr idx
+	}
+	$tree configure -expand 0 -columns $columns
+    }
+    method deiconify { x y min_width } {
+		
+	set n [$tree index last]
+	if { $n < 7 } { set n 7 }
+	if { $n > 15 } { set n 15 }
+	if { [$tree cget -itemheight] != 0 } {
+	    set h [expr {[$tree cget -itemheight]*$n}]
+	} else {
+	    set h [expr {[$tree cget -minitemheight]*$n}]
+	}
+	$tree configure -height $h
+	set wi [winfo width $win]
+	if { $wi < $min_width } { set wi $min_width }
+	if { $wi+$x > [winfo screenwidth $win] } {
+	    set wi [expr {[winfo screenwidth $win]-$x}]
+	}
+	if { $y+$h+10 > [winfo screenheight $win] } {
+	    set h [expr {[winfo screenheight $win]-$y-10}]
+	}
+	wm geometry $win ${wi}x$h+$x+$y
+	update
+	wm deiconify $win
+	focus $tree
+	grab -global $win
+    }
+    method check_unpost { x y } {
+	if { $x < 0 || $x > [winfo width $win] || 
+	    $y < 0 || $y > [winfo height $win] } {
+	    $self unpost
+	}
+    }
+    method unpost {} {
+	
+	$tree close_search_label
+
+	grab release $win
+	wm withdraw $win
+	event generate $win <<ComboboxSelected>> 
     }
 }
 
