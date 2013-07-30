@@ -1731,6 +1731,7 @@ proc cproject::CleanCompiledFiles { w } {
     if { $dataM($debrel,has_userdefined_makefile)  } {
 	set make $dataM($debrel,makefile_file)
 	set make_args $dataM($debrel,makefile_arguments)
+	regsub {\s\w+$} $make_args {} make_args
 	set err [catch { exec make -f $make {*}$make_args clean } ret]
     } else { 
 	set objdir [file join [file dirname $project] [file root $project]_$debrel]
