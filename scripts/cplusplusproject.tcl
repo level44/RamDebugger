@@ -1745,7 +1745,7 @@ proc cproject::CleanCompiledFiles { w } {
     
     RamDebugger::TextCompClear
     RamDebugger::TextCompRaise
-    RamDebugger::TextCompInsert [_ "Compilation files deleted"]
+    RamDebugger::TextCompInsert [_ "Compilation files deleted"]\n
     if { $ret ne "" } {
 	RamDebugger::TextCompInsert $ret
     }
