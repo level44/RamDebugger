@@ -615,15 +615,23 @@ proc "Debug point GiD Post" { w } {
     send_draw_point_to_gidpost $ev
 }
 
-################################################################################
-#    proc Open comment file
-################################################################################
-
 set "macrodata(Open comment file,inmenu)" 1
 set "macrodata(Open comment file,accelerator)" <Control-u><Control-o>
 set "macrodata(Open comment file,help)" "Get the text under the cursor and try to open this file name"
 
 proc "Open comment file" { w } {
+    open_comment_file $w open
+}
+
+set "macrodata(Edit comment file,inmenu)" 1
+set "macrodata(Edit comment file,accelerator)" <Control-u><Control-Shift-O>
+set "macrodata(Edit comment file,help)" "Get the text under the cursor and try to edit this file name"
+
+proc "Edit comment file" { w } {
+    open_comment_file $w edit
+}
+
+proc open_comment_file { w open_edit } {
 
     set line1 [$w get "insert linestart" insert]
     set line2 [$w get insert "insert lineend"]
@@ -661,7 +669,13 @@ proc "Open comment file" { w } {
 	WarnWin "'$file' does not exist"
 	return
     }
-    if { [string tolower [file extension $file]] eq ".wnl" && $page ne "" } {
+    if { $open_edit eq "edit" && [string tolower [file extension $file]] eq ".svg" && [auto_execok inkscape] ne "" } {
+	set err [catch { mc::execute exec inkscape $file & } ret]
+	if { $err } {
+	    WarnWin "Failed executing '$exe -notebookname $file -page $page' ($ret)"
+	}
+	return
+    } elseif { [string tolower [file extension $file]] eq ".wnl" && $page ne "" } {
 	foreach exe [list lognoter dlognoter] {
 	    if { [auto_execok $exe] ne "" } {
 		set err [catch { mc::execute exec $exe -notebookname $file -page $page & } ret]
