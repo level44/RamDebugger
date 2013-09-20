@@ -4,7 +4,7 @@ package require Tk 8.5
 
 catch {
     # package Thread is always tried in order to make get_cwd locking work
-    package require Thread
+    #package require Thread
 }
 
 namespace eval RamDebugger::VCS {
@@ -16,7 +16,7 @@ namespace eval RamDebugger::VCS {
     variable autosave_after ""
     variable autosaveidle_after ""
     #variable try_threaded debug
-    variable try_threaded 1
+    variable try_threaded 0
 }
 
 proc RamDebugger::VCS::get_cwd {} {
