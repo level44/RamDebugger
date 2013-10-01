@@ -5,7 +5,26 @@
 # to compile 64 bits version, do: make M64=yes
 
 HOST = $(shell hostname)
-LINUX = $(shell if [ -e /usr/include/linux ]; then echo yes; else echo no; fi)
+OS = $(shell if [ -e /usr/include/linux ]; then echo linux; else echo mac; fi)
+
+DEBUG=no
+
+ifeq ($(shell gcc -dumpmachine),x86_64-suse-linux)
+    M64=yes
+else ifeq ($(shell gcc -dumpmachine),x86_64-linux-gnu)
+  ifeq ($(WINDOWS),yes)
+    M64=no
+  else
+    M64=yes
+  endif
+else
+  ifeq ($(shell gcc -dumpmachine),arm-linux-gnueabi)
+    M64=arm
+  else
+    M64=no
+  endif
+  M64=no
+endif
 
 ifeq ($(HOST),rrg7.local)
   LIBSDIR=/Users/ramsan/gidproject/libs
@@ -22,7 +41,7 @@ endif
 
 OBJDIR = $(if $(filter yes,$(DEBUG)),debug,release)
 
-CC = gcc
+CC = g++
 CPPFLAGS=-DUSE_TCL_STUBS -DUSE_TK_STUBS -DTCLVERSION -Wunused-variable
 
 INCLUDE_DIRECTORIES = /usr/local/ActiveTcl-8.5/include /opt/ActiveTcl-8.5/include \
@@ -37,7 +56,7 @@ ifeq ($(M64),yes)
   LIBEXT = _x64.so
   LD = g++
 else
-  ifeq ($(LINUX),no)
+  ifeq ($(OS),linux)
     CPPFLAGS += -fast -arch i386
     LDFLAGS += -dynamiclib -arch i386 -shared -fPIC
     LIBS =

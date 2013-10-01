@@ -1487,7 +1487,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 	}
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
-		if { $::tcl_platform(machine) == "amd64"} {
+		if { $::tcl_platform(machine) in "amd64 x86_64"} {
 		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
 		} else {
 		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]

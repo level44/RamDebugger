@@ -1852,7 +1852,9 @@ proc RamDebugger::GotoLine {} {
 
     if { [info exists text_secondary] && [focus -lastfor $text] eq $text_secondary } {
 	set active_text $text_secondary
-    } else { set active_text $text }
+    } else {
+	set active_text $text
+    }
 
     set w [dialogwin_snit $active_text._ask -title [_ "Goto line"] -class $::className]
     set f [$w giveframe]
@@ -1864,13 +1866,20 @@ proc RamDebugger::GotoLine {} {
     ttk::checkbutton $f.cb1 -text [_ "Relative to current line"] -variable \
 	[$w give_uservar relative]
     
+    set idx [$active_text index insert]
+    lassign [scan $idx "%d.%d"] line col
+   
+    ttk::label $f.l2 -text "L: $line C: $col"
+    
     grid $f.l $f.sb -sticky w -padx 5 -pady 3
-    grid $f.cb1 - -sticky w
+    grid $f.cb1 - -sticky w -padx 5
+    grid $f.l2 - -sticky w  -padx 5
     
     grid $f.sb -sticky ew
     grid columnconfigure $f 1 -weight 1
     grid rowconfigure $f 2 -weight 1
   
+    $w set_uservar_value line $line
     $w set_uservar_value relative 0
 
     tk::TabToWindow $f.sb

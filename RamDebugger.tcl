@@ -7531,6 +7531,33 @@ proc RamDebugger::CommentSelection { what } {
     }
 }
 
+proc RamDebugger::TrimLines {} {
+    variable text
+    
+    if { [catch {
+	scan [$text index sel.first] "%d" line1
+	scan [$text index sel.last] "%d" line2
+    }] } {
+	scan [$text index insert] "%d.%d" line1 pos
+	set line2 $line1
+    }
+    
+    for { set i $line1 } { $i <= $line2 } { incr i } {
+	set txt [$text get "$i.0" "$i.0 lineend"]
+	if { [string length $txt] > 80 } {
+	    if { [regexp -indices -start 69 {(\s+)(\S*)$} [string range $txt 0 79] {} idx1 idx2] } {
+		$text delete $i.[lindex $idx1 0] "$i.[lindex $idx1 1]+1c"
+		$text insert $i.[lindex $idx1 0] "\n"
+		incr line2
+	    } elseif { [regexp -indices -start 79 {(\s+)} $txt {} idx1] } {
+		$text delete $i.[lindex $idx1 0] "$i.[lindex $idx1 1]+1c"
+		$text insert $i.[lindex $idx1 0] "\n"
+		incr line2
+	    }
+	}
+    }
+}
+
 # proc RamDebugger::IndentCurrent {} {
 #     variable text
 
@@ -8005,12 +8032,32 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
     variable text
     variable currentfileIsModified
     
+    set data [$text get 1.0 end-1c]
+    
+    if { $none eq "" } {
+	set indent_spaces 2
+    } else {
+	set indent_spaces $none
+    }
+    
+    if { [string is integer -strict $indent_spaces] } {
+	ReinstrumentCurrentFile
+	set err [catch { RamDebuggerInstrumenterDoWorkForXML $data info 0 0 1 $indent_spaces } ret]
+	if { !$err } {
+	    set currentfileIsModified_save $currentfileIsModified
+	    $text delete 1.0 end
+	    $text insert end $ret
+	    if { $currentfileIsModified && !$currentfileIsModified_save } {
+		MarkAsNotModified
+	    }
+	    return
+	}
+    }
     set err [catch { package require tdom }]
     if { $err } {
 	tk_messageBox -message [_ "It is necessary to install package 'tdom'"]
 	return
     }
-    set data [$text get 1.0 end-1c]
     set header ""
     regexp {^(.*?)<\s*?(?!\?|!)} $data {} header
     if { !$html } {
@@ -8032,7 +8079,9 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
 	$text insert end [$root asXML -indent $none]
     }
     ReinstrumentCurrentFile
-    set currentfileIsModified $currentfileIsModified_save
+    if { $currentfileIsModified && !$currentfileIsModified_save } {
+	MarkAsNotModified
+    }
 }
 
 if { [llength [info commands lrepeat]] == 0 } {
@@ -8587,6 +8636,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list cascad &[_ "Advanced"] {} editadvanced 0 [list \
 		    [list command &[_ "Indent region"] {} [_ "Indent selected region or line"] "Print Tab" \
 		        -command "RamDebugger::Indent"] \
+		    [list command &[_ "Trim region lines"] {} [_ "Trim long lines in spaces"] "Alt q" \
+		        -command "RamDebugger::TrimLines"] \
 		    [list command &[_ "Comment region"] {} [_ "Comment selected region"] "F6" \
 		            -command "RamDebugger::CommentSelection toggle"] \
 		    [list command &[_ "Uncomment region"] {} [_ "Un-comment selected region"] "Shift F6" \

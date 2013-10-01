@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <tcl.h>
   
-  #if(defined(_MSC_VER) && _MSC_VER >= 1400)
+#if(defined(_MSC_VER) && _MSC_VER >= 1400)
 //1400==VS 2005, this secure functions are not defined in VS 2003
 //this print functions accept a format with argument order,
 //like "%2$d" instead "%d" to use the second integer argument
@@ -1388,6 +1388,26 @@ enum Xml_states_names {
   att_entername_XS
 };
 
+static const char* xml_states_namesC[]={
+  "NONE",
+  "doctype",
+  "doctypeM",
+  "pi",
+  "comment",
+  "cdata",
+  "tag",
+  "tag_end",
+  "enter_tagtext",
+  "entered_tagtext",
+  "text",
+  "att_text",
+  "att_after_equal",
+  "att_quote",
+  "att_dquote",
+  "att_after_name",
+  "att_entername",
+};
+
 const int MaxStackLen=1000;
 
 struct Xml_state
@@ -1408,6 +1428,8 @@ struct Xml_state
   void push_state(Xml_states_names state);
   void pop_state();
   int state_is(Xml_states_names state,int idx=-1);
+  const char* give_state_name() {
+    return xml_states_namesC[xml_states_names_list[xml_states_names_listNum-1]]; }
 
   void push_tag(char* tag,int len);
   void pop_tag(char* tag,int raiseerror,int len);
@@ -1513,13 +1535,97 @@ void Xml_state::raise_error(const char* txt,int raiseerror)
   throw 1;
 }
 
-int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* blockinfoname,int progress,
-		                           int indentlevel_ini,int raiseerror) {
+static char* insert_new_line(Tcl_Obj* blockPtr,int ipos,int* length)
+{
+  char *block;
+  
+  Tcl_SetObjLength(blockPtr,*length+1);
+  block=Tcl_GetString(blockPtr);
+  memmove(&block[ipos+1],&block[ipos],(*length-ipos)*sizeof(char));
+  block[ipos]='\n';
+  *length+=1;
+  return block;
+}
 
-  int i,length,state_start,state_start_global;
-  char c,buf[1024];
+static char* insert_new_line_if_blanks(Tcl_Obj* blockPtr,int ipos,int* length)
+{
+  int i;
+  char *block;
+  
+  block=Tcl_GetString(blockPtr);
+
+  for(i=ipos;i<*length;i++){
+    if(block[i]==' ' || block[i]=='\t');
+    else break;
+  }
+  if(i==*length || block[i]!='<') return block;
+  return insert_new_line(blockPtr,ipos,length);
+}
+
+static char* insert_new_line_if_not_close_tag(Tcl_Obj* blockPtr,int ipos,int* length)
+{
+  int i;
+  char *block;
+  
+  block=Tcl_GetString(blockPtr);
+
+  for(i=ipos;i<*length;i++){
+    if(block[i]==' ' || block[i]=='\t');
+    else break;
+  }
+  if(i<*length && (block[i]=='>' || block[i]=='/' || block[i]=='\n')) return block;
+  return insert_new_line(blockPtr,ipos,length);
+}
+
+static char* insert_remove_spaces(Tcl_Obj* blockPtr,int ipos,int num_spaces,int* length)
+{
+  int i,num_spacesL,delta;
+  char *block;
+  
+  block=Tcl_GetString(blockPtr);
+
+  num_spacesL=0;
+  for(i=ipos;i<*length;i++){
+    if(block[i]==' ') num_spacesL++;
+    else if(block[i]=='\t') num_spacesL+=8;
+    else break;
+  }
+  delta=num_spaces-num_spacesL;
+  if(delta==0) return block;
+
+  if(delta>0){
+    Tcl_SetObjLength(blockPtr,*length+delta);
+    block=Tcl_GetString(blockPtr);
+    memmove(&block[ipos+delta],&block[ipos],(*length-ipos)*sizeof(char));
+    memset(&block[ipos],' ',delta);
+    *length+=delta;
+  } else {
+    delta*=-1;
+    for(i=ipos;i<ipos+delta;i++){
+      if(block[i]=='\t'){
+	Tcl_SetObjLength(blockPtr,*length+7);
+	block=Tcl_GetString(blockPtr);
+	memmove(&block[i+8],&block[i+1],(*length-(i+1))*sizeof(char));
+	memset(&block[i],' ',8);
+	*length+=7;
+      }
+    }
+    memmove(&block[ipos],&block[ipos+delta],(*length-(ipos+delta))*sizeof(char));
+    *length-=delta;
+    Tcl_SetObjLength(blockPtr,*length);
+    block=Tcl_GetString(blockPtr);
+  }
+  return block;
+}
+
+int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char* blockinfoname,
+  int progress,int indentlevel_ini,int indent_spaces,int raiseerror) {
+
+  int i,length,state_start,state_start_global,i_start_line;
+  char c,buf[1024],*block;
   Tcl_Obj *blockinfo,*blockinfocurrent;
-
+  
+  block=Tcl_GetString(blockPtr);
   length = ( int)strlen(block);
   if(length>1000 && progress){
     /*     RamDebugger::ProgressVar 0 1 */
@@ -1531,12 +1637,16 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
   Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(indentlevel_ini));
   Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
   int indentLevel0=indentlevel_ini;
+  if(indent_spaces){
+    block=insert_remove_spaces(blockPtr,0,indentlevel_ini*indent_spaces,&length);
+  }
 
   // colors: magenta magenta2 green red
   
   Xml_state xml_state(ip,indentlevel_ini);
   int icharline=0;
   int iline=1;
+  i_start_line=0;
   xml_state.enter_line_icharline(iline,icharline);
   try {
     for(i=0;i<length;i++){
@@ -1615,7 +1725,9 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    if(xml_state.state_is(tag_end_XS)){
 	      isend=1;
 	      xml_state.pop_state();
-	    } else { isend=0; }
+	    } else {
+	      isend=0;
+	    }
 	    if(xml_state.state_is(tag_XS)){
 	      if(isend){
 		xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
@@ -1649,6 +1761,9 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    } else {
 	      xml_state.raise_error("Not valid > (2)",raiseerror);
 	    }
+	  }
+	  if(indent_spaces){
+	    block=insert_new_line_if_blanks(blockPtr,i+1,&length);
 	  }
 	  break;
 	case '/':
@@ -1686,45 +1801,53 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    }
 	    break;
 	  case '\'':
-	    if(xml_state.state_is(att_after_equal_XS)){
-	      xml_state.pop_state();
-	      xml_state.push_state(att_quote_XS);
-	      state_start=icharline;
-	      state_start_global=i;
-	    } else if(xml_state.state_is(att_quote_XS)){
-	      char cm1=block[i+1];
-	      if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
-		xml_state.raise_error("Not valid close '",raiseerror);
-	      }
-	      xml_state.pop_state();
-	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
-	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
-	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
-	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
-	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_dquote_XS)){
-		xml_state.raise_error("Not valid '",raiseerror);
+	  if(xml_state.state_is(att_after_equal_XS)){
+	    xml_state.pop_state();
+	    xml_state.push_state(att_quote_XS);
+	    state_start=icharline;
+	    state_start_global=i;
+	  } else if(xml_state.state_is(att_quote_XS)){
+	    char cm1=block[i+1];
+	    if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
+	      xml_state.raise_error("Not valid close '",raiseerror);
 	    }
-	    break;
+	    xml_state.pop_state();
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	    
+	    if(indent_spaces && icharline>=75){
+	      block=insert_new_line_if_not_close_tag(blockPtr,i+1,&length);
+	    }            
+	  } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_dquote_XS)){
+	    xml_state.raise_error("Not valid '",raiseerror);
+	  }
+	  break;
 	  case '"':
-	    if(xml_state.state_is(att_after_equal_XS)){
-	      xml_state.pop_state();
-	      xml_state.push_state(att_dquote_XS);
-	      state_start=icharline;
-	      state_start_global=i;
-	    } else if(xml_state.state_is(att_dquote_XS)){
-	      char cm1=block[i+1];
-	      if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
-		xml_state.raise_error("Not valid close \"",raiseerror);
-	      }
-	      xml_state.pop_state();
-	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
-	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
-	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
-	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
-	    } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_quote_XS)){
-		xml_state.raise_error("Not valid \"",raiseerror);
+	  if(xml_state.state_is(att_after_equal_XS)){
+	    xml_state.pop_state();
+	    xml_state.push_state(att_dquote_XS);
+	    state_start=icharline;
+	    state_start_global=i;
+	  } else if(xml_state.state_is(att_dquote_XS)){
+	    char cm1=block[i+1];
+	    if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
+	      xml_state.raise_error("Not valid close \"",raiseerror);
 	    }
-	    break;
+	    xml_state.pop_state();
+	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline+1));
+	    
+	    if(indent_spaces && icharline>=75){
+	      block=insert_new_line_if_not_close_tag(blockPtr,i+1,&length);
+	    }            
+	  } else if(!xml_state.state_is(text_XS) && !xml_state.state_is(att_quote_XS)){
+	    xml_state.raise_error("Not valid \"",raiseerror);
+	  }
+	  break;
 	case ' ': case '\t': case '\n':
 	    if(xml_state.state_is(enter_tagtext_XS)){
 	       xml_state.pop_state();
@@ -1755,7 +1878,6 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    } else if(xml_state.state_is(att_entername_XS)){
 	      xml_state.pop_state();
 	      xml_state.push_state(att_after_name_XS);
-
 	    }
 	    break;
 	  default:
@@ -1779,32 +1901,61 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
 	    break;
 	 }
        }
-       if(c=='\t'){
-	 icharline+=8;
-       } else if(c=='\n'){
-	 iline++;
-	 icharline=0;
-	 if(xml_state.indentlevel<indentLevel0){
-	   if(iline==2){
-	     xml_state.indentlevel++;
-	   } else {
-	     Tcl_Obj *objPtr;
-	     Tcl_ListObjIndex(ip,blockinfocurrent,0,&objPtr);
-	     Tcl_SetIntObj(objPtr,xml_state.indentlevel);
-	   }
-	 }
-	 blockinfo=Tcl_CopyIfShared(blockinfo);
-	 Tcl_ListObjAppendElement(ip,blockinfo,blockinfocurrent);
-	 blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
-	 Tcl_SetListObj(blockinfocurrent,0,NULL);
-	 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(xml_state.indentlevel));
-	 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
-	 indentLevel0=xml_state.indentlevel;
-       } else {
-	 icharline++;
-       }
-       xml_state.enter_line_icharline(iline,icharline);
-     }
+      if(c=='\t'){
+	icharline+=8;
+      } else if(c=='\n'){
+	iline++;
+	icharline=0;
+	if(xml_state.indentlevel<indentLevel0){
+	  if(iline==2){
+	    xml_state.indentlevel++;
+	  } else {
+	    Tcl_Obj *objPtr;
+	    Tcl_ListObjIndex(ip,blockinfocurrent,0,&objPtr);
+	    Tcl_SetIntObj(objPtr,xml_state.indentlevel);
+	    if(indent_spaces){
+	      int length_before=length;
+	      block=insert_remove_spaces(blockPtr,i_start_line,xml_state.indentlevel*indent_spaces,&length);
+	      int delta=length-length_before;
+	      int bi_len,bi_i,bi_val;
+	      Tcl_ListObjLength(ip,blockinfocurrent,&bi_len);
+	      for(bi_i=3;bi_len<bi_len;bi_len+=3){
+		Tcl_ListObjIndex(ip,blockinfocurrent,bi_i,&objPtr);
+		Tcl_GetIntFromObj(ip,objPtr,&bi_val);
+		Tcl_SetIntObj(objPtr,bi_val+delta);
+		Tcl_ListObjIndex(ip,blockinfocurrent,bi_i+1,&objPtr);
+		Tcl_GetIntFromObj(ip,objPtr,&bi_val);
+		Tcl_SetIntObj(objPtr,bi_val+delta);
+	      }
+	      i+=delta;
+	    }
+	  }
+	}
+	i_start_line=i+1;
+	blockinfo=Tcl_CopyIfShared(blockinfo);
+	Tcl_ListObjAppendElement(ip,blockinfo,blockinfocurrent);
+	blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	Tcl_SetListObj(blockinfocurrent,0,NULL);
+	
+	int indentlevel;
+	if(xml_state.state_is(tag_XS) || xml_state.state_is(tag_end_XS) || 
+	  xml_state.state_is(entered_tagtext_XS)){
+	  indentlevel=xml_state.indentlevel+1;
+	  indentLevel0=0;
+	} else {
+	  indentlevel=xml_state.indentlevel;
+	  indentLevel0=xml_state.indentlevel;
+	}
+	Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(indentlevel));
+	Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+	if(indent_spaces && i_start_line<length){
+	  block=insert_remove_spaces(blockPtr,i_start_line,indentlevel*indent_spaces,&length);
+	}
+      } else {
+	icharline++;
+      }
+      xml_state.enter_line_icharline(iline,icharline);
+    }
      if(xml_state.indentlevel<indentLevel0){
        if(iline==2){
 	 xml_state.indentlevel++;
@@ -1831,6 +1982,9 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,char* block,char* bloc
      }
      Tcl_DecrRefCount(blockinfo);
      Tcl_DecrRefCount(blockinfocurrent);
+     if(indent_spaces){
+       Tcl_SetObjResult(ip,blockPtr);
+     }
      return TCL_OK;
    }   
    catch(...){
@@ -1893,10 +2047,11 @@ int RamDebuggerInstrumenterDoWorkForCpp(ClientData clientData, Tcl_Interp *ip, i
 int RamDebuggerInstrumenterDoWorkForXML(ClientData clientData, Tcl_Interp *ip, int objc,
 		                  Tcl_Obj *CONST objv[])
 {
-  int result,progress=1,indentlevel_ini=0,raiseerror=1;
+  int result,progress=1,indentlevel_ini=0,raiseerror=1,indent_spaces;
+  Tcl_Obj* blockPtr;
   if (objc<3) {
     Tcl_WrongNumArgs(ip, 1, objv,
-		     "block blockinfoname ?progress? ?indentlevel_ini? ?raiseerror?");
+      "block blockinfoname ?progress? ?indentlevel_ini? ?raiseerror? ?indent_spaces?");
     return TCL_ERROR;
   }
   if (objc>=4){
@@ -1907,12 +2062,28 @@ int RamDebuggerInstrumenterDoWorkForXML(ClientData clientData, Tcl_Interp *ip, i
     result=Tcl_GetIntFromObj(ip,objv[4],&indentlevel_ini);
     if(result) return TCL_ERROR;
   }
-  if (objc==6){
+  if (objc>=6){
     result=Tcl_GetBooleanFromObj(ip,objv[5],&raiseerror);
     if(result) return TCL_ERROR;
   }
-  result=RamDebuggerInstrumenterDoWorkForXML_do(ip,Tcl_GetString(objv[1]),Tcl_GetString(objv[2]),
-		                                progress,indentlevel_ini,raiseerror);
+  
+  indent_spaces=0;
+  if (objc==7){
+    result=Tcl_GetIntFromObj(ip,objv[6],&indent_spaces);
+    if(result) return TCL_ERROR;
+  }
+
+  if(indent_spaces){
+    blockPtr=Tcl_DuplicateObj(objv[1]);
+    Tcl_IncrRefCount(blockPtr);
+  } else {
+    blockPtr=objv[1];
+  }
+  result=RamDebuggerInstrumenterDoWorkForXML_do(ip,blockPtr,Tcl_GetString(objv[2]),
+    progress,indentlevel_ini,indent_spaces,raiseerror);
+  if(indent_spaces){
+    Tcl_DecrRefCount(blockPtr);
+  }
   return result;
 }
 
