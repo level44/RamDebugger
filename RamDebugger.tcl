@@ -166,7 +166,8 @@ namespace eval RamDebugger {
 #   Init proc
 ################################################################################
 
-proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _big_icons 0 } } {
+proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _big_icons 0 } 
+    { check_remotes 1 } } {
     variable debuggerserver
     variable debuggerserverNum
     variable topdir
@@ -398,6 +399,8 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
     if { $readwriteprefs eq "yes" || $readwriteprefs eq "nowrite" } {
 	ReadPreferences
     }
+
+    set options(CheckRemotes) $check_remotes
 
     UpdateExecDirs
 
@@ -10020,7 +10023,15 @@ if { ![info exists SkipRamDebuggerInit] } {
     } else {
 	set className RamDebugger
     }
-    RamDebugger::Init $readwriteprefs $prefs_group $registerasremote $big_icons
+    if { [set ipos [lsearch $argv "-check_remotes"]] != -1 } {
+	set iposm1 [expr {$ipos+1}]
+	set check_remotes [lindex $argv $iposm1]
+	set argv [lreplace $argv $ipos $iposm1]
+    } else {
+	set check_remotes 1
+    }
+
+    RamDebugger::Init $readwriteprefs $prefs_group $registerasremote $big_icons $check_remotes
     
     ################################################################################
     #     Init the GUI part
