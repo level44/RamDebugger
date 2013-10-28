@@ -9753,6 +9753,14 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     auto_load tcl_wordBreakAfter
     set ::tcl_wordchars "\\w"
     set ::tcl_nonwordchars "\\W"
+    
+     #do the same in windows than in linux
+     if {[tk windowingsystem] eq "win32"}  {
+     	proc ::tk::TextNextWord {w start} {
+     	    TextNextPos $w $start tcl_endOfWord
+     	}
+     }
+    
 #     set ::tcl_wordchars {\S}
 #     set ::tcl_nonwordchars {\s}
 
