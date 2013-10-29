@@ -6241,7 +6241,7 @@ proc RamDebugger::TextCompInsert { data } {
 
     foreach "- yend" [$textCOMP yview] break
     $textCOMP conf -state normal
-    TextInsertAndWrap $textCOMP $data
+    TextInsertAndWrap $textCOMP $data 160
     $textCOMP conf -state disabled
     if { $yend == 1 } { $textCOMP yview moveto 1 }
 }
@@ -6512,8 +6512,11 @@ proc RamDebugger::PrevNextCompileError { what } {
 		}
 	    }
 	}
-	set rex {(((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+))|(((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+))}
-	if { [regexp $rex [$textCOMP get "$idx linestart" "$idx lineend"]] } {
+	set rex1 {(((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+))}
+	set rex2 {(((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+))}
+	set rex3 {([a-zA-Z:/\\]+\(\d+\))}
+	set rex "$rex1|$rex2|$rex3"
+	 if { [regexp $rex [$textCOMP get "$idx linestart" "$idx lineend"]] } {
 	    $textCOMP tag add sel2 "$idx linestart" "$idx lineend"
 	}
 	if { $idx == $idxini } { break }
@@ -6533,7 +6536,8 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     set data [$textstack get "$idx linestart" "$idx lineend"]
     
     set patternList [list {((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+)} \
-	    {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)}]
+	    {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)} \
+	    {((?:[a-zA-Z]:\\)?[-\\\w.]+)\(([0-9]+)\)}]
     set rex1 {^\#([0-9]+)}
     set rex2 [join $patternList "|"]
     set data0 $data
@@ -9756,9 +9760,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     
      #do the same in windows than in linux
      if {[tk windowingsystem] eq "win32"}  {
-     	proc ::tk::TextNextWord {w start} {
-     	    TextNextPos $w $start tcl_endOfWord
-     	}
+	     proc ::tk::TextNextWord {w start} {
+		 TextNextPos $w $start tcl_endOfWord
+	     }
      }
     
 #     set ::tcl_wordchars {\S}

@@ -2104,15 +2104,19 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	    }
 	    lappend comm -f $make {*}$make_args
 	    
-	    if { $nostop } {
-		RamDebugger::TextCompInsert "make -k -f $make $make_args\n"
-	    } else {
-		RamDebugger::TextCompInsert "make -f $make $make_args\n"
+	    set ctype make
+	    
+	    if { [regexp devenv.com $make] } {
+		set comm [list [string trim $make \"] {*}$make_args]
+		set ctype vc
 	    }
+	    
+	    RamDebugger::TextCompInsert "$comm\n"
+
 	    set fin [open "|$comm |& cat" r]
 	    
 	    fconfigure $fin -blocking 0
-	    fileevent $fin readable [list cproject::CompileFeedback $fin]
+	    fileevent $fin readable [list cproject::CompileFeedback $ctype $fin]
 	    
 	    vwait cproject::compilationstatus
 	
@@ -2168,11 +2172,14 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
     } else { return 0 }
 }
 
-proc cproject::CompileFeedback { fin } {
+proc cproject::CompileFeedback { ctype fin } {
     variable compilationstatus
 
     if { [catch { eof $fin } ret] || $ret } {
 	set err [catch { close $fin } errstring]
+	if { $ctype eq "vc" } {
+	    RamDebugger::TextCompInsert "\n"
+	}
 	if { $err } {
 	    RamDebugger::TextCompInsert $errstring\n
 	    set compilationstatus 1
@@ -2182,9 +2189,22 @@ proc cproject::CompileFeedback { fin } {
 	return
     }
     set ret [gets $fin aa]
-
+    
     if { $aa != "" } {
-	RamDebugger::TextCompInsert $aa\n
+	if { $ctype eq "make" } {
+	    RamDebugger::TextCompInsert $aa\n
+	} else {
+	    set aaNew ""
+	    foreach line [split $aa \n] {
+		if { [regexp {^(\d+>|---|===)} $aa] } {
+		    append aaNew "\n$aa"
+		} else {
+		    append aaNew $aa
+		}
+	    }
+	    set aa $aaNew
+	}
+	RamDebugger::TextCompInsert $aa
 	update
     }
 }
