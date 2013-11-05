@@ -370,6 +370,10 @@ proc cproject::NewData {} {
 	set dataM($i,makefile_file) Makefile
 	set dataM($i,makefile_arguments) ""
 	
+	set dataM($i,has_userdefined_vs) 0
+	set dataM($i,vs_solution) ""
+	set dataM($i,vs_arguments) ""
+
 	foreach link $links {
 	    set dataL($i,$link,librariesdirs) .
 	    set dataL($i,$link,linkgroups) All
@@ -849,6 +853,38 @@ proc cproject::Create { par } {
     bind $nf2.cb1 <Delete> [list trace remove variable cproject::thisdataM(has_userdefined_makefile) \
 	    write "$cmdMake;#"]
     
+    set nf25 [ttk::frame $nb.f25]
+    $nb add $nf25 -text [_ "Visual studio"] -sticky nsew
+
+    ttk::checkbutton $nf25.cb1 -text [_ "Has Visual studio" ] -variable \
+	cproject::thisdataM(has_userdefined_vs)
+    
+    set nf251 [ttk::labelframe $nf25.f1 -text [_  "visual studio"]]
+
+    ttk::label $nf251.l1 -text [_ "Visual studio solution"]:
+    ttk::combobox $nf251.cb1 -textvariable cproject::thisdataM(vs_solution)
+    ttk::button $nf251.b -image [Bitmap::get file]  -style Toolbutton -command [list cproject::select_vs $w]
+    ttk::label $nf251.l2 -text [_ "Arguments"]:
+    ttk::entry $nf251.e -textvariable cproject::thisdataM(vs_arguments)
+
+    grid $nf251.l1 $nf251.cb1 $nf251.b -sticky nsew -padx 2 -pady 2
+    grid  $nf251.l2 $nf251.e -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $nf251 1 -weight 1
+
+    grid $nf25.cb1 -sticky nsew -padx 2 -pady 2
+    grid  $nf25.f1 -sticky nsew -padx 2 -pady 2
+    grid columnconfigure $nf25 0 -weight 1
+    
+    foreach "n v" [list has_userdefined_vs 0 vs_solution "" vs_arguments ""] {
+	if { ![info exists cproject::thisdataM($n)] } {
+	    set cproject::thisdataM($n) $v
+	}
+    }
+    set cmdVS [list cproject::update_active_inactive_vs $w [list $nf251.l1 $nf251.cb1 $nf251.b $nf251.l2 $nf251.e]]
+    trace add variable cproject::thisdataM(has_userdefined_vs) write "$cmdVS;#"
+    bind $nf2.cb1 <Delete> [list trace remove variable cproject::thisdataM(has_userdefined_vs) \
+	    write "$cmdVS;#"]
+    
     set nf3 [ttk::frame $nb.f3]
     $nb add $nf3 -text [_ Execute] -sticky nsew
     
@@ -905,7 +941,8 @@ proc cproject::Create { par } {
     trace var cproject::scripttabs w "UpdateScripttabs ;#"
     
     eval $cmdMake
-
+    eval $cmdVS
+    
     grid $f1.l1 $f1.cb1     -           -           -       -       $f1.b1 $f1.b2 $f1.b3 -sticky w
     grid $f1.l2 $f1.cb2 $f1.b4 $f1.b5 $f1.b6 $f11 -       -          -   -   -sticky w
     grid $f1.pw     -             -           -         -           -    -       -          -   - -sticky nsew
@@ -974,8 +1011,30 @@ proc cproject::update_active_inactive_makefile { w wList } {
 	    $notebook tab $i -state $nstate
 	}
     }
-
 }
+
+proc cproject::update_active_inactive_vs { w wList } {
+    variable thisdataM
+    variable notebook
+    
+    if { $thisdataM(has_userdefined_vs) } {
+	set state !disabled
+	set nstate disabled
+    } else {
+	set state disabled
+	set nstate normal
+    }
+    foreach i $wList {
+	$i state $state
+    }
+    foreach i [$notebook tabs] {
+	set txt [$notebook tab $i -text]
+	if { [string match Link* $txt] || $txt eq [_ "Compilation"]  } {
+	    $notebook tab $i -state $nstate
+	}
+    }
+}
+
 
 proc cproject::fill_files_list { w } {
     variable files
@@ -1503,6 +1562,25 @@ proc cproject::select_makefile { parent } {
     set RamDebugger::options(defaultdir) [file dirname $file]
     set file [ConvertToRelative $projectdir $file]
     set thisdataM(makefile_file)  $file
+}
+
+proc cproject::select_vs { parent } {
+    variable thisdataM
+    
+    set projectdir [IsProjectNameOk]
+    
+    set types {
+	{{Visual studio Files} {.sln .vcproj .vcxproj} }
+	{{All Files} * }
+    }
+
+    set file [tk_getOpenFile -filetypes $types \
+	    -initialdir $RamDebugger::options(defaultdir) -initialfile \
+	    [file tail $thisdataM(vs_solution)] -parent $parent -title [_ "Visual studio solution"]]
+    if { $file eq "" } { return }
+    set RamDebugger::options(defaultdir) [file dirname $file]
+    set file [ConvertToRelative $projectdir $file]
+    set thisdataM(vs_solution)  $file
 }
 
 proc cproject::AddModFiles { listbox what } {
@@ -2086,9 +2164,15 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 		    regexp {^\s*(.*\S)\s*:} $ret {} target
 		    lappend make_args -W $rel_unique_file $target
 		}
+		set ctype make
+	    } elseif { $dataM($debrel,has_userdefined_vs)  } {
+		set make $dataM($debrel,vs_solution)
+		set make_args $dataM($debrel,vs_arguments)
+		set ctype vc
 	    } else {
 		set make [create_auto_makefile $debrel $unique_file]
 		set make_args ""
+		set ctype make
 	    }
 	    if { $::tcl_platform(platform) eq "windows" } {
 		set comm ""
@@ -2098,18 +2182,29 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	    } else {
 		set comm ""
 	    }
-	    lappend comm make
-	    if { $nostop } {
-		lappend comm -k
+	    if { $ctype eq "make" } {
+		lappend comm make
+		if { $nostop } {
+		    lappend comm -k
+		}
+		lappend comm -f $make {*}$make_args
+	    } else {
+		set comm [auto_execok devenv.com]
+		if { $comm eq "" } {
+		    set txt [_ "Add directory for file 'devenv.com' in Preferences->Directories"]
+		    snit_messageBox -message $txt -parent $w
+		    return
+		}
+		
+		#"C:\Program Files (x86)\Microsoft Visual Studio 9.0\Common7\IDE\devenv.com"
+		lappend comm $make {*}$make_args
 	    }
-	    lappend comm -f $make {*}$make_args
 	    
-	    set ctype make
 	    
-	    if { [regexp devenv.com $make] } {
-		set comm [list [string trim $make \"] {*}$make_args]
-		set ctype vc
-	    }
+#             if { [regexp devenv.com $make] } {
+#                 set comm [list [string trim $make \"] {*}$make_args]
+#                 set ctype vc
+#             }
 	    
 	    RamDebugger::TextCompInsert "$comm\n"
 
