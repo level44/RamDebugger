@@ -6,14 +6,20 @@ package require Tk
 
 cd $env(HOME)
 
-if { [winfo screenheight .] < 1024 } {
-    set g1 700x845+0+0
-    set g2 654x525+715+0
-#     set g1 720x845+0+0
-#     set g2 750x600-0+0
+lassign [list 0 0 [winfo screenwidth .] [winfo screenheight .]] x0 y0 x1 y1
+set err [catch { package require twapi }]
+if { !$err } {
+    lassign [twapi::get_desktop_workarea] x0 y0 x1 y1
+}
+set width [expr {$x1-$x0}]
+set height [expr {$y1-$y0}]
+
+if { $height < 1024 } {
+    set g1 700x845+$x0+$y0
+    set g2 660x516+[expr {$x0+715}]+$y0
 } else {
-    set g1 699x970+0+0
-    set g2 550x600-0+0
+    set g1 [expr {$width-550-25}]x970+$x0+$y0
+    set g2 550x600-0+$y0
 }
 
 set big_icons 0
