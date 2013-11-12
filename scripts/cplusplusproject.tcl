@@ -2264,7 +2264,9 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 
     if { $compilationstatus == 2 } {
 	return -1
-    } else { return 0 }
+    } else {
+	return 0
+    }
 }
 
 proc cproject::CompileFeedback { ctype fin } {
@@ -2298,8 +2300,8 @@ proc cproject::CompileFeedback { ctype fin } {
 		}
 	    }
 	    set aa $aaNew
+	    RamDebugger::TextCompInsert $aa
 	}
-	RamDebugger::TextCompInsert $aa
 	update
     }
 }
