@@ -343,6 +343,9 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
 	catch { load $dynlib }
 	if {[info commands RamDebuggerInstrumenterDoWork] ne "" } { return }
     }
+    if { [auto_execok g++] eq "" } {
+	return
+    }
     file delete -force [file join $AppDataDir compile]
     file copy -force [file join $topdir scripts RamDebuggerInstrumenter.cc] \
 	[file join $topdir scripts compile] \
@@ -361,7 +364,7 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
 	0 { set lib [file join $AppDataDir compile libtclstub.a] }
 	1 { set lib [lindex $libs 0] }
 	default {
-	    foreach i [glob -dir [file join $basedir lib] libtclstub*.a] {
+	    foreach i [glob -nocomplain -dir [file join $basedir lib] libtclstub*.a] {
 		regexp {[\d.]+} [file tail $i] version
 		if { $version >= 8.5 } { break }
 	    }
