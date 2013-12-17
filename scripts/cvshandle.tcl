@@ -15,8 +15,8 @@ namespace eval RamDebugger::VCS {
     variable lasttimeautosave ""
     variable autosave_after ""
     variable autosaveidle_after ""
-    variable try_threaded debug
-    #variable try_threaded 0
+    #variable try_threaded debug
+    variable try_threaded 0
 }
 
 proc RamDebugger::VCS::get_cwd {} {
