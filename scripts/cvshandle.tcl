@@ -15,8 +15,8 @@ namespace eval RamDebugger::VCS {
     variable lasttimeautosave ""
     variable autosave_after ""
     variable autosaveidle_after ""
-    #variable try_threaded debug
-    variable try_threaded 0
+    variable try_threaded debug
+    #variable try_threaded 0
 }
 
 proc RamDebugger::VCS::get_cwd {} {
@@ -1648,7 +1648,8 @@ proc RamDebugger::VCS::parse_finfo { finfo } {
 	}
     }
     if { $line ne "" } {
-	regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\]\s*\)} $line {} date checkin comment user artifact
+	regexp {(\S+)\s+\[(\w+)\]\s+(.*)\(user:\s*([^,]+),\s*artifact:\s*\[(\w+)\].*\)} $line {} date \
+	    checkin comment user artifact
 	set ret [parse_timeline [exec $fossil timeline $checkin -n 1]] 
 	lassign [lindex $ret 0] date time - - - tags
 	set date [clock format [clock scan "$date $time" -timezone :UTC] -format "%Y-%m-%d %H:%M:%S"]
@@ -2653,17 +2654,22 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                    }
 		                }
 		                if { !$found } {
-		                    set ret [parse_timeline [exec $fossil timeline parents $checkin -n 2000]]
-		                    foreach i $ret {
-		                        lassign $i date time checkin comment user tags
-		                        foreach i $finfo_list {
-		                            lassign $i date_in checkin_in comment_in user_in artifact
-		                            set len [string length $checkin_in]
-		                            if { [string equal -length $len $checkin $checkin_in] } {
-		                                set found 1
-		                                break
+		                    for { set itry 1000 } { $itry < 10000 } { set itry [expr {$itry*2}] } {
+		                        set ret [parse_timeline [exec $fossil timeline parents $checkin -n $itry]]
+		                        foreach i $ret {
+		                            lassign $i date time checkin comment user tags
+		                            foreach i $finfo_list {
+		                                lassign $i date_in checkin_in comment_in user_in artifact
+		                                set len [string length $checkin_in]
+		                                if { [string equal -length $len $checkin $checkin_in] } {
+		                                    set found 1
+		                                    break
+		                                }
+		                                if { $date_in < $date } {
+		                                    break
+		                                }
 		                            }
-		                            if { $date_in < $date } {
+		                            if { $found } {
 		                                break
 		                            }
 		                        }
