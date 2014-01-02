@@ -1530,6 +1530,10 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 
 proc RamDebugger::Instrumenter::DoWorkForXML_do { block blockinfoname "progress 1" { indentlevel_ini 0 } \
     { raiseerror 1 } } {
+    
+    #
+    # NOTE: necessary to implement xml:space="preserve". It is already implemented in c++
+    #
 
     set length [string length $block]
     if { $length >= 5000 && $progress } {

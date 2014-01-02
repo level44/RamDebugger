@@ -1814,7 +1814,7 @@ proc RamDebugger::rlist { args } {
 	    }
 	}
 	if { $filetype == "XML" } {
-	    set err [catch { dom parset $files($currentfile) } doc]
+	    set err [catch { dom parse $files($currentfile) } doc]
 	    if { !$err } {
 		set files($currentfile) [$doc asXML]
 		$doc delete
@@ -6663,8 +6663,8 @@ proc RamDebugger::CutCopyPasteText { what args } {
 		    set oldSeparator [$text cget -autoseparators]
 		    if { $oldSeparator } {
 		        $text configure -autoseparators 0
-		        $text edit separator
 		    }
+		    $text edit separator
 		    # only delete selection if it is in the same line than insertion
 		    catch {
 		        if { [$text compare "insert linestart" == "sel.first linestart"] } {
@@ -6672,8 +6672,8 @@ proc RamDebugger::CutCopyPasteText { what args } {
 		        }
 		    }
 		    $text insert insert $sel
+		    $text edit separator
 		    if { $oldSeparator } {
-		        $text edit separator
 		        $text configure -autoseparators 1
 		    }
 		    if { [set ipos [lsearch -exact $oldPasteStack $sel]] != -1 } {
@@ -8052,8 +8052,17 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
 	set err [catch { RamDebuggerInstrumenterDoWorkForXML $data info 0 0 1 $indent_spaces } ret]
 	if { !$err } {
 	    set currentfileIsModified_save $currentfileIsModified
+	    
+	    set oldSeparator [$text cget -autoseparators]
+	    if { $oldSeparator } { $text configure -autoseparators 0 }
+	    $text edit separator
+
 	    $text delete 1.0 end
 	    $text insert end $ret
+	    
+	    $text edit separator
+	    if { $oldSeparator } { $text configure -autoseparators 1 }
+
 	    if { $currentfileIsModified && !$currentfileIsModified_save } {
 		MarkAsNotModified
 	    }
@@ -8077,6 +8086,11 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
 	return
     }
     set currentfileIsModified_save $currentfileIsModified
+    
+    set oldSeparator [$text cget -autoseparators]
+    if { $oldSeparator } { $text configure -autoseparators 0 }
+    $text edit separator
+
     $text delete 1.0 end
     $text insert end $header
     set root [$doc documentElement]
@@ -8085,6 +8099,10 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
     } else {
 	$text insert end [$root asXML -indent $none]
     }
+    
+    $text edit separator
+    if { $oldSeparator } { $text configure -autoseparators 1 }
+
     ReinstrumentCurrentFile
     if { $currentfileIsModified && !$currentfileIsModified_save } {
 	MarkAsNotModified

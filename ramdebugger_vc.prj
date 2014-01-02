@@ -1,0 +1,52 @@
+set groups All
+set group All
+set links Link
+set scripttabs Script
+set debugrelease release
+set files {}
+array set thisdataC {flags {-c -O3} defines {} includedirs . compiler gcc}
+array set dataC {All,release,includedirs . All,release,defines {} All,both,compiler gcc All,debug,compiler gcc All,release,compiler gcc All,both,flags -c All,both,includedirs . All,both,defines {} All,debug,flags {-c -g} All,debug,includedirs . All,debug,defines {} All,release,flags {-c -O3}}
+array set thisdataM {has_userdefined_vs 1 vs_solution RDIDoWork/RDIDoWork.sln makefile_file Makefile has_userdefined_makefile 0 vs_arguments {/Project RDIDoWork /Build Release} makefile_arguments {}}
+array set dataM {debug,makefile_file Makefile debug,vs_solution RDIDoWork/RDIDoWork.sln debug,vs_arguments {/Project RDIDoWork /Build Debug} release,makefile_file Makefile release,vs_solution RDIDoWork/RDIDoWork.sln release,vs_arguments {/Project RDIDoWork /Build Release} debug,has_userdefined_vs 1 both,vs_solution {} both,makefile_file Makefile debug,makefile_arguments {} release,has_userdefined_vs 1 both,vs_arguments {} release,makefile_arguments {} debug,has_userdefined_makefile 0 both,has_userdefined_vs 0 release,has_userdefined_makefile 0 both,makefile_arguments {} both,has_userdefined_makefile 0}
+array set thisdataL {Link,linkgroups All Link,linkflags {} Link,librariesdirs . Link,linkexe ramdebugger_vc Link,linker gcc Link,libraries {libc libm}}
+array set dataL {both,Link,linker gcc both,Link,linkgroups All debug,Link,libraries {libc libm} debug,Link,librariesdirs . release,Link,libraries {libc libm} debug,Link,linkexe ramdebugger_vc release,Link,librariesdirs . release,Link,linkexe ramdebugger_vc both,Link,libraries {libc libm} debug,Link,linkflags {} both,Link,librariesdirs . debug,Link,linker gcc release,Link,linkflags {} both,Link,linkexe ramdebugger_vc debug,Link,linkgroups All release,Link,linker gcc release,Link,linkgroups All both,Link,linkflags {}}
+array set thisdataS {Script,script {# It is possible to include a TCL script here
+# it will be executed either automatically or
+# manually, depending on configuration. In this
+# latter case, it is possible to use it as a NOTES
+# storage place
+
+# AVAILABLE VARIABLES
+# $ProjectDir: the directory where the project is
+# $ObjectsDir: the directory where the object files are
+} Script,executetime {No automatic}}
+array set dataS {both,Script,executetime {No automatic} release,Script,executetime {No automatic} debug,Script,script {# It is possible to include a TCL script here
+# it will be executed either automatically or
+# manually, depending on configuration. In this
+# latter case, it is possible to use it as a NOTES
+# storage place
+
+# AVAILABLE VARIABLES
+# $ProjectDir: the directory where the project is
+# $ObjectsDir: the directory where the object files are
+} debug,Script,executetime {No automatic} both,Script,script {# It is possible to include a TCL script here
+# it will be executed either automatically or
+# manually, depending on configuration. In this
+# latter case, it is possible to use it as a NOTES
+# storage place
+
+# AVAILABLE VARIABLES
+# $ProjectDir: the directory where the project is
+# $ObjectsDir: the directory where the object files are
+} release,Script,script {# It is possible to include a TCL script here
+# it will be executed either automatically or
+# manually, depending on configuration. In this
+# latter case, it is possible to use it as a NOTES
+# storage place
+
+# AVAILABLE VARIABLES
+# $ProjectDir: the directory where the project is
+# $ObjectsDir: the directory where the object files are
+}}
+array set thisdataE {execdir C:/Users/ramsan/Documents/myTclTk/RamDebugger/ramdebugger_vc_release exe ramdebugger_vc exeargsList {{}} exeargs {}}
+array set dataE {debug,exeargs {} release,exeargs {} debug,exe ramdebugger_vc debug,exeargsList {{}} debug,execdir C:/Users/ramsan/Documents/myTclTk/RamDebugger/ramdebugger_vc_debug release,exe ramdebugger_vc release,exeargsList {{}} both,exeargs {} release,execdir C:/Users/ramsan/Documents/myTclTk/RamDebugger/ramdebugger_vc_release both,exe {} both,exeargsList {} both,execdir {}}

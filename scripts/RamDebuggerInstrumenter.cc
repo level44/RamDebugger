@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <assert.h>
 #include <tcl.h>
   
 #if(defined(_MSC_VER) && _MSC_VER >= 1400)
@@ -1361,11 +1362,17 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
   return result;
 }
 
+enum Xml_space_values {
+  default_XSV,
+  preserve_XSV
+};
+
 struct Xml_state_tag
 {
   char* tag;
   int charlen;
   int line;
+  Xml_space_values xml_space_value;
 };
 
 enum Xml_states_names {
@@ -1421,8 +1428,8 @@ struct Xml_state
   int iline,icharline;
 
   Xml_state(Tcl_Interp *_ip,int _indentlevel): ip(_ip),indentlevel(_indentlevel),
-		                               xml_state_tag_listNum(0),xml_states_names_listNum(0),
-		                               iline(0),icharline(0) {}
+    xml_state_tag_listNum(0),xml_states_names_listNum(0),
+    iline(0),icharline(0) {}
   void enter_line_icharline(int _iline,int _icharline) { iline=_iline ; icharline=_icharline; }
 
   void push_state(Xml_states_names state);
@@ -1433,6 +1440,8 @@ struct Xml_state
 
   void push_tag(char* tag,int len);
   void pop_tag(char* tag,int raiseerror,int len);
+  void add_xml_space_value(Xml_space_values xml_space_value);
+  Xml_space_values give_xml_space_value();
   void raise_error_if_tag_stack();
 
   void raise_error(const char* txt,int raiseerror);
@@ -1474,6 +1483,13 @@ void Xml_state::push_tag(char* tag,int charlen)
   xml_state_tag_list[xml_state_tag_listNum].tag=tag;
   xml_state_tag_list[xml_state_tag_listNum].charlen=charlen;
   xml_state_tag_list[xml_state_tag_listNum].line=iline;
+
+  if(xml_state_tag_listNum>0){
+    xml_state_tag_list[xml_state_tag_listNum].xml_space_value=
+      xml_state_tag_list[xml_state_tag_listNum-1].xml_space_value;
+  } else {
+    xml_state_tag_list[xml_state_tag_listNum].xml_space_value=default_XSV;
+  }
   xml_state_tag_listNum++;
   indentlevel++;
 }
@@ -1506,6 +1522,18 @@ void Xml_state::pop_tag(char* tag,int raiseerror,int charlen)
     printf("pop_tag error\n"); // without it, program crashes on MacOS
     throw 1;
   }
+}
+
+void Xml_state::add_xml_space_value(Xml_space_values xml_space_value)
+{
+  assert(xml_state_tag_listNum>0);
+  xml_state_tag_list[xml_state_tag_listNum-1].xml_space_value=xml_space_value;
+}
+
+Xml_space_values Xml_state::give_xml_space_value()
+{
+  if(xml_state_tag_listNum==0) return default_XSV;
+  return xml_state_tag_list[xml_state_tag_listNum-1].xml_space_value;
 }
 
 void Xml_state::raise_error_if_tag_stack()
@@ -1621,7 +1649,7 @@ static char* insert_remove_spaces(Tcl_Obj* blockPtr,int ipos,int num_spaces,int*
 int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char* blockinfoname,
   int progress,int indentlevel_ini,int indent_spaces,int raiseerror) {
 
-  int i,length,state_start,state_start_global,i_start_line;
+  int i,length,state_start,state_start_global,i_start_line,last_att_is_xml_space;
   char c,buf[1024],*block;
   Tcl_Obj *blockinfo,*blockinfocurrent;
   
@@ -1647,6 +1675,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
   int icharline=0;
   int iline=1;
   i_start_line=0;
+  last_att_is_xml_space=0;
   xml_state.enter_line_icharline(iline,icharline);
   try {
     for(i=0;i<length;i++){
@@ -1762,7 +1791,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	      xml_state.raise_error("Not valid > (2)",raiseerror);
 	    }
 	  }
-	  if(indent_spaces){
+	  if(indent_spaces && xml_state.give_xml_space_value()==default_XSV){
 	    block=insert_new_line_if_blanks(blockPtr,i+1,&length);
 	  }
 	  break;
@@ -1792,14 +1821,21 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	  }
 	  break;
 	  case '=':
-	    if(xml_state.state_is(att_entername_XS) || xml_state.state_is(att_after_name_XS)){
-	      xml_state.pop_state();
-	      xml_state.push_state(att_after_equal_XS);
-	    } else if(!xml_state.state_is(text_XS) &&
-	      !xml_state.state_is(att_quote_XS) && !xml_state.state_is(att_dquote_XS)){
-		xml_state.raise_error("Not valid =",raiseerror);
+	  if(xml_state.state_is(att_entername_XS) || xml_state.state_is(att_after_name_XS)){
+	    if(xml_state.state_is(att_entername_XS)){
+	      if(strncmp(&block[state_start_global],"xml:space",9)==0){
+		last_att_is_xml_space=1;
+	      } else {
+		last_att_is_xml_space=0;
+	      }
 	    }
-	    break;
+	    xml_state.pop_state();
+	    xml_state.push_state(att_after_equal_XS);
+	  } else if(!xml_state.state_is(text_XS) &&
+	    !xml_state.state_is(att_quote_XS) && !xml_state.state_is(att_dquote_XS)){
+	    xml_state.raise_error("Not valid =",raiseerror);
+	  }
+	  break;
 	  case '\'':
 	  if(xml_state.state_is(att_after_equal_XS)){
 	    xml_state.pop_state();
@@ -1810,6 +1846,14 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	    char cm1=block[i+1];
 	    if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
 	      xml_state.raise_error("Not valid close '",raiseerror);
+	    }
+	    if(last_att_is_xml_space){
+	      if(strncmp(&block[state_start_global+1],"default",7)==0){
+		xml_state.add_xml_space_value(default_XSV);
+	      } else if(strncmp(&block[state_start_global+1],"preserve",8)==0){
+		xml_state.add_xml_space_value(preserve_XSV);
+	      }
+	      last_att_is_xml_space=0;
 	    }
 	    xml_state.pop_state();
 	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
@@ -1835,6 +1879,14 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	    if(cm1!=' ' && cm1!='\t' && cm1!='\n' && cm1!='?' && cm1!='/' && cm1!='>'){
 	      xml_state.raise_error("Not valid close \"",raiseerror);
 	    }
+	    if(last_att_is_xml_space){
+	      if(strncmp(&block[state_start_global+1],"default",7)==0){
+		xml_state.add_xml_space_value(default_XSV);
+	      } else if(strncmp(&block[state_start_global+1],"preserve",8)==0){
+		xml_state.add_xml_space_value(preserve_XSV);
+	      }
+	      last_att_is_xml_space=0;
+	    }
 	    xml_state.pop_state();
 	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
 	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("grey",-1));
@@ -1849,37 +1901,44 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	  }
 	  break;
 	case ' ': case '\t': case '\n':
-	    if(xml_state.state_is(enter_tagtext_XS)){
-	       xml_state.pop_state();
-	       int isend;
-	       if(xml_state.state_is(tag_end_XS)){
-		 isend=1;
-		 xml_state.pop_state();
-	       } else {
-		 isend=0;
-	       }
-	       if(xml_state.state_is(tag_XS)){
-		 if(isend){
-		   xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
-		 } else {
-		   xml_state.push_tag(&block[state_start_global],i-state_start_global);
-		 }
-		 blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
-		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
-		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
-		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
-	       } else {
-		 blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
-		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
-		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
-		 Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
-	       }
-	       xml_state.push_state(entered_tagtext_XS);
-	    } else if(xml_state.state_is(att_entername_XS)){
+	  if(xml_state.state_is(enter_tagtext_XS)){
+	    xml_state.pop_state();
+	    int isend;
+	    if(xml_state.state_is(tag_end_XS)){
+	      isend=1;
 	      xml_state.pop_state();
-	      xml_state.push_state(att_after_name_XS);
+	    } else {
+	      isend=0;
 	    }
-	    break;
+	    if(xml_state.state_is(tag_XS)){
+	      if(isend){
+		xml_state.pop_tag(&block[state_start_global],raiseerror,i-state_start_global);
+	      } else {
+		xml_state.push_tag(&block[state_start_global],i-state_start_global);
+	      }
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("magenta",-1));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    } else {
+	      blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(state_start));
+	      Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(icharline));
+	    }
+	    xml_state.push_state(entered_tagtext_XS);
+	  } else if(xml_state.state_is(att_entername_XS)){
+	    if(xml_state.state_is(att_entername_XS)){
+	      if(strncmp(&block[state_start_global],"xml:space",9)==0){
+		last_att_is_xml_space=1;
+	      } else {
+		last_att_is_xml_space=0;
+	      }
+	    }
+	    xml_state.pop_state();
+	    xml_state.push_state(att_after_name_XS);
+	  }
+	  break;
 	  default:
 	    if(xml_state.state_is(tag_XS) || xml_state.state_is(pi_XS) ||
 	      xml_state.state_is(tag_end_XS)){

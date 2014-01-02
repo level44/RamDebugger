@@ -2115,7 +2115,7 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	WarnWin [_ "error: program must be in debug or in release mode"]
 	return -1
     }
-    if { [auto_execok gcc] == "" } {
+    if { !$dataM($debrel,has_userdefined_vs) && [auto_execok gcc] eq "" } {
 	set ret [snit_messageBox -default yes -icon question -message \
 		[_ "Could not find command 'gcc'. Do you want to see the help?"] -parent $w \
 		-title [_ "Command not found"] -type yesno]
