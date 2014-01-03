@@ -380,6 +380,35 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
 	WarnWin $::errorInfo
     }
 }
+
+proc RamDebugger::Instrumenter::TryLoadLibrary {} {
+    variable FastInstrumenterLoaded
+    
+    if { ![info exists FastInstrumenterLoaded] } {
+	if { $::tcl_platform(machine) in "amd64 x86_64"} {
+	    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
+	} else {
+	    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
+	}
+	set dynlib [file join $RamDebugger::topdir scripts $dynlib_base]
+	set err [catch { load $dynlib }]
+	if { $err } {
+	    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
+	}
+	catch { load $dynlib }
+	if { [info commands RamDebuggerInstrumenterDoWork] eq "" && \
+	    $RamDebugger::options(CompileFastInstrumenter) != 0 } {
+	    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
+		TryCompileFastInstrumenter 0
+		set RamDebugger::options(CompileFastInstrumenter) 0
+	    } else {
+		TryCompileFastInstrumenter 1
+	    }
+	    catch { load $dynlib }
+	}
+	set FastInstrumenterLoaded 1
+    }
+}
     
 proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newblocknameR blockinfoname \
 		                                   "progress 1" } {
@@ -401,28 +430,7 @@ proc RamDebugger::Instrumenter::DoWorkForTcl { block filenum newblocknameP newbl
 	}
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
-		if { $::tcl_platform(machine) in "amd64 x86_64"} {
-		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
-		} else {
-		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
-		}
-		set dynlib [file join $RamDebugger::topdir scripts $dynlib_base]
-		set err [catch { load $dynlib }]
-		if { $err } {
-		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
-		}
-		catch { load $dynlib }
-		if { [info commands RamDebuggerInstrumenterDoWork] eq "" && \
-		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
-		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
-		        TryCompileFastInstrumenter 0
-		        set RamDebugger::options(CompileFastInstrumenter) 0
-		    } else {
-		        TryCompileFastInstrumenter 1
-		    }
-		    catch { load $dynlib }
-		}
-		set FastInstrumenterLoaded 1
+		TryLoadLibrary
 	    }
 	}
 	tcl {
@@ -819,28 +827,7 @@ proc RamDebugger::Instrumenter::DoWorkForC++ { block blockinfoname "progress 1" 
 	}
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
-		if { $::tcl_platform(machine) in "amd64 x86_64"} {
-		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
-		} else {
-		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
-		}
-		set dynlib [file join $RamDebugger::topdir scripts $dynlib_base]
-		set err [catch { load $dynlib }]
-		if { $err } {
-		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
-		}
-		catch { load $dynlib }
-		if { [info commands RamDebuggerInstrumenterDoWorkForXML] eq "" && \
-		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
-		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
-		        TryCompileFastInstrumenter 0
-		        set RamDebugger::options(CompileFastInstrumenter) 0
-		    } else {
-		        TryCompileFastInstrumenter 1
-		    }
-		    catch { load $dynlib }
-		}
-		set FastInstrumenterLoaded 1
+		TryLoadLibrary
 	    }
 	}
 	tcl {
@@ -1490,28 +1477,7 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
 	}
 	c++ {
 	    if { ![info exists FastInstrumenterLoaded] } {
-		if { $::tcl_platform(machine) in "amd64 x86_64"} {
-		    set dynlib_base RamDebuggerInstrumenter6_x64[info sharedlibextension]
-		} else {
-		    set dynlib_base RamDebuggerInstrumenter6_x32[info sharedlibextension]
-		}
-		set dynlib [file join $RamDebugger::topdir scripts $dynlib_base]
-		set err [catch { load $dynlib }]
-		if { $err } {
-		    set dynlib [file join $RamDebugger::AppDataDir $dynlib_base]
-		}
-		catch { load $dynlib }
-		if { [info commands RamDebuggerInstrumenterDoWorkForXML] eq "" && \
-		         $RamDebugger::options(CompileFastInstrumenter) != 0 } {
-		    if { $RamDebugger::options(CompileFastInstrumenter) == -1 } {
-		        TryCompileFastInstrumenter 0
-		        set RamDebugger::options(CompileFastInstrumenter) 0
-		    } else {
-		        TryCompileFastInstrumenter 1
-		    }
-		    catch { load $dynlib }
-		}
-		set FastInstrumenterLoaded 1
+		TryLoadLibrary
 	    }
 	}
 	tcl {

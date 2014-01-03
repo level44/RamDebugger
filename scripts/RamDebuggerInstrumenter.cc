@@ -421,6 +421,8 @@ int RamDebuggerInstrumenterPopState(InstrumenterState* is,Word_types type,int li
   if(is->level>0){
     last_type=is->stack[is->level-1].type;
     if(type==BRACKET_WT && last_type!=BRACKET_WT) return 1;
+  } else {
+    last_type=NONE_WT;
   }
 
   if(type==BRACE_WT){
@@ -2146,6 +2148,135 @@ int RamDebuggerInstrumenterDoWorkForXML(ClientData clientData, Tcl_Interp *ip, i
   return result;
 }
 
+static int give_line_chars(char* block,int ipos)
+{
+  int i;
+  for(i=ipos-1;i>=0;i--){
+    if(block[i]=='\n') break;
+  }
+  i++;
+  return Tcl_NumUtfChars(&block[i],ipos-i);
+}
+
+int RamDebuggerInstrumenterSearchBraces_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,
+  int& linenum,int& linecharpos)
+{
+  int linenumL,i_stack;
+  size_t i,j,i_start_line,delta_i,delta_iL,backslashes,length;
+  
+  const int stack_len=2048;
+  const char* p;
+  char *block,stack[stack_len],c_opposite;
+  
+  block=Tcl_GetString(blockPtr);
+  length=strlen(block);
+  
+  linenumL=1;
+  if(linenum==1){
+    i=0;
+  } else {
+    for(i=0;i<length;i++){
+      if(block[i]=='\n'){
+	linenumL++;
+	if(linenumL==linenum){
+	  i++;
+	  break;
+	}
+      }
+    }
+    if(i==length){
+      linenum=linenumL;
+      linecharpos=0;
+      return TCL_ERROR;
+    }
+  }
+  for(i_start_line=i;i<length;i++){
+    if(block[i]=='\n') break;
+    if(Tcl_NumUtfChars(&block[i_start_line],i-i_start_line)==linecharpos) break;
+  }
+  if(i==length || block[i]=='\n'){
+    linenum=linenumL;
+    linecharpos=0;
+    return TCL_ERROR;
+  }
+  
+  const char *keys="{[()]}";
+  
+  i_stack=0;
+  p=strchr(keys,block[i]);
+  if(!p) return TCL_ERROR;
+  if(p-keys<3) delta_i=1;
+  else delta_i=-1;
+  
+  stack[i_stack++]=block[i];
+  
+  for(i+=delta_i;i>=0 && i<length;i+=delta_i){
+    if(block[i]=='\n'){
+      if(delta_i==1) linenum++;
+      else linenum--;
+    } else if((p=strchr(keys,block[i]))){
+      backslashes=0;
+      for(j=i-1;j>=0;j--){
+	if(block[j]=='\\') backslashes++;
+	else break;
+      }
+      if(backslashes%2==1) continue;
+
+      if(p-keys<3) delta_iL=1;
+      else delta_iL=-1;
+      c_opposite=keys[5-(p-keys)];
+      
+      if(delta_iL==delta_i){
+	if(i_stack==stack_len){
+	  linecharpos=give_line_chars(block,i);
+	  return TCL_ERROR;
+	}
+	stack[i_stack++]=block[i];
+      } else {
+	if(stack[i_stack-1]!=c_opposite){
+	  linecharpos=give_line_chars(block,i);
+	  return TCL_ERROR;
+	}
+	i_stack--;
+	if(i_stack==0){
+	  linecharpos=give_line_chars(block,i);
+	  return TCL_OK;
+	}
+      }
+    }
+  }
+  if(i<0) i=0;
+  if(i>=length) i=length-1;
+  
+  linecharpos=give_line_chars(block,i);
+  return TCL_ERROR;
+}
+
+int RamDebuggerInstrumenterSearchBraces(ClientData clientData, Tcl_Interp *ip, int objc,
+  Tcl_Obj *CONST objv[])
+{
+  int result,linenum,linepos;
+  Tcl_Obj* blockPtr;
+  if (objc!=4) {
+    Tcl_WrongNumArgs(ip, 1, objv,"block linenum linepos");
+    return TCL_ERROR;
+  }
+  blockPtr=objv[1];
+
+  result=Tcl_GetIntFromObj(ip,objv[2],&linenum);
+  if(result) return TCL_ERROR;
+  
+  result=Tcl_GetIntFromObj(ip,objv[3],&linepos);
+  if(result) return TCL_ERROR;
+
+  result=RamDebuggerInstrumenterSearchBraces_do(ip,blockPtr,linenum,linepos);
+  
+  Tcl_Obj *listPtr=Tcl_NewListObj(0,NULL);
+  Tcl_ListObjAppendElement(ip,listPtr,Tcl_NewIntObj(linenum));
+  Tcl_ListObjAppendElement(ip,listPtr,Tcl_NewIntObj(linepos));
+  Tcl_SetObjResult(ip,listPtr);
+  return result;
+}
 
 extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
 {
@@ -2156,9 +2287,9 @@ extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
 
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWork",RamDebuggerInstrumenterDoWork,NULL,NULL);
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForCpp",RamDebuggerInstrumenterDoWorkForCpp,NULL,NULL);
-
-
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForXML",RamDebuggerInstrumenterDoWorkForXML,NULL,NULL);
+
+  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterSearchBraces",RamDebuggerInstrumenterSearchBraces,NULL,NULL);
   return TCL_OK;
 }
 

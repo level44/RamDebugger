@@ -1814,9 +1814,9 @@ proc RamDebugger::rlist { args } {
 	    }
 	}
 	if { $filetype == "XML" } {
-	    set err [catch { dom parse $files($currentfile) } doc]
+	    set err [catch { dom parse -keepEmpties $files($currentfile) } doc]
 	    if { !$err } {
-		set files($currentfile) [$doc asXML]
+		set files($currentfile) [$doc asXML -indent none]
 		$doc delete
 	    }
 	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
@@ -4390,12 +4390,15 @@ proc RamDebugger::CloseFile {} {
     variable WindowFilesList
     variable WindowFilesListLineNums
     variable options
+    variable files
 
     # first, we take it out to avoid reopening it
     if { [set pos [lsearch -exact $WindowFilesList $currentfile]] != -1 } {
 	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
     }
+    
+    unset -nocomplain files($currentfile)
 
     set cf $currentfile
 
@@ -7337,68 +7340,88 @@ proc RamDebugger::_search_braces_and_select { openL closeL x y } {
     set open $sel
     set close [lindex $closeL [lsearch -exact $openL $open]]
     
-    lassign [list 0 0 0 0 ""] error found level level_alt idx_alt
-    while { [set idx2 [$text search $dir -regexp -- $rex $idx $stopindex]] != "" } {
-	set ret [$text search -backwards -regexp -count ::nppar {\\+} $idx2 "$idx2 linestart"]
-	if { $ret eq "" || [$text compare "$ret+${::nppar}c" != $idx2] } {
-	    set ::nppar 0
+    if { [info command ::RamDebuggerInstrumenterSearchBraces] eq "" } {
+	Instrumenter::TryLoadLibrary
+    }
+    if { [info command ::RamDebuggerInstrumenterSearchBraces] ne "" } {
+	set data [$text get 1.0 end-1c]
+	if { $dir eq "-forwards" } {
+	    set idx [$text index $idx-1c]
+	} else {
+	    set idx [$text index $idx]
 	}
-	if { $::nppar%2 == 1 } {
+	scan $idx "%d.%d" linenum linepos
+	set error [catch { RamDebuggerInstrumenterSearchBraces $data $linenum $linepos } ret]
+	lassign $ret linenum linepos
+	if { $dir ne "-forwards" } {
+	    set idx [$text index $idx+1c]
+	}
+	set idx2 $linenum.$linepos
+    } else {
+	lassign [list 0 0 0 0 ""] error found level level_alt idx_alt
+	while { [set idx2 [$text search $dir -regexp -- $rex $idx $stopindex]] != "" } {
+	    set ret [$text search -backwards -regexp -count ::nppar {\\+} $idx2 "$idx2 linestart"]
+	    if { $ret eq "" || [$text compare "$ret+${::nppar}c" != $idx2] } {
+		set ::nppar 0
+	    }
+	    if { $::nppar%2 == 1 } {
+		if { $dir == "-forwards" } {
+		    set idx [$text index $idx2+1c]
+		} else {
+		    set idx $idx2
+		}
+		continue
+	    }
+	    set newsel [$text get $idx2]
+	    
+	    if { $newsel eq $open } {
+		incr level
+	    } elseif { $newsel eq $close } {
+		incr level -1
+		if { $level < 0 } {
+		    #                         if { $level_alt > 0 } {
+		    #                             set error 1
+		    #                             set idx2 $idx_alt
+		    #                             break
+		    #                         }
+		    set found 1
+		    break
+		}
+	    } elseif { $newsel in $openL } {
+		incr level_alt
+		set idx_alt $idx2
+	    } elseif { $newsel in $closeL } {
+		incr level_alt -1
+		if { $level_alt < 0 } {
+		    set level_alt 0
+		    set error 1
+		    break
+		}
+	    }
 	    if { $dir == "-forwards" } {
 		set idx [$text index $idx2+1c]
 	    } else {
 		set idx $idx2
 	    }
-	    continue
 	}
-	set newsel [$text get $idx2]
-	
-	if { $newsel eq $open } {
-	    incr level
-	} elseif { $newsel eq $close } {
-	    incr level -1
-	    if { $level < 0 } {
-		#                         if { $level_alt > 0 } {
-		    #                             set error 1
-		    #                             set idx2 $idx_alt
-		    #                             break
-		    #                         }
-		set found 1
-		break
-	    }
-	} elseif { $newsel in $openL } {
-	    incr level_alt
-	    set idx_alt $idx2
-	} elseif { $newsel in $closeL } {
-	    incr level_alt -1
-	    if { $level_alt < 0 } {
-		set level_alt 0
-		set error 1
-		break
-	    }
+	if { $level_alt != 0 } {
+	    set error 1
 	}
-	if { $dir == "-forwards" } {
-	    set idx [$text index $idx2+1c]
-	} else {
-	    set idx $idx2
+	if { $idx2 eq "" } {
+	    set error 1
+	    set idx2 $stopindex
 	}
-    }
-    if { $level_alt != 0 } {
-	set error 1
-    }
-    if { $idx2 eq "" } {
-	set error 1
-	set idx2 $stopindex
+	set idx insert
     }
     if { $error } { bell }
     $text tag remove sel 1.0 end
     
     if { $dir == "-forwards" } {
-	set idxA insert
+	set idxA $idx
 	set idxB $idx2+1c
     } else {
 	set idxA $idx2
-	set idxB insert
+	set idxB $idx
     }
     if { $error } { SetMessage [_ "Error: braces not OK"] }
     
@@ -8077,9 +8100,9 @@ proc RamDebugger::XMLIndent { { none "" } { html 0 } } {
     set header ""
     regexp {^(.*?)<\s*?(?!\?|!)} $data {} header
     if { !$html } {
-	set err [catch { dom parse $data doc } errstring]
+	set err [catch { dom parse -keepEmpties $data doc } errstring]
     } else {
-	set err [catch { dom parse -html $data doc } errstring]
+	set err [catch { dom parse -keepEmpties -html $data doc } errstring]
     }
     if { $err } {
 	tk_messageBox -message [_ "XML in file is not correct (%s)" $errstring]
