@@ -685,7 +685,19 @@ proc open_comment_file { w open_edit } {
 		return
 	    }
 	}
-	WarnWin "Failed executing lognoter"
+	set err [catch {
+		package require registry
+		set key1 {HKEY_CURRENT_USER\Software\Compass\Lognoter}
+		set version [registry get $key1 CurrentVersion]
+		set key2 {HKEY_CURRENT_USER\Software\Compass}
+		append key2 "\\" $version
+		set path [registry get $key2 InstallPath]
+		set exe [file join $path Lognoter.exe]
+		mc::execute exec $exe -notebookname $file -page $page &
+	    } ret]
+	if { $err } {
+	    WarnWin "Failed executing lognoter ($ret)"
+	}
     } else {
 	set err [catch { mc::execute start $file } ret]
 	if { $err } {
