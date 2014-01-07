@@ -3107,7 +3107,8 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    }
 	    if { $::tcl_platform(platform) ne "windows" } {                   
 		foreach "ev k" [list braceleft \{ braceright \} bracketleft \[ bracketright \] backslash \\ \
-		        bar | at @ numbersign # asciitilde ~ EuroSign €] {
+		        bar | at @ numbersign # asciitilde ~] {
+		    # EuroSign €
 		    bind $w.search <$ev> "$w.search icursor end; [list tkEntryInsert $w.search $k]; break"
 		}
 	    }

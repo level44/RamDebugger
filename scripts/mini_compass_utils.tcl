@@ -879,7 +879,8 @@ proc cu::text_entry_bindings { w } {
     
     if { $::tcl_platform(platform) ne "windows" } {
 	foreach "ev k" [list braceleft \{ braceright \} bracketleft \[ bracketright \] backslash \\ \
-		bar | at @ numbersign # asciitilde ~ EuroSign €] {
+		bar | at @ numbersign # asciitilde ~] {
+	    # EuroSign €
 	    # they are class bindings so as search in text widgets can continue working
 	    bind Text <$ev> "[list tk::TextInsert %W $k]; break"
 	    bind TEntry <$ev> "[list ttk::entry::Insert %W $k]; break"

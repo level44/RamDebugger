@@ -522,7 +522,7 @@ proc RamDebugger::Wizard::CondMatWizard { text filename } {
 }
 
 namespace eval RamDebugger::Wizard {
-    package require img::png
+    catch {package require img::png}
     package require img::jpeg
     package require img::gif
     

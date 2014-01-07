@@ -201,6 +201,8 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
     lappend ::auto_path [file join $topdir scripts]
     lappend ::auto_path [file join $topdir_external addons]
 
+    tcl::tm::add [file join $topdir_external addons tcl8 site-tcl] 
+
     if { $iswince } {
 	set AppDataDir $topdir_external
     } elseif { $::tcl_platform(platform) eq "windows" } {
@@ -353,6 +355,13 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
 		                              -slant roman -underline 0 -overstrike 0 }
 	    set options_def(HelpFont)  { -family "Helvetica" -size 12 -weight normal \
 		                             -slant roman -underline 0 -overstrike 0 }
+	    
+	    if { $::tcl_platform(machine) eq "armv7l" } {
+		foreach i [list NormalFont FixedFont HelpFont] {
+		    set options_def($i) { -family "Georgia" -size 14 }
+		}
+	    }
+	    
 	    set options_def(ViewOnlyTextOrAll) OnlyText
 	}
     }
@@ -8582,7 +8591,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } ;# if !inside_gid
     #needed a catch for wince
     catch { package require tkdnd } ;# only if it is compiled
-    package require fulltktree
+    catch { package require fulltktree }
 
     if { [package vcompare [package present Tcl] 8.5] >= 0 } {
 	option add *Panedwindow.Stretch always
@@ -9106,7 +9115,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     set idx 0
     foreach "img help cmd" $data {
 	if { $big_icons && $img ne "-" && $img ne "" } {
-	    package require compass_utils::img
+	    #package require compass_utils::img
 	    set img0 $img
 	    set img [image create photo -width 48 -height 48]
 	    $img copy $img0 -to 16 16

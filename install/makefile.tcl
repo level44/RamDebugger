@@ -149,7 +149,7 @@ set remove_packages0 [list {*}$createdistribution::remove_packages trf bwidget \
 	vfs vfs::ftp he_dialog wce compass_utils compass_utils::c \
 	textutil::adjust textutil::repeat \
 	textutil::split textutil::tabify  textutil::trim  textutil::string tile \
-	tooltip htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread \
+	htmlparse math autoscroll base64 cmdline md5 struct textutil uri thread \
 	ncgi sha1 math::constants \
 	]
 
@@ -160,7 +160,8 @@ foreach pNode $pNodes {
     
     puts "\n[string repeat # 80]\n   building $program_name\n[string repeat # 80]\n"
 
-    set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib tktablet snit]
+    set createdistribution::add_packages [list treectrl BWidgetR tkhtml tdom tcltklib \
+	    tktablet snit tooltip]
     if { $::tcl_platform(os) ne "Darwin" } {
 	lappend createdistribution::add_packages tkdnd
     }
