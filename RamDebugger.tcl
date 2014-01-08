@@ -6184,8 +6184,8 @@ proc RamDebugger::TextOutInsertBlue { data } {
 
 proc RamDebugger::TextOutRaiseDo { pane } {
     variable options
-    
-    if { [set! options(auto_raise_stack_trace)] == 1 } {
+
+    if { [info exists options(auto_raise_stack_trace)] && $options(auto_raise_stack_trace) } {
 	catch { $pane raise output }
     }
 }
