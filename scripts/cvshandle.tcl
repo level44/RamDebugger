@@ -1615,6 +1615,8 @@ proc RamDebugger::VCS::parse_timeline { timeline } {
 	    set time [clock format $d -format "%H:%M:%S"]
 	    set checkin $checkin_curr
 	    set comment $comment_curr
+	} elseif { [regexp {^[+]+\s+no more data.*[+]+$} $line] } {
+	    # nothing
 	} else {
 	    append comment " [string trim $line]"
 	}
