@@ -211,6 +211,7 @@ int RamDebuggerInstrumenterEndState(InstrumenterState* is)
   }
   for(i=0;i<is->level;i++){
     switch(is->stack[i].type){
+    case NONE_WT: assert(0); break;
     case W_WT: type='w'; break;
     case BRACE_WT: type='{'; break;
     case DQUOTE_WT: type='"'; break;
@@ -347,7 +348,7 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	  is->NeedsNamespaceClose=1;
 	}
       }
-      else if((wordslen==1 && strcmp(pword0,"catch")==0) ||
+      else if(((wordslen==1 && strcmp(pword0,"catch")==0) ||
 	(wordslen==2 && strcmp(pword0,"while")==0) ||
 	(wordslen>=3 && strcmp(pword0,"foreach")==0) ||
 	(wordslen>=3 && strcmp(pword0,"mk::loop")==0) ||
@@ -355,7 +356,7 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	(wordslen>1 && strcmp(pword0,"eval")==0) ||
 	(wordslen>1 && strcmp(pword0,"html::eval")==0) ||
 	(wordslen==3 && strcmp(pword0,"bind")==0) ||
-	(wordslen==4 && strcmp(pword1,"sql")==0) &&
+	(wordslen==4 && strcmp(pword1,"sql")==0)) &&
 	Tcl_ListObjIndex(is->ip,is->words,2,&wordi)==TCL_OK &&
 	strcmp(Tcl_GetStringFromObj(wordi,NULL),"maplist")==0) 
 	NewDoInstrument=1;
@@ -605,6 +606,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	  switch(checkExtraCharsAfterCQB){
 	  case BRACE_WT: cblocktype='}'; break;
 	  case DQUOTE_WT: cblocktype='"'; break;
+	  case NONE_WT: case W_WT: case BRACKET_WT: assert(0); break;
 	  }
 	  SNPRINTF(buf,1024,"There is a non valid character (%c) in line %d "
 		  "after a closing block with (%c)",c,line,cblocktype);
@@ -687,6 +689,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	    quoteintobraceline=-1;
 	  }
 	  break;
+	  default: assert(0);
 	}
       }
       break;
