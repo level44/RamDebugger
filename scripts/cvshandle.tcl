@@ -2632,7 +2632,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		                set err [catch { parse_timeline [exec $fossil descendants] } ret]
 		                if { !$err && [llength $ret] > 0 } {
 		                    lassign [lindex $ret 0] date time checkin comment user tags
-		                    set err [catch { parse_finfo [exec $fossil finfo $file] } ret]
+		                    set err [catch { parse_finfo [exec $fossil finfo --limit 5 $file] } ret]
 		                    set finfo_list $ret
 		                } else {
 		                    set err 1
