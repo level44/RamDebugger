@@ -2933,7 +2933,9 @@ proc RamDebugger::inline_replace_end { w focus grab search_entry what } {
 }
 
 proc RamDebugger::textPaste_insert_after { w } {
-
+    variable searchmode
+    variable searchstring
+    
     set err [catch {::tk::GetSelection $w CLIPBOARD} sel]
     if { $err } { return }
     
@@ -2942,6 +2944,15 @@ proc RamDebugger::textPaste_insert_after { w } {
 	$w configure -autoseparators 0
 	$w edit separator
     }
+    
+    if { $searchmode eq "-regexp" } {
+	catch {
+	    set from [$w get sel.first sel.last]
+	    set rex $searchstring
+	    set to $sel
+	    regsub $rex $from $to sel
+	}
+    }    
     catch { $w delete sel.first sel.last }
 
     set d [expr {[string length $sel]-[string length $::RamDebugger::searchstring]}]
@@ -2955,6 +2966,8 @@ proc RamDebugger::textPaste_insert_after { w } {
 
 proc RamDebugger::Search_add_open_brace { w } {
     variable currentfile
+    variable searchmode
+    variable searchstring
     
     if { [GiveFileType $currentfile] eq "C/C++" } {
 	set openb "("
@@ -2967,7 +2980,7 @@ proc RamDebugger::Search_add_open_brace { w } {
     }
     set rex "\\$openb\\s*\$"
     
-    if { [regexp $rex $RamDebugger::searchstring] } {
+    if { $searchstring eq $txt } {
 	RamDebugger::Search $w iforward
 	return
     }
@@ -3028,7 +3041,19 @@ proc RamDebugger::_search_BP1 { w w_press } {
     if { $w_press eq "$w.search" } {
 	return -code break
     }
-}    
+}
+
+proc RamDebugger::Search_toggle_regexp_mode { search_entry } {
+    variable searchmode
+    
+    if { $searchmode eq "-exact" } {
+	set searchmode "-regexp"
+	$search_entry configure -bd 2
+    } else {
+	set searchmode "-exact"
+	$search_entry configure -bd 1
+    }
+}
 
 proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
     variable text
@@ -3085,9 +3110,10 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 
 	    set msg1 [_ "Press Ctrl+J to replace"]
 	    set msg2 [_ "Press Ctrl+C to use selection or word on cursor for search"]
-	    set msg3 [_ "Press Home to search from beginning"]
-	    set msg4 [_ "Press Ctrl+I again to use last word for search"]
-	    set msg "$msg1\n$msg2\n$msg3\n$msg4"
+	    set msg3 [_ "Press Ctrl+X to search using regexp engine"]
+	    set msg4 [_ "Press Home to search from beginning"]
+	    set msg5 [_ "Press Ctrl+I again to use last word for search"]
+	    set msg "$msg1\n$msg2\n$msg3\n$msg4\n$msg5"
 	    tooltip::tooltip $w.search $msg
 
 	    focus $active_text
@@ -3117,6 +3143,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <$::control-r> "RamDebugger::Search $w ibackward ; break"
 	    bind $w.search <$::control-p> "RamDebugger::Search_add_open_brace $w ; break"
 	    bind $w.search <$::control-g> "RamDebugger::Search $w stop ; break"
+	    bind $w.search <$::control-x> "RamDebugger::Search_toggle_regexp_mode $w.search; break"
 	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
 	    
