@@ -2980,7 +2980,7 @@ proc RamDebugger::Search_add_open_brace { w } {
     }
     set rex "\\$openb\\s*\$"
     
-    if { $searchstring eq $txt } {
+    if { [regexp $rex $RamDebugger::searchstring] } {
 	RamDebugger::Search $w iforward
 	return
     }
