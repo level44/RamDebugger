@@ -150,12 +150,23 @@ namespace eval RamDebugger {
     variable options
     variable options_def
     
-    variable topdir [file normalize [file dirname [info script]]]
+    if { [file type [info script]] eq "link" } {
+	set info_script [file link [info script]]
+    } else {
+	set info_script [info script]
+    }
+    variable topdir [file normalize [file dirname $info_script]]
+
     if { [info exists starkit::topdir] } {
-	if { [file exists [file dirname $starkit::topdir]/../share/ramdebugger] } {
-	    variable topdir_external [file normalize  [file dirname $starkit::topdir]/../share/ramdebugger]
+	if { [file type $starkit::topdir] eq "link" } {
+	    set starkit_topdir [file link $starkit::topdir]
 	} else {
-	    variable topdir_external [file normalize [file dirname $starkit::topdir]]
+	    set starkit_topdir $starkit::topdir
+	}
+	if { [file exists [file dirname $starkit::topdir]/../share/ramdebugger] } {
+	    variable topdir_external [file normalize  [file dirname $starkit_topdir]/../share/ramdebugger]
+	} else {
+	    variable topdir_external [file normalize [file dirname $starkit_topdir]]
 	}
     } else {
 	variable topdir_external $topdir
