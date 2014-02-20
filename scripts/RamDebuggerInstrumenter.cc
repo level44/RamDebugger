@@ -348,7 +348,7 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	  is->NeedsNamespaceClose=1;
 	}
       }
-      else if(((wordslen==1 && strcmp(pword0,"catch")==0) ||
+      else if((wordslen==1 && strcmp(pword0,"catch")==0) ||
 	(wordslen==2 && strcmp(pword0,"while")==0) ||
 	(wordslen>=3 && strcmp(pword0,"foreach")==0) ||
 	(wordslen>=3 && strcmp(pword0,"mk::loop")==0) ||
@@ -356,11 +356,11 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	(wordslen>1 && strcmp(pword0,"eval")==0) ||
 	(wordslen>1 && strcmp(pword0,"html::eval")==0) ||
 	(wordslen==3 && strcmp(pword0,"bind")==0) ||
-	(wordslen==4 && strcmp(pword1,"sql")==0)) &&
-	 wordslen>2	&& Tcl_ListObjIndex(is->ip,is->words,2,&wordi)==TCL_OK &&
-	strcmp(Tcl_GetStringFromObj(wordi,NULL),"maplist")==0) 
+	(wordslen==4 && strcmp(pword1,"sql")==0 &&
+	  Tcl_ListObjIndex(is->ip,is->words,2,&wordi)==TCL_OK &&
+	 strcmp(Tcl_GetStringFromObj(wordi,NULL),"maplist")==0)){
 	NewDoInstrument=1;
-      else if(wordslen>1 && strcmp(pword0,"uplevel")==0){
+      } else if(wordslen>1 && strcmp(pword0,"uplevel")==0){
 	int len=wordslen;
 	pchar=pword1;
 	if(*pchar=='#') pchar++;
@@ -527,6 +527,7 @@ void RamDebuggerInstrumenterInsertSnitPackage_ifneeded(InstrumenterState* is)
   Tcl_Obj *word0;
   char* pword0;
   Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+  if(!word0) return;
   pword0=Tcl_GetStringFromObj(word0,NULL);
   if(*pword0==':' && *(pword0+1)==':') pword0+=2;
 
@@ -974,21 +975,22 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	}
 	break;
       case ';':
-	if(lastc != '\\' && is->wordtype!=BRACE_WT && is->wordtype!=DQUOTE_WT &&
-	   wordslen> 0 && *pword0!='#'){
-	  consumed=1;
-	  is->words=Tcl_ResetList(is->words);
-	  wordslen=0;
-	  Tcl_ListObjIndex(is->ip,is->words,0,&word0);
-	  is->currentword=Tcl_ResetString(is->currentword);
-	  is->wordtype=NONE_WT;
-	  
-	  if(is->OutputType==P){
-	    Tcl_AppendToObj(is->newblock[P],&c,1);
-	    is->OutputType=R;
-	  }
+       if(lastc != '\\' && is->wordtype!=BRACE_WT && is->wordtype!=DQUOTE_WT &&
+	wordslen> 0 && *pword0!='#'){
+	consumed=1;
+	is->words=Tcl_ResetList(is->words);
+	wordslen=0;
+	word0=NULL;
+	//Tcl_ListObjIndex(is->ip,is->words,0,&word0);
+	is->currentword=Tcl_ResetString(is->currentword);
+	is->wordtype=NONE_WT;
+	
+	if(is->OutputType==P){
+	  Tcl_AppendToObj(is->newblock[P],&c,1);
+	  is->OutputType=R;
 	}
-	break;
+      }
+      break;
     }
     
     Tcl_AppendToObj(is->newblock[is->OutputType],&c,1);
