@@ -112,9 +112,7 @@ $(OBJDIR)/%.o: %.cc
 	$(CC) -c $(CPPFLAGS) $< -o $@
 
 $(EXE_INSTALL): $(EXE)
-ifneq ($(OBJDIR),debug)
 	cp $(EXE) $(EXE_INSTALL)
-endif
 
 $(EXE_INSTALL2): $(EXE)
 ifneq ($(OBJDIR),debug)

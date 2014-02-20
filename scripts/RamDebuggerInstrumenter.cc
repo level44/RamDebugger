@@ -357,7 +357,7 @@ int RamDebuggerInstrumenterPushState(InstrumenterState* is,Word_types type,int l
 	(wordslen>1 && strcmp(pword0,"html::eval")==0) ||
 	(wordslen==3 && strcmp(pword0,"bind")==0) ||
 	(wordslen==4 && strcmp(pword1,"sql")==0)) &&
-	Tcl_ListObjIndex(is->ip,is->words,2,&wordi)==TCL_OK &&
+	 wordslen>2	&& Tcl_ListObjIndex(is->ip,is->words,2,&wordi)==TCL_OK &&
 	strcmp(Tcl_GetStringFromObj(wordi,NULL),"maplist")==0) 
 	NewDoInstrument=1;
       else if(wordslen>1 && strcmp(pword0,"uplevel")==0){
@@ -631,7 +631,7 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
     consumed=0;
     switch(c){
     case '"':
-      if(lastc != '\\' && wordslen> 0 && *pword0!='#') {
+      if(lastc != '\\' && (wordslen==0 || *pword0!='#')) {
 	switch(is->wordtype){
 	case NONE_WT:
 	  is->wordtype=DQUOTE_WT;
@@ -689,7 +689,14 @@ int RamDebuggerInstrumenterDoWork_do(Tcl_Interp *ip,char* block,int filenum,char
 	    quoteintobraceline=-1;
 	  }
 	  break;
-	  default: assert(0);
+	default:
+	  SNPRINTF(buf,1024,"Quoted text (\") in line %d contains and invalid brace text  icharline=%d",line, icharline);
+	    Tcl_SetObjResult(is->ip,Tcl_NewStringObj(buf,-1));
+	    Tcl_DecrRefCount(is->newblock[P]);
+	    Tcl_DecrRefCount(is->newblock[R]);
+	    Tcl_DecrRefCount(blockinfo);
+	    Tcl_DecrRefCount(blockinfocurrent);
+	    return TCL_ERROR;
 	}
       }
       break;
