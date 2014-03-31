@@ -1604,7 +1604,7 @@ proc RamDebugger::VCS::parse_timeline { timeline } {
     foreach line [split $timeline \n] {
 	if { [regexp {===\s*(\S+)\s*===} $line {} date_curr] } {
 	    # nothing
-	} elseif { [regexp {^(\S+)\s+\[([^]]*)\]\s*(.*)} $line {} time_curr checkin_curr comment_curr] } {
+	} elseif { [regexp {^(\S+)\s+\[([^\]]*)\]\s*(.*)} $line {} time_curr checkin_curr comment_curr] } {
 	    if { $comment ne "" } {
 		lassign "" user tags
 		regexp {(.*)\(\s*user:\s*(.*)\s*tags:\s*(.*)\s*\)} $comment {} comment user tags
@@ -3041,6 +3041,64 @@ proc RamDebugger::VCS::open_program { args } {
     $what eval [list source $file]
 }
 
+proc RamDebugger::VCS::register_windows_shell_cmd { w } {
+    package require registry
+    
+    set key(B,1) {HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\vcs}
+    set val(B,1) "fossil vcs"
+    
+    set key(B,2) {HKEY_LOCAL_MACHINE\SOFTWARE\Classes\Directory\shell\vcs\command}
+    set val(B,2) "\"[file nativename [file normalize [info nameofexecutable]]]\" "
+    if { ![string equal [file tail $::argv0] main.tcl] } {
+	append val(B,2) "\"[file nativename [file normalize $::argv0]]\" "
+    }
+    append val(B,2) " \"%1\""
+    
+    set are_equal 1
+    for { set i 1 } { $i <= 2 } { incr i } {
+	foreach l [list B] {
+	    if { [catch { registry get $key($l,$i) "" } rval($l,$i)] } {
+		set rval($l,$i) ""
+	    }
+	    if { $val($l,$i) ne $rval($l,$i) } { set are_equal 0 }
+	}
+    }
+    
+    if { $are_equal } {
+	set text [_ "Do you want to remove the windows shell command?"]
+	set retval [snit_messageBox -default ok -icon question -message $text \
+		-type okcancel -parent $w]
+	if { $retval == "cancel" } { return }
+	
+	if { [catch {
+		for { set i 1 } { $i <= 2 } { incr i } {
+		    foreach l [list B] {
+		        registry delete $key($l,$i)
+		    }
+		}
+	    }] } {
+	    tk_messageBox -message \
+		[_ "Error in the operation. Verify your permissions and/or enter as administrator"]
+	}
+	return
+    }
+    set text [_ "Do you want to create the windows shell command?"]
+    set retval [snit_messageBox -default ok -icon question -message $text \
+	    -type okcancel -parent $w]
+    if { $retval == "cancel" } { return }
+    
+    if { [catch {
+	    for { set i 1 } { $i <= 2 } { incr i } {
+		foreach l [list B] {
+		    registry set $key($l,$i) "" $val($l,$i)
+		}
+	    }
+	} errstring] } {
+	tk_messageBox -parent $w -message \
+	    [_ "Error in the operation. Verify your permissions and/or enter as administrator (%s)" $errstring]
+    }
+}
+
 if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] && 
     [file root [file tail $::starkit::topdir]] eq "vcs-ramdebugger") } {
     wm withdraw .
@@ -3112,6 +3170,9 @@ if { $argv0 eq [info script] || ( [info exists ::starkit::topdir] &&
     catch {
 	package require commR
 	comm::register vcs-ramdebugger 1
+    }
+    if  0 {
+	RamDebugger::VCS::register_windows_shell_cmd $w
     }
 }
 
