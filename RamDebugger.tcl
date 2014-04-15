@@ -6682,7 +6682,8 @@ proc RamDebugger::CutCopyPasteText { what args } {
 		# paste is made here in order to substitute tabs by spaces
 		global tcl_platform
 		if {![catch {::tk::GetSelection $text CLIPBOARD} sel]} {
-		    set sel [string map [list "\t" "        "] $sel]
+		    set map [list "\t" "        " \u00a0 " " \u200b " " \u2060 " " \u3000 "" \ufeff " "]
+		    set sel [string trimright [string map $map $sel]]
 		    set oldSeparator [$text cget -autoseparators]
 		    if { $oldSeparator } {
 		        $text configure -autoseparators 0
