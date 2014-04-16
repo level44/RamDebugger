@@ -624,7 +624,7 @@ proc "Open comment file" { w } {
 }
 
 set "macrodata(Edit comment file,inmenu)" 1
-set "macrodata(Edit comment file,accelerator)" <Control-u><Control-Shift-O>
+set "macrodata(Edit comment file,accelerator)" <Control-u><Control-O>
 set "macrodata(Edit comment file,help)" "Get the text under the cursor and try to edit this file name"
 
 proc "Edit comment file" { w } {
@@ -632,7 +632,7 @@ proc "Edit comment file" { w } {
 }
 
 proc open_comment_file { w open_edit } {
-
+    
     set line1 [$w get "insert linestart" insert]
     set line2 [$w get insert "insert lineend"]
     
@@ -669,12 +669,11 @@ proc open_comment_file { w open_edit } {
 	WarnWin "'$file' does not exist"
 	return
     }
-    if { $open_edit eq "edit" && [string tolower [file extension $file]] eq ".svg" && [auto_execok inkscape] ne "" } {
-	set err [catch { mc::execute exec inkscape $file & } ret]
+    if { [string tolower [file extension $file]] eq ".gid" } {
+	set err [catch { mc::execute gid $file } ret]
 	if { $err } {
-	    WarnWin "Failed executing '$exe -notebookname $file -page $page' ($ret)"
+	    WarnWin "Failed executing '$file' ($ret)"
 	}
-	return
     } elseif { [string tolower [file extension $file]] eq ".wnl" && $page ne "" } {
 	foreach exe [list lognoter dlognoter] {
 	    if { [auto_execok $exe] ne "" } {
@@ -685,27 +684,15 @@ proc open_comment_file { w open_edit } {
 		return
 	    }
 	}
-	set err [catch {
-		package require registry
-		set key1 {HKEY_CURRENT_USER\Software\Compass\Lognoter}
-		set version [registry get $key1 CurrentVersion]
-		set key2 {HKEY_CURRENT_USER\Software\Compass}
-		append key2 "\\" $version
-		set path [registry get $key2 InstallPath]
-		set exe [file join $path Lognoter.exe]
-		mc::execute exec $exe -notebookname $file -page $page &
-	    } ret]
-	if { $err } {
-	    WarnWin "Failed executing lognoter ($ret)"
-	}
+	WarnWin "Failed executing lognoter"
     } else {
-	set err [catch { mc::execute start $file } ret]
+	if { $open_edit eq "edit" && [string equal -nocase [file extension $file] ".svg"] } {
+	    set err [catch { mc::execute exec inkscape $file } ret]
+	} else {
+	    set err [catch { mc::execute start $file } ret]
+	}
 	if { $err } {
 	    WarnWin "Failed executing '$file' ($ret)"
 	}
     }
 }
-
-
-
-
