@@ -886,6 +886,8 @@ proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
     
     $menu add separator
     $menu add command -label [_ "Differences"] -command \
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_diff_tk "" "" [list $currentfileL]]
+    $menu add command -label [_ "Differences (tkdiff)"] -command \
 	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff "" "" [list $currentfileL]]
     $menu add command -label [_ "Differences (ignore blanks)"] -command \
 	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $currentfileL]]
@@ -1339,7 +1341,7 @@ proc RamDebugger::VCS::update_recursive_do0 { directory current_or_last } {
     $w set_uservar_value dir $dir
     $w set_uservar_value message ""
     
-    bind $w <$::control-d> [list "update_recursive_cmd" $w open_program tkdiff $f.toctree ""]
+    bind $w <$::control-d> [list "update_recursive_cmd" $w open_program fossil_diff_tk $f.toctree ""]
     bind $w <$::control-D> [list "update_recursive_cmd" $w open_program tkdiff_ignore_blanks $f.toctree ""]
     bind $w <$::control-i> [list "update_recursive_cmd" $w commit $f.toctree ""]
     bind $w <$::control-f> [list "update_recursive_cmd" $w open_program fossil_ui $f.toctree ""]
@@ -2046,6 +2048,8 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    set need_sep 0
 	    if { $is_timeline == 0 && ($has_cvs || $has_fossil) } {
 		$menu add command -label [_ "View diff"] -accelerator $::control_txt-d -command \
+		    [list "update_recursive_cmd" $w open_program fossil_diff_tk $tree $sel_ids]
+		$menu add command -label [_ "View diff (tkdiff)"] -accelerator $::control_txt-d -command \
 		    [list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
 		$menu add command -label [_ "View diff (ignore blanks)"] -accelerator $::control_txt-D -command \
 		    [list "update_recursive_cmd" $w open_program tkdiff_ignore_blanks $tree $sel_ids]
@@ -2569,6 +2573,24 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		set sel_ids [$tree selection get]
 	    }
 	    switch $what_in {
+		fossil_diff_tk {
+		    set files [lindex $args 0]
+		    foreach item $sel_ids {
+		        if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
+		        set dir [$tree item text [$tree item parent $item] 0]
+		        lappend files [file join $dir $file]
+		    }
+		    set fossil [auto_execok fossil]
+		    get_cwd
+		    set err [catch {
+		            cd [file dirname [lindex $files 0]]
+		            exec $fossil diff --tk
+		        } ret]
+		    release_cwd
+		    if { $err } {
+		        snit_messageBox -message $ret -parent $w
+		    }
+		}
 		tkdiff - tkdiff_ignore_blanks {
 		    set files [lindex $args 0]
 		    set files_list ""
