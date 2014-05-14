@@ -324,10 +324,16 @@ proc RamDebugger::VCS::SaveRevisionDoCommit { what comment file args } {
 	    }
 	    set doing_commit 1
 	    set fin [open "|[list $fossil commit {*}$commit_no_warnings -m $comment $file]" r]
+	    fconfigure $fin -blocking 0
 	    fileevent $fin readable [list RamDebugger::VCS::SaveRevisionDoCommit end "" $file $fin]
 	}
 	end {
 	    lassign $args fin
+	    flush stdout
+	    set ret [read $fin]
+	    if { ![regexp {(?i)New_Version} $ret] } {
+		puts $ret
+	    }
 	    catch { close $fin }
 	    file delete $file
 	    unset doing_commit
@@ -1564,7 +1570,7 @@ proc RamDebugger::VCS::is_fossil_version_newer { version } {
 	    set fossil_version_cache 1.0
 	}
     }
-    return [expr {$version >= $fossil_version_cache }]
+    return [expr { $fossil_version_cache >= $version }]
 }
 
 proc RamDebugger::VCS::insert_ticket { w entry ticket txt } {
