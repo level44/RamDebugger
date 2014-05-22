@@ -269,7 +269,7 @@ proc RamDebugger::GetSelOrWordInIndex { args } {
 	} else { set var "" }
     }
     if { $return_range } {
-	return [list [$text index "$idx0+1c"] [$text index "$idx1-1c"]]
+	return [list [$text index "$idx0+1c"] [$text index "$idx1"]]
     } else {
 	return $var
     }
@@ -2998,15 +2998,44 @@ proc RamDebugger::Search_add_open_brace { w } {
     }
 }
 
-proc RamDebugger::Search_get_selection { active_text } {
+proc RamDebugger::Search_increase_selection { active_text left_right } {
     
-    lassign [GetSelOrWordInIndex -return_range 1 insert] idx1 idx2
-    set txt [$active_text get $idx1 "$idx2+1c"]
+    lassign [$active_text tag ranges sel] idx1 idx2
+    if { $left_right eq "left" } {
+	set idx1 [tk::TextPrevPos $active_text $idx1 tcl_startOfPreviousWord]
+    } else {
+	set idx2 [tk::TextNextWord $active_text $idx2]
+    }
+    set txt [$active_text get $idx1 "$idx2"]
     if { [string trim $txt] ne "" } {
 	$active_text mark set insert $idx1
 	set ::RamDebugger::SearchIni $idx1
 	set ::RamDebugger::SearchPos $idx1
-	$active_text tag add sel $idx1 "$idx2+1c"
+	$active_text tag add sel $idx1 "$idx2"
+    } else {
+	return
+    }
+    set save_traces [trace info variable RamDebugger::searchstring]
+    foreach i $save_traces {
+	trace remove variable RamDebugger::searchstring {*}$i
+    }
+    set RamDebugger::searchstring $txt
+    set RamDebugger::Lastsearchstring $txt
+    
+    foreach i $save_traces {
+	trace add variable RamDebugger::searchstring {*}$i
+    }
+}
+
+proc RamDebugger::Search_get_selection { active_text } {
+    
+    lassign [GetSelOrWordInIndex -return_range 1 insert] idx1 idx2
+    set txt [$active_text get $idx1 "$idx2"]
+    if { [string trim $txt] ne "" } {
+	$active_text mark set insert $idx1
+	set ::RamDebugger::SearchIni $idx1
+	set ::RamDebugger::SearchPos $idx1
+	$active_text tag add sel $idx1 "$idx2"
     } else {
 	set err [catch { clipboard get } txt]
 	if { $err } { set txt "" }
@@ -3146,6 +3175,8 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <$::control-x> "RamDebugger::Search_toggle_regexp_mode $w.search; break"
 	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
+	    bind $w.search <$::control-Left> "RamDebugger::Search_increase_selection $active_text left; break"
+	    bind $w.search <$::control-Right> "RamDebugger::Search_increase_selection $active_text right; break"
 	    
 	    if { $active_text eq $text } {
 		bind $w.search <$::control-j> "RamDebugger::inline_replace $w $w.search; break"
