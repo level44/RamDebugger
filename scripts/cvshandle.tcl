@@ -891,17 +891,37 @@ proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
 	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_ui "" $dir -file $currentfileL]
     
     $menu add separator
-    $menu add command -label [_ "Differences"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_diff_tk "" "" [list $currentfileL]]
+    $menu add command -label [_ "Differences"] -acc "Ctrl-Shift-d" -command \
+	[list RamDebugger::VCS::differences fossil_diff_tk]
     $menu add command -label [_ "Differences (tkdiff)"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff "" "" [list $currentfileL]]
+	[list RamDebugger::VCS::differences tkdiff]
     $menu add command -label [_ "Differences (ignore blanks)"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $currentfileL]]
+	[list RamDebugger::VCS::differences tkdiff_ignore_blanks]
 
     $menu add command -label [_ "Differences window"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" diff_window "" "" [list $currentfileL]]
+	[list RamDebugger::VCS::differences diff_window]
 
     tk_popup $menu $x $y
+}
+
+proc RamDebugger::VCS::differences { what } {
+    
+    set currentfileL $RamDebugger::currentfile
+    
+    switch $what {
+	fossil_diff_tk {
+	    update_recursive_cmd "" open_program fossil_diff_tk "" "" [list $currentfileL]
+	}
+	tkdiff {
+	    update_recursive_cmd "" open_program tkdiff "" "" [list $currentfileL]
+	}
+	tkdiff_ignore_blanks {
+	    update_recursive_cmd "" open_program tkdiff_ignore_blanks "" "" [list $currentfileL]
+	}
+	diff_window {
+	    update_recursive_cmd "" diff_window "" "" [list $currentfileL]
+	}
+    }
 }
 
 proc RamDebugger::VCS::indicator_update {} {
@@ -2590,7 +2610,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		    get_cwd
 		    set err [catch {
 		            cd [file dirname [lindex $files 0]]
-		            exec $fossil diff --tk &
+		            exec $fossil diff --tk {*}$files &
 		        } ret]
 		    release_cwd
 		    if { $err } {
