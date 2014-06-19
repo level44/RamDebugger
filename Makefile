@@ -20,6 +20,8 @@ else ifeq ($(shell gcc -dumpmachine),x86_64-linux-gnu)
 else
   ifeq ($(shell gcc -dumpmachine),arm-linux-gnueabi)
     M64=arm
+  else ifeq ($(shell gcc -dumpmachine),arm-linux-gnueabihf)
+    M64=arm
   else
     M64=no
   endif
