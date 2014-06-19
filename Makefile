@@ -57,21 +57,25 @@ ifeq ($(M64),yes)
   LIBS += 
   LIBEXT = _x64.so
   LD = g++
-else
-  ifeq ($(OS),linux)
+else ifeq ($(OS),arm)
+    CPPFLAGS += -m32
+    LDFLAGS += -m32 -shared -fPIC
+    LIBS =
+    LIBEXT = _x32.so
+    LD = g++
+else ifeq ($(OS),linux)
     CPPFLAGS += -fast -arch i386
     LDFLAGS += -dynamiclib -arch i386 -shared -fPIC
     LIBS =
     LIBEXT = _x32.dylib
     LD = g++
-  else
+else
     CFLAGS += -m32 -mtune=prescott -march=pentium4
     CPPFLAGS += -m32 -mtune=prescott -march=pentium4
     LDFLAGS  += -m32 -mtune=prescott -march=pentium4 -shared -static-libgcc
     LIBS += `g++ -m32 -print-file-name=libstdc++.a`
     LIBEXT = _x32.so
     LD = gcc
-  endif
 endif
 
 LIB_DIRECTORIES = $(LIBSDIR)/lib
