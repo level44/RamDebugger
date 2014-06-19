@@ -25,7 +25,6 @@ else
   else
     M64=no
   endif
-  M64=no
 endif
 
 ifeq ($(HOST),rrg7.local)
@@ -57,9 +56,9 @@ ifeq ($(M64),yes)
   LIBS += 
   LIBEXT = _x64.so
   LD = g++
-else ifeq ($(OS),arm)
-    CPPFLAGS += -m32
-    LDFLAGS += -m32 -shared -fPIC
+else ifeq ($(M64),arm)
+    CPPFLAGS += -fPIC
+    LDFLAGS += -shared -fPIC
     LIBS =
     LIBEXT = _x32.so
     LD = g++
@@ -122,6 +121,7 @@ $(EXE_INSTALL): $(EXE)
 
 $(EXE_INSTALL2): $(EXE)
 ifneq ($(OBJDIR),debug)
+	mkdir $(shell dirname $(EXE_INSTALL2))
 	cp $(EXE) $(EXE_INSTALL2)
 endif
 
@@ -131,3 +131,4 @@ clean:
 copy:
 	cp $(EXE) $(EXE_INSTALL)
 	cp $(EXE) $(EXE_INSTALL2)
+
