@@ -2610,7 +2610,11 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		    get_cwd
 		    set err [catch {
 		            cd [file dirname [lindex $files 0]]
-		            exec $fossil diff --tk {*}$files &
+		            if { $::tcl_platform(platform) eq "windows" } {
+		                exec {*}[auto_execok cmd.exe] /c start /min /wait fossil diff --tk {*}$files &
+		            } else {
+		                exec $fossil diff --tk {*}$files &
+		            }
 		        } ret]
 		    release_cwd
 		    if { $err } {
