@@ -5625,7 +5625,6 @@ proc RamDebugger::ContNextGUI { what } {
     # before, there was the additional cond: || ($remoteserverType == "local" && !$IsInStop) || \
 	# ($remoteserver == "master all" && !$IsInStop) 
 
-
     if { $remoteserverType ne "" && [info commands master] ne "" } {
 	set cmd [master eval info command ::RDC::F]
 	if { $cmd eq "" } {
@@ -5643,6 +5642,10 @@ proc RamDebugger::ContNextGUI { what } {
 	}
 	set filetype [GiveFileType $currentfile]
 	if { $filetype eq "C/C++" } {
+	    if { $::tcl_platform(platform) eq "windows" } {
+		cproject::start_visual_studio
+		return
+	    }
 	    if { $options(ConfirmStartDebugging) && $remoteserver != "" } {
 		set ret [DialogWin::messageBox -default yes -icon question -message \
 		             [_ "Do you want to start to debug c++ program?"] -parent $text \
@@ -8836,17 +8839,20 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[list command &[_ "Create/Edit"] c++entry [_ "Create or edit a c++ compile project"] "Alt F7" \
 		-command "cproject::Create $w"] \
 		[list cascad [_ "C&onfiguration"] {} activeconfiguration 0 [list \
-		        [list radiobutton [_ "Debug"] activeconfiguration [_ "Compile debug version"] "" \
+		    [list radiobutton [_ "Debug"] activeconfiguration [_ "Compile debug version"] "" \
 		        -variable RamDebugger::options(debugrelease) -value debug -selectcolor black] \
-		        [list radiobutton [_ "Release"] activeconfiguration [_ "Compile release version"] "" \
+		    [list radiobutton [_ "Release"] activeconfiguration [_ "Compile release version"] "" \
 		        -variable RamDebugger::options(debugrelease) -value release \
-		            -selectcolor black] \
+		        -selectcolor black] \
+		    separator \
+		    [list command [_ "Toggle"] activeconfiguration [_ "Toggle debug release version"] "Ctrl F7" \
+		        -command "RamDebugger::ToggleDebugRelease"] \
 		        ] \
 		] \
 		[list command [_ "Co&mpile"] c++entry [_ "Compile project"] "F7" \
 		-command "cproject::Compile $w"] \
 		[list command [_ "Com&pile non stop"] c++entry [_ "Compile project, do not stop on errors"] \
-		"Ctrl F7" -command "cproject::CompileNoStop $w"] \
+		"" -command "cproject::CompileNoStop $w"] \
 		[list command [_ "Compile all"] c++entry [_ "Compile project, all targets"] "" \
 		-command "cproject::CompileAll $w"] \
 		separator \
@@ -9945,6 +9951,17 @@ proc RamDebugger::insert_translation_cmd {} {
     if {$oldSeparator} {
 	$text configure -autoseparators 1
     }
+}
+
+proc RamDebugger::ToggleDebugRelease {} {
+    variable options
+    
+    if { $options(debugrelease) eq "debug" } {
+	set options(debugrelease) release
+    } else {
+	set options(debugrelease) debug
+    }
+    SetMessage [_ "Seting compiler to '%s' mode" $options(debugrelease)]
 }
 
 proc RamDebugger::OpenFileInNewWindow { args } {

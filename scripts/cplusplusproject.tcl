@@ -1326,6 +1326,7 @@ proc cproject::AddScripttab { f scripttab } {
     append helptext "# AVAILABLE VARIABLES\n"
     append helptext "# \$ProjectDir: the directory where the project is\n"
     append helptext "# \$ObjectsDir: the directory where the object files are\n"
+    append helptext "# \$debrel: with values 'debug' and 'release'\n"
     
     supertext::text $f0.text -wrap none -syncvar cproject::thisdataS($scripttab,script) \
 	-height 4 -bg white -postproc [list cproject::ScriptTabColorize $f0.text] \
@@ -2091,6 +2092,55 @@ proc cproject::create_auto_makefile { debrel unique_file } {
     close $fout
     
     return $make
+}
+
+proc cproject::start_visual_studio {} {
+    variable project
+    variable dataM
+    
+    if { $project eq "" } {
+	if { [info exists RamDebugger::options(recentprojects)] && \
+		[llength $RamDebugger::options(recentprojects)] > 0 } {
+	    set project [lindex $RamDebugger::options(recentprojects) 0]
+	    set err [catch { cproject::OpenProject $w 0 }]
+	    if { $err } { set project "" }
+	}
+	if { $project == "" } {
+	    cproject::Create $w
+	    return -1
+	}
+    }
+
+    set debrel $RamDebugger::options(debugrelease)
+    if { $debrel != "debug" && $debrel != "release" } {
+	WarnWin [_ "error: program must be in debug or in release mode"]
+	return -1
+    }
+    
+    if { $dataM($debrel,has_userdefined_vs)  } {
+	set make $dataM($debrel,vs_solution)
+	set make_args $dataM($debrel,vs_arguments)
+    } else {
+	error "visual studio project not defined"
+    }
+    
+    set comm [auto_execok devenv.com]
+    if { $comm eq "" } {
+	set txt [_ "Add directory for file 'devenv.com' in Preferences->Directories"]
+	snit_messageBox -message $txt -parent $w
+	return
+    }
+    lappend comm /run $make
+
+    set pwd [pwd]
+    cd [file dirname $project]
+
+    set err [catch { exec {*}$comm & } errstring]
+    if { $err } {
+	WarnWin [_ "error: %s" $errstring]
+	return -1
+    }
+    cd $pwd
 }
 
 proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
