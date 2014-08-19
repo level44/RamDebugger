@@ -373,7 +373,8 @@ proc cproject::NewData {} {
 	set dataM($i,has_userdefined_vs) 0
 	set dataM($i,vs_solution) ""
 	set dataM($i,vs_arguments) ""
-
+	set dataM($i,vs_executable) ""
+	
 	foreach link $links {
 	    set dataL($i,$link,librariesdirs) .
 	    set dataL($i,$link,linkgroups) All
@@ -863,19 +864,30 @@ proc cproject::Create { par } {
 
     ttk::label $nf251.l1 -text [_ "Visual studio solution"]:
     ttk::combobox $nf251.cb1 -textvariable cproject::thisdataM(vs_solution)
-    ttk::button $nf251.b -image [Bitmap::get file]  -style Toolbutton -command [list cproject::select_vs $w]
+    ttk::button $nf251.b -image [Bitmap::get file]  -style Toolbutton -command \
+	[list cproject::select_vs $w]
     ttk::label $nf251.l2 -text [_ "Arguments"]:
     ttk::entry $nf251.e -textvariable cproject::thisdataM(vs_arguments)
 
+    ttk::label $nf251.l3 -text [_ "Generated executable"]:
+    ttk::entry $nf251.cb2 -textvariable cproject::thisdataM(vs_executable)
+    ttk::button $nf251.b2 -image [Bitmap::get file]  -style Toolbutton -command \
+	[list cproject::select_vs_exe $w]
+    
+    tooltip::tooltip $nf251.cb2 [_ "The name of the generated executable is used for deleting it in some cases in order to regenerate solution"]
+    
     grid $nf251.l1 $nf251.cb1 $nf251.b -sticky nsew -padx 2 -pady 2
     grid  $nf251.l2 $nf251.e -sticky nsew -padx 2 -pady 2
+    grid $nf251.l3 $nf251.cb2 $nf251.b2 -sticky nsew -padx 2 -pady 2
+
     grid columnconfigure $nf251 1 -weight 1
 
     grid $nf25.cb1 -sticky nsew -padx 2 -pady 2
-    grid  $nf25.f1 -sticky nsew -padx 2 -pady 2
+    grid $nf25.f1 -sticky nsew -padx 2 -pady 2
     grid columnconfigure $nf25 0 -weight 1
     
-    foreach "n v" [list has_userdefined_vs 0 vs_solution "" vs_arguments ""] {
+    foreach "n v" [list has_userdefined_vs 0 vs_solution "" vs_arguments "" \
+	    vs_executable ""] {
 	if { ![info exists cproject::thisdataM($n)] } {
 	    set cproject::thisdataM($n) $v
 	}
@@ -1584,6 +1596,25 @@ proc cproject::select_vs { parent } {
     set thisdataM(vs_solution)  $file
 }
 
+proc cproject::select_vs_exe { parent } {
+    variable thisdataM
+    
+    set projectdir [IsProjectNameOk]
+    
+    set types {
+	{{Executables} {.exe .dll}}
+	{{All Files} * }
+    }
+
+    set file [tk_getOpenFile -filetypes $types \
+	    -initialdir $RamDebugger::options(defaultdir) -initialfile \
+	    [file tail $thisdataM(vs_executable)] -parent $parent -title [_ "Generated executable"]]
+    if { $file eq "" } { return }
+    set RamDebugger::options(defaultdir) [file dirname $file]
+    set file [ConvertToRelative $projectdir $file]
+    set thisdataM(vs_executable) $file
+}
+
 proc cproject::AddModFiles { listbox what } {
     variable project
     variable files
@@ -2120,6 +2151,7 @@ proc cproject::start_visual_studio {} {
     if { $dataM($debrel,has_userdefined_vs)  } {
 	set make $dataM($debrel,vs_solution)
 	set make_args $dataM($debrel,vs_arguments)
+	set make_executable $dataM($debrel,vs_executable)
     } else {
 	error "visual studio project not defined"
     }
@@ -2218,6 +2250,7 @@ proc cproject::CompileDo { w debrel nostop { unique_file "" } } {
 	    } elseif { $dataM($debrel,has_userdefined_vs)  } {
 		set make $dataM($debrel,vs_solution)
 		set make_args $dataM($debrel,vs_arguments)
+		set make_executable $dataM($debrel,vs_executable)
 		set ctype vc
 	    } else {
 		set make [create_auto_makefile $debrel $unique_file]
@@ -2416,6 +2449,33 @@ proc cproject::EvalScript { w debrel scripttab { show 0 } } {
 	}
     }
     cd $pwd
+}
+
+proc cproject::ToggleDebugRelease {} {
+    variable dataM
+    variable project
+    
+    set devrel $RamDebugger::options(debugrelease)
+    
+    if { $devrel eq "debug" } {
+	set RamDebugger::options(debugrelease) release
+    } else {
+	set RamDebugger::options(debugrelease) debug
+    }
+    if { $dataM($devrel,vs_executable) ne "" } {
+	set make_executable [file join [file dirname $project] $dataM($devrel,vs_executable)]
+    } else {
+	set make_executable ""
+    }
+    
+    if { [file exists $make_executable] && [file isfile $make_executable] } {
+	file delete $make_executable
+	set txt [_ "Seting compiler to '%s' mode (deleted file %s)" \
+		$RamDebugger::options(debugrelease) [file tail $make_executable]]
+    } else {
+	set txt [_ "Seting compiler to '%s' mode" $RamDebugger::options(debugrelease)]
+    }
+    RamDebugger::SetMessage $txt
 }
 
 ################################################################################

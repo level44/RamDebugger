@@ -8846,7 +8846,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		        -selectcolor black] \
 		    separator \
 		    [list command [_ "Toggle"] activeconfiguration [_ "Toggle debug release version"] "Ctrl F7" \
-		        -command "RamDebugger::ToggleDebugRelease"] \
+		        -command "cproject::ToggleDebugRelease"] \
 		        ] \
 		] \
 		[list command [_ "Co&mpile"] c++entry [_ "Compile project"] "F7" \
@@ -9951,17 +9951,6 @@ proc RamDebugger::insert_translation_cmd {} {
     if {$oldSeparator} {
 	$text configure -autoseparators 1
     }
-}
-
-proc RamDebugger::ToggleDebugRelease {} {
-    variable options
-    
-    if { $options(debugrelease) eq "debug" } {
-	set options(debugrelease) release
-    } else {
-	set options(debugrelease) debug
-    }
-    SetMessage [_ "Seting compiler to '%s' mode" $options(debugrelease)]
 }
 
 proc RamDebugger::OpenFileInNewWindow { args } {
