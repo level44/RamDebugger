@@ -369,6 +369,7 @@ proc cproject::NewData {} {
 	set dataM($i,has_userdefined_makefile) 0
 	set dataM($i,makefile_file) Makefile
 	set dataM($i,makefile_arguments) ""
+	set dataM($i,makefile_cleanexe) ""
 	
 	set dataM($i,has_userdefined_vs) 0
 	set dataM($i,vs_solution) ""
@@ -836,15 +837,22 @@ proc cproject::Create { par } {
     ttk::label $nf21.l2 -text [_ "Makefile arguments"]:
     ttk::entry $nf21.e -textvariable cproject::thisdataM(makefile_arguments)
 
+    ttk::label $nf21.l3 -text [_ "Makefile cleanexe"]:
+    ttk::entry $nf21.e2 -textvariable cproject::thisdataM(makefile_cleanexe)
+    
+    tooltip::tooltip $nf21.e2 [_ "makefile arguments for deleting it in some cases in order to regenerate solution"]
+    
     grid $nf21.l1 $nf21.cb1 $nf21.b -sticky nsew -padx 2 -pady 2
     grid  $nf21.l2 $nf21.e -sticky nsew -padx 2 -pady 2
+    grid  $nf21.l3 $nf21.e2 -sticky nsew -padx 2 -pady 2
     grid columnconfigure $nf21 1 -weight 1
 
     grid $nf2.cb1 -sticky nsew -padx 2 -pady 2
     grid  $nf2.f1 -sticky nsew -padx 2 -pady 2
     grid columnconfigure $nf2 0 -weight 1
     
-    foreach "n v" [list has_userdefined_makefile 0 makefile_file Makefile makefile_arguments ""] {
+    foreach "n v" [list has_userdefined_makefile 0 makefile_file Makefile makefile_arguments "" \
+	    makefile_cleanexe ""] {
 	if { ![info exists cproject::thisdataM($n)] } {
 	    set cproject::thisdataM($n) $v
 	}
@@ -2455,20 +2463,32 @@ proc cproject::ToggleDebugRelease {} {
     variable dataM
     variable project
     
-    set devrel $RamDebugger::options(debugrelease)
+    set debrel $RamDebugger::options(debugrelease)
     
-    if { $devrel eq "debug" } {
-	set RamDebugger::options(debugrelease) release
+    if { $debrel eq "debug" } {
+	set debrel release
     } else {
-	set RamDebugger::options(debugrelease) debug
+	set debrel debug
     }
-    if { $dataM($devrel,vs_executable) ne "" } {
-	set make_executable [file join [file dirname $project] $dataM($devrel,vs_executable)]
+    set RamDebugger::options(debugrelease) $debrel
+    
+    if { $dataM($debrel,has_userdefined_vs) && $dataM($debrel,vs_executable) ne "" } {
+	set make_executable [file join [file dirname $project] $dataM($debrel,vs_executable)]
     } else {
 	set make_executable ""
     }
-    
-    if { [file exists $make_executable] && [file isfile $make_executable] } {
+    if { $dataM($debrel,has_userdefined_makefile)  && $dataM($debrel,makefile_cleanexe) ne "" } {
+	set make $dataM($debrel,makefile_file)
+	set make_args $dataM($debrel,makefile_cleanexe)
+	set pwd [pwd]
+	cd [file dirname $project]
+	set err [catch { exec make -f $make {*}$make_args } ret]
+	cd $pwd
+	if { $err } {
+	    set ret "error: $ret"
+	}
+	set txt [_ "Seting compiler to '%s' mode (%s)" $RamDebugger::options(debugrelease)  $ret]
+    } elseif { [file exists $make_executable] && [file isfile $make_executable] } {
 	file delete $make_executable
 	set txt [_ "Seting compiler to '%s' mode (deleted file %s)" \
 		$RamDebugger::options(debugrelease) [file tail $make_executable]]
