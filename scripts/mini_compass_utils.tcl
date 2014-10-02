@@ -946,6 +946,68 @@ proc cu::text_entry_insert { w { what "" } } {
     dict set last_text_enty_bindings $w [list $t $d]
 }
 
+################################################################################
+#     cu::text operations on text widget
+################################################################################
+
+namespace eval cu::text {}
+
+proc cu::text::get_selection_or_word { args } {
+    
+    set optional {
+	{ -return_range boolean 0 }
+    }
+    set compulsory "text idx"
+    parse_args $optional $compulsory $args
+    
+    set range [$text tag ranges sel]
+    if { $range != "" && [$text compare [lindex $range 0] <= $idx] && \
+	[$text compare [lindex $range 1] >= $idx] } {
+	if { $return_range } {
+	    return $range
+	} else {
+	    return [$text get {*}$range]
+	}
+    } else {
+	if { $idx != "" } {
+	    set var ""
+	    set idx0 $idx
+	    set char [$text get $idx0]
+	    if { [string is space $char] } {
+		set c [$text get "$idx0-1c"]
+		if { [string is wordchar $c] } {
+		    set idx [$text index "$idx0-1c"]
+		    set idx0 $idx
+		    set char [$text get $idx0]
+		}
+	    }
+	    while { [string is wordchar $char] } {
+		#  || $char == "(" || $char == ")"
+		set var $char$var
+		set idx0 [$text index $idx0-1c]
+		if { [$text compare $idx0 <= 1.0] } { break }
+		set char [$text get $idx0]
+	    }
+	    set idx1 [$text index $idx+1c]
+	    set char [$text get $idx1]
+	    while { [string is wordchar $char] } {
+		#  || $char == "(" || $char == ")"
+		append var $char
+		set idx1 [$text index $idx1+1c]
+		if { [$text compare $idx1 >= end-1c] } { break }
+		set char [$text get $idx1]
+	    }
+	    if { ![regexp {[^()]*\([^\)]+\)} $var] } {
+		set var [string trimright $var "()"]
+	    }
+	} else { set var "" }
+    }
+    if { $return_range } {
+	return [list [$text index "$idx0+1c"] [$text index "$idx1"]]
+    } else {
+	return $var
+    }
+}
 
 ################################################################################
 #    store preferences
