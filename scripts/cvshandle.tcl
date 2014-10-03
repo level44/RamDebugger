@@ -2345,7 +2345,11 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		            }
 		            lassign [lindex $ticketList $ipos] - ticketF comment
 		            append comment "\ncommit: $new_commit. Change status to: $ticket_status"
-		            exec $fossil ticket change $ticketF status $ticket_status comment $comment
+		            set err [catch { exec $fossil ticket change $ticketF status $ticket_status \
+		                        comment $comment --quote } errstring]
+		            if { $err } {
+		                tk_messageBox -message [_ "Error updating ticket (%s)" $errstring]
+		            }
 		            incr num_tickets
 		        }
 		        if { $num_tickets } {
