@@ -163,7 +163,7 @@ proc RamDebugger::VCS::ManageAutoSave {} {
     if { $now-$lasttimeautosave < $RamDebugger::options(AutoSaveRevisions_time) } {
 	set time [expr {int(($RamDebugger::options(AutoSaveRevisions_time)-$now+\
 		                 $lasttimeautosave)*1000)}]
-	set $autosave_after [after $time RamDebugger::VCS::ManageAutoSave]
+	set autosave_after [after $time RamDebugger::VCS::ManageAutoSave]
     } else {
 	set time [expr {int($RamDebugger::options(AutoSaveRevisions_idletime)*1000)}]
 	set autosaveidle_after [after $time RamDebugger::VCS::ManageAutoSaveDo]
