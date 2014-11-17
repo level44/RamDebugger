@@ -171,6 +171,9 @@ namespace eval RamDebugger {
     } else {
 	variable topdir_external $topdir
     }
+    lappend ::auto_path [file dirname $topdir]
+    lappend ::auto_path [file join $topdir scripts]
+    lappend ::auto_path [file join $topdir_external addons]
 }
 
 ################################################################################
@@ -178,7 +181,7 @@ namespace eval RamDebugger {
 ################################################################################
 
 proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _big_icons 0 } 
-    { check_remotes 1 } } {
+    { check_remotes 1 }} {
     variable debuggerserver
     variable debuggerserverNum
     variable topdir
@@ -208,10 +211,6 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
 	set iswince 1
     } else { set iswince 0 }
    
-    lappend ::auto_path [file dirname $topdir]
-    lappend ::auto_path [file join $topdir scripts]
-    lappend ::auto_path [file join $topdir_external addons]
-
     tcl::tm::add [file join $topdir_external addons tcl8 site-tcl] 
 
     if { $iswince } {
@@ -10090,6 +10089,13 @@ if { ![info exists SkipRamDebuggerInit] } {
     } else {
 	set topleveluse ""
     }
+    if { [set ipos [lsearch $argv "-font_increase_decrease"]] != -1 } {
+	set iposm1 [expr {$ipos+1}]
+	set increase_decrease_font [lindex $argv $iposm1]
+	set argv [lreplace $argv $ipos $iposm1]
+    } else {
+	set increase_decrease_font ""
+    }
     if { [set ipos [lsearch $argv "-big_icons"]] != -1 } {
 	set iposm1 [expr {$ipos+1}]
 	set big_icons [lindex $argv $iposm1]
@@ -10113,6 +10119,7 @@ if { ![info exists SkipRamDebuggerInit] } {
     }
 
     RamDebugger::Init $readwriteprefs $prefs_group $registerasremote $big_icons $check_remotes
+	
     
     ################################################################################
     #     Init the GUI part
@@ -10122,6 +10129,10 @@ if { ![info exists SkipRamDebuggerInit] } {
 	wm withdraw .
 
 	RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
+
+	if { $increase_decrease_font ne "" } {
+	    RamDebugger::increase_decrease_text_font $increase_decrease_font
+	}
 
 	if { [llength $argv] } {
 	    RamDebugger::OpenFileF [file normalize [lindex $argv 0]]
