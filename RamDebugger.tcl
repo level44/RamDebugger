@@ -10091,10 +10091,10 @@ if { ![info exists SkipRamDebuggerInit] } {
     }
     if { [set ipos [lsearch $argv "-font_increase_decrease"]] != -1 } {
 	set iposm1 [expr {$ipos+1}]
-	set increase_decrease_font [lindex $argv $iposm1]
+	set font_increase_decrease [lindex $argv $iposm1]
 	set argv [lreplace $argv $ipos $iposm1]
     } else {
-	set increase_decrease_font ""
+	set font_increase_decrease ""
     }
     if { [set ipos [lsearch $argv "-big_icons"]] != -1 } {
 	set iposm1 [expr {$ipos+1}]
@@ -10130,8 +10130,8 @@ if { ![info exists SkipRamDebuggerInit] } {
 
 	RamDebugger::InitGUI .gui $geometry $ViewOnlyTextOrAll $topleveluse
 
-	if { $increase_decrease_font ne "" } {
-	    RamDebugger::increase_decrease_text_font $increase_decrease_font
+	if { $font_increase_decrease ni [list "" "-"] } {
+	    RamDebugger::increase_decrease_text_font $font_increase_decrease
 	}
 
 	if { [llength $argv] } {
