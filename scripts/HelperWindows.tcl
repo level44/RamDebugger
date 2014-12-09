@@ -4641,3 +4641,56 @@ proc RamDebugger::go_to_proc {} {
 	set action [$wg waitforwindow]
     }
 }
+
+
+################################################################################
+#    go_to_proc
+################################################################################
+
+proc RamDebugger::edit_recent_files {} {
+    variable text
+    variable options
+    
+    set wg $text.g
+    destroy $wg
+    dialogwin_snit $wg -title [_ "Edit recent files"] -entrytext [_ "Select file that must stay permanent in menu"]
+    set f [$wg giveframe]
+    
+    set values ""
+    foreach elm $options(RecentFilesL) {
+	lassign $elm file fixed
+	if { $fixed } { set state on } else { set state off }
+	lappend values [list "[file tail $file] ([file dirname $file])" $state "" ""]
+    }
+    cu::check_listbox $f.cl -values $values -width 600 -height 400
+    
+    grid configure $f.cl -sticky nsew
+    grid columnconfigure $f 0 -weight 1
+    grid rowconfigure $f 0 -weight 1 
+    focus $f.cl
+
+    bind $wg <Return> [list $wg invokeok]
+    set action [$wg createwindow]
+
+    while 1 {
+	switch -- $action {
+	    -1 - 0 {
+		destroy $wg
+		return
+	    }
+	    1 {
+		set values [$f.cl cget -values]
+		lassign [list $options(RecentFilesL) ""] rf options(RecentFilesL)
+		foreach elm $rf v $values {
+		    lassign $elm file
+		    lassign $v - state
+		    if { $state eq "on" } { set fixed 1 } else { set fixed 0 }
+		    lappend options(RecentFilesL) [list $file $fixed]
+		}
+		destroy $wg
+		return
+	    }
+	}
+	set action [$wg waitforwindow]
+    }
+}

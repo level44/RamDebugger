@@ -2555,6 +2555,14 @@ proc RamDebugger::lsearchfile { list file } {
     }
 }
 
+proc RamDebugger::lsearchfileI { list index file } {
+    if { $::tcl_platform(platform) == "windows" } {
+	return [lsearch -index $index -exact [string tolower $list] [string tolower $file]]
+    } else {
+	return [lsearch -index $index -exact $list $file]
+    }
+}
+
 proc RamDebugger::ReceiveFromProgram { breaknum filenum line procname textline condinfo } {
     variable fileslist
     variable text
@@ -4011,6 +4019,32 @@ proc RamDebugger::OpenFile { args } {
     FillListBox
 }
 
+proc RamDebugger::add_to_recent_files { file } {
+    variable options
+    
+    if { ![info exists options(RecentFilesL)] } {
+	set options(RecentFilesL) ""
+    }
+    set ipos [lsearchfileI $options(RecentFilesL) 0 $file]
+    if { $ipos != -1 } {
+	set elm [lindex $options(RecentFilesL) $ipos]
+	set options(RecentFilesL) [lreplace $options(RecentFilesL) $ipos $ipos]
+    } else {
+	set elm [list $file 0]
+    }
+    set options(RecentFilesL) [linsert $options(RecentFilesL) 0 $elm]
+    if { [llength $options(RecentFilesL)] > 15 } {
+	for { set i [expr {[llength $options(RecentFilesL)]-1}] } { $i >= 0 } { incr i -1 } {
+	    if { [lindex $options(RecentFilesL) $i 1] == 0 } {
+		set options(RecentFilesL) [lreplace $options(RecentFilesL) $i $i]
+		if { [llength $options(RecentFilesL)] <= 15 } {
+		    break
+		}
+	    }
+	}
+    }
+}
+
 proc RamDebugger::OpenFileF { args } {
     variable marker
     variable text
@@ -4137,17 +4171,7 @@ proc RamDebugger::OpenFileF { args } {
 
     if { [string index $file 0] != "*" } {
 	if { !$no_history } {
-	    if { ![info exists options(RecentFiles)] } {
-		set options(RecentFiles) ""
-	    }
-	    set ipos [lsearchfile $options(RecentFiles) $file]
-	    if { $ipos != -1 } {
-		set options(RecentFiles) [lreplace $options(RecentFiles) $ipos $ipos]
-	    }
-	    set options(RecentFiles) [linsert $options(RecentFiles) 0 $file]
-	    if { [llength $options(RecentFiles)] > 10 } {
-		set options(RecentFiles) [lreplace $options(RecentFiles) 10 end]
-	    }
+	    add_to_recent_files $file
 	}
 	set options(defaultdir) [file dirname $file]
 	#FillListBox
@@ -4430,8 +4454,9 @@ proc RamDebugger::CloseFile {} {
 	set WindowFilesList [lreplace $WindowFilesList $pos $pos]
 	set WindowFilesListLineNums [lreplace $WindowFilesListLineNums $pos $pos]
     }
-    if { [set pos [lsearch -exact $options(RecentFiles) $cf]] != -1 } {
-	set options(RecentFiles) [lreplace $options(RecentFiles) $pos $pos]
+    set ipos [lsearchfileI $options(RecentFilesL) 0 $cf]
+    if { $ipos != -1 && [lindex $options(RecentFilesL) $ipos 1] == 0 } {
+	set options(RecentFilesL) [lreplace $options(RecentFilesL) $ipos $ipos]
     }
 }
 
@@ -4659,17 +4684,7 @@ proc RamDebugger::SaveFileF { args } {
 	lappend WindowFilesListLineNums $linenum
     }
     if { [string index $file 0] != "*" } {
-	if { ![info exists options(RecentFiles)] } {
-	    set options(RecentFiles) ""
-	}
-	set ipos [lsearchfile $options(RecentFiles) $file]
-	if { $ipos != -1 } {
-	    set options(RecentFiles) [lreplace $options(RecentFiles) $ipos $ipos]
-	}
-	set options(RecentFiles) [linsert $options(RecentFiles) 0 $file]
-	if { [llength $options(RecentFiles)] > 10 } {
-	    set options(RecentFiles) [lreplace $options(RecentFiles) 10 end]
-	}
+	add_to_recent_files $file
 	set options(defaultdir) [file dirname $file]
 	#FillListBox
     }
@@ -5035,11 +5050,12 @@ proc RamDebugger::ChooseViewFile { what args } {
 
     switch $what {
 	start - startrecent - startcurrdir {
-	    if { ![info exists options(RecentFiles)] } { set options(RecentFiles) "" }
+	    if { ![info exists options(RecentFilesL)] } { set options(RecentFilesL) "" }
+	    
 	    if { $what eq "start" && [llength $WindowFilesList] < 2 } {
 		set what startrecent
 	    }
-	    if { $what eq "startrecent" && ![llength options(RecentFiles)] } {
+	    if { $what eq "startrecent" && ![llength options(RecentFilesL)] } {
 		set what startcurrdir
 	    }
 	    if { $what eq "startcurrdir" } {
@@ -5053,7 +5069,7 @@ proc RamDebugger::ChooseViewFile { what args } {
 		} else { set list "" }
 		if { $list eq "" } {
 		    if { [llength $WindowFilesList] >= 2 || \
-		             ![llength options(RecentFiles)] } {
+		             ![llength options(RecentFilesL)] } {
 		        set what start
 		    } else { set what startrecent }
 		}
@@ -5066,7 +5082,10 @@ proc RamDebugger::ChooseViewFile { what args } {
 		    }
 		}
 		startrecent {
-		    set list $options(RecentFiles)
+		    set list ""
+		    foreach elm $options(RecentFilesL) {
+		        lappend list [lindex $elm 0]
+		    }
 		}
 		startcurrdir {
 		    set list [lsort -dictionary $list]
@@ -5366,16 +5385,18 @@ proc RamDebugger::AddRecentfilesToMenu { menu } {
 
     $menu del 0 end
 
-    if { ![info exists options(RecentFiles)] } { return }
+    if { ![info exists options(RecentFilesL)] } { return }
 
-    foreach i $options(RecentFiles) {
-	set label $i
+    foreach i $options(RecentFilesL) {
+	set label [lindex $i 0]
 	if { [string length $label] > 45 } {
 	    set label ...[string range $label end-42 end]
 	}
 	$menu add command -label $label -command \
 	    "[list RamDebugger::OpenFileF $i] ; RamDebugger::FillListBox"
     }
+    $menu add separator
+    $menu add command -label [_ "Edit"] -command [list RamDebugger::edit_recent_files]
 }
 
 
@@ -6408,12 +6429,12 @@ proc RamDebugger::ListBoxLabelMenu { w x y } {
 	}
     }
 
-    if { ![info exists options(RecentFiles)] } {
-	set options(RecentFiles) ""
+    if { ![info exists options(RecentFilesL)] } {
+	set options(RecentFilesL) ""
     }
     set sep 0
-    foreach i $options(RecentFiles) {
-	set dir [file dirname $i]
+    foreach i $options(RecentFilesL) {
+	set dir [file dirname [lindex $i 0]]
 	if { $dir != $options(defaultdir) && [lsearchfile $dirs $dir] == -1 } {
 	    if { !$sep } {
 		lappend dirs ---
@@ -6610,7 +6631,8 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 		}
 	    }
 	    if { ![file exists $file] } {
-		foreach fileF $options(RecentFiles) {
+		foreach i $options(RecentFilesL) {
+		    set fileF [lindex $i 0]
 		    if { [file tail $fileF] eq $file } {
 		        set file $fileF
 		        break
@@ -9740,8 +9762,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		          [sendmaster set ::RamDebugger::currentfile]] } {
 		
 		set options(currentfile) ""
-		for { set i 0 } { $i < [llength $options(RecentFiles)] } { incr i } {
-		    set options(currentfile) [lindex $options(RecentFiles) $i]
+		for { set i 0 } { $i < [llength $options(RecentFilesL)] } { incr i } {
+		    set options(currentfile) [lindex $options(RecentFilesL) $i 0]
 		    if { ![AreFilesEqual $options(currentfile) \
 		               [sendmaster set ::RamDebugger::currentfile]] } {
 		        break
