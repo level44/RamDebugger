@@ -1832,6 +1832,7 @@ proc RamDebugger::VCS::update_recursive_accept { args } {
 		return
 	    }
 	    if { [regexp {^Pull finished with} $line] } {  continue }
+	    if { [regexp {^Pull done,} $line] } {  continue }
 	    if { [regexp {^Total network traffic:} $line] } {  continue }
 	    if { [regexp {^waiting for server} $line] } {  continue }
 	    if { [regexp {^(Autosync:|Sent:|processed:|Received:|\s*Bytes|\s*$)} $line] } {  continue }
@@ -2301,6 +2302,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		}
 		regsub -all {processed:\s*\d+%\s*} [string trim $ret] {} ret
 		regsub -all -line {Round-trips:\s*\d+\s.*} [string trim $ret] {} ret
+		regsub -all -line {Pull done, sent:\s*\d+} [string trim $ret] {} ret
 
 		if { $err } { set color red } else { set color blue }
 		foreach file $fs {
