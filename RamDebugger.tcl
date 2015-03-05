@@ -8304,6 +8304,8 @@ proc RamDebugger::MarkerContextualSubmenu { w x y X Y } {
 
     $menu add command -label [_ "Last Position"] -command \
 	"RamDebugger::PositionsStack go"
+    $menu add command -label [_ "Last Position in file"] -command \
+	"RamDebugger::PositionsStack go_same_file"
     $menu add separator
     $menu add command -label [_ "Positions window"] -command \
 	[list RamDebugger::DisplayPositionsStack  -curr_text $text -nowline $line]
@@ -8749,7 +8751,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		        -command "RamDebugger::PositionsStack save"] \
 		    [list command &[_ "Go to position"] {} [_ "Recover position from stack"] "F2" \
 		        -command "RamDebugger::PositionsStack go"] \
-		    [list command &[_ "Display positions stack"] {} [_ "Display positions stack"] "Ctrl F2" \
+		    [list command &[_ "Go to position in file"] {} [_ "Recover position from stack in current file"] "Ctrl F2" \
+		        -command "RamDebugger::PositionsStack go_same_file"] \
+		    [list command &[_ "Display positions stack"] {} [_ "Display positions stack"] "" \
 		        -command "RamDebugger::DisplayPositionsStack"] \
 		    separator \
 		    [list command &[_ "Go to proc"] {} \

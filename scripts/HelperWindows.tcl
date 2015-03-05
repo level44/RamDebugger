@@ -3982,6 +3982,39 @@ proc RamDebugger::PositionsStack { what args } {
 	    $curr_text see $line.0
 	    SetMessage "Gone to position in line $line"
 	}
+	go_same_file {
+	    set ipos [expr {[llength $options(saved_positions_stack)]-1}]
+	    set found 0
+	    foreach i [lreverse $options(saved_positions_stack)] {
+		if { $file eq [lindex $i 0] && $line == [lindex $i 1] } {
+		    set found 1
+		    break
+		}
+		incr ipos -1
+	    }
+	    if { $found } {
+		incr ipos -1
+		if { $ipos < 0 } { set ipos [expr {[llength $options(saved_positions_stack)]-1}] }
+	    } else {
+		set ipos [expr {[llength $options(saved_positions_stack)]-1}]
+	    }
+	    while 1 {
+		lassign [lindex $options(saved_positions_stack) $ipos] file_new line
+		if { $file_new eq "" } {
+		    bell
+		    SetMessage "Stack is void"
+		    return
+		}
+		if { ![AreFilesEqual $file_new $file] } {
+		    incr ipos -1
+		    continue
+		}
+		$curr_text mark set insert $line.0
+		$curr_text see $line.0
+		SetMessage "Gone to position in line $line"
+		return
+	    }
+	}
 	clean {
 	    set ipos [expr {[llength $options(saved_positions_stack)]-1}]
 	    set found 0
