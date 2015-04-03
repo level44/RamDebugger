@@ -9287,7 +9287,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set ::alt Alt
 	set ::alt_txt Alt
     }
-    bind $marker <<Contextual>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
+    bind $marker <<ContextualPress>> [list RamDebugger::MarkerContextualSubmenu %W %x %y %X %Y]
     
     set text [supertext::text $fulltext.text -background white -foreground black \
 		  -wrap none -width 80 -height 40 \
@@ -9393,10 +9393,10 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	}
 	tk_popup $f.m $x $y
     }
-    $pane2in2.nb bindtabs <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y]
-    bind $textST <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y stacktrace]
-    bind $textOUT <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y output]
-    bind $textCOMP <<Contextual>> [list RamDebugger::NoteBookPopupMenu %W %X %Y compile]
+    $pane2in2.nb bindtabs <<ContextualPress>> [list RamDebugger::NoteBookPopupMenu %W %X %Y]
+    bind $textST <<ContextualPress>> [list RamDebugger::NoteBookPopupMenu %W %X %Y stacktrace]
+    bind $textOUT <<ContextualPress>> [list RamDebugger::NoteBookPopupMenu %W %X %Y output]
+    bind $textCOMP <<ContextualPress>> [list RamDebugger::NoteBookPopupMenu %W %X %Y compile]
 
 
     proc TextStackTraceRaise {} "catch { $pane2in2.nb raise stacktrace }"
@@ -9573,7 +9573,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	set menu [$mainframe getmenu edit]   
     }
     bind $text <1> [list focus $text]
-    bind $text <<Contextual>> "%W mark set insert @%x,%y ; RamDebugger::TextMotion -1 -1 -1 -1;\
+    bind $text <<ContextualPress>> "%W mark set insert @%x,%y ; RamDebugger::TextMotion -1 -1 -1 -1;\
 	    tk_popup $menu %X %Y"
     if { $iswince } { pocketpc::add $text }
 
