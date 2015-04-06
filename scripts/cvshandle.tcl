@@ -2121,7 +2121,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    set fossil [auto_execok fossil]
 	    set err [catch { exec $fossil settings autosync } ret]
 	    if { !$err } {
-		regexp {(\d)\s*$} $ret {} autosync
+		regexp -line {autosync\s+\S+?\s+(\d)} $ret {} autosync
 	    }
 	    release_cwd
 	    return $autosync
