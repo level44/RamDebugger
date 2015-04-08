@@ -521,8 +521,8 @@ proc RamDebugger::Wizard::CondMatWizard { text filename } {
     UpdateNumbersInGiDFiles 0
 }
 
-namespace eval RamDebugger::Wizard {
-    catch {package require img::png}
+namespace eval RamDebugger::Wizard {   
+    package require img::png
     package require img::jpeg
     package require img::gif
     
