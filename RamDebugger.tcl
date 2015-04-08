@@ -1,4 +1,5 @@
 #!/bin/sh
+# -*- tcl -*- \
 # the next line restarts using wish \
 exec wish "$0" "$@"
 # RamDebugger  -*- TCL -*- Created: ramsan Jul-2002, Modified: ramsan Dec-2009
@@ -8670,7 +8671,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     # ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
     
     set descmenu ""
-    if { [ tk windowingsystem] eq "aqua"} {
+    if { [ tk windowingsystem] eq "aqua" && [ info exists ::GIDDEFAULT] } {
 	proc ::tk::mac::ShowPreferences {} {
 	    after idle RamDebugger::PreferencesWindow
 	}
@@ -8988,7 +8989,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 #                 -variable RamDebugger::options(viewvariablespaneV2)] \
 
     
-    if { [ tk windowingsystem] eq "aqua"} {
+    if { [ tk windowingsystem] eq "aqua" && [ info exists ::GIDDEFAULT] } {
 	set descmenu_old $descmenu
 	set descmenu ""
 	set bad [list &[_ "Preferences"] &[_ "About"] &[_ "Extract examples"] \
@@ -9722,8 +9723,17 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     }
 
     #bind all <$::control-Key-1> "RamDebugger::DisplayWindowsHierarchy ;break"
-
-    ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
+    
+    if { $::tcl_platform(os) == "Darwin"} {
+	# may be with this is enough ?
+	ApplyDropBinding $mainframe [list RamDebugger::DropBindingDone %D]
+	# should it be the text ?
+	ApplyDropBinding $text [list RamDebugger::DropBindingDone %D]
+    } elseif { $::tcl_platform(os) == "Linux"} {
+	ApplyDropBinding $mainframe [list RamDebugger::DropBindingDone %D]
+    } else {
+	ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
+    }
 
     # BWidgets automatically sets these because they are in the main main
     # we only want them individually in every widget
