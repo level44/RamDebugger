@@ -364,6 +364,7 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
 	0 { set lib [file join $AppDataDir compile libtclstub.a] }
 	1 { set lib [lindex $libs 0] }
 	default {
+	    set i ""
 	    foreach i [glob -nocomplain -dir [file join $basedir lib] libtclstub*.a] {
 		regexp {[\d.]+} [file tail $i] version
 		if { $version >= 8.5 } { break }
