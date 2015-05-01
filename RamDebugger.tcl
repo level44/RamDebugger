@@ -9533,7 +9533,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     ################################################################################
 
     if {[string equal "unix" $::tcl_platform(platform)]} {
-	foreach "but units" [list 4 -2 5 2] {
+	foreach "but units" [list 4 -1 5 1] {
 	    set comm {
 		set w %W
 		while { $w != [winfo toplevel $w] } {
@@ -9567,7 +9567,6 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    }
 	}
     }
-
 
     set menu [$mainframe getmenu debug]
     if { $menu eq "" } {
