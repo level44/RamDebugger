@@ -2348,7 +2348,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		            lassign [lindex $ticketList $ipos] - ticketF comment
 		            append comment "\n\ncommit: $new_commit. Change status to: $ticket_status"
 		            set err [catch { exec $fossil ticket change $ticketF status $ticket_status \
-		                        comment $comment --quote } errstring]
+		                        resolution Fixed comment $comment --quote } errstring]
 		            if { $err } {
 		                tk_messageBox -message [_ "Error updating ticket (%s)" $errstring]
 		            }
@@ -2358,7 +2358,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		            set autosync 0
 		            set err_autosync [catch { exec $fossil settings autosync } ret]
 		            if { !$err_autosync } {
-		                regexp {(\d)\s*$} $ret {} autosync
+		                regexp -line {(\d)\s*$} $ret {} autosync
 		            }
 		            if { $autosync == 1 } {
 		                exec $fossil sync
