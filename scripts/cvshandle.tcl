@@ -893,10 +893,10 @@ proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
     $menu add separator
     $menu add command -label [_ "Differences"] -acc "Ctrl-Shift-d" -command \
 	[list RamDebugger::VCS::differences fossil_diff_tk]
+    $menu add command -label [_ "Differences (ignore blanks)"] -command \
+	[list RamDebugger::VCS::differences fossil_diff_tk_ignore_blank]
     $menu add command -label [_ "Differences (tkdiff)"] -command \
 	[list RamDebugger::VCS::differences tkdiff]
-    $menu add command -label [_ "Differences (ignore blanks)"] -command \
-	[list RamDebugger::VCS::differences tkdiff_ignore_blanks]
 
     $menu add command -label [_ "Differences window"] -command \
 	[list RamDebugger::VCS::differences diff_window]
@@ -909,8 +909,8 @@ proc RamDebugger::VCS::differences { what } {
     set currentfileL $RamDebugger::currentfile
     
     switch $what {
-	fossil_diff_tk {
-	    update_recursive_cmd "" open_program fossil_diff_tk "" "" [list $currentfileL]
+	fossil_diff_tk - fossil_diff_tk_ignore_blank {
+	    update_recursive_cmd "" open_program $what "" "" [list $currentfileL]
 	}
 	tkdiff {
 	    update_recursive_cmd "" open_program tkdiff "" "" [list $currentfileL]
@@ -992,6 +992,7 @@ proc RamDebugger::VCS::indicator_update_do { cvs_or_fossil } {
    
     if { ![info exists fossil_indicator_fileid] } {
 	#return ;#kike: uncommenting this return spend all cpu when opening ramdebugger from GiD !!!
+	return
     }
     if { $cvs_or_fossil eq "cvs" } {
 	append cvs_indicator_data "[gets $cvs_indicator_fileid]\n"
@@ -1368,7 +1369,7 @@ proc RamDebugger::VCS::update_recursive_do0 { directory current_or_last } {
     $w set_uservar_value message ""
     
     bind $w <$::control-d> [list "update_recursive_cmd" $w open_program fossil_diff_tk $f.toctree ""]
-    bind $w <$::control-D> [list "update_recursive_cmd" $w open_program tkdiff_ignore_blanks $f.toctree ""]
+    bind $w <$::control-D> [list "update_recursive_cmd" $w open_program fossil_diff_tk_ignore_blank $f.toctree ""]
     bind $w <$::control-i> [list "update_recursive_cmd" $w commit $f.toctree ""]
     bind $w <$::control-f> [list "update_recursive_cmd" $w open_program fossil_ui $f.toctree ""]
 
@@ -2076,10 +2077,10 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    if { $is_timeline == 0 && ($has_cvs || $has_fossil) } {
 		$menu add command -label [_ "View diff"] -accelerator $::control_txt-d -command \
 		    [list "update_recursive_cmd" $w open_program fossil_diff_tk $tree $sel_ids]
-		$menu add command -label [_ "View diff (tkdiff)"] -accelerator $::control_txt-d -command \
-		    [list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
 		$menu add command -label [_ "View diff (ignore blanks)"] -accelerator $::control_txt-D -command \
-		    [list "update_recursive_cmd" $w open_program tkdiff_ignore_blanks $tree $sel_ids]
+		    [list "update_recursive_cmd" $w open_program fossil_diff_tk_ignore_blank $tree $sel_ids]
+		$menu add command -label [_ "View diff (tkdiff)"] -command \
+		    [list "update_recursive_cmd" $w open_program tkdiff $tree $sel_ids]
 		set need_sep 1
 	    }
 	    if { $cvs_active } {
@@ -2089,6 +2090,8 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    }
 	    if { $fossil_active || $is_timeline != 0 } {
 		if { $is_timeline == 0 && $has_fossil } {
+		    $menu add command -label [_ "View file history"]... -command \
+		        [list "update_recursive_cmd" $w diff_window_fossil $tree $sel_ids]
 		    $menu add command -label [_ "View diff window"]... -command \
 		        [list "update_recursive_cmd" $w diff_window $tree $sel_ids]
 		}
@@ -2605,21 +2608,27 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		set sel_ids [$tree selection get]
 	    }
 	    switch $what_in {
-		fossil_diff_tk {
+		fossil_diff_tk - fossil_diff_tk_ignore_blank {
 		    set files [lindex $args 0]
 		    foreach item $sel_ids {
 		        if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
 		        set dir [$tree item text [$tree item parent $item] 0]
 		        lappend files [file join $dir $file]
 		    }
+		    if { $what_in eq "fossil_diff_tk_ignore_blank" } {
+		        set w_cmd -w
+		    } else {
+		        set w_cmd ""
+		    }
 		    set fossil [auto_execok fossil]
 		    get_cwd
 		    set err [catch {
 		            cd [file dirname [lindex $files 0]]
 		            if { $::tcl_platform(platform) eq "windows" } {
-		                exec {*}[auto_execok cmd.exe] /c start /min /wait fossil diff --tk {*}$files &
+		                exec {*}[auto_execok cmd.exe] /c start /min /wait fossil diff --tk {*}$w_cmd \
+		                    {*}$files &
 		            } else {
-		                exec $fossil diff --tk {*}$files &
+		                exec $fossil diff --tk {*}$w_cmd {*}$files &
 		            }
 		        } ret]
 		    release_cwd
@@ -2792,7 +2801,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		        cd [file dirname $file]
 		        set err [catch { exec $fossil finfo --limit 0 $file } ret]
 		        if { !$err } {
-		            set ret [regexp {History of\s+(\S.*)$} $ret {} sfile]
+		            set ret [regexp -line {History of\s+(\S.*)$} $ret {} sfile]
 		            if { $ret } {
 		                set url_suffix "/finfo?name=$sfile"
 		            }
@@ -2916,7 +2925,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		}
 	    }
 	}
-	diff_window {
+	diff_window - diff_window_fossil {
 	    lassign $args tree sel_ids files
 	    set files_list ""
 	    get_cwd
@@ -2947,6 +2956,12 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		return
 	    }
 	    lassign [lindex $files_list 0] mode dir file
+	    
+	    if { $what eq "diff_window_fossil" } {
+		set file [file join $dir $file]
+		update_recursive_cmd "" open_program fossil_ui "" $dir -file $file
+		return
+	    }
 	    cd $dir
 	    set err [catch { parse_finfo [exec $fossil finfo $file] } ret]
 	    if { $err } {
