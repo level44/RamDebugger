@@ -9652,10 +9652,12 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <$::control-I> [list RamDebugger::Search $w iforward_get_insert]
     bind $text <Escape><i> "[list RamDebugger::Search $w iforward_get_insert] ;break"
     bind $w <$::control-slash> [list RamDebugger::VCS::update_recursive . current] ;# control-shift-7
+    bind $w <$::control-Key-8> [list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_ui "" current]
     bind $w <$::control-Shift-D> [list RamDebugger::VCS::differences fossil_diff_tk]
     bind $text <Control-u><Control-minus> [list RamDebugger::increase_decrease_text_font decrease]
     bind $text <Control-u><Control-plus> [list RamDebugger::increase_decrease_text_font increase]
-
+    bind $text <Control-w> [list RamDebugger::ExitGUI]
+    
     for { set i 0 } { $i <=9 } { incr i } {
 	bind $text <$::control-u><$::control-Key-$i> "[list event generate $text <F$i>]; break"
 	bind $text <$::control-u><$::control-s><$::control-Key-$i> \

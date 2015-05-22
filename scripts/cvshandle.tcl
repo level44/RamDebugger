@@ -885,10 +885,10 @@ proc RamDebugger::VCS::indicator_menu { cvs_indicator_frame x y } {
     set menu [menu $cvs_indicator_frame.menu -tearoff 0]
     $menu add command -label [_ "Open"] -accelerator "Ctrl+7" -command \
 	[list RamDebugger::VCS::update_recursive $cvs_indicator_frame last]
-    $menu add command -label [_ "Open - current directory"] -accelerator "Ctrl+Shift-7" -command \
+    $menu add command -label [_ "Open - current directory"] -accelerator "Ctrl+Shift+7" -command \
 	[list RamDebugger::VCS::update_recursive $cvs_indicator_frame current]
-    $menu add command -label [_ "Open fossil"] -command \
-	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_ui "" $dir -file $currentfileL]
+    $menu add command -label [_ "Open fossil"] -accelerator "Ctrl+8" -command \
+	[list RamDebugger::VCS::update_recursive_cmd "" open_program fossil_ui "" current -file $currentfileL]
     
     $menu add separator
     $menu add command -label [_ "Differences"] -acc "Ctrl-Shift-d" -command \
@@ -2796,6 +2796,10 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		    set compulsory "url_suffix"
 		    parse_args -raise_compulsory_error 0  $optional $compulsory $args
 		    
+		    if { $sel_ids eq "current" } {
+		        set file $RamDebugger::currentfile
+		        set sel_ids [file dirname $file]
+		    }
 		    if { $file ne "" } {
 		        get_cwd
 		        cd [file dirname $file]
