@@ -17,6 +17,9 @@ set height [expr {$y1-$y0}]
 if { $height < 1024 } {
     set g1 750x845+$x0+$y0
     set g2 700x516+[expr {$x0+765}]+$y0
+} elseif { $height == 1080 } {
+    set g1 [expr {$width-900-25}]x1025+$x0+$y0
+    set g2 800x600-95+$y0
 } else {
     set g1 [expr {$width-550-25}]x970+$x0+$y0
     set g2 550x600-0+$y0

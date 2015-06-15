@@ -9629,6 +9629,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     
     cu::text_entry_bindings $text
 
+    bind $text <$::control-Key-a> "tk::TextSetCursor %W {insert display linestart}; break"
+    bind $text <$::control-Key-e> "tk::TextSetCursor %W {insert display lineend}; break"
     bind $text <$::control-A> [list tk::TextSetCursor %W 1.0]
     bind $text <$::control-E> [list tk::TextSetCursor %W {end - 1 indices}]
     
