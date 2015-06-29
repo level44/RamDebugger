@@ -2135,8 +2135,8 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 	    cd [$w give_uservar_value dir]
 	    set fossil [auto_execok fossil]
 	    set err [catch { exec $fossil settings autosync $autosync } ret]
-	    if { !$err } {
-		snit_messageBox -message $ret -parent $w
+	    if { $err } {
+		snit_messageBox -message "error: $ret" -parent $w
 	    }
 	    release_cwd
 	}
@@ -2361,7 +2361,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		            set autosync 0
 		            set err_autosync [catch { exec $fossil settings autosync } ret]
 		            if { !$err_autosync } {
-		                regexp -line {(\d)\s*$} $ret {} autosync
+		                regexp -line {autosync\s+\S+?\s+(\d)} $ret {} autosync
 		            }
 		            if { $autosync == 1 } {
 		                exec $fossil sync
@@ -2840,7 +2840,8 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		            set err [catch {
 		                    set remote [exec $fossil remote]
 		                    set autosync 0
-		                    regexp {\d\s*$} [exec $fossil settings autosync] autosync
+		                    set ret [exec $fossil settings autosync]
+		                    regexp -line {autosync\s+\S+?\s+(\d)} $ret {} autosync
 		                }]
 		            if { !$err && $remote ne "off" } {
 		                if { $w ne "" } {
