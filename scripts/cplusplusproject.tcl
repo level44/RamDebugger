@@ -1775,6 +1775,7 @@ proc cproject::GiveDebugData {} {
 proc cproject::TryToFindPath { file } {
     variable project
     variable files
+    variable thisdataM
 
     set last_path ""
 
@@ -1783,7 +1784,12 @@ proc cproject::TryToFindPath { file } {
     if { [file exists [file join $base_dir $file]] } {
 	return [file join $base_dir $file]
     }
-
+    if { [info exists thisdataM(vs_executable)] } {
+	set dir [file dirname $thisdataM(vs_executable)]
+	if { [file exists [file join $base_dir $dir $file]] } {
+	    return [file join $base_dir $dir $file]
+	}
+    }
     foreach i $files {
 	foreach "file_in type group_in path" $i break
 	if { $path == $last_path } { continue }

@@ -6584,7 +6584,8 @@ proc RamDebugger::StackDouble1 { textstack idx } {
     
     set patternList [list {((?:[a-zA-Z]:/)?[-/\w.]+):([0-9]+)} \
 	    {((?:[a-zA-Z]:/)?[-/\w. ]+):([0-9]+)} \
-	    {((?:[a-zA-Z]:\\)?[-\\\w.]+)\(([0-9]+)\)}]
+	    {((?:[a-zA-Z]:\\)?[-\\\w.]+)\(([0-9]+)\)} \
+	    {((?:[\d]>)?[-\\\w.]+)\(([0-9]+)\)}]
     set rex1 {^\#([0-9]+)}
     set rex2 [join $patternList "|"]
     set data0 $data
@@ -6606,7 +6607,6 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 	}
     }
     foreach pattern $patternList {
-
 	if { [regexp $pattern $data {} file line] } {
 
 	    # strange case in Windows mingw
