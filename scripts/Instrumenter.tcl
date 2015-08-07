@@ -358,16 +358,23 @@ proc RamDebugger::Instrumenter::TryCompileFastInstrumenter { { raiseerror 0 } } 
     set basedir [file dirname [file dirname [info nameofexecutable]]]
     lappend OPTS -I[file join $basedir include] \
 	-I[file join $AppDataDir compile]
-    set libs [glob -nocomplain -dir [file join $basedir lib] *tclstub*]
-    lappend libs {*}[glob -nocomplain -dir /usr/lib64 *tclstub*]
+    
+   set dirList  [list [file join $basedir lib] /usr/lib64  /usr/lib/x86_64-linux-gnu]
+    
+    set libs ""
+    foreach dir $dirList {
+	lappend libs {*}[glob -nocomplain -dir $dir *tclstub*]
+    }
     switch [llength $libs] {
 	0 { set lib [file join $AppDataDir compile libtclstub.a] }
 	1 { set lib [lindex $libs 0] }
 	default {
 	    set i ""
-	    foreach i [glob -nocomplain -dir [file join $basedir lib] libtclstub*.a] {
-		regexp {[\d.]+} [file tail $i] version
-		if { $version >= 8.5 } { break }
+	    foreach dir $dirList {
+		foreach i [glob -nocomplain -dir $dir libtclstub*.a] {
+		    regexp {[\d.]+} [file tail $i] version
+		    if { $version >= 8.5 } { break }
+		}
 	    }
 	    set lib $i
 	}
