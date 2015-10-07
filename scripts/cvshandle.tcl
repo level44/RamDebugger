@@ -2800,6 +2800,16 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		        set file $RamDebugger::currentfile
 		        set sel_ids [file dirname $file]
 		    }
+		    if { $file eq "" } {
+		        foreach item $sel_ids {
+		            if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
+		            set dir [$tree item text [$tree item parent $item] 0]
+		            lappend files [file join $dir $file]
+		        }   
+		        if { [llength $files] == 1 } {
+		            set file [lindex $files 0]
+		        }
+		    }
 		    if { $file ne "" } {
 		        get_cwd
 		        cd [file dirname $file]
