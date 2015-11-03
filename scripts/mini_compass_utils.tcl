@@ -1551,10 +1551,24 @@ proc cu::file::execute { args } {
 		set pwd [pwd]
 		cd $workdir
 	    }
-	    set err [catch { exec $file {*}$args } errstring]
+	    set err [catch { exec $file {*}$args } errstring opts]
+	    
+	    if { $err && $::tcl_platform(platform) eq "windows" } {
+		package require registry
+		set key0 {HKEY_CLASSES_ROOT\Applications\%s\shell\open\command}
+		set file [file root [file tail $file]].exe
+		set key [format $key0 $file]
+		set err [catch { registry get $key "" } value]
+		if { !$err } {
+		    set cmd [string map [list %1 [lindex $args 0]] $value]
+		    regsub -all {\\} $cmd / cmd
+		    set err [catch { exec {*}$cmd } errstring opts]
+		}
+	    }
+	    
 	    if { $workdir ne "" } { cd $pwd }
 	    if { $err } {
-		error $errstring $::errorInfo
+		error $errstring [dict get $opts -errorinfo]
 	    }
 	}
 	execList {
