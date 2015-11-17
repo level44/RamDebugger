@@ -9658,6 +9658,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $w <$::control-Shift-D> [list RamDebugger::VCS::differences fossil_diff_tk]
     bind $text <Control-u><Control-minus> [list RamDebugger::increase_decrease_text_font decrease]
     bind $text <Control-u><Control-plus> [list RamDebugger::increase_decrease_text_font increase]
+    bind $text <Control-MouseWheel> "[list RamDebugger::increase_decrease_text_font wheel %D]; break"
     bind $text <Control-w> [list RamDebugger::ExitGUI]
     
     for { set i 0 } { $i <=9 } { incr i } {

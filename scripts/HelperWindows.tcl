@@ -865,7 +865,7 @@ proc RamDebugger::_update_pref_font { w label fontname } {
     $label configure -font $font
 }
 
-proc RamDebugger::increase_decrease_text_font { increase_decrease } {
+proc RamDebugger::increase_decrease_text_font { increase_decrease args } {
     variable options
 
     set font ""
@@ -875,6 +875,14 @@ proc RamDebugger::increase_decrease_text_font { increase_decrease } {
     switch $increase_decrease {
 	increase { set delta 1 }
 	decrease { set delta -1 }
+	wheel {
+	    lassign $args d
+	    if { $d > 0 } {
+		set delta 1
+	    } else {
+		set delta -1
+	    }
+	}
     }
     lappend font -size [expr {[font configure FixedFont -size]+$delta}]
     
