@@ -1729,6 +1729,9 @@ proc RamDebugger::rlist { args } {
 	if { $opts(-encoding) != 0 && $opts(-encoding) != "" } {
 	    fconfigure $fin -encoding $opts(-encoding)
 	} else {
+	    if {[string range $header 0 2] eq [binary format ccc 0xEF 0xBB 0xBF] } {
+		fconfigure $fin -encoding utf-8
+	    }
 	    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
 	    append rex {|<\?xml\s+version=\S+\s*\?>}
 	    if { [regexp -nocase -line -- $rex $header] } {
@@ -5663,7 +5666,7 @@ proc RamDebugger::ContNextGUI { what } {
 	}
 	set filetype [GiveFileType $currentfile]
 	if { $filetype eq "C/C++" } {
-	    if { $::tcl_platform(platform) eq "windows" } {
+	    if { $::tcl_platform(platform) eq "windows" && [cproject::has_visual_studio] } {
 		cproject::start_visual_studio
 		return
 	    }
@@ -6220,9 +6223,10 @@ proc RamDebugger::TextOutInsertBlue { data } {
 proc RamDebugger::TextOutRaiseDo { pane } {
     variable options
 
-    if { [info exists options(auto_raise_stack_trace)] && $options(auto_raise_stack_trace) } {
-	catch { $pane raise output }
-    }
+#     if { [info exists options(auto_raise_stack_trace)] && $options(auto_raise_stack_trace) } {
+#         catch { $pane raise output }
+#     }
+    catch { $pane raise output }
 }
 
 proc RamDebugger::TextCompGet {} {
@@ -6620,6 +6624,7 @@ proc RamDebugger::StackDouble1 { textstack idx } {
 		    set file $fullfile
 		}
 	    }
+	    set file [file tail $file]
 	    if { ![file exists $file] && [file exists [file join $options(defaultdir) $file]] } {
 		set file [file join $options(defaultdir) $file]
 	    }

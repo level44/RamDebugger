@@ -2139,9 +2139,21 @@ proc cproject::create_auto_makefile { debrel unique_file } {
     return $make
 }
 
+proc cproject::has_visual_studio {} {
+    variable dataM
+    
+    set debrel $RamDebugger::options(debugrelease)
+    if { $dataM($debrel,has_userdefined_vs) } {
+	return 1
+    } else {
+	return 0
+    }
+}
+
 proc cproject::start_visual_studio {} {
     variable project
     variable dataM
+    variable dataE
     
     if { $project eq "" } {
 	if { [info exists RamDebugger::options(recentprojects)] && \
@@ -2170,6 +2182,26 @@ proc cproject::start_visual_studio {} {
 	error "visual studio project not defined"
     }
     
+    set exe [set! dataE($debrel,exe)]
+    set exeargs [set! dataE($debrel,exeargs)]
+    set execdir [set! dataE($debrel,execdir)]
+    
+    if { [file executable $exe] } {
+	cd $execdir
+	set err [catch { open "|$exe $exeargs |& cat" r+ } fid]
+	if { $err } {
+	    snit_messageBox -message $fid
+	    return
+	}
+	RamDebugger::TextOutInsert [_ "Started program '%s'\n" "$exe $exeargs"]
+	RamDebugger::ViewOnlyTextOrAll -force_all
+	RamDebugger::TextOutRaise
+	
+	fconfigure $fid -blocking 0 -buffering line
+	fileevent $fid readable [list cproject::dump_program_output $fid]
+	return
+    }
+    
     set comm [auto_execok devenv.com]
     if { $comm eq "" } {
 	set txt [_ "Add directory for file 'devenv.com' in Preferences->Directories"]
@@ -2187,6 +2219,24 @@ proc cproject::start_visual_studio {} {
 	return -1
     }
     cd $pwd
+}
+
+proc cproject::dump_program_output { fid } {
+    
+    if { [eof $fid] } {
+	set err [catch { close $fid } ret]
+	if { $err } {
+	    RamDebugger::TextOutInsertRed [_ "Program finished --- %s\n" $ret]
+	} else {
+	    RamDebugger::TextOutInsert [_ "Program finished\n"]  
+	}
+	return
+    }
+    set aa [read $fid]
+    if { $aa ne "" } {
+	RamDebugger::ViewOnlyTextOrAll -force_all
+	RamDebugger::TextOutInsert $aa
+    }
 }
 
 proc cproject::CompileDo { w debrel nostop { unique_file "" } } {

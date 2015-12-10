@@ -203,7 +203,12 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 		    }
 		} else {
 		    $w set_uservar_value type ""
-		    [$w give_uservar_value textv] insert end [lindex [lindex $res 1] 1]
+		    set txt [lindex [lindex $res 1] 1]
+		    set rex {^type\s*=\s*char\s*\*\s+[^\"]*\"(.+)\"}
+		    if { [regexp $rex $txt {} txt] } {
+		       set txt [string map [list \\\" \" \\n \n] $txt]
+		    }
+		    [$w give_uservar_value textv] insert end $txt
 		}
 	    }
 	    1 {
@@ -349,6 +354,13 @@ proc RamDebugger::DisplayVarWindow_contextual_do { text what } {
     }
 }
 
+proc RamDebugger::entry_PSx { entry preffix suffix } {
+    
+    $entry insert 0 $preffix
+    $entry insert end $suffix
+    $entry icursor insert
+}
+
 proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     variable text
     variable options
@@ -387,6 +399,8 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	*  $variablename[4:2][6::8]: One extension to the gdb expressions. Permmits to
 	   print part of a string or vector
 	*  gdb set print elements 1000 (to send a literal gdb command to debugger, prefix it with "gdb ...")
+	    
+	try Ctrl-2,9,+,n
     }]
 
     if { ![info exists options(old_expressions)] } {
@@ -397,11 +411,16 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	-values $options(old_expressions)]
 
     cu::text_entry_bindings $f.e1
-
-    set c { %W icursor [expr { [%W index "insert"]-1}] }
-    bind $f.e1 <$::control-Key-2> "[list ttk::entry::Insert $f.e1 {""}];$c"
-    bind $f.e1 <$::control-Key-9> "[list ttk::entry::Insert $f.e1 {()}];$c"
-    bind $f.e1 <$::control-plus> "[list ttk::entry::Insert $f.e1 {[]}];$c"
+    
+    bind $f.e1 <$::control-Key-2> [list RamDebugger::entry_PSx $f.e1 \" \"]
+    bind $f.e1 <$::control-Key-9> [list RamDebugger::entry_PSx $f.e1 ( )]
+    bind $f.e1 <$::control-plus> [list RamDebugger::entry_PSx $f.e1 \[ \]]
+    bind $f.e1 <$::control-n> [list RamDebugger::entry_PSx $f.e1 nprint( )]
+    
+#     set c { %W icursor [expr { [%W index "insert"]-1}] }
+#     bind $f.e1 <$::control-Key-2> "[list ttk::entry::Insert $f.e1 {""}];$c"
+#     bind $f.e1 <$::control-Key-9> "[list ttk::entry::Insert $f.e1 {()}];$c"
+#     bind $f.e1 <$::control-plus> "[list ttk::entry::Insert $f.e1 {[]}];$c"
 
     $w set_uservar_value expression $var
     
