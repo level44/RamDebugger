@@ -361,6 +361,55 @@ proc RamDebugger::entry_PSx { entry preffix suffix } {
     $entry icursor insert
 }
 
+proc RamDebugger::entry_T { w entry txt } {
+    
+    $entry delete 0 end
+    $entry insert end $txt
+    $entry icursor end
+    $w invokeok
+}
+
+proc RamDebugger::entry_PSx_nprint { w entry } {
+
+    set txt [$entry get]
+    if { [regexp {nprint\((.*)\)} $txt {} txt] } {
+	set ic [$entry index insert]
+	$entry delete 0 end
+	$entry insert end "nprintx($txt,\"..\")"
+	$entry icursor [expr {$ic+1}]
+    } elseif { [regexp {nprintx\((.*),(.*)\)} $txt {} txt] } {
+	set ic [$entry index insert]
+	$entry delete 0 end
+	$entry insert end "$txt"
+	$entry icursor [expr {$ic-8}]
+    } else {
+	set ic [$entry index insert]
+	$entry delete 0 end
+	$entry insert end "nprint($txt)"
+	$entry icursor [expr {$ic+7}]
+    }
+    $w invokeok
+}
+
+proc RamDebugger::OpenXMLViewer { w entry } {
+    
+    package require registry
+    set key {HKEY_CLASSES_ROOT\Applications\XMLViewer.exe\shell\open\command}
+    set err [catch { registry get $key "" } cmd]
+    if { $err } {
+	set txt "error. Program 'MindFusion Limited - Xml Viewer' not installed"
+	tk_messageBox -parent $w -message $txt
+	return
+    }
+    set txt [[$w give_uservar_value textv] get 1.0 end]
+    set fout [file tempfile x file.xml]
+    puts $fout $txt
+    close $fout
+    
+    regexp {\"(.*?)\"} $cmd {} exe
+    exec $exe $x &
+}
+
 proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     variable text
     variable options
@@ -399,8 +448,15 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	*  $variablename[4:2][6::8]: One extension to the gdb expressions. Permmits to
 	   print part of a string or vector
 	*  gdb set print elements 1000 (to send a literal gdb command to debugger, prefix it with "gdb ...")
+	
+	Accelerators:
 	    
-	try Ctrl-2,9,+,n
+	*  Ctrl-2: insert ""
+	*  Ctrl-9: insert ()
+	*  Ctrl-+: insert []
+	*  Ctrl-n: insert 'nprint(...)'
+	*  Ctrl-N: open XML Viewer
+	*  Ctrl-p: insert 'gdb set print elements 1000'
     }]
 
     if { ![info exists options(old_expressions)] } {
@@ -415,7 +471,10 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     bind $f.e1 <$::control-Key-2> [list RamDebugger::entry_PSx $f.e1 \" \"]
     bind $f.e1 <$::control-Key-9> [list RamDebugger::entry_PSx $f.e1 ( )]
     bind $f.e1 <$::control-plus> [list RamDebugger::entry_PSx $f.e1 \[ \]]
-    bind $f.e1 <$::control-n> [list RamDebugger::entry_PSx $f.e1 nprint( )]
+    bind $f.e1 <$::control-n> [list RamDebugger::entry_PSx_nprint $w $f.e1]
+    bind $f.e1 <$::control-N> [list RamDebugger::OpenXMLViewer $w $f.e1]
+    bind $f.e1 <$::control-p> [list RamDebugger::entry_T $w $f.e1 \
+	    "gdb set print elements 1000"]
     
 #     set c { %W icursor [expr { [%W index "insert"]-1}] }
 #     bind $f.e1 <$::control-Key-2> "[list ttk::entry::Insert $f.e1 {""}];$c"
