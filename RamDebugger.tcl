@@ -1079,8 +1079,9 @@ proc RamDebugger::rdebug { args } {
     } elseif {  $remoteserverType == "gdb" } {
 	set remotecomm "set confirm off\n"
 	append remotecomm "set breakpoint pending on\n"
-	append remotecomm "set print elements 10000\n"
+	append remotecomm "set print elements 200\n"
 	append remotecomm "set print repeats 100\n"
+	append remotecomm "set print address off\n"
 	lassign $opts(program) cmd dir args
 	if { [file exists $dir] } {
 	    append remotecomm "cd \"$dir\"\n"

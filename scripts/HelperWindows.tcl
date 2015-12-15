@@ -85,8 +85,9 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
     variable remoteserver
     variable remoteserverType
     variable options
-
-    if { $what == "do" } {
+    variable after_DisplayVarWindowEval
+    
+    if { $what eq "do" } {
 	if { [string trim [$w give_uservar_value expression]] == "" } {
 	    $w set_uservar_value type ""
 	    return
@@ -110,6 +111,11 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 	    set remoteserver [lreplace $remoteserver 3 3 [list getdata \
 		        [list RamDebugger::DisplayVarWindowEval res $w]]]
 	    
+	    set comm ""
+	    if { [regexp {^\s*nprint} $var] } {
+		append comm "\nset print elements 100000\n"
+	    }
+
 	    if { [regexp {^\s*gdb\s+(.*)} $var] } {
 		regexp {^\s*gdb\s+(.*)} $var {} comm
 		append comm "\nprintf \"\\n\"\n"
@@ -122,7 +128,6 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 		    set ini2 1
 		    set end2 1
 		}
-		set comm ""
 		set isinit 0
 		for { set i1 $ini1 } { $i1 <= $end1 } { incr i1 } {
 		    regsub {\[([0-9]+):([0-9]+)\]} $var \[$i1\] varn
@@ -140,6 +145,11 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 		}
 	    }
 	    append comm "printf \"FINISHED GETDATA\\n\""
+	    
+	    if { [regexp {^\s*nprint} $var] } {
+		append comm "\nset print elements 200\n"
+	    }
+	    
 	    EvalRemote $comm
 	    return
 	} else {
@@ -219,6 +229,11 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 	}
 	[$w give_uservar_value textv] see end
 	[$w give_uservar_value textv] configure -state disabled
+	
+	if { [info exists after_DisplayVarWindowEval] } {
+	    uplevel #0 $after_DisplayVarWindowEval
+	    unset after_DisplayVarWindowEval
+	}
     }
 }
 
@@ -388,11 +403,18 @@ proc RamDebugger::entry_PSx_nprint { w entry } {
 	$entry insert end "nprint($txt)"
 	$entry icursor [expr {$ic+7}]
     }
-    $w invokeok
+    DisplayVarWindowEval do $w
 }
 
 proc RamDebugger::OpenXMLViewer { w entry } {
+    variable after_DisplayVarWindowEval
     
+    set after_DisplayVarWindowEval [list RamDebugger::OpenXMLViewer_do \
+	    $w $entry]
+    DisplayVarWindowEval do $w
+}
+
+proc RamDebugger::OpenXMLViewer_do { w entry } {
     package require registry
     set key {HKEY_CLASSES_ROOT\Applications\XMLViewer.exe\shell\open\command}
     set err [catch { registry get $key "" } cmd]
