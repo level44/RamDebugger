@@ -113,7 +113,7 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 	    
 	    set comm ""
 	    if { [regexp {^\s*nprint} $var] } {
-		append comm "\nset print elements 100000\n"
+		append comm "set print elements 100000\n"
 	    }
 
 	    if { [regexp {^\s*gdb\s+(.*)} $var] } {
@@ -149,7 +149,6 @@ proc RamDebugger::DisplayVarWindowEval { what w { res "" } } {
 	    if { [regexp {^\s*nprint} $var] } {
 		append comm "\nset print elements 200\n"
 	    }
-	    
 	    EvalRemote $comm
 	    return
 	} else {
@@ -3309,8 +3308,8 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <$::control-x> "RamDebugger::Search_toggle_regexp_mode $w.search; break"
 	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
-	    bind $w.search <$::control-Left> "RamDebugger::Search_increase_selection $active_text left; break"
-	    bind $w.search <$::control-Right> "RamDebugger::Search_increase_selection $active_text right; break"
+	    bind $w.search <$::control-Shift-Left> "RamDebugger::Search_increase_selection $active_text left; break"
+	    bind $w.search <$::control-Shift-Right> "RamDebugger::Search_increase_selection $active_text right; break"
 	    
 	    if { $active_text eq $text } {
 		bind $w.search <$::control-j> "RamDebugger::inline_replace $w $w.search; break"
