@@ -9666,6 +9666,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Control-u><Control-minus> [list RamDebugger::increase_decrease_text_font decrease]
     bind $text <Control-u><Control-plus> [list RamDebugger::increase_decrease_text_font increase]
     bind $text <Control-MouseWheel> "[list RamDebugger::increase_decrease_text_font wheel %D]; break"
+    bind $text <Button-4> "[list RamDebugger::increase_decrease_text_font wheel 120]; break"
+    bind $text <Button-5> "[list RamDebugger::increase_decrease_text_font wheel -120]; break"
     bind $text <Control-w> [list RamDebugger::ExitGUI]
     
     for { set i 0 } { $i <=9 } { incr i } {
