@@ -967,25 +967,27 @@ proc RamDebugger::_update_pref_font { w label fontname } {
 proc RamDebugger::increase_decrease_text_font { increase_decrease args } {
     variable options
 
-    set font ""
-    foreach i [list family weight slant underline] {
-	lappend font -$i [font configure FixedFont -$i]
-    }
-    switch $increase_decrease {
-	increase { set delta 1 }
-	decrease { set delta -1 }
-	wheel {
-	    lassign $args d
-	    if { $d > 0 } {
-		set delta 1
-	    } else {
-		set delta -1
+    foreach fam [list FixedFont NormalFont] {
+	set font ""
+	foreach i [list family weight slant underline] {
+	    lappend font -$i [font configure $fam -$i]
+	}
+	switch $increase_decrease {
+	    increase { set delta 1 }
+	    decrease { set delta -1 }
+	    wheel {
+		lassign $args d
+		if { $d > 0 } {
+		    set delta 1
+		} else {
+		    set delta -1
+		}
 	    }
 	}
+	lappend font -size [expr {[font configure $fam -size]+$delta}]
+	
+	set options($fam) $font
     }
-    lappend font -size [expr {[font configure FixedFont -size]+$delta}]
-    
-    set options(FixedFont) $font
     CreateModifyFonts
 }
 
