@@ -6677,6 +6677,130 @@ proc RamDebugger::DeletePreviousWord {} {
     }
 }
 
+proc RamDebugger::paste_image_selection_get_dir { w } {
+
+    set dir [$w give_uservar_value dir]
+    set dir [tk_chooseDirectory -initialdir $dir -mustexist 1 \
+	    -parent $w -title [_ "Choose directory to save image"]]
+    if { $dir eq "" } { return }
+    $w set_uservar_value dir $dir
+}
+
+proc RamDebugger::paste_image_selection {} {
+    variable text
+    variable currentfile
+    variable paste_image_selection_dirList
+    variable paste_image_selection_file
+    
+    set err [catch { cu::img::clipboard get -type tclimage } img]
+    if { $err } {
+	tk_messageBox -message [_ "Could not retrieve image"]
+	return
+    }
+    if { [info exists paste_image_selection_dirList] } {
+	set dirList $paste_image_selection_dirList
+    } else {
+	set dirList ""
+    }
+    if { [file dirname $currentfile] ni $dirList } {
+	lappend dirList [file dirname $currentfile]
+    }
+    set dir [lindex $dirList 0]
+    
+#     \psfig{file=bspline-cubic-bezier.ps}
+#     \epsffile{fig3a.ps}
+#     \includegraphics[width=11cm]{Fig4_3.eps}
+    
+    set filesList ""
+    
+    set rex {\\psfig\{.*?file=([-\w.]+).*\}}
+    append rex {|\\epsffile.*?\{(.+?)\}}
+    append rex {|\\includegraphics.*?\{(.+?)\}}
+    set txt [$text get "insert linestart" "insert lineend"]
+    if { [regexp $rex $txt {} f1 f2 f3] } {
+	if { $f1 eq "" } {
+	    set f1 $f2
+	    if { $f1 eq "" } {
+		set f1 $f3
+	    }
+	}
+	lappend filesList [file root $f1].png
+    }
+    if { [info exists paste_image_selection_file] } {
+	set d 1
+	set file [file tail [file root $paste_image_selection_file]]
+	regexp {^(.*[^\d])(\d+)$} $file {} file d
+	incr d
+	lappend filesList "$file$d.png"
+    } else {
+	lappend filesList image01.png
+    }
+    set file [lindex $filesList 0]
+	
+    set w $text._ask
+    destroy $w
+    dialogwin_snit $w -title [_ "Create image"]
+    set f [$w giveframe]
+    label $f.l1 -text [_ "Save clipboard image to file"]
+    
+    ttk::combobox $f.e1 -textvariable [$w give_uservar dir $dir] \
+	-values $dirList -width 40
+    ttk::button $f.b1 -image [Bitmap::get folder] -command \
+	[list RamDebugger::paste_image_selection_get_dir $w] \
+	-style Toolbutton
+    ttk::combobox $f.e2 -textvariable [$w give_uservar file $file] \
+	-values $filesList
+    
+    grid $f.l1 - -sticky w -padx 2 -pady 5
+    grid $f.e1 $f.b1 -sticky ew -padx 2  -pady 2
+    grid $f.e2 -sticky ew -padx 2 -pady 2
+    
+    grid columnconfigure $f 0 -weight 1
+    
+    tk::TabToWindow $f.e2
+    bind $w <Return> [list $w invokeok]
+    set action [$w createwindow]
+    while 1 {
+	if { $action != 1 } {
+	    destroy $w
+	    return
+	}
+	set dir [$w give_uservar_value dir]
+	set file0 [$w give_uservar_value file]
+	set file [file join $dir $file0]
+	if { ![file isdirectory [file dirname $file]] } {
+	    tk_messageBox -message [_ "Directory '%s' is not correct" \
+		    [file dirname $file]]
+	    set action [$w waitforwindow]
+	    continue
+	}
+	if { [file exists $file] } {
+	    set t [_ "File '%s' exists. Overwrite?" $file]
+	    set retval [snit_messageBox -default ok -icon question \
+		    -message $t \
+		    -type okcancel -parent $w -title [_ "overwrite"]]
+	    if { $retval eq "cancel" } {
+		set action [$w waitforwindow]    
+		continue
+	    }
+	}
+	set err [catch { $img write $file -format png } errstring]
+	if { $err } {
+	    destroy $w
+	    tk_messageBox -message [_ "Error writing image to file '%s'" \
+		    $file]
+	    return
+	}
+	image delete $img
+	break
+    }
+    destroy $w
+    
+    set paste_image_selection_dirList [linsert0 $dirList [file dirname $file]]
+    set paste_image_selection_file $file
+    
+    SetMessage [_ "Created image file '%s'" $file]
+}
 
 proc RamDebugger::CutCopyPasteText { what args } {
     variable text
@@ -6737,6 +6861,14 @@ proc RamDebugger::CutCopyPasteText { what args } {
 		    }
 		    set oldPasteStack [linsert $oldPasteStack 0 $sel]
 		    set oldPasteStack [lrange $oldPasteStack 0 12]
+		} else {
+		    set err [catch {
+		            package require compass_utils::img
+		            set is_image [cu::img::clipboard isimage]
+		        }]
+		    if { !$err && $is_image } {
+		        paste_image_selection
+		    }
 		}
 	    } else {
 		tk_textPaste $text
