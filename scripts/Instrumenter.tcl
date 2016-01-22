@@ -1502,6 +1502,60 @@ proc RamDebugger::Instrumenter::DoWorkForXML { block blockinfoname "progress 1" 
     }
 }
 
+proc RamDebugger::Instrumenter::DoWorkForLatex { block blockinfoname "progress 1" { indentlevel_ini 0 } \
+    { raiseerror 1 } } {
+    variable FastInstrumenterLoaded
+
+    # this variable is used to make tests
+    set what c++
+
+    switch $what {
+	debug {
+	   # nothing
+	}
+	c++ {
+	    if { ![info exists FastInstrumenterLoaded] } {
+		TryLoadLibrary
+	    }
+	}
+	tcl {
+	    # nothing
+	}
+    }
+
+    if { [info commands RamDebuggerInstrumenterDoWorkForLatex] ne "" } {
+	RamDebuggerInstrumenterDoWorkForLatex $block $blockinfoname \
+	    $progress $indentlevel_ini $raiseerror
+    }
+}
+
+proc RamDebugger::Instrumenter::DoWorkForWiki { block blockinfoname "progress 1" { indentlevel_ini 0 } \
+    { raiseerror 1 } } {
+    variable FastInstrumenterLoaded
+
+    # this variable is used to make tests
+    set what c++
+
+    switch $what {
+	debug {
+	   # nothing
+	}
+	c++ {
+	    if { ![info exists FastInstrumenterLoaded] } {
+		TryLoadLibrary
+	    }
+	}
+	tcl {
+	    # nothing
+	}
+    }
+
+    if { [info commands RamDebuggerInstrumenterDoWorkForWiki] ne "" } {
+	RamDebuggerInstrumenterDoWorkForWiki $block $blockinfoname \
+	    $progress $indentlevel_ini $raiseerror
+    }
+}
+
 proc RamDebugger::Instrumenter::DoWorkForXML_do { block blockinfoname "progress 1" { indentlevel_ini 0 } \
     { raiseerror 1 } } {
     

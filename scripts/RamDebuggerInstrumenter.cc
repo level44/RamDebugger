@@ -5,6 +5,15 @@
 #include <assert.h>
 #include <tcl.h>
   
+const char open_brace_CS='{';
+const char close_brace_CS='}';
+#define open_brace_CSS "{"
+#define close_brace_CSS "}"
+const char open_braquet_CS='[';
+const char close_braquet_CS=']';
+#define open_braquet_CSS "["
+#define close_braquet_CSS "]"
+  
 #if(defined(_MSC_VER) && _MSC_VER >= 1400)
 //1400==VS 2005, this secure functions are not defined in VS 2003
 //this print functions accept a format with argument order,
@@ -21,6 +30,107 @@
 enum P_or_R {P=0,R=1,PP=2};
 enum Word_types { NONE_WT,W_WT,BRACE_WT,DQUOTE_WT,BRACKET_WT};
 enum braces_history_types { open_BHT,close_BHT };
+
+//################################################################################
+//    regexp_string
+//################################################################################
+
+// length=-1 means to the end of the string
+inline int string_regexp(char* buf,int pos,int length,const char* regexp)
+{
+  int result,has_saved_char=0;
+  char save_char;
+  
+  if(length==-1) length=strlen(buf);
+  
+  if(pos==length){
+    return 0;
+  } else if(buf[length]!='\0'){
+    save_char=buf[length];
+    buf[length]='\0';
+    has_saved_char=1;
+  }
+  Tcl_RegExp rex=Tcl_RegExpCompile(NULL,regexp);
+  if(!rex){
+    if(has_saved_char) buf[length]=save_char;
+    return -1;
+  }
+  result=Tcl_RegExpExec(NULL,rex,&buf[pos],&buf[pos]);
+  if(has_saved_char) buf[length]=save_char;
+  return result;
+}
+
+// length=-1 means to the end of the string
+inline int string_regexp(char* buf,int pos,int length,
+  const char* regexp,const char** match_start,int* match_length,int max_matches)
+{
+  int i,result,has_saved_char=0;
+  char save_char;
+  const char* endPtr;
+  
+  if(length==-1) length=strlen(buf);
+  
+  if(pos==length){
+    return 0;
+  } else if(buf[length]!='\0'){
+    save_char=buf[length];
+    buf[length]='\0';
+    has_saved_char=1;
+  }
+  Tcl_RegExp rex=Tcl_RegExpCompile(NULL,regexp);
+  if(!rex){
+    if(has_saved_char) buf[length]=save_char;
+    return -1;
+  }
+  result=Tcl_RegExpExec(NULL,rex,&buf[pos],&buf[pos]);
+  if(result!=1){
+    if(has_saved_char) buf[length]=save_char;
+    return result;
+  }
+  for(i=0;i<max_matches;i++){
+    Tcl_RegExpRange(rex,i,&match_start[i],&endPtr);
+    if(match_start[i]){
+      match_length[i]=endPtr-match_start[i];
+    } else {
+      match_length[i]=0;
+    }
+  }
+  if(has_saved_char) buf[length]=save_char;
+  return result;
+}
+
+//################################################################################
+//    string_match_brace
+//################################################################################
+
+// return position of closing brace ({} or [] or "") or -1
+inline int string_match_brace(const char* str,size_t length)
+{
+  size_t i=0;
+  char open_c,close_c;
+  
+  if(str[i]=='{') { open_c='{'; close_c='}'; }
+  else if(str[i]=='[') { open_c='['; close_c=']'; }
+  else if(str[i]=='"') { open_c='\0'; close_c='"'; }
+  else assert(0);
+
+  int level=1,backslash=0;
+  for(i++;str[i] && (length<0 || i<length);i++){
+    if(!backslash){
+      if(str[i]=='\\'){
+	backslash=1;
+      } else if(str[i]==open_c){
+	level++;
+      } else if(str[i]==close_c){
+	level--;
+	if(level==0) return i;
+      }
+    } else {
+      backslash=0;
+    }
+  }
+  return -1;
+}
 
 struct Braces_history
 {
@@ -1699,7 +1809,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	/* RamDebugger::ProgressVar [expr {$ichar*100/$length}] */
       }
       if(xml_state.state_is(cdata_XS)){
-	if(strncmp(&block[i-2],"]]>",3)==0){
+	if(strncmp(&block[i-2],close_braquet_CSS close_braquet_CSS ">",3)==0){
 	  xml_state.pop_state();
 	  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
 	  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
@@ -1721,14 +1831,14 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	  state_start=0;
 	}
       } else if(xml_state.state_is(doctype_XS)){
-	if(c=='['){
+	if(c==open_braquet_CS){
 	  xml_state.pop_state();
 	  xml_state.push_state(doctypeM_XS);
 	} else if(c=='>'){
 	  xml_state.pop_state();
 	}
       } else if(xml_state.state_is(doctypeM_XS)){
-	if(strncmp(&block[i-1],"]>",2)==0){
+	if(strncmp(&block[i-1],close_braquet_CSS ">",2)==0){
 	  xml_state.pop_state();
 	}
       } else {
@@ -1746,7 +1856,7 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	    xml_state.push_state(comment_XS);
 	    state_start=icharline;
 	    state_start_global=i;
-	  } else if(strncmp(&block[i],"<![CDATA[",9)==0){
+	  } else if(strncmp(&block[i],"<!" open_braquet_CSS "CDATA" open_braquet_CSS,9)==0){
 	    xml_state.push_state(cdata_XS);
 	    blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
 	    Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("green",-1));
@@ -2071,6 +2181,310 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 }
 
 
+void add_new_line(Tcl_Interp *ip,Tcl_Obj*& blockinfo,Tcl_Obj*& blockinfocurrent,
+  int indentlevel)
+{
+  blockinfo=Tcl_CopyIfShared(blockinfo);
+  Tcl_ListObjAppendElement(ip,blockinfo,blockinfocurrent);
+  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+  Tcl_SetListObj(blockinfocurrent,0,NULL);
+  
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(indentlevel));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+}
+
+void add_new_color(Tcl_Interp *ip,Tcl_Obj*& blockinfocurrent,const char* color,
+  int c_ini,int c_end)
+{
+  blockinfocurrent=Tcl_CopyIfShared(blockinfocurrent);
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj(color,-1));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(c_ini));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(c_end));
+}
+
+int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char* blockinfoname,
+  int progress,int indentlevel_ini,int indent_spaces,int raiseerror)
+{
+
+  int i,length;
+  char c,*block;
+  Tcl_Obj *blockinfo,*blockinfocurrent;
+  const char* ms[5]; int mL[5];
+  
+  block=Tcl_GetString(blockPtr);
+  length = ( int)strlen(block);
+  if(length>1000 && progress){
+    /*     RamDebugger::ProgressVar 0 1 */
+  }
+  blockinfo=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfo);
+  blockinfocurrent=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfocurrent);
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(indentlevel_ini));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+  int indentLevel=indentlevel_ini;
+  if(indent_spaces){
+    block=insert_remove_spaces(blockPtr,0,indentlevel_ini*indent_spaces,&length);
+  }
+
+  // colors: magenta magenta2 green red blue orange
+  
+  try {
+    int i_line=0;
+    int line_num=1;
+    i=0;
+    while(i<length){
+      c=block[i];
+      switch(c){
+	case '\n':
+	{
+	  add_new_line(ip,blockinfo,blockinfocurrent,indentLevel);
+	  line_num++;
+	  i_line=0;
+	  i++;
+	  continue;
+	}
+	break;
+	case '\\':
+	{
+	  if(string_regexp(block,i+1,length,"^[a-zA-Z]+",ms,mL,1)==1){
+	    mL[0]++;
+	  } else {
+	    mL[0]=2;
+	  }
+	  add_new_color(ip,blockinfocurrent,"magenta",i_line,i_line+mL[0]);
+	  i+=mL[0];
+	  i_line+=mL[0];
+	  continue;
+	}
+	break;
+	case '%':
+	{
+	  if(string_regexp(block,i+1,length,"^[^\n]*",ms,mL,1)==1){
+	    mL[0]++;
+	  } else {
+	    mL[0]=1;
+	  }
+	  add_new_color(ip,blockinfocurrent,"red",i_line,i_line+mL[0]);
+	  i+=mL[0];
+	  i_line+=mL[0];
+	  continue;
+	}
+	break;
+	case open_brace_CS:
+	{
+	  int len=string_match_brace(&block[i],length-i)+1;
+	  if(len>0){
+	    while(string_regexp(&block[i],0,len,"\n",ms,mL,1)==1){
+	      mL[0]=ms[0]-&block[i];
+	      add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
+	      add_new_line(ip,blockinfo,blockinfocurrent,indentLevel);
+	      i+=mL[0]+1;
+	      len-=mL[0]+1;
+	      i_line=0;
+	      line_num++;
+	    }
+	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+len);
+	    i+=len;
+	    i_line+=len;
+	    continue;
+	  }
+	}
+	break;
+	case '$':
+	{
+	  const char* xp="^[^\\$\n]+[\\$]";
+	  if(string_regexp(block,i+1,length,xp,ms,mL,1)==1){
+	    mL[0]++;
+	    add_new_color(ip,blockinfocurrent,"cyan",i_line,i_line+mL[0]);
+	    i+=mL[0];
+	    i_line+=mL[0];
+	    continue;
+	  }
+	}
+	break;
+      }
+      i++;
+      i_line++;
+    }
+    
+    Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+    Tcl_SetVar2Ex(ip,"blockinfo",NULL,blockinfo,0);
+    
+#ifdef _DEBUG
+      char* tmpblockinfo=Tcl_GetString(blockinfo);
+#endif
+    if(length>1000 && progress){
+/*     RamDebugger::ProgressVar 100 */
+    }
+    Tcl_DecrRefCount(blockinfo);
+    Tcl_DecrRefCount(blockinfocurrent);
+    if(indent_spaces){
+      Tcl_SetObjResult(ip,blockPtr);
+    }
+    return TCL_OK;
+  }   
+  catch(...){
+    Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+    Tcl_SetVar2Ex(ip,"blockinfo",NULL,blockinfo,0);
+    
+    Tcl_DecrRefCount(blockinfo);
+    Tcl_DecrRefCount(blockinfocurrent);
+    return TCL_ERROR;
+  }
+}
+
+int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char* blockinfoname,
+  int progress,int indentlevel_ini,int indent_spaces,int raiseerror)
+{
+
+  int i,length;
+  char c,*block;
+  Tcl_Obj *blockinfo,*blockinfocurrent;
+  const char* ms[5]; int mL[5];
+  
+  block=Tcl_GetString(blockPtr);
+  length = ( int)strlen(block);
+  if(length>1000 && progress){
+    /*     RamDebugger::ProgressVar 0 1 */
+  }
+  blockinfo=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfo);
+  blockinfocurrent=Tcl_NewListObj(0,NULL);
+  Tcl_IncrRefCount(blockinfocurrent);
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewIntObj(indentlevel_ini));
+  Tcl_ListObjAppendElement(ip,blockinfocurrent,Tcl_NewStringObj("n",-1));
+  int indentLevel=indentlevel_ini;
+  if(indent_spaces){
+    block=insert_remove_spaces(blockPtr,0,indentlevel_ini*indent_spaces,&length);
+  }
+
+  // colors: magenta magenta2 green red blue orange
+  
+  try {
+    int i_line=0;
+    int line_num=1;
+    i=0;
+    while(i<length){
+      c=block[i];
+      switch(c){
+	case '\n':
+	{
+	  add_new_line(ip,blockinfo,blockinfocurrent,indentLevel);
+	  line_num++;
+	  i_line=0;
+	  i++;
+	  continue;
+	}
+	break;
+	case '=':
+	{
+	  if(string_regexp(block,i+1,length,"^=*[^=\n]+=+",ms,mL,1)==1){
+	    mL[0]++;
+	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
+	    i+=mL[0];
+	    i_line+=mL[0];
+	    continue;
+	  }
+	}
+	break;
+	case '\'':
+	{
+	  if(string_regexp(block,i,length,"^'''?[^'\n]+'''?",ms,mL,1)==1){
+	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
+	    i+=mL[0];
+	    i_line+=mL[0];
+	    continue;
+	  }
+	}
+	break;
+	case '<':
+	{
+	  if(string_regexp(block,i,length,"^<[^\n>]+>",ms,mL,1)==1){
+	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+mL[0]);
+	    i+=mL[0];
+	    i_line+=mL[0];
+	    continue;
+	  }
+	}
+	break;
+	case '\\':
+	{
+	  if(string_regexp(block,i+1,length,"^[a-zA-Z]+",ms,mL,1)==1){
+	    mL[0]++;
+	  } else {
+	    mL[0]=2;
+	  }
+	  add_new_color(ip,blockinfocurrent,"magenta",i_line,i_line+mL[0]);
+	  i+=mL[0];
+	  i_line+=mL[0];
+	  continue;
+	}
+	break;
+	case open_brace_CS:
+	{
+	  if(string_regexp(block,i+1,length,"^\\|",ms,mL,1)==1){
+	    mL[0]++;
+	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+mL[0]);
+	    i+=mL[0];
+	    i_line+=mL[0];
+	    continue;
+	  }
+	}
+	break;
+	case '|':
+	{
+	  const char* xp="^\\|[-\\" close_brace_CSS "]*";
+	  if(string_regexp(block,i,length,xp,ms,mL,1)==1){
+	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+mL[0]);
+	    i+=mL[0];
+	    i_line+=mL[0];
+	    continue;
+	  }
+	}
+	break;
+	case open_braquet_CS:
+	{
+	  const char* xp="^\\[\\[[^\n\\" close_braquet_CSS "]+\\]\\]";
+	  if(string_regexp(block,i,length,xp,ms,mL,1)==1){
+	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+mL[0]);
+	    i+=mL[0];
+	    i_line+=mL[0];
+	    continue;
+	  }
+	}
+	break;
+      }
+      i++;
+      i_line++;
+    }
+    
+    Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+    Tcl_SetVar2Ex(ip,"blockinfo",NULL,blockinfo,0);
+    
+#ifdef _DEBUG
+      char* tmpblockinfo=Tcl_GetString(blockinfo);
+#endif
+    if(length>1000 && progress){
+/*     RamDebugger::ProgressVar 100 */
+    }
+    Tcl_DecrRefCount(blockinfo);
+    Tcl_DecrRefCount(blockinfocurrent);
+    if(indent_spaces){
+      Tcl_SetObjResult(ip,blockPtr);
+    }
+    return TCL_OK;
+  }   
+  catch(...){
+    Tcl_UpVar(ip,"1",blockinfoname,"blockinfo",0);
+    Tcl_SetVar2Ex(ip,"blockinfo",NULL,blockinfo,0);
+    
+    Tcl_DecrRefCount(blockinfo);
+    Tcl_DecrRefCount(blockinfocurrent);
+    return TCL_ERROR;
+  }
+}
+
 int RamDebuggerInstrumenterDoWork(ClientData clientData, Tcl_Interp *ip, int objc,
 		                  Tcl_Obj *CONST objv[])
 {
@@ -2153,6 +2567,92 @@ int RamDebuggerInstrumenterDoWorkForXML(ClientData clientData, Tcl_Interp *ip, i
     blockPtr=objv[1];
   }
   result=RamDebuggerInstrumenterDoWorkForXML_do(ip,blockPtr,Tcl_GetString(objv[2]),
+    progress,indentlevel_ini,indent_spaces,raiseerror);
+  if(indent_spaces){
+    Tcl_DecrRefCount(blockPtr);
+  }
+  return result;
+}
+
+int RamDebuggerInstrumenterDoWorkForLatex(ClientData clientData, Tcl_Interp *ip, int objc,
+		                  Tcl_Obj *CONST objv[])
+{
+  int result,progress=1,indentlevel_ini=0,raiseerror=1,indent_spaces;
+  Tcl_Obj* blockPtr;
+  if (objc<3) {
+    Tcl_WrongNumArgs(ip, 1, objv,
+      "block blockinfoname ?progress? ?indentlevel_ini? ?raiseerror? ?indent_spaces?");
+    return TCL_ERROR;
+  }
+  if (objc>=4){
+    result=Tcl_GetIntFromObj(ip,objv[3],&progress);
+    if(result) return TCL_ERROR;
+  }
+  if (objc>=5){
+    result=Tcl_GetIntFromObj(ip,objv[4],&indentlevel_ini);
+    if(result) return TCL_ERROR;
+  }
+  if (objc>=6){
+    result=Tcl_GetBooleanFromObj(ip,objv[5],&raiseerror);
+    if(result) return TCL_ERROR;
+  }
+  
+  indent_spaces=0;
+  if (objc==7){
+    result=Tcl_GetIntFromObj(ip,objv[6],&indent_spaces);
+    if(result) return TCL_ERROR;
+  }
+
+  if(indent_spaces){
+    blockPtr=Tcl_DuplicateObj(objv[1]);
+    Tcl_IncrRefCount(blockPtr);
+  } else {
+    blockPtr=objv[1];
+  }
+  result=RamDebuggerInstrumenterDoWorkForLatex_do(ip,blockPtr,Tcl_GetString(objv[2]),
+    progress,indentlevel_ini,indent_spaces,raiseerror);
+  if(indent_spaces){
+    Tcl_DecrRefCount(blockPtr);
+  }
+  return result;
+}
+
+int RamDebuggerInstrumenterDoWorkForWiki(ClientData clientData, Tcl_Interp *ip, int objc,
+		                  Tcl_Obj *CONST objv[])
+{
+  int result,progress=1,indentlevel_ini=0,raiseerror=1,indent_spaces;
+  Tcl_Obj* blockPtr;
+  if (objc<3) {
+    Tcl_WrongNumArgs(ip, 1, objv,
+      "block blockinfoname ?progress? ?indentlevel_ini? ?raiseerror? ?indent_spaces?");
+    return TCL_ERROR;
+  }
+  if (objc>=4){
+    result=Tcl_GetIntFromObj(ip,objv[3],&progress);
+    if(result) return TCL_ERROR;
+  }
+  if (objc>=5){
+    result=Tcl_GetIntFromObj(ip,objv[4],&indentlevel_ini);
+    if(result) return TCL_ERROR;
+  }
+  if (objc>=6){
+    result=Tcl_GetBooleanFromObj(ip,objv[5],&raiseerror);
+    if(result) return TCL_ERROR;
+  }
+  
+  indent_spaces=0;
+  if (objc==7){
+    result=Tcl_GetIntFromObj(ip,objv[6],&indent_spaces);
+    if(result) return TCL_ERROR;
+  }
+
+  if(indent_spaces){
+    blockPtr=Tcl_DuplicateObj(objv[1]);
+    Tcl_IncrRefCount(blockPtr);
+  } else {
+    blockPtr=objv[1];
+  }
+  result=RamDebuggerInstrumenterDoWorkForWiki_do(ip,blockPtr,Tcl_GetString(objv[2]),
     progress,indentlevel_ini,indent_spaces,raiseerror);
   if(indent_spaces){
     Tcl_DecrRefCount(blockPtr);
@@ -2300,7 +2800,8 @@ extern "C" DLLEXPORT int Ramdebuggerinstrumenter_Init(Tcl_Interp *interp)
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWork",RamDebuggerInstrumenterDoWork,NULL,NULL);
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForCpp",RamDebuggerInstrumenterDoWorkForCpp,NULL,NULL);
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForXML",RamDebuggerInstrumenterDoWorkForXML,NULL,NULL);
-
+  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForLatex",RamDebuggerInstrumenterDoWorkForLatex,NULL,NULL);
+  Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterDoWorkForWiki",RamDebuggerInstrumenterDoWorkForWiki,NULL,NULL);
   Tcl_CreateObjCommand( interp, "RamDebuggerInstrumenterSearchBraces",RamDebuggerInstrumenterSearchBraces,NULL,NULL);
   return TCL_OK;
 }

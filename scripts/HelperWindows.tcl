@@ -1204,6 +1204,8 @@ proc RamDebugger::PreferencesWindow {} {
     foreach "type extsdefaultlist" [list TCL [list ".tcl" ".tcl .tk *"] \
 	    C/C++ [list ".c .cpp .cc .h"] \
 	    XML [list ".xml .html .htm"] \
+	    latex [list ".tex"] \
+	    wiki [list ".wiki"] \
 	    Makefile [list Makefile] \
 	    "GiD BAS file" .bas \
 	    "GiD data files" [list ".prb .mat .cnd"]] {

@@ -383,7 +383,9 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
     set "options_def(extensions,GiD BAS file)" .bas
     set "options_def(extensions,GiD data files)" ".prb .mat .cnd"
     set "options_def(extensions,Makefile)" "Makefile"
-
+    set "options_def(extensions,latex)" ".tex"
+    set "options_def(extensions,wiki)" ".wiki"
+    
     # this variable is only used on windows. It can be:
     # 0: Only check remote programs on demand (useful if not making remote debugging, the
     #    start up is faster)
@@ -1845,6 +1847,40 @@ proc RamDebugger::rlist { args } {
 		$doc delete
 	    }
 	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
+	    if { $err } {
+		set einfo $::errorInfo
+		RamDebugger::ProgressVar 100
+		if { ![string match  "*user demand*" $errstring] } {
+		    RamDebugger::TextOutRaise
+		    RamDebugger::TextOutInsertRed $einfo
+		}
+		#WarnWin $errstring--$einfo
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
+	    }
+	}
+	if { $filetype == "latex" } {
+	    set err [catch { Instrumenter::DoWorkForLatex $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
+	    if { $err } {
+		set einfo $::errorInfo
+		RamDebugger::ProgressVar 100
+		if { ![string match  "*user demand*" $errstring] } {
+		    RamDebugger::TextOutRaise
+		    RamDebugger::TextOutInsertRed $einfo
+		}
+		#WarnWin $errstring--$einfo
+		if { $opts(-return_error) } {
+		    error $errstring
+		} else {
+		    WarnWin $errstring
+		}
+	    }
+	}
+	if { $filetype == "wiki" } {
+	    set err [catch { Instrumenter::DoWorkForWiki $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
 	    if { $err } {
 		set einfo $::errorInfo
 		RamDebugger::ProgressVar 100
@@ -6710,21 +6746,28 @@ proc RamDebugger::paste_image_selection {} {
 #     \psfig{file=bspline-cubic-bezier.ps}
 #     \epsffile{fig3a.ps}
 #     \includegraphics[width=11cm]{Fig4_3.eps}
+#     [[Image:image_name.png|...]]
     
     set filesList ""
     
     set rex {\\psfig\{.*?file=([-\w.]+).*\}}
     append rex {|\\epsffile.*?\{(.+?)\}}
     append rex {|\\includegraphics.*?\{(.+?)\}}
+    append rex {|Image:([^][|]+)}
     set txt [$text get "insert linestart" "insert lineend"]
-    if { [regexp $rex $txt {} f1 f2 f3] } {
+    set has_regexp 0
+    if { [regexp $rex $txt {} f1 f2 f3 f4] } {
 	if { $f1 eq "" } {
 	    set f1 $f2
 	    if { $f1 eq "" } {
 		set f1 $f3
 	    }
+	    if { $f1 eq "" } {
+		set f1 $f4
+	    }
 	}
 	lappend filesList [file root $f1].png
+	set has_regexp 1
     }
     if { [info exists paste_image_selection_file] } {
 	set d 1
@@ -6799,6 +6842,23 @@ proc RamDebugger::paste_image_selection {} {
     set paste_image_selection_dirList [linsert0 $dirList [file dirname $file]]
     set paste_image_selection_file $file
     
+    set filetype [GiveFileType $currentfile]
+
+    if { !$has_regexp && $filetype eq "latex" } {
+	set f0 [file root [file tail $file]]
+	$text insert insert "\\begin{figure}\n"
+	$text insert insert "\\includegraphics\[width=15cm\]{$f0}\n"
+	$text insert insert "\\caption{the caption}\n"
+	$text insert insert "\\\end{figure}\n"
+    } elseif { !$has_regexp && $filetype eq "wiki" } {
+	set f0 [file root [file tail $file]]
+	$text insert insert "\{| style=\"text-align: center; border: 1px solid #BBB; margin: 1em auto; width: 100%;\"\n"
+	$text insert insert "|-\n"
+	$text insert insert "|\[\[Image:$f0.png|600px|my own caption\]\]\n"
+	$text insert insert "|- style=\"text-align: center; font-size: 86%;\"\n"
+	$text insert insert "| colspan='1' | my own caption text\n"
+	$text insert insert "|\}\n"
+    }
     SetMessage [_ "Created image file '%s'" $file]
 }
 
@@ -7240,6 +7300,14 @@ proc RamDebugger::CheckText { command args } {
 	}
 	XML {
 	    set err [catch { Instrumenter::DoWorkForXML $block blockinfo 0 $oldlevel 0 } errstring]
+	    set oldlevel 0
+	}
+	latex {
+	    set err [catch { Instrumenter::DoWorkForLatex $block blockinfo 0 $oldlevel 0 } errstring]
+	    set oldlevel 0
+	}
+	wiki {
+	    set err [catch { Instrumenter::DoWorkForWiki $block blockinfo 0 $oldlevel 0 } errstring]
 	    set oldlevel 0
 	}
 	"GiD BAS file" {
