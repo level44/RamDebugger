@@ -678,8 +678,9 @@ snit::widget cu::multiline_entry {
 	$toctree item style set $id 0 imagetextimage
 	$toctree item element configure $id 0 e_text_sel -text $name
 	$toctree item element configure $id 0 e_image -image $image
-	$toctree item element configure $id 0 e_image_r -image [cu::get_image actitemdelete16]
-	
+	catch {
+	    $toctree item element configure $id 0 e_image_r -image [cu::get_image actitemdelete16]
+	}
 	return $id
     }
 }
