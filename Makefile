@@ -46,7 +46,7 @@ CC = g++
 CPPFLAGS=-DUSE_TCL_STUBS -DUSE_TK_STUBS -DTCLVERSION -Wunused-variable
 
 INCLUDE_DIRECTORIES = /usr/local/ActiveTcl-8.5/include /opt/ActiveTcl-8.5/include \
- /usr/include/tcl8.5 $(LIBSDIR)/include
+ /usr/include/tcl8.6 $(LIBSDIR)/include
 CPPFLAGS += $(addprefix -I ,$(INCLUDE_DIRECTORIES))
 
 ifeq ($(M64),yes)
@@ -79,7 +79,7 @@ endif
 
 LIB_DIRECTORIES = $(LIBSDIR)/lib
 LDFLAGS += $(addprefix -L,$(LIB_DIRECTORIES))
-LIBS += -ltclstub8.5
+LIBS += -ltclstub8.6
 
 EXE = $(OBJDIR)/RamDebuggerInstrumenter6$(LIBEXT)
 
