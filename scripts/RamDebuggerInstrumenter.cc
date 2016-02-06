@@ -5,6 +5,14 @@
 #include <assert.h>
 #include <tcl.h>
   
+#ifdef DEBUG_TIME
+#include "Clock.h"
+#define Clock_report(A) Clock report(A);
+#else
+#define Clock_report(A) ((void)0)
+#endif
+#define Clock_report_OFF(A) ((void)0)
+  
 const char open_brace_CS='{';
 const char close_brace_CS='}';
 #define open_brace_CSS "{"
@@ -2206,7 +2214,7 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
   int progress,int indentlevel_ini,int indent_spaces,int raiseerror)
 {
 
-  int i,length;
+  int i,length,lengthL;
   char c,*block;
   Tcl_Obj *blockinfo,*blockinfocurrent;
   const char* ms[5]; int mL[5];
@@ -2234,6 +2242,9 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
     int line_num=1;
     i=0;
     while(i<length){
+      lengthL=i+200;
+      if(lengthL>length) lengthL=length;
+      
       c=block[i];
       switch(c){
 	case '\n':
@@ -2247,7 +2258,7 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	break;
 	case '\\':
 	{
-	  if(string_regexp(block,i+1,length,"^[a-zA-Z]+",ms,mL,1)==1){
+	  if(string_regexp(block,i+1,lengthL,"^[a-zA-Z]+",ms,mL,1)==1){
 	    mL[0]++;
 	  } else {
 	    mL[0]=2;
@@ -2260,7 +2271,7 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	break;
 	case '%':
 	{
-	  if(string_regexp(block,i+1,length,"^[^\n]*",ms,mL,1)==1){
+	  if(string_regexp(block,i+1,lengthL,"^[^\n]*",ms,mL,1)==1){
 	    mL[0]++;
 	  } else {
 	    mL[0]=1;
@@ -2294,7 +2305,7 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	case '$':
 	{
 	  const char* xp="^[^\\$\n]+[\\$]";
-	  if(string_regexp(block,i+1,length,xp,ms,mL,1)==1){
+	  if(string_regexp(block,i+1,lengthL,xp,ms,mL,1)==1){
 	    mL[0]++;
 	    add_new_color(ip,blockinfocurrent,"cyan",i_line,i_line+mL[0]);
 	    i+=mL[0];
@@ -2338,7 +2349,7 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
   int progress,int indentlevel_ini,int indent_spaces,int raiseerror)
 {
 
-  int i,length;
+  int i,length,lengthL;
   char c,*block;
   Tcl_Obj *blockinfo,*blockinfocurrent;
   const char* ms[5]; int mL[5];
@@ -2363,9 +2374,13 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
   
   try {
     int i_line=0;
+    int i_line_no_space=-1;
     int line_num=1;
     i=0;
     while(i<length){
+      lengthL=i+200;
+      if(lengthL>length) lengthL=length;
+      
       c=block[i];
       switch(c){
 	case '\n':
@@ -2373,44 +2388,52 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	  add_new_line(ip,blockinfo,blockinfocurrent,indentLevel);
 	  line_num++;
 	  i_line=0;
+	  i_line_no_space=-1;
 	  i++;
 	  continue;
 	}
 	break;
 	case '=':
 	{
-	  if(string_regexp(block,i+1,length,"^=*[^=\n]+=+",ms,mL,1)==1){
+	  const char* rex="^=*[^=\n]+=+";
+	  if(i_line_no_space==-1 && string_regexp(block,i+1,lengthL,rex,ms,mL,1)==1){
 	    mL[0]++;
 	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
 	    i+=mL[0];
 	    i_line+=mL[0];
+	    i_line_no_space=i;
 	    continue;
 	  }
+	  i_line_no_space=i;
 	}
 	break;
 	case '\'':
 	{
-	  if(string_regexp(block,i,length,"^'''?[^'\n]+'''?",ms,mL,1)==1){
+	  if(string_regexp(block,i,lengthL,"^'''?[^'\n]+'''?",ms,mL,1)==1){
 	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
 	    i+=mL[0];
 	    i_line+=mL[0];
+	    i_line_no_space=i;
 	    continue;
 	  }
+	  i_line_no_space=i;
 	}
 	break;
 	case '<':
 	{
-	  if(string_regexp(block,i,length,"^<[^\n>]+>",ms,mL,1)==1){
+	  if(string_regexp(block,i,lengthL,"^<[^\n>]+>",ms,mL,1)==1){
 	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+mL[0]);
 	    i+=mL[0];
 	    i_line+=mL[0];
+	    i_line_no_space=i;
 	    continue;
 	  }
+	  i_line_no_space=i;
 	}
 	break;
 	case '\\':
 	{
-	  if(string_regexp(block,i+1,length,"^[a-zA-Z]+",ms,mL,1)==1){
+	  if(string_regexp(block,i+1,lengthL,"^[a-zA-Z]+",ms,mL,1)==1){
 	    mL[0]++;
 	  } else {
 	    mL[0]=2;
@@ -2418,40 +2441,57 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	  add_new_color(ip,blockinfocurrent,"magenta",i_line,i_line+mL[0]);
 	  i+=mL[0];
 	  i_line+=mL[0];
+	  i_line_no_space=i;
 	  continue;
 	}
 	break;
 	case open_brace_CS:
 	{
-	  if(string_regexp(block,i+1,length,"^\\|",ms,mL,1)==1){
+	  if(string_regexp(block,i+1,lengthL,"^\\|",ms,mL,1)==1){
 	    mL[0]++;
 	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+mL[0]);
 	    i+=mL[0];
 	    i_line+=mL[0];
+	    i_line_no_space=i;
 	    continue;
 	  }
+	  i_line_no_space=i;
 	}
 	break;
 	case '|':
 	{
 	  const char* xp="^\\|[-\\" close_brace_CSS "]*";
-	  if(string_regexp(block,i,length,xp,ms,mL,1)==1){
+	  if(string_regexp(block,i,lengthL,xp,ms,mL,1)==1){
 	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+mL[0]);
 	    i+=mL[0];
 	    i_line+=mL[0];
+	    i_line_no_space=i;
 	    continue;
 	  }
+	  i_line_no_space=i;
 	}
 	break;
 	case open_braquet_CS:
 	{
 	  const char* xp="^\\[\\[[^\n\\" close_braquet_CSS "]+\\]\\]";
-	  if(string_regexp(block,i,length,xp,ms,mL,1)==1){
+	  if(string_regexp(block,i,lengthL,xp,ms,mL,1)==1){
 	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+mL[0]);
 	    i+=mL[0];
 	    i_line+=mL[0];
+	    i_line_no_space=i;
 	    continue;
 	  }
+	  i_line_no_space=i;
+	}
+	break;
+	case ' ': case '\t':
+	{
+	  // nothing
+	}
+	break;
+	default:
+	{
+	  i_line_no_space=i;
 	}
 	break;
       }
