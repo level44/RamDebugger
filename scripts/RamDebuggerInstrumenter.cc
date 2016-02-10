@@ -2314,6 +2314,11 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	  }
 	}
 	break;
+	case '\t':
+	{
+	  i_line+=7; // total=8
+	}
+	break;
       }
       i++;
       i_line++;
@@ -2484,9 +2489,14 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	  i_line_no_space=i;
 	}
 	break;
-	case ' ': case '\t':
+	case ' ':
 	{
 	  // nothing
+	}
+	break;
+	case '\t':
+	{
+	  i_line+=7; // total=8
 	}
 	break;
 	default:

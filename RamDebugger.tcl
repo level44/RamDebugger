@@ -1818,6 +1818,9 @@ proc RamDebugger::rlist { args } {
 	    }
 	}
     }
+    
+    if { $filetype eq "XML" } { set reinstrument 1 }
+    
     if { ($filetype == "TCL"  && ![info exists instrumentedfilesP($currentfile)]) || \
 	     ![info exists instrumentedfilesInfo($currentfile)] || $force || $reinstrument } {
 	SetMessage [_ "Instrumenting file '%s'" $currentfile]...
@@ -1843,7 +1846,7 @@ proc RamDebugger::rlist { args } {
 	if { $filetype == "XML" } {
 	    set err [catch { dom parse -keepEmpties $files($currentfile) } doc]
 	    if { !$err } {
-		set files($currentfile) [$doc asXML -indent none]
+		set files($currentfile) [$doc asXML -indent 2]
 		$doc delete
 	    }
 	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
@@ -6201,6 +6204,17 @@ proc RamDebugger::WaitState { what { w . } } {
     update
 }
 
+proc RamDebugger::Redefine_debug_log {} {
+    ViewOnlyTextOrAll -force_all
+    TextOutRaise
+    TextOutClear
+    proc ::mylog::log { args } {
+	RamDebugger::TextOutInsert "[lindex $args 0]\n"
+	update idletasks
+    }
+    proc ::mylog::debug { args } {}
+}
+
 proc RamDebugger::TextOutClear {} {
     variable textOUT
 
@@ -8278,6 +8292,32 @@ proc RamDebugger::AddFileTypeMenu { filetype } {
 		         "" -command "RamDebugger::XMLIndent {} 1"]]
 	    set descmenu_new [linsert $descmenu 30 "&XML" all filetypemenu 0 $menu]
 	    set changes 1
+	}
+	latex - wiki {
+	    set err [catch { package require compass_utils }]
+	    if { !$err } {
+		set cmd1 [list mediawiki::upload_window_file -parent $text \
+		        -file $currentfile \
+		        -start_callback RamDebugger::Redefine_debug_log]
+		set cmd2 [list mediawiki::upload_window -parent $text \
+		        -file $currentfile \
+		        -start_callback RamDebugger::Redefine_debug_log]
+		set cmd3 [list mediawiki::upload_window_goto_linkF \
+		        -parent $text \
+		        -file $currentfile \
+		        -start_callback RamDebugger::Redefine_debug_log]
+
+		set menu [list \
+		        [list command "&Upload file" {} "Upload file to server" \
+		            "" -command $cmd1] \
+		        [list command "&Upload window..." {} "Detailed upload file to server" \
+		            "" -command $cmd2] \
+		        [list separator] \
+		        [list command "&Go to web page" {} "Go to server webpage" \
+		            "" -command $cmd3]]
+		set descmenu_new [linsert $descmenu 30 "&Mediawiki" all filetypemenu 0 $menu]
+		set changes 1
+	    }
 	}
 	default { set descmenu_new $descmenu }
     }
