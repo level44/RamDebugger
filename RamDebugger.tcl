@@ -1716,6 +1716,7 @@ proc RamDebugger::rlist { args } {
 	lappend fileslist $currentfile
     }
 
+    set read_from_file 0
     if { ![info exists files($currentfile)] || $force} {
 	
 	set err [catch [list open $currentfile r] fin]
@@ -1752,6 +1753,7 @@ proc RamDebugger::rlist { args } {
 	    }
 	}
 	set files($currentfile) [read $fin]
+	set read_from_file 1
 	set files_endline($currentfile) $currentfile_endline
 	close $fin
 	if { [lsearchfile $fileslist $currentfile] == -1 } {
@@ -1844,10 +1846,12 @@ proc RamDebugger::rlist { args } {
 	    }
 	}
 	if { $filetype == "XML" } {
-	    set err [catch { dom parse -keepEmpties $files($currentfile) } doc]
-	    if { !$err } {
-		set files($currentfile) [$doc asXML -indent 2]
-		$doc delete
+	    if { $read_from_file } {
+		set err [catch { dom parse -keepEmpties $files($currentfile) } doc]
+		if { !$err } {
+		    set files($currentfile) [$doc asXML -indent 2]
+		    $doc delete
+		}
 	    }
 	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
 	    if { $err } {
