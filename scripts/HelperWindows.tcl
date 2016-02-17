@@ -383,6 +383,17 @@ proc RamDebugger::entry_T { w entry txt } {
     $w invokeok
 }
 
+proc RamDebugger::PrintElements100000 { w entry } {
+    variable options
+    
+    set txt [$entry get]
+    set cmd "gdb set print elements 100000"
+    if { $txt eq $cmd } {
+	set cmd [lindex $options(old_expressions) 1]
+    }
+    entry_T $w $entry $cmd
+}
+    
 proc RamDebugger::entry_PSx_nprint { w entry } {
 
     set txt [$entry get]
@@ -477,7 +488,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
 	*  Ctrl-+: insert []
 	*  Ctrl-n: insert 'nprint(...)'
 	*  Ctrl-N: open XML Viewer
-	*  Ctrl-p: insert 'gdb set print elements 1000'
+	*  Ctrl-p: insert 'gdb set print elements 100000'
     }]
 
     if { ![info exists options(old_expressions)] } {
@@ -494,8 +505,7 @@ proc RamDebugger::DisplayVarWindow { mainwindow { var "" } } {
     bind $f.e1 <$::control-plus> [list RamDebugger::entry_PSx $f.e1 \[ \]]
     bind $f.e1 <$::control-n> [list RamDebugger::entry_PSx_nprint $w $f.e1]
     bind $f.e1 <$::control-N> [list RamDebugger::OpenXMLViewer $w $f.e1]
-    bind $f.e1 <$::control-p> [list RamDebugger::entry_T $w $f.e1 \
-	    "gdb set print elements 1000"]
+    bind $f.e1 <$::control-p> [list RamDebugger::PrintElements100000 $w $f.e1]
     
 #     set c { %W icursor [expr { [%W index "insert"]-1}] }
 #     bind $f.e1 <$::control-Key-2> "[list ttk::entry::Insert $f.e1 {""}];$c"

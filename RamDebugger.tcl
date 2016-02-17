@@ -3840,6 +3840,7 @@ proc RamDebugger::Colorize { { what text } } {
 	foreach "tag li le" [lrange $i 2 end] {
 	    $t tag add $tag $iline.$li $iline.$le
 	}
+       
 	incr iline
     }
     $t tag raise sel
@@ -8780,6 +8781,17 @@ proc RamDebugger::set_title { title } {
 	wm title [winfo toplevel $text] "R - $title"
     }
 }
+
+proc RamDebugger::ToggleTextWrap {} {
+    variable text
+    
+    if { [$text cget -wrap] eq "none" } {
+	$text configure -wrap word  -spacing1 -5
+    } else {
+	$text configure -wrap none
+    }
+}
+
 proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } { topleveluse "" } } {
     variable options
     variable options_def
@@ -9062,6 +9074,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	    [list command &[_ "Increase font"] {} \
 		[_ "Increase main text font"] "" \
 		-command "RamDebugger::increase_decrease_text_font increase"] \
+	    [list command &[_ "Wrap text words"] {} \
+		[_ "Toggle wrap of text long lines"] "Alt w" \
+		-command "RamDebugger::ToggleTextWrap"] \
 	    separator \
 	    [list checkbutton [_ "Status bar"] {} \
 		 [_ "View/hide status bar"] "" \
