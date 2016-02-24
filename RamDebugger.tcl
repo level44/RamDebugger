@@ -1847,10 +1847,19 @@ proc RamDebugger::rlist { args } {
 	}
 	if { $filetype == "XML" } {
 	    if { $read_from_file } {
-		set err [catch { dom parse -keepEmpties $files($currentfile) } doc]
-		if { !$err } {
-		    set files($currentfile) [$doc asXML -indent 2]
-		    $doc delete
+		if { [info command ::p::xml] ne "" } {
+		    set err [catch { p::xml parse $files($currentfile) } doc]
+		    if { !$err } {
+		        set files($currentfile) [$doc asXML]
+		        $doc delete
+		    }
+		} else {
+		    # -keepEmpties
+		    set err [catch { dom parse $files($currentfile) } doc]
+		    if { !$err } {
+		        set files($currentfile) [$doc asXML -indent 2]
+		        $doc delete
+		    }
 		}
 	    }
 	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
