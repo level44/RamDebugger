@@ -121,7 +121,7 @@ $(EXE_INSTALL): $(EXE)
 
 $(EXE_INSTALL2): $(EXE)
 ifneq ($(OBJDIR),debug)
-	mkdir $(shell dirname $(EXE_INSTALL2))
+	mkdir -p $(shell dirname $(EXE_INSTALL2))
 	cp $(EXE) $(EXE_INSTALL2)
 endif
 
