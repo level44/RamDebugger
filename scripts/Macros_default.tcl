@@ -178,7 +178,7 @@ proc "Macro regsub" { w } {
 ################################################################################
 
 set "macrodata(Comment header,inmenu)" 1
-set "macrodata(Comment header,accelerator)" ""
+set "macrodata(Comment header,accelerator)" "<Control-u><Control-h>"
 set "macrodata(Comment header,help)" "This commands inserts a comment menu for TCL"
 
 proc "Comment header" { w } {
@@ -381,6 +381,18 @@ set "macrodata(Background color region,accelerator)" "<Control-u><Control-b>"
 set "macrodata(Background color region,help)" "Apply color to the selected text region background (To unapply, use function without selection)"
 
 proc "Background color region" { w } {
+    background_color_region $w 1
+}
+
+set "macrodata(Background color default,inmenu)" 1
+set "macrodata(Background color default,accelerator)" "<Control-u><b>"
+set "macrodata(Background color default,help)" "Apply default color to the selected text region background (To unapply, use function without selection)"
+
+proc "Background color default" { w } {
+    background_color_region $w 0
+}
+
+proc background_color_region { w force_ask } {
 
     set range [$w tag nextrange sel 1.0 end]
     if { $range == "" } {
@@ -412,12 +424,20 @@ proc "Background color region" { w } {
 	}
 	return
     }
-    set color [tk_chooseColor -initialcolor grey20]
+    set prefs [cu::get_program_preferences -valueName bgcolor ramdebugger_pres]
+    set color [dict_getd $prefs bgcolor ""]
+    if { $color eq "" || $force_ask } {
+	if { $color eq "" } { set color grey20 }
+	set color [tk_chooseColor -initialcolor $color]
     if { $color eq "" } { return }
+    }
 
     $w tag add background_color_$color [lindex $range 0] [lindex $range 1]
     $w tag configure background_color_$color -background $color
     $w tag lower background_color_$color sel
+
+    set prefs [dict create bgcolor $color]
+    cu::store_program_preferences -valueName bgcolor ramdebugger_pres $prefs
 }
 
 ################################################################################
@@ -696,3 +716,51 @@ proc open_comment_file { w open_edit } {
 	}
     }
 }
+
+set "macrodata(Open XML viewer,inmenu)" 1
+set "macrodata(Open XML viewer,accelerator)" <Control-u><Control-x>
+set "macrodata(Open XML viewer,help)" "Open current file in external XML viewer"
+
+proc "Open XML viewer" { w } {
+    
+    set exe "c:/Program Files (x86)/MindFusion Limited/Xml Viewer/XMLViewer.exe"
+    set file [mc::give_currentfile]
+    
+    mc::execute "" $exe $file &
+}
+
+set "macrodata(Words to c array,inmenu)" 1
+set "macrodata(Words to c array,accelerator)" <Control-u><Control-w>
+set "macrodata(Words to c array,help)" "Words list to c array"
+
+proc "Words to c array" { w } {
+    
+    set txt [clipboard get]
+    
+    lassign "" h c
+    foreach word $txt {
+	regsub : $word _ wordA
+	append h "${wordA}_WT,\n"
+	append c "\"$word\", // ${wordA}_WT\n"
+    }
+    $w insert insert "\n$c\n$h\n"
+}
+
+set "macrodata(Words to c arrayL,inmenu)" 1
+set "macrodata(Words to c arrayL,accelerator)" <Control-u><Control-q>
+set "macrodata(Words to c arrayL,help)" "Words list to c array latex"
+
+proc "Words to c arrayL" { w } {
+    
+    set txt [clipboard get]
+    
+    lassign "" h c
+    foreach word $txt {
+	regsub : $word _ wordA
+	append h "${wordA}_LT,\n"
+	append c "\"$word\", // ${wordA}_LT\n"
+    }
+    $w insert insert "\n$c\n$h\n"
+}
+
+
