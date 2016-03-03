@@ -2720,11 +2720,28 @@ static int give_line_chars(char* block,int ipos)
   return Tcl_NumUtfChars(&block[i],ipos-i);
 }
 
+static int is_backslashed(char *block,int i)
+{
+  int backslashes=0;
+  for(int j=i-1;j>=0;j--){
+    if(block[j]=='\\') backslashes++;
+    else break;
+  }
+  if(backslashes%2==1) return 1;
+  else return 0;
+}
+
+static int is_c_char(char *block,int i)
+{
+  if(i>0 && block[i-1]=='\'' && block[i+1]=='\'') return 1;
+  return 0;
+}
+
 int RamDebuggerInstrumenterSearchBraces_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,
   int& linenum,int& linecharpos)
 {
-  int linenumL,i_stack;
-  size_t i,j,i_start_line,delta_i,delta_iL,backslashes,length;
+  int linenumL,i_stack,delta_i,delta_iL;
+  size_t i,j,i_start_line,length;
   
   const int stack_len=2048;
   const char* p;
@@ -2777,12 +2794,7 @@ int RamDebuggerInstrumenterSearchBraces_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,
       if(delta_i==1) linenum++;
       else linenum--;
     } else if((p=strchr(keys,block[i]))){
-      backslashes=0;
-      for(j=i-1;j>=0;j--){
-	if(block[j]=='\\') backslashes++;
-	else break;
-      }
-      if(backslashes%2==1) continue;
+      if(is_backslashed(block,i)) continue;
 
       if(p-keys<3) delta_iL=1;
       else delta_iL=-1;
@@ -2803,6 +2815,28 @@ int RamDebuggerInstrumenterSearchBraces_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,
 	if(i_stack==0){
 	  linecharpos=give_line_chars(block,i);
 	  return TCL_OK;
+	}
+      }
+    } else if(block[i]=='"'){
+      // assuming "" blocks are contained in one line
+      if(is_backslashed(block,i) || is_c_char(block,i)) continue;
+      int is_start,num_to_start=0;
+      for(j=i-1;j>=0;j--){
+	if(block[j]=='"' && !is_backslashed(block,j) && !is_c_char(block,j)){
+	  num_to_start++;
+	} else if(block[j]=='\n') break;
+      }
+      if(num_to_start%2==0) is_start=1;
+      else is_start=0;
+      if((is_start && delta_i>0) || (!is_start && delta_i<0)){
+	for(i+=delta_i;i>=0 && i<length;i+=delta_i){
+	  if(block[i]=='"' && !is_backslashed(block,i) && !is_c_char(block,i)){
+	    break;
+	  } else if(block[i]=='\n'){
+	    if(delta_i==1) linenum++;
+	    else linenum--;
+	    break;
+	  }
 	}
       }
     }

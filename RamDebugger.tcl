@@ -5135,22 +5135,25 @@ proc RamDebugger::ChooseViewFile { what args } {
 	    }
 	    switch $what {
 		start {
-		    set list ""
-		    for { set i [expr {[llength $WindowFilesList]-1}] } { $i >= 0 } { incr i -1 } {
-		        set file [lindex $WindowFilesList $i]
+		    set WF ""
+		    foreach file $WindowFilesList {
 		        if { [file exists $file] } {
-		            lappend list $file
+		            lappend WF $file
 		        }
 		    }
+		    set WindowFilesList $WF
+		    set list [lreverse $WindowFilesList]
 		}
 		startrecent {
-		    set list ""
+		    lassign "" RF list
 		    foreach elm $options(RecentFilesL) {
 		        set file [lindex $elm 0]
 		        if { [file exists $file] } {
 		            lappend list $file
+		            lappend RF $elm
 		        }
 		    }
+		    set options(RecentFilesL) $RF
 		}
 		startcurrdir {
 		    set list [lsort -dictionary $list]
