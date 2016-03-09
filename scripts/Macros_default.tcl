@@ -395,11 +395,10 @@ proc "Background color default" { w } {
 proc background_color_region { w force_ask } {
 
     set range [$w tag nextrange sel 1.0 end]
-    if { $range == "" } {
-	if { [lsearch [$w tag names insert] background_color_*] == -1 } {
-	    WarnWin "Select a region to apply color or put the cursor in a region to unapply"
-	    return
+    if { $range eq "" && [lsearch [$w tag names insert] background_color_*] == -1 } {
+	set range [list "insert linestart" "insert lineend"]
 	}
+    if { $range eq "" } {
 	dialogwin_snit $w._ask -title "Unapply background color" \
 	    -entrytext "Do you want to unapply background color to current region?" \
 	    -morebuttons [list "Unapply all"]
