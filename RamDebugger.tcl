@@ -7798,6 +7798,8 @@ proc RamDebugger::CommentSelection { what } {
     } elseif { $filetype == "XML" } {
 	set commentchar "<!--"
 	set end_commentchar "-->"
+    } elseif { $filetype eq "latex" } {
+	set commentchar "%"
     } else {
 	set commentchar "#"
     }
