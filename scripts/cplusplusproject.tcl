@@ -134,6 +134,10 @@ proc cproject::syncfromUI {} {
 	}
 	set dataS($i) $thisdataS($prop)
     }
+    
+    if { [file isdirectory $thisdataE(execdir)] } {
+	set thisdataE(execdirList) [linsert0 [set! thisdataE(execdirList)] $thisdataE(execdir)]
+    }    
     foreach i [array names dataE $debugreleasebefore,*] {
 	regexp {^[^,]+,(.*)} $i {} prop
 	if { $debugreleasebefore == "both" } {
@@ -386,11 +390,11 @@ proc cproject::NewData {} {
 	    
 	    if { $i != "both" } {
 		set dataE($i,execdir) [file join [file dirname $project] [file root $project]_$i]
+		set dataE($i,execdirList) [linsert0 [set! dataE($i,execdirList)] $dataE($i,execdir)]
 		set dataE($i,exe) [file root [file tail $project]]
 	    } else {
 		set dataE($i,execdir) ""
 		set dataE($i,exe) ""
-		
 	    }
 	    set dataE($i,exeargs) ""
 	    set dataE($i,exeargsList) ""
@@ -482,9 +486,11 @@ proc cproject::OpenProject { w { ask 1 } { raise_error 0 } } {
 	    if { [regexp {(librariesdirs|libraries|linkflags)$} $i] } {
 		regexp {^([^,]+),(.*)} $i {} dr r 
 		set dataL($dr,Link,$r) $data($i)
-	    } elseif { [regexp {(execdir|exe|exeargs)$} $i] } {
+	    } elseif { [regexp {(execdir|execdirList|exe|exeargs)$} $i] } {
 		set dataE($i) $data($i)
-	    } else { set dataC($i) $data($i) }
+	    } else {
+		set dataC($i) $data($i)
+	    }
 	}
     }
     
@@ -920,9 +926,9 @@ proc cproject::Create { par } {
     grid columnconfigure $nf31 0 -weight 1
 
     set nf32 [ttk::labelframe $nf3.f2 -text [_  "working directory"]]
-    
 
-    ttk::entry $nf32.e -textvariable cproject::thisdataE(execdir)
+    ttk::combobox $nf32.e -textvariable cproject::thisdataE(execdir) \
+	-values [set! cproject::thisdataE(execdirList)]
     ttk::button $nf32.b -image [Bitmap::get file] -style Toolbutton -command \
 	[list cproject::select_executable_dir $w]
     
@@ -999,7 +1005,9 @@ proc cproject::select_executable_dir { w } {
     variable thisdataE
     variable project
 
-    if { [file isdirectory [file dirname $thisdataE(exe)]] } {
+    if { [file isdirectory $thisdataE(execdir)] } {
+	set initial $thisdataE(execdir)
+    } elseif { [file isdirectory [file dirname $thisdataE(exe)]] } {
 	set initial [file dirname $thisdataE(exe)]
     } else {
 	set initial $RamDebugger::options(defaultdir)
@@ -1009,6 +1017,7 @@ proc cproject::select_executable_dir { w } {
     if { $dir eq "" } { return }
     set dir [ConvertToRelative [file dirname $project] $dir]
     set thisdataE(execdir) $dir
+    set thisdataE(execdirList) [linsert0 [set! thisdataE(execdirList)] $dir]
 }
 
 proc cproject::update_active_inactive_makefile { w wList } {
