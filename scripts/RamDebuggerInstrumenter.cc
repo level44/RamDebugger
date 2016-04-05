@@ -1265,8 +1265,14 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
       ichar++;
 
       if(c=='\t') icharline+=8;
-      else if(c!='\n') icharline++;
-      else icharline=0;
+      else if(c!='\n'){
+	Tcl_UniChar ccharU;
+	int num=Tcl_UtfToUniChar(&block[i],&ccharU);
+	icharline++;
+	i+=num-1;
+      } else {
+	icharline=0;
+      }
       continue;
     }
     switch(c){
@@ -1458,8 +1464,14 @@ int RamDebuggerInstrumenterDoWorkForCpp_do(Tcl_Interp *ip,char* block,char* bloc
     ichar++;
 
     if(c=='\t') icharline+=8;
-    else if(c!='\n') icharline++;
-    else icharline=0;
+    else if(c!='\n'){
+      Tcl_UniChar ccharU;
+      int num=Tcl_UtfToUniChar(&block[i],&ccharU);
+      icharline++;
+      i+=num-1;
+    } else {
+      icharline=0;
+    }
   }
   blockinfo=Tcl_CopyIfShared(blockinfo);
   Tcl_ListObjAppendElement(is->ip,blockinfo,blockinfocurrent);
@@ -2143,11 +2155,14 @@ int RamDebuggerInstrumenterDoWorkForXML_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,char
 	  block=insert_remove_spaces(blockPtr,i_start_line,indentlevel*indent_spaces,&length);
 	}
       } else {
+	Tcl_UniChar ccharU;
+	int num=Tcl_UtfToUniChar(&block[i],&ccharU);
+	i+=num-1;
 	icharline++;
       }
       xml_state.enter_line_icharline(iline,icharline);
     }
-     if(xml_state.indentlevel<indentLevel0){
+    if(xml_state.indentlevel<indentLevel0){
        if(iline==2){
 	 xml_state.indentlevel++;
        } else {
@@ -2214,7 +2229,7 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
   int progress,int indentlevel_ini,int indent_spaces,int raiseerror)
 {
 
-  int i,length,lengthL;
+  int i,length,lengthL,lengthC;
   char c,*block;
   Tcl_Obj *blockinfo,*blockinfocurrent;
   const char* ms[5]; int mL[5];
@@ -2263,9 +2278,10 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	  } else {
 	    mL[0]=2;
 	  }
-	  add_new_color(ip,blockinfocurrent,"magenta",i_line,i_line+mL[0]);
+	  lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	  add_new_color(ip,blockinfocurrent,"magenta",i_line,i_line+lengthC);
 	  i+=mL[0];
-	  i_line+=mL[0];
+	  i_line+=lengthC;
 	  continue;
 	}
 	break;
@@ -2276,9 +2292,10 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	  } else {
 	    mL[0]=1;
 	  }
-	  add_new_color(ip,blockinfocurrent,"red",i_line,i_line+mL[0]);
+	  lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	  add_new_color(ip,blockinfocurrent,"red",i_line,i_line+lengthC);
 	  i+=mL[0];
-	  i_line+=mL[0];
+	  i_line+=lengthC;
 	  continue;
 	}
 	break;
@@ -2288,16 +2305,18 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	  if(len>0){
 	    while(string_regexp(&block[i],0,len,"\n",ms,mL,1)==1){
 	      mL[0]=ms[0]-&block[i];
-	      add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
+	      lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	      add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+lengthC);
 	      add_new_line(ip,blockinfo,blockinfocurrent,indentLevel);
 	      i+=mL[0]+1;
 	      len-=mL[0]+1;
 	      i_line=0;
 	      line_num++;
 	    }
-	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+len);
+	    lengthC=Tcl_NumUtfChars(&block[i],len);
+	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+lengthC);
 	    i+=len;
-	    i_line+=len;
+	    i_line+=lengthC;
 	    continue;
 	  }
 	}
@@ -2307,9 +2326,10 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	  const char* xp="^[^\\$\n]+[\\$]";
 	  if(string_regexp(block,i+1,lengthL,xp,ms,mL,1)==1){
 	    mL[0]++;
-	    add_new_color(ip,blockinfocurrent,"cyan",i_line,i_line+mL[0]);
+	    lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	    add_new_color(ip,blockinfocurrent,"cyan",i_line,i_line+lengthC);
 	    i+=mL[0];
-	    i_line+=mL[0];
+	    i_line+=lengthC;
 	    continue;
 	  }
 	}
@@ -2317,6 +2337,13 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	case '\t':
 	{
 	  i_line+=7; // total=8
+	}
+	break;
+	default:
+	{
+	  Tcl_UniChar ccharU;
+	  int num=Tcl_UtfToUniChar(&block[i],&ccharU);
+	  i+=num-1; // total=num
 	}
 	break;
       }
@@ -2354,7 +2381,7 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
   int progress,int indentlevel_ini,int indent_spaces,int raiseerror)
 {
 
-  int i,length,lengthL;
+  int i,length,lengthL,lengthC;
   char c,*block;
   Tcl_Obj *blockinfo,*blockinfocurrent;
   const char* ms[5]; int mL[5];
@@ -2379,7 +2406,7 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
   
   try {
     int i_line=0;
-    int i_line_no_space=-1;
+    int i_no_space=-1;
     int line_num=1;
     i=0;
     while(i<length){
@@ -2393,7 +2420,7 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	  add_new_line(ip,blockinfo,blockinfocurrent,indentLevel);
 	  line_num++;
 	  i_line=0;
-	  i_line_no_space=-1;
+	  i_no_space=-1;
 	  i++;
 	  continue;
 	}
@@ -2401,39 +2428,42 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	case '=':
 	{
 	  const char* rex="^=*[^=\n]+=+";
-	  if(i_line_no_space==-1 && string_regexp(block,i+1,lengthL,rex,ms,mL,1)==1){
+	  if(i_no_space==-1 && string_regexp(block,i+1,lengthL,rex,ms,mL,1)==1){
 	    mL[0]++;
-	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
+	    lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+lengthC);
 	    i+=mL[0];
-	    i_line+=mL[0];
-	    i_line_no_space=i;
+	    i_line+=lengthC;
+	    i_no_space=i;
 	    continue;
 	  }
-	  i_line_no_space=i;
+	  i_no_space=i;
 	}
 	break;
 	case '\'':
 	{
 	  if(string_regexp(block,i,lengthL,"^'''?[^'\n]+'''?",ms,mL,1)==1){
-	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+mL[0]);
+	    lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	    add_new_color(ip,blockinfocurrent,"blue",i_line,i_line+lengthC);
 	    i+=mL[0];
-	    i_line+=mL[0];
-	    i_line_no_space=i;
+	    i_line+=lengthC;
+	    i_no_space=i;
 	    continue;
 	  }
-	  i_line_no_space=i;
+	  i_no_space=i;
 	}
 	break;
 	case '<':
 	{
 	  if(string_regexp(block,i,lengthL,"^<[^\n>]+>",ms,mL,1)==1){
-	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+mL[0]);
+	    lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+lengthC);
 	    i+=mL[0];
-	    i_line+=mL[0];
-	    i_line_no_space=i;
+	    i_line+=lengthC;
+	    i_no_space=i;
 	    continue;
 	  }
-	  i_line_no_space=i;
+	  i_no_space=i;
 	}
 	break;
 	case '\\':
@@ -2443,10 +2473,11 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	  } else {
 	    mL[0]=2;
 	  }
-	  add_new_color(ip,blockinfocurrent,"magenta",i_line,i_line+mL[0]);
+	  lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	  add_new_color(ip,blockinfocurrent,"magenta",i_line,i_line+lengthC);
 	  i+=mL[0];
-	  i_line+=mL[0];
-	  i_line_no_space=i;
+	  i_line+=lengthC;
+	  i_no_space=i;
 	  continue;
 	}
 	break;
@@ -2454,39 +2485,42 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	{
 	  if(string_regexp(block,i+1,lengthL,"^\\|",ms,mL,1)==1){
 	    mL[0]++;
-	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+mL[0]);
+	    lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+lengthC);
 	    i+=mL[0];
-	    i_line+=mL[0];
-	    i_line_no_space=i;
+	    i_line+=lengthC;
+	    i_no_space=i;
 	    continue;
 	  }
-	  i_line_no_space=i;
+	  i_no_space=i;
 	}
 	break;
 	case '|':
 	{
 	  const char* xp="^\\|[-\\" close_brace_CSS "]*";
 	  if(string_regexp(block,i,lengthL,xp,ms,mL,1)==1){
-	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+mL[0]);
+	    lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	    add_new_color(ip,blockinfocurrent,"magenta2",i_line,i_line+lengthC);
 	    i+=mL[0];
-	    i_line+=mL[0];
-	    i_line_no_space=i;
+	    i_line+=lengthC;
+	    i_no_space=i;
 	    continue;
 	  }
-	  i_line_no_space=i;
+	  i_no_space=i;
 	}
 	break;
 	case open_braquet_CS:
 	{
 	  const char* xp="^\\[\\[[^\n\\" close_braquet_CSS "]+\\]\\]";
 	  if(string_regexp(block,i,lengthL,xp,ms,mL,1)==1){
-	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+mL[0]);
+	    lengthC=Tcl_NumUtfChars(&block[i],mL[0]);
+	    add_new_color(ip,blockinfocurrent,"green",i_line,i_line+lengthC);
 	    i+=mL[0];
-	    i_line+=mL[0];
-	    i_line_no_space=i;
+	    i_line+=lengthC;
+	    i_no_space=i;
 	    continue;
 	  }
-	  i_line_no_space=i;
+	  i_no_space=i;
 	}
 	break;
 	case ' ':
@@ -2501,7 +2535,10 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	break;
 	default:
 	{
-	  i_line_no_space=i;
+	  Tcl_UniChar ccharU;
+	  int num=Tcl_UtfToUniChar(&block[i],&ccharU);
+	  i+=num-1; // total=num
+	  i_no_space=i;
 	}
 	break;
       }
