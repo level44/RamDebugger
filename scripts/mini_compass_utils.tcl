@@ -1381,11 +1381,13 @@ proc cu::ps { args } {
 	set ps_args ""
 	foreach i $args {
 	    if { $i eq "" } { continue }
-	    if { ![regexp {^\*} $i] } {
-		set i "*$i"
-	    }
-	    if { ![regexp {\*$} $i] } {
-		set i "$i*"
+	    if { ![string is integer -strict $i] } {
+		if { ![regexp {^\*} $i] } {
+		    set i "*$i"
+		}
+		if { ![regexp {\*$} $i] } {
+		    set i "$i*"
+		}
 	    }
 	    lappend ps_args $i
 	}
@@ -1396,12 +1398,14 @@ proc cu::ps { args } {
 	    lassign $i cmd pid
 	    if { [info command ::twapi::get_process_info] ne "" } {
 		set d [twapi::get_process_info $pid -createtime -privilegedtime -workingset]
-		set stime [clock format [twapi::large_system_time_to_secs [dict get $d -createtime]] \
-		        -format "%H:%M:%S"]
-		set cputime [clock format [twapi::large_system_time_to_secs \
-		            [dict get $d -privilegedtime]] -format "%H:%M:%S" -timezone :UTC]
-		set size [expr {[dict get $d -workingset]/1024}]
-		set i [list $cmd $pid $stime $cputime $size]
+		if { [string is digit -strict [dict get $d -createtime]] } {
+		    set start [clock format [twapi::large_system_time_to_secs [dict get $d -createtime]] \
+		            -format "%H:%M:%S"]
+		    set cputime [clock format [twapi::large_system_time_to_secs \
+		                [dict get $d -privilegedtime]] -format "%H:%M:%S" -timezone :UTC]
+		    set size [expr {[dict get $d -workingset]/1024}]
+		    set i [list $cmd $pid $start $cputime $size]
+		}
 	    }
 	    lappend retret $i
 	}
@@ -1412,22 +1416,28 @@ proc cu::ps { args } {
 	#set retList  [split $ret \n]
 	lassign $args pattern
 	if { $pattern eq "" } {
-	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,pcpu,size,cmd } ret]
+	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,start,time,pcpu,size,cmd } ret]
 	} elseif { [string is integer -strict $pattern] } {
-	    set err [catch { exec ps --pid $pattern --no-headers -o pid,stime,time,pcpu,size,cmd } ret]
+	    set err [catch { exec ps --pid $pattern --no-headers -o pid,start,time,pcpu,size,cmd } ret]
 	} else {
-	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,stime,time,pcpu,size,cmd | grep -i $pattern } ret]
+	    set err [catch { exec ps -u $::env(USER) --no-headers -o pid,start,time,pcpu,size,cmd | grep -i $pattern } ret]
 	}        
 	if { $err } {
 	    return ""
 	} else {
 	    set retList ""
 	    foreach line [split $ret \n] {
-		regexp {(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)} $line {} pid stime cputime \
+		regexp {(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)} $line {} pid start cputime \
 		    pcpu size cmd
-		set pcpu [format "%02.0f%%" $pcpu]
+		catch { format "%02.0f%%" $pcpu } pcpu
 		if { $pattern ne "" && $cmd eq "grep -i $pattern" } { continue }
-		lappend retList [list $cmd $pid $stime "$cputime ($pcpu)" $size]
+
+		set err [catch { clock scan $start -format "%H:%M:%S" } secs]
+		if { $err } {
+		    set secs [clock scan $start -format "%b"]
+		}
+		set start [clock format $secs -format "%Y-%m-%d %H:%M:%S"]
+		lappend retList [list $cmd $pid $start "$cputime ($pcpu)" $size]
 	    }
 	    return $retList
 	}
