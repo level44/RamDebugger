@@ -2704,9 +2704,9 @@ proc RamDebugger::SearchWindow { args }  {
     ttk::combobox $f.e1 -textvariable ::RamDebugger::searchstring -values $options(old_searchs)
 
     cu::text_entry_bindings $f.e1
-
+    
     # to avoid problems with paste, that sometimes pastes too to the main window
-    bind $f.e1 "[bind [winfo class $f.e1] $f.e1]; break"
+    bind $f.e1 <<Paste>> "[bind [winfo class $f.e1] <<Paste>>]; break"
     
     set cmd "$f.e1 configure -values \$RamDebugger::options(old_searchs)"
     trace add variable ::RamDebugger::options(old_searchs) write "$cmd ;#"
@@ -2771,6 +2771,8 @@ proc RamDebugger::SearchWindow { args }  {
 	ttk::combobox $f.e11 -textvariable ::RamDebugger::replacestring \
 	    -values $options(old_replaces)
 	cu::text_entry_bindings $f.e11
+	bind $f.e11 <<Paste>> "[bind [winfo class $f.e11] <<Paste>>]; break"
+	
 	raise $f.e11 $f2.r1
 	frame $f.buts
 	
@@ -3198,6 +3200,24 @@ proc RamDebugger::Search_get_selection { active_text } {
     }
 }
 
+proc RamDebugger::Search_paste_selection { active_text } {
+
+    set err [catch {::tk::GetSelection $active_text CLIPBOARD} txt]
+    puts "$err--$txt"
+    if { $err } { return }
+    
+    set save_traces [trace info variable RamDebugger::searchstring]
+    foreach i $save_traces {
+	trace remove variable RamDebugger::searchstring {*}$i
+    }
+    set RamDebugger::searchstring $txt
+    set RamDebugger::Lastsearchstring $txt
+    
+    foreach i $save_traces {
+	trace add variable RamDebugger::searchstring {*}$i
+    }
+}
+
 proc RamDebugger::Search_goHome { active_text } {
     
     $active_text mark set insert 1.0
@@ -3321,6 +3341,7 @@ proc RamDebugger::Search { w what { raiseerror 0 } {f "" } } {
 	    bind $w.search <$::control-g> "RamDebugger::Search $w stop ; break"
 	    bind $w.search <$::control-x> "RamDebugger::Search_toggle_regexp_mode $w.search; break"
 	    bind $w.search <$::control-c> "RamDebugger::Search_get_selection $active_text; break"
+	    bind $w.search <$::control-v> "RamDebugger::Search_paste_selection $active_text; break"
 	    bind $w.search <Home> "RamDebugger::Search_goHome $active_text; break"
 	    bind $w.search <$::control-Shift-Left> "RamDebugger::Search_increase_selection $active_text left; break"
 	    bind $w.search <$::control-Shift-Right> "RamDebugger::Search_increase_selection $active_text right; break"
