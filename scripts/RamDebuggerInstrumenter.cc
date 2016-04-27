@@ -2275,6 +2275,8 @@ int RamDebuggerInstrumenterDoWorkForLatex_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,ch
 	{
 	  if(string_regexp(block,i+1,lengthL,"^[a-zA-Z]+",ms,mL,1)==1){
 	    mL[0]++;
+	  } else if(block[i+1]=='\n'){
+	    mL[0]=1;
 	  } else {
 	    mL[0]=2;
 	  }
@@ -2470,6 +2472,8 @@ int RamDebuggerInstrumenterDoWorkForWiki_do(Tcl_Interp *ip,Tcl_Obj* blockPtr,cha
 	{
 	  if(string_regexp(block,i+1,lengthL,"^[a-zA-Z]+",ms,mL,1)==1){
 	    mL[0]++;
+	  } else if(block[i+1]=='\n'){
+	    mL[0]=1;
 	  } else {
 	    mL[0]=2;
 	  }

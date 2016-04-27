@@ -20,6 +20,12 @@ proc RamDebugger::CreateImages {} {
 	/////////////////////////yH5BAEKAB8ALAAAAAALAAsAAAUn4CeOZGme
 	H4CKgTAOREwUxoGIiaLvC6N8DYfQ8YBEJKgJZVVZOU0hADs=
     }]
+    set images(linecontinue) [image create photo -data {
+	    R0lGODlhEAAQAIQYAPwCBCyaXBRiNKzCtNzu3MTSzLzSxIzCjDSmXBxWJETOfBQ+FCSKFDSCNBxS
+	    HHSmfJzOnISyjMTexCSCRKzWrFSyXDyKTBxmPP///////////////////////////////yH5BAEK
+	    AB8ALAAAAAAQABAAAAVZ4CeOZGkKl2CWQruy7ju26hhcKX19U00KDIWiYllMeisgAkExMnw/xVKy
+	    CDAC0JYUEqF+rA2sICBEEByJx+JrWCLK5lpizT64CQZowhYYEAoxMgFYMoWGhSEAOw==
+	}]
     set images(arrowbreak) [image create photo -data {
 	R0lGODlhCwALAKUAAMQ4OMQ6OsZBQchGRsZCQs/PtclLS9NsbNd7e9Rubrq6
 	ltjYw8zMsb6+nby8ma2thLa2kd7ezb6+nKysga2tgrOzjM3Ns8DAn729m66u

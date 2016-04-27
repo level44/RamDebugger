@@ -8199,6 +8199,7 @@ proc RamDebugger::ScrollScrollAndCanvas { text yscroll canvas args } {
     eval $yscroll set $args
     $canvas yview moveto [lindex [$text yview] 0]
     MoveCanvas $text $canvas
+    update_wrap_indicators_idle
 }
 
 proc RamDebugger::InitOptions {} {
@@ -8802,14 +8803,59 @@ proc RamDebugger::set_title { title } {
     }
 }
 
+proc RamDebugger::update_wrap_indicators_idle {} {
+    variable update_wrap_indicators_after
+
+    after cancel [set! update_wrap_indicators_after]
+    set update_wrap_indicators_after [after idle \
+	    [list RamDebugger::update_wrap_indicators]]
+}
+
+proc RamDebugger::update_wrap_indicators {} {
+    variable update_wrap_indicators_after
+    variable update_wrap_indicators_size
+    variable text
+    variable marker
+    variable images
+
+    after cancel $update_wrap_indicators_after
+    
+    set uwis [list [winfo height $text] [$text yview] \
+	    [$text cget -wrap]]
+    if { $uwis eq [set! update_wrap_indicators_size] } {
+	return
+    }
+    set update_wrap_indicators_size $uwis
+    
+    $marker delete newline
+
+    if { [$text cget -wrap] eq "none" } { return }
+    
+    scan [$text index @0,0] %d idx1
+    scan [$text index @0,[winfo height $text]] %d idx2
+   
+    for { set i $idx1 } { $i < $idx2 } { incr i } {
+	set nl [$text count -displaylines $i.0 [expr {$i+1}].0]
+	if { $nl == 1 } { continue }
+	
+	for { set j 2 } { $j <= $nl } { incr j } {
+	    lassign [$text bbox "$i.0+$j display line"] x y w h
+	    set ypos [$marker canvasy $y]
+	    $marker create image 0 $ypos -anchor sw \
+		-image $images(linecontinue) -tags "newline l$i"
+	}
+    }
+}
+
 proc RamDebugger::ToggleTextWrap {} {
     variable text
-    
+
     if { [$text cget -wrap] eq "none" } {
 	$text configure -wrap word  -spacing1 -5
     } else {
 	$text configure -wrap none
     }
+    update_wrap_indicators_idle
 }
 
 proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } { topleveluse "" } } {
@@ -9592,7 +9638,9 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     if { $big_icons } {
 	$fulltext.yscroll configure -width 22
     }
-
+	
+    bind $text <Configure> [list RamDebugger::update_wrap_indicators_idle]
+	
 #    grid $fulltext.can $fulltext.text $fulltext.yscroll -sticky wns
     
 #    grid $fulltext.can -bg grey90 -grid "0 wns"
