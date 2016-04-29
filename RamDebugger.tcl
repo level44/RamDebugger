@@ -8833,13 +8833,14 @@ proc RamDebugger::update_wrap_indicators {} {
     
     scan [$text index @0,0] %d idx1
     scan [$text index @0,[winfo height $text]] %d idx2
-   
+    
     for { set i $idx1 } { $i < $idx2 } { incr i } {
 	set nl [$text count -displaylines $i.0 [expr {$i+1}].0]
 	if { $nl == 1 } { continue }
 	
 	for { set j 2 } { $j <= $nl } { incr j } {
 	    lassign [$text bbox "$i.0+$j display line"] x y w h
+	    if { $y eq "" } { continue }
 	    set ypos [$marker canvasy $y]
 	    $marker create image 0 $ypos -anchor sw \
 		-image $images(linecontinue) -tags "newline l$i"
