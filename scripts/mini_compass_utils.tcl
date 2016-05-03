@@ -1345,6 +1345,7 @@ proc dict_getd { args } {
 proc linsert0 { args } {
     set optional {
 	{ -max_len len "" }
+	{ -remove_prefixes "" 0 }
     }
     set compulsory "list element"
     parse_args $optional $compulsory $args
@@ -1353,9 +1354,17 @@ proc linsert0 { args } {
     if { $ipos != -1 } {
 	set list [lreplace $list $ipos $ipos]
     }
+    if { $remove_prefixes } {
+	for { set i 0 } { $i < [llength $list] } { incr i } {
+	    if { [string match "[lindex $list $i]*" $element] } {
+		set list [lreplace $list $i $i]
+		incr i -1
+	    }
+	}
+    }
     set list [linsert $list 0 $element]
     if { $max_len ne "" } {
-	set list [lrange $list 0 $max_len]
+	set list [lrange $list 0 $max_len-1]
     }
     return $list
 }
