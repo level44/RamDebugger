@@ -9868,7 +9868,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     ################################################################################
 
     if {[string equal "unix" $::tcl_platform(platform)]} {
-	foreach "but units" [list 4 -1 5 1] {
+	foreach "but units" [list 4 -3 5 3] {
 	    set comm {
 		set w %W
 		while { $w != [winfo toplevel $w] } {
