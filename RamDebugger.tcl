@@ -8819,9 +8819,9 @@ proc RamDebugger::update_wrap_indicators {} {
     variable images
 
     after cancel $update_wrap_indicators_after
-    
-    set uwis [list [winfo height $text] [$text yview] \
-	    [$text cget -wrap]]
+
+    set yview [lindex [$text yview] 0]
+    set uwis [list [winfo height $text] $yview [$text cget -wrap]]
     if { $uwis eq [set! update_wrap_indicators_size] } {
 	return
     }
