@@ -8224,8 +8224,12 @@ proc RamDebugger::InitOptions {} {
 }
 
 proc RamDebugger::ApplyDropBinding { w command } {
+
     if { [info commands dnd] eq "" } { return }
-    dnd bindtarget $w text/uri-list <Drop> $command
+    
+    if { [winfo class $w] ni "Menu" } {
+	dnd bindtarget $w text/uri-list <Drop> $command
+    }
     foreach i [winfo children $w] {
 	ApplyDropBinding $i $command
     }
@@ -10071,7 +10075,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 	# should it be the text ?
 	ApplyDropBinding $text [list RamDebugger::DropBindingDone %D]
     } elseif { $::tcl_platform(os) == "Linux"} {
-	ApplyDropBinding $mainframe [list RamDebugger::DropBindingDone %D]
+	ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
     } else {
 	ApplyDropBinding $w [list RamDebugger::DropBindingDone %D]
     }
