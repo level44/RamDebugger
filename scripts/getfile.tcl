@@ -74,8 +74,8 @@ proc RamDebugger::GetFile { what types title }  {
     bind $f.e1 <Escape> [list set RamDebugger::getFile_done 0]
     bind $f.e1 <$::alt-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
     bind $f.e1 <$::control-BackSpace> "[list RamDebugger::GetFile_del_backwards] ; break"
-    bind $f.e1 <Home> [list RamDebugger::GetFile_Home home]
-    bind $f.e1 <Shift-Home> [list RamDebugger::GetFile_Home desktop]
+#     bind $f.e1 <Home> [list RamDebugger::GetFile_Home home]
+#     bind $f.e1 <Shift-Home> [list RamDebugger::GetFile_Home desktop]
     bind $f <1> {
 	if { %Y < [winfo rooty %W] || %Y > \
 	    [expr {[winfo rooty %W]+[winfo height %W]}] } {
@@ -94,6 +94,10 @@ proc RamDebugger::GetFile { what types title }  {
 
     bind $f.e1 <Control-Tab> "[list set RamDebugger::getFile_done 0] ; [bind $text <Control-KeyPress-Tab>]"
 
+    foreach ev [list <<Paste>>] {
+	bind $f.e1 $ev "[bind [winfo class $f.e1] $ev]; break"
+    }
+    
     tooltip::tooltip $f.e1 "\
 	Enter the filename path. Remote paths are also allowed. Examples:\n\
 	\tplink://user@host/filename"
