@@ -8977,7 +8977,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     CreateModifyFonts
     InitOptions
     
-    set tktablet_ok [expr {![catch { package require tktablet }]}]
+    #set tktablet_ok [expr {![catch { package require tktablet }]}]
+    set tktablet_ok 0
 
     if { $::tcl_platform(os) eq "Darwin" } {
 	set tktablet_ok 0 
