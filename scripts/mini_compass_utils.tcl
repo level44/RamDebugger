@@ -1,6 +1,15 @@
 
 package require snit
 
+proc set! { varName args } {
+    
+    upvar 1 $varName v
+    if { [llength $args] == 0 && ![info exists v] } {
+	return ""
+    }
+    return [uplevel 1 [list set $varName {*}$args]]
+}
+
 proc info_fullargs { procname } {
     set ret ""
     foreach arg [uplevel 1 [list info args $procname]] {
