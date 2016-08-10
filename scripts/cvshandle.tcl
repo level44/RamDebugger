@@ -2801,6 +2801,7 @@ proc RamDebugger::VCS::update_recursive_cmd { w what args } {
 		        set sel_ids [file dirname $file]
 		    }
 		    if { $file eq "" } {
+		        set files ""
 		        foreach item $sel_ids {
 		            if { ![regexp {^(\w+)\s+(\S+)} [$tree item text $item 0] {} mode file] } { continue }
 		            set dir [$tree item text [$tree item parent $item] 0]
