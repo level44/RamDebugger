@@ -333,6 +333,7 @@ proc RamDebugger::Init { _readwriteprefs _prefs_group { registerasremote 1 } { _
     set options_def(listfilespane) 0
     set options_def(viewvariablespaneV2) 0
     set options_def(auto_raise_stack_trace) 0
+    set options_def(auto_raise_output) 1
     
     set options_def(filetype) auto
     set options_def(filetype_only_this_file) 1
@@ -6301,7 +6302,9 @@ proc RamDebugger::TextOutRaiseDo { pane } {
 #     if { [info exists options(auto_raise_stack_trace)] && $options(auto_raise_stack_trace) } {
 #         catch { $pane raise output }
 #     }
-    catch { $pane raise output }
+    if { $options(auto_raise_output) } {
+	catch { $pane raise output }
+    }
 }
 
 proc RamDebugger::TextCompGet {} {
@@ -9723,6 +9726,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		$f.m add command -label [_ "Clear"] -command RamDebugger::TextOutClear
 		$f.m add checkbutton -label [_ "Auto raise stack trace"] -variable \
 		    RamDebugger::options(auto_raise_stack_trace)
+		$f.m add checkbutton -label [_ "Auto raise output"] -variable \
+		    RamDebugger::options(auto_raise_output)
 	    }
 	    compile {
 		set xt [expr {$x-[winfo rootx $f]}]
