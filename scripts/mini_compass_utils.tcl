@@ -983,7 +983,7 @@ proc cu::text::get_selection_or_word { args } {
 	    set var ""
 	    set idx0 $idx
 	    set char [$text get $idx0]
-	    if { [string is space $char] } {
+	    if { [regexp {[\s,;]} $char] } {
 		set c [$text get "$idx0-1c"]
 		if { [string is wordchar $c] } {
 		    set idx [$text index "$idx0-1c"]
