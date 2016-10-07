@@ -1739,7 +1739,7 @@ proc RamDebugger::rlist { args } {
 		fconfigure $fin -encoding utf-8
 	    }
 	    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
-	    append rex {|<\?xml\s+version=\S+\s*\?>}
+	    append rex {|<\?xml\s+version=\S+\s*\?>|charset=UTF-8}
 	    if { [regexp -nocase -line -- $rex $header] } {
 		fconfigure $fin -encoding utf-8
 	    }
