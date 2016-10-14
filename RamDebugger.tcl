@@ -1850,6 +1850,9 @@ proc RamDebugger::rlist { args } {
 	    if { $read_from_file } {
 		if { [info command ::p::xml] ne "" } {
 		    set err [catch { p::xml parse $files($currentfile) } doc]
+		    if { $err } {
+		        set err [catch { p::xml parse -html $files($currentfile) } doc]
+		    }
 		    if { !$err } {
 		        set files($currentfile) [$doc asXML]
 		        $doc delete
@@ -1863,7 +1866,8 @@ proc RamDebugger::rlist { args } {
 		    }
 		}
 	    }
-	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) instrumentedfilesInfo($currentfile) } errstring]
+	    set err [catch { Instrumenter::DoWorkForXML $files($currentfile) \
+		        instrumentedfilesInfo($currentfile) } errstring]
 	    if { $err } {
 		set einfo $::errorInfo
 		RamDebugger::ProgressVar 100
@@ -4624,7 +4628,9 @@ proc RamDebugger::_savefile_only { args } {
 	fconfigure $fout -translation $file_endline
 
 	set header [string range $data 0 255]
+	
 	set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
+	append rex {|<\?xml\s+version=\S+\s*\?>|charset=UTF-8}
 	if { [regexp -nocase -line -- $rex $header] } {
 	    fconfigure $fout -encoding utf-8
 	}
@@ -9403,7 +9409,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		   -anchor e -padx 3 -anchor w]
     set menu [$mainframe getmenu activeprograms]
     set menu1 [menu $w.actualizeprogramsmenu -tearoff 0]
-    $menu1 configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu1 1]
+    $menu1 configure -postcommand [list RamDebugger::ActualizeActivePrograms $menu1 0]
 
     bind $label <1> "tk_popup $menu1 %X %Y"
     set menu [$mainframe getmenu view]
