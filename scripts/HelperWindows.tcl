@@ -1982,6 +1982,7 @@ proc RamDebugger::GotoLine {} {
 
     set w [dialogwin_snit $active_text._ask -title [_ "Goto line"] -class $::className]
     set f [$w giveframe]
+    wm attributes $w -type dialog
 
     ttk::label $f.l -text [_ "Go to line:"]
     spinbox $f.sb -from 1 -to 10000 -increment 1 -textvariable [$w give_uservar line] \
