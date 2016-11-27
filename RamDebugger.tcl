@@ -481,24 +481,27 @@ proc RamDebugger::UpdateExecDirs {} {
 	}
     }
 
-    if { ![info exists ::env(PATH)] } {
-	set list ""
-    } else {
-	set list [split $::env(PATH) \;]
-    }
+    set path_list [split [set ::env(PATH)] \;]
+    set ld_list [split [set ::env(LD_LIBRARY_PATH)] :]
+
     set haschanged 0
     foreach i $options(executable_dirs) {
 	if { $::tcl_platform(platform) eq "windows" } {
 	    set err [catch { set shortname [file native [file attributes $i -shortname]] }]
 	    if { !$err } { set i $shortname }
 	}
-	if { [lsearch -exact $list $i] == -1 } {
-	    lappend list $i
+	if { [lsearch -exact $path_list $i] == -1 } {
+	    lappend path_list $i
+	    set haschanged 1
+	}
+	if { [lsearch -exact $ld_list $i] == -1 } {
+	    lappend ld_list $i
 	    set haschanged 1
 	}
     }
     if { $haschanged } {
-	set ::env(PATH) [join $list \;]
+	set ::env(PATH) [join $path_list \;]
+	set ::env(LD_LIBRARY_PATH) [join $ld_list :]
 	# this is a variable from the TCL library
 	array unset ::auto_execs
     }
