@@ -481,9 +481,16 @@ proc RamDebugger::UpdateExecDirs {} {
 	}
     }
 
-    set path_list [split [set ::env(PATH)] \;]
-    set ld_list [split [set ::env(LD_LIBRARY_PATH)] :]
-
+    if { ![info exists  ::env(PATH)]  } {
+	set path_list ""
+    } else {
+	set path_list [split [set ::env(PATH)] \;]
+      }
+    if { ![info exists  ::env(LD_LIBRARY_PATH)]  } {
+	set ld_list ""
+    } else {
+	set ld_list [split [set ::env(LD_LIBRARY_PATH)] :]
+    }
     set haschanged 0
     foreach i $options(executable_dirs) {
 	if { $::tcl_platform(platform) eq "windows" } {
