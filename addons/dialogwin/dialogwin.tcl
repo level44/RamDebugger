@@ -125,7 +125,7 @@ if { [info commands tkButtonInvoke] == "" } {
     #::tk::unsupported::ExposePrivateCommand tkButtonInvoke
 }
 
-package provide dialogwin 1.30
+package provide dialogwin 1.31
 
 ################################################################################
 #  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
@@ -2028,6 +2028,9 @@ snit::widget dialogwin_snit {
 	if { $options(-transient) } {
 	    if { [wm state $top] ne "withdrawn" } {
 		wm transient $win $parent
+	    }
+	    if { $::tcl_platform(platform) eq "unix" } {
+		wm attributes $w -type dialog
 	    }
 	}
 	update
