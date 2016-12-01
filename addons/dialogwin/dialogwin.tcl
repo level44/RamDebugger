@@ -2030,7 +2030,7 @@ snit::widget dialogwin_snit {
 		wm transient $win $parent
 	    }
 	    if { $::tcl_platform(platform) eq "unix" } {
-		wm attributes $w -type dialog
+		wm attributes $win -type dialog
 	    }
 	}
 	update

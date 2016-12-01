@@ -9166,7 +9166,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[_ "Increase main text font"] "" \
 		-command "RamDebugger::increase_decrease_text_font increase"] \
 	    [list command &[_ "Wrap text words"] {} \
-		[_ "Toggle wrap of text long lines"] "Alt w" \
+		[_ "Toggle wrap of text long lines"] "ShiftCtrl W" \
 		-command "RamDebugger::ToggleTextWrap"] \
 	    separator \
 	    [list checkbutton [_ "Status bar"] {} \
