@@ -9166,7 +9166,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
 		[_ "Increase main text font"] "" \
 		-command "RamDebugger::increase_decrease_text_font increase"] \
 	    [list command &[_ "Wrap text words"] {} \
-		[_ "Toggle wrap of text long lines"] "ShiftCtrl W" \
+		[_ "Toggle wrap of text long lines"] "Ctrl W" \
 		-command "RamDebugger::ToggleTextWrap"] \
 	    separator \
 	    [list checkbutton [_ "Status bar"] {} \
@@ -10022,8 +10022,8 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     bind $text <Control-MouseWheel> "[list RamDebugger::increase_decrease_text_font wheel %D]; break"
     bind $text <Control-Button-4> "[list RamDebugger::increase_decrease_text_font wheel 120]; break"
     bind $text <Control-Button-5> "[list RamDebugger::increase_decrease_text_font wheel -120]; break"
-    bind $text <Control-w> [list RamDebugger::ExitGUI]
-    
+    #bind $text <Control-w> [list RamDebugger::ExitGUI]
+	
     for { set i 0 } { $i <=9 } { incr i } {
 	bind $text <$::control-u><$::control-Key-$i> "[list event generate $text <F$i>]; break"
 	bind $text <$::control-u><$::control-s><$::control-Key-$i> \
