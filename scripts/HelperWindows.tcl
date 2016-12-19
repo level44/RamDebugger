@@ -1969,7 +1969,6 @@ proc RamDebugger::MotionInAbout { but } {
 # GotoLine
 ################################################################################
 
-
 proc RamDebugger::GotoLine {} {
     variable text
     variable text_secondary
@@ -1980,6 +1979,7 @@ proc RamDebugger::GotoLine {} {
 	set active_text $text
     }
 
+    set focus [focus]
     set w [dialogwin_snit $active_text._ask -title [_ "Goto line"] -class $::className]
     set f [$w giveframe]
     if { $::tcl_platform(platform) eq "unix" } {
@@ -2016,6 +2016,7 @@ proc RamDebugger::GotoLine {} {
 	switch $action {
 	    0 {
 		destroy $w
+		catch { focus -force $focus }
 		return
 	    }
 	    1 {
@@ -2044,6 +2045,7 @@ proc RamDebugger::GotoLine {} {
 		    $active_text see $line.0
 		    focus $active_text
 		    destroy $w
+		    catch { focus -force $focus }
 		    return
 		}
 	    }
@@ -2343,7 +2345,9 @@ proc RamDebugger::SearchInFilesDo { w } {
     variable searchstring
     
     if { [$w giveaction] < 1 || $searchstring eq "" } {
+	set focus [$w give_uservar_value focus]
 	destroy $w
+	catch { focus -force $focus }
 	return
     }
 
@@ -2456,6 +2460,7 @@ proc RamDebugger::SearchInFiles {} {
 
     set txt [GetSelOrWordInIndex insert]
     
+    set focus [focus]
     set w [dialogwin_snit $text.%AUTO% -title [_ "Search in files"] -class $::className \
 	    -grab 0 -transient 1 -callback [namespace code SearchInFilesDo] \
 	    -cancelname [_ Close]]
@@ -2575,6 +2580,7 @@ proc RamDebugger::SearchInFiles {} {
     tk::TabToWindow $f.e1
     bind $w <Return> [list $w invokeok]
     
+    $w set_uservar_value focus $focus
     set action [$w createwindow]
 }
 
