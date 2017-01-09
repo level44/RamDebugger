@@ -805,7 +805,7 @@ proc RamDebugger::rdebug { args } {
 	set pid [lindex [pid $fid] 0]
 	cd $pwd
 	set remoteserver [list $fid $pid $opts(program) start]
-	fconfigure $fid -blocking 0 -buffering line
+	fconfigure $fid -blocking 0 -buffering line -encoding utf-8
 	fileevent $fid readable RamDebugger::ReceiveFromGdb
 	TakeArrowOutFromText
     } else {
@@ -1095,6 +1095,7 @@ proc RamDebugger::rdebug { args } {
 	append remotecomm "set print elements 200\n"
 	append remotecomm "set print repeats 100\n"
 	append remotecomm "set print address off\n"
+	append remotecomm "set charset UTF-8\n"
 	lassign $opts(program) cmd dir args
 	if { [file exists $dir] } {
 	    append remotecomm "cd \"$dir\"\n"
