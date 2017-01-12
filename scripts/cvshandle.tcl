@@ -991,8 +991,7 @@ proc RamDebugger::VCS::indicator_update_do { cvs_or_fossil } {
     set cdir [file tail [file dirname $currentfile]]
    
     if { ![info exists fossil_indicator_fileid] } {
-	#return ;#kike: uncommenting this return spend all cpu when opening ramdebugger from GiD !!!
-	return
+	#return ;#kike: uncommenting this return spend all cpu when opening ramdebugger from GiD !!!	
     }
     if { $cvs_or_fossil eq "cvs" } {
 	append cvs_indicator_data "[gets $cvs_indicator_fileid]\n"
