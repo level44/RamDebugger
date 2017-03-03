@@ -598,7 +598,8 @@ proc RamDebugger::DisplayWindowsHierarchy {} {
     variable text
     
     destroy $text.windowshierarchy
-    set w [dialogwin_snit $text.windowshierarchy -title [_ "Windows hierarchy"] -class $::className -okname "" \
+    set w [dialogwin_snit $text.windowshierarchy -title [_ "Windows hierarchy"] \
+	    -class ${::className}w -okname "" \
 	    -grab 0 -callback RamDebugger::DisplayWindowsHierarchyCancel]
     set f [$w giveframe]    
 
