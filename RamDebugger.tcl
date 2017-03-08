@@ -1741,7 +1741,7 @@ proc RamDebugger::rlist { args } {
 	}
 	set fconf [fconfigure $fin]
 	fconfigure $fin -translation binary
-	set header [read $fin 1024]
+	set header [read $fin 2000]
 	seek $fin 0
 	fconfigure $fin {*}$fconf
 	if { $opts(-encoding) != 0 && $opts(-encoding) != "" } {
@@ -1751,7 +1751,8 @@ proc RamDebugger::rlist { args } {
 		fconfigure $fin -encoding utf-8
 	    }
 	    set rex {-\*-.*coding:\s*utf-8\s*;.*-\*-|encoding=['\"]utf-8['\"]}
-	    append rex {|<\?xml\s+version=\S+\s*\?>|charset=['"]?UTF-8['"]?}
+	    append rex {|<\?xml\s+version=\S+\s*\?>|charset=['"]?UTF-8['"]?|}
+	    append rex {\\usepackage\[utf8\]{inputenc}}
 	    if { [regexp -nocase -line -- $rex $header] } {
 		fconfigure $fin -encoding utf-8
 	    }
