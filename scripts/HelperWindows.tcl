@@ -3088,6 +3088,16 @@ proc RamDebugger::textPaste_insert_after { w } {
 	    set from [$w get sel.first sel.last]
 	    set rex $searchstring
 	    set to $sel
+	    
+	    # special hack to substitute utf-8 \uAAAA into their equivalent
+	    # \xAA\xBB (\uAAAA does not work in windows)
+	    if { [regexp {^\\u\w{4}} $from] && $to eq "" } {
+		set letter [subst $from]
+		set to ""
+		foreach i [split [encoding convertto utf-8 $letter] ""] {
+		    append to [format "\\x%x" [scan $i %c]]
+		}
+	    }
 	    regsub $rex $from $to sel
 	}
     }    
