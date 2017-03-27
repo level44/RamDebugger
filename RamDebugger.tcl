@@ -4881,6 +4881,15 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 #         exec open [file join $topdir help 01RamDebugger RamDebugger_toc.html] &
 #         return
 #     }
+    
+    
+    set err [catch { package require drawp }]
+    if { !$err } {
+	drawp::execute help_directory [file join $topdir help] -quit
+	drawp::execute hide_window 0
+	return
+    }
+    
     package require helpviewer
 
     HelpViewer::EnterDirForIndex $AppDataDir
@@ -4896,13 +4905,9 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 
 proc RamDebugger::ViewHelpForWord { { word "" } } {
     variable text
+    variable topdir
     variable AppDataDir
 
-    package require helpviewer
-
-    HelpViewer::EnterDirForIndex $AppDataDir
-
-    set w [ViewHelpFile]
 
     set range [$text tag ranges sel]
     if { $word != "" } {
@@ -4926,9 +4931,25 @@ proc RamDebugger::ViewHelpForWord { { word "" } } {
 	    if { [$text compare $idx1 >= end-1c] } { break }
 	    set idx1 [$text index $idx1+1c]
 	}
-	if { $word == "" } { return }
     }
-    HelpViewer::HelpSearchWord $word
+    
+    set err [catch { package require drawp }]
+    if { !$err } {
+	drawp::execute help_directory [file join $topdir help] -quit
+	drawp::execute help_search $word
+	drawp::execute hide_window 0
+	return
+    }
+    
+    package require helpviewer
+
+    HelpViewer::EnterDirForIndex $AppDataDir
+
+    set w [ViewHelpFile]
+    
+    if { $word ne "" } {
+	HelpViewer::HelpSearchWord $word
+    }
 }
 
 proc RamDebugger::ActualizeActiveProgramsIfVoid { menu } {
