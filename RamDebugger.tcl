@@ -4872,9 +4872,18 @@ proc RamDebugger::ViewInstrumentedFile { what } {
     set currentfile_endline auto
 }
 
+proc RamDebugger::FocusToText { hidden } {
+    variable text
+   
+    if { $hidden } {
+	focus -force $text
+    }
+}
+
 proc RamDebugger::ViewHelpFile { { file "" } } {
     variable topdir
     variable AppDataDir
+    variable text
     
 #     if { [ tk windowingsystem] eq "aqua" } {
 #         tk_messageBox -message [_ "Normal help is not active on MacOSX. You'll be redirected to a web browser"]
@@ -4887,6 +4896,8 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
     if { !$err } {
 	drawp::execute help_directory [file join $topdir help] -quit
 	drawp::execute hide_window 0
+	drawp::execute on_hide_command RamDebugger::FocusToText
+	bind $text <Destroy> { drawp::execute hide_window 1 }
 	return
     }
     
@@ -4938,6 +4949,8 @@ proc RamDebugger::ViewHelpForWord { { word "" } } {
 	drawp::execute help_directory [file join $topdir help] -quit
 	drawp::execute help_search $word
 	drawp::execute hide_window 0
+	drawp::execute on_hide_command RamDebugger::FocusToText
+	bind $text <Destroy> { drawp::execute hide_window 1 }
 	return
     }
     
