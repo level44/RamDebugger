@@ -2558,6 +2558,7 @@ proc RamDebugger::SearchInFiles {} {
 	    [list 35 [_ "Path"] left text 0] \
 	    ]
     
+    package require fulltktree
     $w set_uservar_value toctree [fulltktree $f.toctree \
 	    -selecthandler2 [list RamDebugger::SearchInFilesGo $w] \
 	    -columns $columns -expand 0 \

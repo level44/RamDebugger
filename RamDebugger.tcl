@@ -174,7 +174,7 @@ namespace eval RamDebugger {
     }
     lappend ::auto_path [file dirname $topdir]
     lappend ::auto_path [file join $topdir scripts]
-    lappend ::auto_path [file join $topdir_external addons]
+    set ::auto_path [linsert $::auto_path 0 [file join $topdir_external addons]]
 }
 
 ################################################################################
@@ -8984,7 +8984,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     auto_load ComboBox
     package require supergrid
     package require supertext
-    package require dialogwin
+    package require dialogwinR
     package require textutil
     package require tooltip
     #kike: catch porque no se porque da error tcl al arrancar desde GiD que ya tiene img::png interno
@@ -9020,7 +9020,7 @@ proc RamDebugger::InitGUI { { w .gui } { geometry "" } { ViewOnlyTextOrAll "" } 
     } ;# if !inside_gid
     #needed a catch for wince
     catch { package require tkdnd } ;# only if it is compiled
-    catch { package require fulltktree }
+    #catch { package require fulltktree }
 
     if { [package vcompare [package present Tcl] 8.5] >= 0 } {
 	option add *Panedwindow.Stretch always

@@ -125,7 +125,8 @@ if { [info commands tkButtonInvoke] == "" } {
     #::tk::unsupported::ExposePrivateCommand tkButtonInvoke
 }
 
-package provide dialogwin 1.31
+package provide dialogwinR 1.32
+package provide dialogwin 1.32
 
 ################################################################################
 #  This software is copyrighted by Ramon Ribó (RAMSAN) ramsan@cimne.upc.es.
@@ -2718,7 +2719,7 @@ snit::widgetadaptor wizard_snit {
 #
 ################################################################################
 
-if { [catch { package require compass_utils }] } {
+if { 1|| [catch { package require compass_utils }] } {
     proc ::parse_args { args } {
 	
 	set optional {
