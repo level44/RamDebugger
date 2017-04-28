@@ -10,6 +10,10 @@ package require Tk 8.5
 # package require compass_utils
 # mylog::init -view_binding <Control-L> debug
 
+catch {
+    package require -exact compass_utils::c 1.15
+}
+
 if { [info exists ::starkit::topdir] } {
     # This is for the starkit in UNIX to start graphically
     # that the following line out if you want to run without GUI
@@ -4897,7 +4901,7 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 	drawp::execute help_directory [file join $topdir help] -quit
 	drawp::execute hide_window 0
 	drawp::execute on_hide_command RamDebugger::FocusToText
-	bind $text <Destroy> { drawp::execute hide_window 1 }
+	bind $text <Destroy> { drawp::execute close_window }
 	return
     }
     
@@ -4912,7 +4916,6 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
     }
     return $w
 }
-
 
 proc RamDebugger::ViewHelpForWord { { word "" } } {
     variable text
@@ -4950,7 +4953,7 @@ proc RamDebugger::ViewHelpForWord { { word "" } } {
 	drawp::execute help_search $word
 	drawp::execute hide_window 0
 	drawp::execute on_hide_command RamDebugger::FocusToText
-	bind $text <Destroy> { drawp::execute hide_window 1 }
+	bind $text <Destroy> { drawp::execute close_window }
 	return
     }
     

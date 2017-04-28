@@ -420,6 +420,7 @@ proc RamDebugger::VCS::OpenRevisionsDo { file lfile finfo } {
     variable vcsworkdir
     variable cvs_or_fossil
 
+    package require fulltktree
     set w $RamDebugger::text._openrev
     destroy $w
     dialogwin_snit $w -title [_ "Choose revision"] -class $::className -entrytext \
@@ -991,7 +992,7 @@ proc RamDebugger::VCS::indicator_update_do { cvs_or_fossil } {
     set cdir [file tail [file dirname $currentfile]]
    
     if { ![info exists fossil_indicator_fileid] } {
-	#return ;#kike: uncommenting this return spend all cpu when opening ramdebugger from GiD !!!	
+	#return ;#kike: uncommenting this return spend all cpu when opening ramdebugger from GiD !!!        
     }
     if { $cvs_or_fossil eq "cvs" } {
 	append cvs_indicator_data "[gets $cvs_indicator_fileid]\n"
