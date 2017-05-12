@@ -4898,6 +4898,8 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
     
     set err [catch { package require drawp }]
     if { !$err } {
+	drawp::execute set_preferences_name ramdebugger_help
+	drawp::execute set_title [_ "Help"]
 	drawp::execute help_directory [file join $topdir help] -quit
 	drawp::execute hide_window 0
 	drawp::execute on_hide_command RamDebugger::FocusToText
@@ -4949,6 +4951,8 @@ proc RamDebugger::ViewHelpForWord { { word "" } } {
     
     set err [catch { package require drawp }]
     if { !$err } {
+	drawp::execute set_preferences_name ramdebugger_help
+	drawp::execute set_title [_ "Help"]
 	drawp::execute help_directory [file join $topdir help] -quit
 	drawp::execute help_search $word
 	drawp::execute hide_window 0
