@@ -4896,14 +4896,16 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 #     }
     
     
-    set err [catch { package require drawp }]
+    set err [catch {
+	    package require drawp
+	    drawp::execute set_preferences_name ramdebugger_help
+	    drawp::execute set_title [_ "Help"]
+	    drawp::execute help_directory [file join $topdir help] -quit
+	    drawp::execute on_hide_command RamDebugger::FocusToText
+	    bind $text <Destroy> { drawp::execute close_window }
+	    drawp::execute hide_window 0
+	}]
     if { !$err } {
-	drawp::execute set_preferences_name ramdebugger_help
-	drawp::execute set_title [_ "Help"]
-	drawp::execute help_directory [file join $topdir help] -quit
-	drawp::execute hide_window 0
-	drawp::execute on_hide_command RamDebugger::FocusToText
-	bind $text <Destroy> { drawp::execute close_window }
 	return
     }
     
