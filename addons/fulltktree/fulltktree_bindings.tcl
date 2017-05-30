@@ -845,7 +845,10 @@ proc ::TreeCtrl::EntryExpanderOpen {T item column element { text - } } {
     set Priv(entry,$T,focus) [focus]
 
     # Get window coords of the Element
-    scan [$T item bbox $item $column $element] "%d %d %d %d" x1 y1 x2 y2
+    scan [$T item bbox $item $column $element] "%d %d %d %d" x1 y1 x2 y2   
+    if { ![info exists y1] } {
+	return  ""
+    }
     if { $y1 == $y2 } {
 	scan [$T item bbox $item $column] "%d %d %d %d" - y1 - y2
 	incr y1 2
@@ -941,8 +944,7 @@ proc ::TreeCtrl::EntryExpanderOpen {T item column element { text - } } {
 	set justify left
     }
     $T.entry configure -justify $justify
-    place $T.entry -x $ex -y [expr {$y1 - $ebw - 1}] \
-	-bordermode outside -width $width
+    place $T.entry -x $ex -y [expr {$y1 - $ebw - 1}] -bordermode outside -width $width
 
     SetGrabAndFocus $T.entry $T.entry
     return $T.entry
@@ -1982,17 +1984,3 @@ proc ::TreeCtrl::WidgetClose {T accept} {
     lappend cmd $T $accept
     eval $cmd
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-

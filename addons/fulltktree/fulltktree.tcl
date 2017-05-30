@@ -4,9 +4,7 @@ package require snit
 package require autoscroll
 package require tooltip
 catch { package require compass_utils }
-
-#kike: add catch because GiD has img::png internal, starting ramdebugger can't load img::png as external package
-catch {package require img::png}
+package require img::png
 
 package provide fulltktree 1.22
 
@@ -23,6 +21,13 @@ namespace eval ::fulltktree_top {
     }
 }
 source [file join $::fulltktree_top::topdir fulltktree_bindings.tcl]
+if { [ tk windowingsystem] eq "aqua"} {
+    set ::acceleratorKey Command
+    set ::acceleratorText Command
+} else {
+    set ::acceleratorKey Control
+    set ::acceleratorText Ctrl
+}
 
 # for tclIndex
 proc fulltktree { args } {}
@@ -124,15 +129,13 @@ snit::widget fulltktree {
 
 	install vscrollbar as ttk::scrollbar $win.sv -orient vertical -command [list $win.t yview] -takefocus 0
 	install hscrollbar as ttk::scrollbar $win.sh -orient horizontal -command [list $win.t xview] -takefocus 0
-	if { $options(-arrow_image_expand) } {
-
-	set err [catch {
-		$tree configure -openbuttonimage mac-collapse \
-		    -closedbuttonimage mac-expand
+	if { $options(-arrow_image_expand) } {	    
+	    set err [catch {
+		$tree configure -openbuttonimage mac-collapse -closedbuttonimage mac-expand
 	    }]
-	if { $err } {
-	    $tree configure -buttonimage [list mac-collapse open mac-expand !open ]
-	}
+	    if { $err } {
+		$tree configure -buttonimage [list mac-collapse open mac-expand !open ]
+	    }
 	}
 	autoscroll::autoscroll $win.sh
 	if { $options(-have_vscrollbar) eq "automatic" } {
@@ -612,7 +615,7 @@ snit::widget fulltktree {
 		}
 	    }
 	}
-	bind $tree <Control-c> [mymethod clipboard_copy]
+        bind $tree <${::acceleratorKey}-c> [mymethod clipboard_copy]
 
 	$tree notify bind $tree <Edit-accept> { 
 	    set self [winfo parent %W]
@@ -628,7 +631,7 @@ snit::widget fulltktree {
 	}
 	$tree notify bind $tree <ActiveItem> {
 	    set self [winfo parent %W]
-	    after idle [list catch [list $self active_item_changed %c]]
+	    after idle [list $self active_item_changed %c]
 	}
 
 	set sortcolumn ""
@@ -791,17 +794,15 @@ snit::widget fulltktree {
 	set options(-arrow_image_expand) $value
 	
 	if { $options(-arrow_image_expand)} {
-		set err [catch {
-		$tree configure -openbuttonimage mac-collapse \
-		    -closedbuttonimage mac-expand
+	    set err [catch {
+		$tree configure -openbuttonimage mac-collapse -closedbuttonimage mac-expand
 	    }]
 	    if { $err } {
 		$tree configure -buttonimage [list mac-collapse open mac-expand !open ]
 	    }
 	} else {
 	    set err [catch {
-	    $tree configure -openbuttonimage "" \
-		    -closedbuttonimage ""
+		$tree configure -openbuttonimage "" -closedbuttonimage ""
 	    }]
 	    if { $err } {
 		$tree configure -buttonimage [list "" open "" !open ]
@@ -884,8 +885,10 @@ snit::widget fulltktree {
     variable manage_popup_id
     variable manage_popup_active 1
     method manage_popup { x y } {
-	if { !$manage_popup_active } { return }
-
+	if { !$manage_popup_active } { 
+	    #kike: Gerardo comentaba este return para arreglar en Linux un tooltip que no se cerraba nunca
+	    return 
+	}
 	if { [info exists manage_popup_id] } {
 	    after cancel $manage_popup_id
 	    unset -nocomplain manage_popup_id
@@ -928,10 +931,11 @@ snit::widget fulltktree {
     method popup_help_reactivate {} {
 	set manage_popup_active 1
     }
-    method popup_help_cancel {} {
-       
-	if { !$manage_popup_active } { return }
-	
+    method popup_help_cancel {} {       
+	if { !$manage_popup_active } { 
+	    #kike: Gerardo comentaba este return para arreglar en Linux un tooltip que no se cerraba nunca
+	    return
+	}
 	if { [info exists manage_popup_id] } {
 	    after cancel $manage_popup_id
 	    unset -nocomplain manage_popup_id
@@ -1024,7 +1028,7 @@ snit::widget fulltktree {
 	    -justify left -wraplength 300
 	pack $w.l -padx 1 -pady 1
 	#focus $w.l
-	grab $w.l
+	
 	incr y 24
 	
 	if { $y+[winfo reqheight $w.l] > [winfo screenheight $wp]-40 } {
@@ -1037,7 +1041,7 @@ snit::widget fulltktree {
 		$w <ButtonPress-1> %X %Y]
 	bind $w.l <<ContextualPress>> [mymethod _popup_help_button_event \
 		$w <<ContextualPress>> %X %Y]
-	after $minimum_time [mymethod _popup_help_activate_motion $w.l]
+	
 	bind $w.l <KeyPress> [mymethod _popup_help_button_event \
 		$w "" "" ""]
 	
@@ -1047,6 +1051,8 @@ snit::widget fulltktree {
 		$w "" "" ""];break"
 	bind $w.l <MouseWheel> "[mymethod _popup_help_button_event \
 		$w "" "" ""];break"
+	after $minimum_time [mymethod _popup_help_activate_motion $w.l]
+	grab $w.l
 	
 	return $w
     }
@@ -2076,6 +2082,7 @@ snit::widget fulltktree {
 	}
     }
     method active_item_changed { item } {
+        if { [$tree item id $item] eq "" } { return }
 	
 	if { [$tree item state get $item disabled] } {
 	    set dir next
