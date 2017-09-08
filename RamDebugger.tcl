@@ -4895,19 +4895,29 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
 #         return
 #     }
     
-    
     set err [catch {
-	    package require drawp
-	    drawp::execute set_preferences_name ramdebugger_help
-	    drawp::execute set_title [_ "Help"]
-	    drawp::execute help_directory [file join $topdir help] -quit
-	    drawp::execute on_hide_command RamDebugger::FocusToText
-	    bind $text <Destroy> { drawp::execute close_window }
-	    drawp::execute hide_window 0
+	    set exe ~/myTclTk/drawp/drawp.exe
+	    set fout [open |[list $exe -no_window -preferences_name ramdebugger_help] w+]
+	    puts $fout [list set_title [_ "Help"]]
+	    puts $fout [list help_directory [file join $topdir help] -quit]
+	    puts $fout [list hide_window 0]
+	    flush $fout 
+	    bind $text <Destroy> [list puts $fout quit]
 	}]
-    if { !$err } {
-	return
-    }
+    if { !$err } { return }
+    
+#     set err [catch {
+#             package require drawp
+#             drawp::execute set_preferences_name ramdebugger_help
+#             drawp::execute set_title [_ "Help"]
+#             drawp::execute help_directory [file join $topdir help] -quit
+#             drawp::execute on_hide_command RamDebugger::FocusToText
+#             bind $text <Destroy> { drawp::execute close_window }
+#             drawp::execute hide_window 0
+#         }]
+#     if { !$err } {
+#         return
+#     }
     
     package require helpviewer
 
@@ -4951,17 +4961,29 @@ proc RamDebugger::ViewHelpForWord { { word "" } } {
 	}
     }
     
-    set err [catch { package require drawp }]
-    if { !$err } {
-	drawp::execute set_preferences_name ramdebugger_help
-	drawp::execute set_title [_ "Help"]
-	drawp::execute help_directory [file join $topdir help] -quit
-	drawp::execute help_search $word
-	drawp::execute hide_window 0
-	drawp::execute on_hide_command RamDebugger::FocusToText
-	bind $text <Destroy> { drawp::execute close_window }
-	return
-    }
+    set err [catch {
+	set exe ~/myTclTk/drawp/drawp.exe
+	set fout [open |[list $exe -no_window -preferences_name ramdebugger_help] w+]
+	puts $fout [list set_title [_ "Help"]]
+	puts $fout [list help_directory [file join $topdir help] -quit]
+	puts $fout [list help_search $word]
+	puts $fout [list hide_window 0]
+	flush $fout 
+	bind $text <Destroy> [list puts $fout quit]
+    }]
+    if { !$err } { return }
+    
+#     set err [catch { package require drawp }]
+#     if { !$err } {
+#         drawp::execute set_preferences_name ramdebugger_help
+#         drawp::execute set_title [_ "Help"]
+#         drawp::execute help_directory [file join $topdir help] -quit
+#         drawp::execute help_search $word
+#         drawp::execute hide_window 0
+#         drawp::execute on_hide_command RamDebugger::FocusToText
+#         bind $text <Destroy> { drawp::execute close_window }
+#         return
+#     }
     
     package require helpviewer
 
