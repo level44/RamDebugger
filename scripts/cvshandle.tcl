@@ -346,6 +346,7 @@ proc RamDebugger::VCS::OpenRevisions { args } {
 
     set optional {
 	{ -file file "" }
+	{ -all "" 0 }
     }
     set compulsory ""
    parse_args $optional $compulsory $args
@@ -356,7 +357,7 @@ proc RamDebugger::VCS::OpenRevisions { args } {
 	set file $RamDebugger::currentfile
     }
     get_cwd
-    set err [catch { OpenRevisionsInit $file } ret opts]
+    set err [catch { OpenRevisionsInit -all=$all $file } ret opts]
     release_cwd    
 
     RamDebugger::WaitState 0
@@ -366,13 +367,19 @@ proc RamDebugger::VCS::OpenRevisions { args } {
 	return
     }
     lassign $ret lfile finfo
-    OpenRevisionsDo $file $lfile $finfo
+    OpenRevisionsDo -all=$all $file $lfile $finfo
 }
 
-proc RamDebugger::VCS::OpenRevisionsInit { file } {
+proc RamDebugger::VCS::OpenRevisionsInit { args } {
     variable vcsworkdir
     variable vcsrootdir
     variable cvs_or_fossil
+    
+    set optional {
+	{ -all "" 0 }
+    }
+    set compulsory "file"
+    parse_args $optional $compulsory $args
 
     package require sha1
     
@@ -395,7 +402,12 @@ proc RamDebugger::VCS::OpenRevisionsInit { file } {
 	set err [catch { exec cvs log $lfile } retval]
     } else {
 	set fossil [auto_execok fossil]
-	set err [catch { exec $fossil finfo -l -b $lfile } finfo]
+	if { $all } {
+	    set cmd [list exec $fossil finfo -l -b $lfile]
+	} else {
+	    set cmd [list exec $fossil finfo -n 10 -l -b $lfile]
+	}
+	set err [catch $cmd finfo]
 	if { !$err } {
 	    set retval ""
 	    foreach line [split $finfo \n] {
@@ -416,15 +428,27 @@ proc RamDebugger::VCS::OpenRevisionsInit { file } {
     }
 }
 
-proc RamDebugger::VCS::OpenRevisionsDo { file lfile finfo } {
+proc RamDebugger::VCS::OpenRevisionsDo { args } {
     variable vcsworkdir
     variable cvs_or_fossil
+    
+    set optional {
+	{ -all "" 0 }
+    }
+    set compulsory "file lfile finfo"
+    parse_args $optional $compulsory $args
 
     package require fulltktree
     set w $RamDebugger::text._openrev
     destroy $w
+    
+    if { !$all } {
+	set morebuttons [list [_ "Differences"] [_ "All"]]
+    } else {
+	set morebuttons [list [_ "Differences"]]
+    }
     dialogwin_snit $w -title [_ "Choose revision"] -class $::className -entrytext \
-	[_ "Choose a revision for file '%s'" $file] -morebuttons [list [_ "Differences"]]
+	[_ "Choose a revision for file '%s'" $file] -morebuttons $morebuttons
     set f [$w giveframe]
 
     set list ""
@@ -444,9 +468,9 @@ proc RamDebugger::VCS::OpenRevisionsDo { file lfile finfo } {
 	    [list 12 [_ "Rev"] left text 0] \
 	    [list 20 [_ "Date"] left text 0] \
 	    [list  8 [_ "Author"] center text 0] \
-	    [list  8 [_ "Lines"] left text 0] \
+	    [list 20 [_ "Lines"] left text 0] \
 	]
-    fulltktree $f.lf -width 400 \
+    fulltktree $f.lf -width 400 -height 450 \
 	-columns $columns -expand 0 \
 	-selectmode extended -showheader 1 -showlines 0  \
 	-indent 0 -sensitive_cols all \
@@ -460,6 +484,9 @@ proc RamDebugger::VCS::OpenRevisionsDo { file lfile finfo } {
     if { $num } {
 	$f.lf selection add 1
 	$f.lf activate 1
+    }
+    if { !$all } {
+	$f.lf insert end [list "..."]
     }
     focus $f.lf
 
@@ -496,6 +523,10 @@ proc RamDebugger::VCS::OpenRevisionsDo { file lfile finfo } {
 		destroy $w
 		return
 	    }
+	} elseif { $action == 3 } {
+	    destroy $w
+	    RamDebugger::VCS::OpenRevisions -file $file -all
+	    return
 	} elseif { [llength $selecteditems] < 1 || [llength $selecteditems] > 2 } {
 	    WarnWin [_ "Select one or two revisions in order to visualize the differences"] $w
 	} else {
