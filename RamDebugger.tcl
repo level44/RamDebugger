@@ -7862,9 +7862,10 @@ proc RamDebugger::CenterDisplay {} {
 
     if { [info exists last_center_display] } {
 	lassign $last_center_display last_ys last_time
-	if { $time  < $last_time+1000 && round($ys*1000) == round($last_ys*1000) } {
-	    set fac 0.25
-	}
+# deactivated
+#         if { $time  < $last_time+1000 && round($ys*1000) == round($last_ys*1000) } {
+#             set fac 0.25
+#         }
     }
     set ys [expr $line/double($NumLines)-$fac*($f2-$f1)]
     if { $ys < 0 } { set ys 0 }
