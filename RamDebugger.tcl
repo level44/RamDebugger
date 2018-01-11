@@ -4897,7 +4897,7 @@ proc RamDebugger::ViewHelpFile { { file "" } } {
     
     set err [catch {
 	    set exe ~/myTclTk/drawp/drawp.exe
-	    set fout [open |[list $exe -no_window -preferences_name ramdebugger_help] w+]
+	    set fout [open |[list $exe -no_window -preferences_name ramdebugger_help -cmds_from_stdin] w+]
 	    puts $fout [list set_title [_ "Help"]]
 	    puts $fout [list help_directory [file join $topdir help] -quit]
 	    puts $fout [list hide_window 0]
