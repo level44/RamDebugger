@@ -358,6 +358,427 @@ snit::widgetadaptor cu::combobox {
 }
 
 ################################################################################
+#    check_listbox
+################################################################################
+
+snit::widgetadaptor cu::check_listbox {
+    option -values
+    option -add_new_button 0
+    option -permit_rename 0
+    option -permit_delete 0
+
+    delegate method * to hull
+    delegate option * to hull
+
+    variable tree
+    variable is_built
+    variable itemDict ""
+    variable exclusiveDict ""
+    variable prev_selection ""
+    variable add_item ""
+    
+    constructor args {
+	
+	package require fulltktree
+	
+	set is_built 0
+	
+	set columns [list \
+		[list 25 Groups left imagetext 1] \
+		]
+	
+	installhull using ::fulltktree -width 130 -height 150 \
+	    -columns $columns -expand 1 \
+	    -selectmode extended -showlines 1 -showrootlines 0 -indent 1 -showbutton 1 \
+	    -showheader 0 -sensitive_cols all -buttonpress_open_close 0 \
+	    -have_vscrollbar 1 \
+	    -contextualhandler_menu [mymethod contextual_menu]  \
+	    -editbeginhandler [mymethod edit_name_begin] \
+	    -editaccepthandler [mymethod edit_name_accept] \
+	    -selecthandler [mymethod _selection]
+	set tree $self
+	
+	$tree state define check
+	$tree state define on
+	
+	set is_built 1
+	$self configurelist $args
+    }
+    onconfigure -values { values } {
+	set options(-values) $values
+	
+	if { !$is_built } { return }
+	$self _update_from_values
+    }
+    onconfigure -add_new_button { value } {
+	set options(-add_new_button) $value
+	
+	if { !$is_built } { return }
+	$self _update_from_values
+    }
+    oncget -values {
+	foreach i [range 0 [llength $options(-values)]] {
+	    set elm [lindex $options(-values) $i]
+	    foreach j [range [llength $elm] 4] { lappend elm "" }
+	    lassign $elm name state parentName open_close
+	    set item [dict get $itemDict values_idx $i]
+
+	    if { [$tree item state get $item on] } {
+		lset elm 1 on
+	    } else {
+		lset elm 1 off
+	    }
+	    if { $parentName ne "" } {
+		if { [$tree item state get $item open] } {
+		    lset elm 3 open
+		} else {
+		    lset elm 3 close
+		}
+	    }
+	    lset options(-values) $i $elm
+	}
+	return $options(-values)
+    }
+    method _update_from_values {} {
+	
+	$tree item delete all
+	set itemDict ""
+	set exclusiveDict ""
+	set values_idx 0
+	foreach value $options(-values)  {
+	    $self _insert end $value $values_idx
+	    incr values_idx
+	}
+	if { $options(-add_new_button) } {
+	    $self _create_add_button
+	}
+    }
+    method contextual_menu { - menu item selection } {
+	
+	$menu add command -label [_ "Activate"] -command [mymethod set_state $selection on]
+	$menu add command -label [_ "Dectivate"] -command [mymethod set_state $selection !on]
+	
+	set children [$tree item children [$tree item parent $item]]
+	set ipos [lsearch -exact $children $add_item]
+	if { $ipos != -1 } {
+	    set children [lreplace $children $ipos $ipos]
+	}
+	if { [lsearch -exact $children $item] > 0 } {
+	    $menu add command -label [_ "Move up"] -command [mymethod move_item $item up]
+	}
+	if { [lsearch -exact $children $item] < [llength $children]-1 } {
+	    $menu add command -label [_ "Move down"] -command [mymethod move_item $item down]
+	}
+	$menu add separator
+	
+	if { $options(-permit_rename) } {
+	    $menu add command -label [_ "Rename"] -command [mymethod rename [lindex $selection 0]]
+	}
+	if { $options(-add_new_button) } {
+	    $menu add command -label [_ "Add"] -command [mymethod add_new_item]
+	}
+	if { $options(-permit_delete) } {
+	    $menu add separator
+	    $menu add command -label [_ "Delete"] -command [mymethod delete_items $selection]
+	}
+    }
+    method rename { { item "" } } {
+	if { $item ne "" } {
+	    $tree selection clear
+	    $tree selection add $item
+	    $tree activate $item
+	    $tree see $item
+	}
+	focus [$tree givetreectrl]
+	update
+	event generate $tree <F2>
+    }
+    method _create_add_button {} {
+	set b [$tree givetreectrl].message
+	destroy $b
+	button $b -text [_ "Add"] \
+	    -foreground blue -background white -bd 0 -cursor hand2 \
+	    -command [mymethod add_new_item]
+	set font [concat [font actual [$b cget -font]] -underline 1]
+	$b configure -font $font
+	
+	set add_item [$tree insert end ""]
+	$tree item style set $add_item 0 window
+	$tree item element configure $add_item 0 e_window -destroy 1 \
+	    -window $b
+    }
+    method add_new_item {} {
+	
+	foreach item [$tree item children 0] {
+	    if { [$tree item style set $item 0] eq "window" } {
+		$tree item delete $item
+		break
+	    }
+	}
+	set idx 1
+	while { [lsearch -index 0 $options(-values) [_ "Unnamed%d" $idx]] != -1 } {
+	    incr idx
+	}
+	set value [list [_ "Unnamed%d" $idx] on "" open]
+	set values_idx [llength $options(-values)]
+	lappend options(-values) $value
+	set item [$self _insert end $value $values_idx]
+	if { $options(-add_new_button) } {
+	    $self _create_add_button
+	}
+	$tree selection clear
+	$tree selection add $item
+	$tree activate $item
+	$tree see $item
+	#focus $tree
+	focus [$tree givetreectrl]
+	update
+	event generate $tree <F2>
+    }
+    method edit_name_begin { args } {
+	if { $options(-permit_rename) == 0 } {
+	    return 0
+	}
+	return 1
+    }
+    method edit_name_accept { args } {
+
+	lassign $args - item col text
+	
+	if { ![regexp {[-\w.]{2,}} $text] } {
+	    tk_messageBox -message [_ "Name can only contain letters, digits, -_.'"] -parent $win
+	    return
+	}
+	$tree item text $item 0 $text
+	set values_idx [dict get $itemDict item $item]
+	lset options(-values) $values_idx 0 $text
+    }
+    method move_item { item up_down } {
+	
+	set values_idx [dict get $itemDict item $item]
+	
+	switch $up_down {
+	    up {
+		set sibling [$tree item prevsibling $item]
+		set values_idx_sibling [dict get $itemDict item $sibling]
+
+		set v [lindex $options(-values) $values_idx]
+		lset options(-values) $values_idx [lindex $options(-values) $values_idx_sibling]
+		lset options(-values) $values_idx_sibling $v
+		$tree item prevsibling $sibling $item
+	    }
+	    down {
+		set sibling [$tree item nextsibling $item]
+		set values_idx_sibling [dict get $itemDict item $sibling]
+
+		set v [lindex $options(-values) $values_idx]
+		lset options(-values) $values_idx [lindex $options(-values) $values_idx_sibling]
+		lset options(-values) $values_idx_sibling $v
+		$tree item nextsibling $sibling $item
+	    }
+	}
+    }
+    method delete_items { itemList } {
+	
+	for { set il 0 } { $il < [llength $itemList] } { incr il } {
+	    set item [lindex $itemList $il]
+	    if { [$tree item id $item] eq "" } { continue }
+	    
+	    set values_idx [dict get $itemDict item $item]
+	    set options(-values) [lreplace $options(-values) $values_idx $values_idx]
+	    while 1 {
+		set values_idx_next [expr {$values_idx+1}]
+		if { ![dict exists $itemDict values_idx $values_idx_next] } {
+		    dict unset itemDict values_idx $values_idx_next
+		    break
+		}
+		set item [dict get $itemDict values_idx $values_idx_next]
+		dict set itemDict values_idx $values_idx $item
+		dict set itemDict item $item $values_idx
+		set values_idx $values_idx_next
+	    }
+	    lappend itemList {*}[$tree item children $item]
+	    $tree item delete $item
+	}
+    }
+    method get_selected_comma_list { args } {
+	set optional {
+	    { -varname name "" }
+	}
+	set compulsory ""
+	parse_args $optional $compulsory $args
+
+	set ret ""
+	set map [list "," "&#44;"]
+	foreach elm [$self cget -values] {
+	    if { [lindex $elm 1] eq "on" } {
+		lappend ret [string map $map [lindex $elm 0]]
+	    }
+	}
+	if { $varname ne "" } {
+	    uplevel 1 [list set $varname [join $ret ","]]
+	} else {
+	    return [join $ret ","]
+	}
+    }
+    method set_selected_comma_list { args } {
+	set optional {
+	    { -varname name "" }
+	    { -insert "" 0 }
+	}
+	set compulsory "data"
+	set args [parse_args -raise_compulsory_error 0 \
+		$optional $compulsory $args]
+	
+	if { $varname ne "" } {
+	    set data [uplevel 1 [list set $varname]]
+	}
+	set map [list "&#44;" "," "&comma;" ","]
+	set list ""
+	foreach i [split $data ","] {
+	    lappend list [string map $map $i]
+	}
+	set list [lsort $list]
+	
+	foreach i [range 0 [llength $options(-values)]] {
+	    set elm [lindex $options(-values) $i]
+	    lassign $elm name state parentName open_close
+	    
+	    set item [dict get $itemDict values_idx $i]
+
+	    if { [llength [lindex $options(-values) $i]] < 2 } {
+		set v [list [lindex $options(-values) $i 0] on]
+		lset options(-values) $i $v
+	    }
+	    if { [lsearch -sorted $list $name] != -1 } {
+		$tree item state set $item on
+		lset options(-values) $i 1 on
+	    } else {
+		$tree item state set $item !on
+		lset options(-values) $i 1 off
+	    }
+	}
+	if { $insert } {
+	    set changes 0
+	    set values $options(-values)
+	    foreach i $list {
+		if { [lsearch -index 0 $values $i] == -1 } {
+		    lappend values [list $i on "" open]
+		    set changes 1
+		}
+	    }
+	    if { $changes } {
+		$self configure -values $values
+	    }
+	}
+    }
+    method _insert { index list values_idx } {
+
+	set imgState [list \
+		[cu::get_image_selected internet-check-on] {selected check on} \
+		[cu::get_image_selected internet-check-off] {selected check} \
+		[cu::get_image internet-check-on] {check on} \
+		[cu::get_image internet-check-off] {check} \
+		]
+	
+	lassign $list name state parentName open_close
+	
+	if { $parentName eq "" } {
+	    set parent 0
+	} else {
+	    set parent [dict get $itemDict name $parentName]
+	}
+	set newlist [list [list ::cu::images::internet-check-off $name]]
+	set item [$tree insert $index $newlist $parent]
+	
+	dict set itemDict name $name $item
+	dict set itemDict item $item $values_idx
+	dict set itemDict values_idx $values_idx $item
+
+	$tree item state set $item check
+	if { $state eq "on" } {
+	    $tree item state set $item on
+	}
+	switch $open_close {
+	    open { $tree item expand $item }
+	    close { $tree item collapse $item }
+	    disabled { $tree item enabled $item 0 }
+	}
+	$tree item element configure $item 0 e_image -image $imgState
+	return $item
+    }
+    method _recursive_change_state { item state } {
+	$tree item state set $item $state
+	foreach child [$tree item children $item] {
+	    $self _recursive_change_state $child $state
+	}
+    }
+    method add_exclusive_item { name } {
+	
+	set item [dict get $itemDict name $name]
+	dict set exclusiveDict $item [$tree item state get $item on]
+    }
+    method set_state { itemList state } {
+	set sel [lsort -integer $itemList]
+	foreach item $sel {
+	    $self _recursive_change_state $item $state
+	}
+    }
+    method _selection { _tree ids } {
+	
+	set sel [lsort -integer $ids]
+	
+	foreach item [dict keys $exclusiveDict] {
+	    dict set exclusiveDict $item [$tree item state get $item on]
+	}
+	set num_activated 0
+    
+	if { $sel eq $prev_selection } {
+	    set item active
+	    if { [$tree item state get $item on] } {
+		$self _recursive_change_state $item !on
+	    } else {
+		$self _recursive_change_state $item on
+		incr num_activated
+	    }
+	} else {
+	    foreach item $sel {
+		if { [lsearch -integer -sorted $prev_selection $item] == -1 } {
+		    if { [$tree item state get $item on] } {
+		        $self _recursive_change_state $item !on
+		    } else {
+		        $self _recursive_change_state $item on
+		        incr num_activated
+		    }
+		}
+	    }
+	}
+	set prev_selection $sel
+	
+	foreach item [dict keys $exclusiveDict] {
+	    set new_state [$tree item state get $item on]
+	    if { $new_state && ![dict get $exclusiveDict $item] } {
+		foreach child [$tree item children 0] {
+		    $self _recursive_change_state $child !on
+		}
+		foreach item_in [dict keys $exclusiveDict] {
+		    dict set exclusiveDict $item_in 0
+		}
+		$tree item state set $item on
+		dict set exclusiveDict $item 1
+		return
+	    }
+	}
+	if { $num_activated } {
+	    foreach item [dict keys $exclusiveDict] {
+		$tree item state set $item !on
+		dict set exclusiveDict $item 0
+	    }
+	}
+    }
+}
+
+################################################################################
 # cu::multiline_entry
 ################################################################################
 
