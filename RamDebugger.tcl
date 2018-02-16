@@ -5541,12 +5541,13 @@ proc RamDebugger::AddRecentfilesToMenu { menu } {
     if { ![info exists options(RecentFilesL)] } { return }
 
     foreach i $options(RecentFilesL) {
+	set file [lindex $i 0]
 	set label [lindex $i 0]
 	if { [string length $label] > 45 } {
 	    set label ...[string range $label end-42 end]
 	}
 	$menu add command -label $label -command \
-	    "[list RamDebugger::OpenFileF $i] ; RamDebugger::FillListBox"
+	    "[list RamDebugger::OpenFileF $file] ; RamDebugger::FillListBox"
     }
     $menu add separator
     $menu add command -label [_ "Edit"] -command [list RamDebugger::edit_recent_files]
