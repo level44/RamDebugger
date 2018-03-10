@@ -762,4 +762,70 @@ proc "Words to c arrayL" { w } {
     $w insert insert "\n$c\n$h\n"
 }
 
+################################################################################
+#    proc c_string_region
+################################################################################
+
+set "macrodata(c_string_region,inmenu)" 1
+set "macrodata(c_string_region,accelerator)" ""
+set "macrodata(c_string_region,help)" "This commands converts selected region to a c++ string"
+
+proc "c_string_region" { w } {
+
+    set range [$w tag nextrange sel 1.0 end]
+    if { $range == "" } { 
+        WarnWin "Select a region to modify"
+        return
+    }
+    set sel [$w get {*}$range]
+    
+    set res ""
+    set create_string -1
+    foreach line [split $sel "\n"] {
+        if { $create_string == -1 } {
+            if { [regexp {^\s*"} $line] } {
+                set create_string 0
+            } else {
+                set create_string 1
+            }
+        }
+        if { $create_string } {
+            if { [regexp {^(\s*)([^\s"].*)$} $line {} sp c] } {
+                append res "$sp\"$c\\n\"\n"
+            }
+        } else {
+            if { [regexp {^(\s*)"(.*)"\s*$} $line {} sp c] } {
+                regsub {\\n$} $c {} c
+                append res "$sp$c\n"
+            }
+        }
+    }
+    set idx0 [lindex $range 0]
+    $w delete {*}$range
+    $w insert $idx0 $res
+    $w tag add sel $idx0 "$idx0+[string length $res]c"
+    mc::set_is_modified
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

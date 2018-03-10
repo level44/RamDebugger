@@ -4256,6 +4256,8 @@ proc RamDebugger::MacrosDo { w what } {
 
 proc RamDebugger::Macros { parent } {
     
+    package require fulltktree
+    
     destroy $parent.macros
     set w [dialogwin_snit $parent.macros -title [_ "Macros"] -class ${::className}w -okname [_ "Execute"] \
 	    -morebuttons [list [_ "Edit"] [_ "Default"]] \
